@@ -1,0 +1,48 @@
+{
+  "id": "bloodman",
+  "title": "Bloodman",
+  "description": "Bloodman system for Foundry VTT v13 (flat additive modifiers).",
+  "version": "0.13.0",
+  "compatibility": {
+    "minimum": 13,
+    "verified": 13
+  },
+  "authors": [
+    {
+      "name": "Bloodman"
+    }
+  ],
+  "esmodules": [
+    "bloodman.mjs"
+  ],
+  "styles": [
+    "styles/bloodman.css"
+  ],
+  "media": [
+    {
+      "type": "setup",
+      "thumbnail": "systems/bloodman/Images/system-thumbnail.jpg"
+    }
+  ],
+  "background": "systems/bloodman/Images/system-background.jpg",
+  "languages": [
+    {
+      "lang": "fr",
+      "name": "Français",
+      "path": "lang/fr.json"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "personnage": {}
+    },
+    "Item": {
+      "arme": {},
+      "objet": {},
+      "soin": {},
+      "protection": {},
+      "aptitude": {},
+      "pouvoir": {}
+    }
+  }
+}

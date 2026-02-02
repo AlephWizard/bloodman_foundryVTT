@@ -1,0 +1,258 @@
+<form class="bloodman-sheet">
+  <header class="sheet-header">
+    <div class="sheet-title">BLOODMAN</div>
+    <div class="state-bar">
+      <span class="state-label">ÉTATS</span>
+      <div class="state-inputs">
+        <div class="state-field">
+          <span>ALL</span>
+          <input type="number" name="system.modifiers.all" value="{{modifiers.all}}" />
+        </div>
+        {{#each characteristics}}
+          <div class="state-field">
+            <span>{{this.key}}</span>
+            <input type="number" name="system.modifiers.{{this.key}}" value="{{lookup ../modifiers this.key}}" />
+          </div>
+        {{/each}}
+      </div>
+      <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="Nom de l'état" />
+    </div>
+  </header>
+
+  <section class="sheet-body">
+    <aside class="sidebar">
+      <img src="{{actor.img}}" data-edit="img" class="portrait" />
+
+      <div class="resource-badges">
+        <div class="resource-circle pv">
+          <div class="value">
+            <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" max="{{resources.pv.max}}" />
+            <span>/</span>
+            <span class="max">{{resources.pv.max}}</span>
+          </div>
+          <div class="label">PV</div>
+        </div>
+        <div class="resource-circle pp">
+          <div class="value">
+            <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" max="{{resources.pp.max}}" />
+            <span>/</span>
+            <span class="max">{{resources.pp.max}}</span>
+          </div>
+          <div class="label">PP</div>
+        </div>
+        <div class="resource-circle voyage">
+          <div class="value">
+            <input type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
+            <span>/</span>
+            <input type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
+          </div>
+          <div class="label">XP</div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="column center">
+      <section class="card characteristics-card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-list"></i> CARACTÉRISTIQUES</span>
+          <span class="card-meta">410 points à répartir · 30 min / 65 max</span>
+        </div>
+
+        <div class="characteristics-table">
+          {{#each characteristics}}
+            <div class="char-row" data-key="{{this.key}}">
+              <div class="char-icon"><i class="fa-solid {{this.icon}}"></i></div>
+              <div class="char-name"><a class="char-roll" data-key="{{this.key}}">{{this.label}}</a></div>
+              <div class="char-value">
+                <input type="number" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" min="0" max="100" />
+                <span class="char-effective">{{this.effective}}</span>
+                {{#if this.showMoveValue}}
+                  <input type="number" class="move-box" value="{{this.moveValue}}" readonly />
+                {{/if}}
+              </div>
+              <div class="char-xp">
+                {{#each this.xp}}
+                  <label class="xp-check">
+                    <input type="checkbox" name="system.characteristics.{{../key}}.xp.{{@index}}" {{checked this}} />
+                  </label>
+                {{/each}}
+                <span class="xp-text">XP</span>
+                {{#if this.xpReady}}
+                  <button type="button" class="xp-roll" data-key="{{this.key}}">G</button>
+                {{/if}}
+              </div>
+            </div>
+          {{/each}}
+        </div>
+      </section>
+
+      <section class="card equipment-card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-toolbox"></i> ÉQUIPEMENTS</span>
+        </div>
+
+        <div class="equip-block">
+          <div class="equip-title"><i class="fa-solid fa-gun"></i> ARMES</div>
+          <ol class="item-list weapon-list">
+            {{#each weapons}}
+              <li class="item weapon-item" data-item-id="{{this._id}}">
+                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-meta">{{#if this.system.weaponType}}{{this.system.weaponType}}{{else}}poing{{/if}}</span>
+                <span class="weapon-roll">1{{this.system.damageDie}}</span>
+                <a class="item-delete" title="Supprimer">&times;</a>
+                {{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}
+              </li>
+            {{/each}}
+          </ol>
+        </div>
+
+        <div class="equip-block">
+          <div class="equip-title"><i class="fa-solid fa-bullseye"></i> MUNITIONS</div>
+          <div class="ammo-list">
+            {{#each ammo as |a idx|}}
+              <div class="ammo-row">
+                <input type="text" name="system.ammoPool.{{idx}}.type" value="{{a.type}}" placeholder="Type" />
+                <input type="number" name="system.ammoPool.{{idx}}.value" value="{{a.value}}" />
+              </div>
+            {{/each}}
+          </div>
+        </div>
+
+        <div class="equip-block">
+          <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> PROTECTIONS</div>
+          <ol class="item-list">
+            {{#each protections}}
+              <li class="item" data-item-id="{{this._id}}">
+                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-meta">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
+                <a class="item-delete" title="Supprimer">&times;</a>
+                {{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}
+              </li>
+            {{/each}}
+          </ol>
+        </div>
+
+        <div class="equip-block">
+          <div class="equip-title"><i class="fa-solid fa-box-open"></i> OBJETS</div>
+          <ol class="item-list">
+            {{#each objects}}
+              <li class="item" data-item-id="{{this._id}}">
+                <span class="item-name item-edit">{{this.name}}</span>
+                {{#if this.system.mark}}<span class="item-mark">{{this.system.mark}}</span>{{/if}}
+                {{#if this.system.noteSmall}}<span class="item-meta">{{this.system.noteSmall}}</span>{{/if}}
+                <a class="item-delete" title="Supprimer">&times;</a>
+                {{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}
+              </li>
+            {{/each}}
+          </ol>
+
+          <ol class="item-list">
+            {{#each soins}}
+              <li class="item" data-item-id="{{this._id}}">
+                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-use">{{#if this.system.healDie}}1{{this.system.healDie}}{{else}}1d4{{/if}}</span>
+                <a class="item-delete" title="Supprimer">&times;</a>
+                {{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}
+              </li>
+            {{/each}}
+          </ol>
+        </div>
+
+        <div class="equip-block">
+          <div class="equip-title"><i class="fa-solid fa-coins"></i> MONNAIES</div>
+          <input type="text" name="system.equipment.monnaies" value="{{equipment.monnaies}}" />
+        </div>
+
+        <div class="equip-block">
+          <div class="equip-title"><i class="fa-solid fa-truck"></i> TRANSPORTS</div>
+          <input type="text" name="system.equipment.transports" value="{{equipment.transports}}" />
+        </div>
+      </section>
+    </section>
+
+    <section class="column right">
+      <section class="card identity-card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-id-card"></i> IDENTITÉ</span>
+        </div>
+        <div class="identity-grid">
+          <div class="identity-left">
+            <div class="field">
+              <label>NOM</label>
+              <input type="text" name="name" value="{{actor.name}}" />
+            </div>
+            <div class="field">
+              <label>ARCHÉTYPE</label>
+              <input type="text" name="system.profile.archetype" value="{{profile.archetype}}" />
+            </div>
+            <div class="field">
+              <label>VICE</label>
+              <input type="text" name="system.profile.vice" value="{{profile.vice}}" />
+            </div>
+            <div class="field-row">
+              <div class="field small">
+                <label>POIDS</label>
+                <input type="text" name="system.profile.poids" value="{{profile.poids}}" />
+              </div>
+              <div class="field small">
+                <label>TAILLE</label>
+                <input type="text" name="system.profile.taille" value="{{profile.taille}}" />
+              </div>
+              <div class="field small">
+                <label>ÂGE</label>
+                <input type="text" name="system.profile.age" value="{{profile.age}}" />
+              </div>
+              <div class="field small wide">
+                <label>ORIGINE</label>
+                <input type="text" name="system.profile.origine" value="{{profile.origine}}" />
+              </div>
+            </div>
+          </div>
+          <div class="identity-right">
+            <div class="field">
+              <label>HISTORIQUE</label>
+              <textarea name="system.profile.historique" rows="6">{{profile.historique}}</textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card notes-card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-pen"></i> NOTES</span>
+        </div>
+        <textarea name="system.profile.notes" rows="6">{{profile.notes}}</textarea>
+      </section>
+
+      <section class="card aptitudes-card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-hand-fist"></i> APTITUDES</span>
+        </div>
+        <ol class="item-list">
+          {{#each aptitudes}}
+            <li class="item" data-item-id="{{this._id}}">
+              <span class="item-name item-edit">{{this.name}}</span>
+              <a class="item-delete" title="Supprimer">&times;</a>
+              {{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}
+            </li>
+          {{/each}}
+        </ol>
+      </section>
+
+      <section class="card powers-card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-bolt"></i> POUVOIRS</span>
+        </div>
+        <ol class="item-list">
+          {{#each pouvoirs}}
+            <li class="item" data-item-id="{{this._id}}">
+              <span class="item-name item-edit">{{this.name}}</span>
+              <a class="item-delete" title="Supprimer">&times;</a>
+              {{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}
+            </li>
+          {{/each}}
+        </ol>
+      </section>
+    </section>
+  </section>
+</form>

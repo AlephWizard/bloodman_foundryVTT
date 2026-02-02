@@ -1,0 +1,531 @@
+@import url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600;700&display=swap");
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css");
+
+@font-face {
+  font-family: "Penumbra";
+  src: url("../Images/Penumbra.woff2") format("woff2"),
+    url("../Images/Penumbra.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bm-green: #1dbb3c;
+  --bm-black: #0f0f0f;
+  --bm-red: #c72d2d;
+  --bm-purple: #6f2dbd;
+  --bm-gray: #e7e7e7;
+  --bm-ink: #121212;
+  --bm-line: #111111;
+  --bm-white: #ffffff;
+}
+
+.bloodman.sheet.actor {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f6f6 100%);
+}
+
+.bloodman-sheet,
+.bloodman-sheet * {
+  box-sizing: border-box;
+}
+
+.bloodman-sheet {
+  font-family: "Oswald", sans-serif;
+  color: var(--bm-ink);
+  padding: 0;
+}
+
+.bloodman-sheet input,
+.bloodman-sheet textarea,
+.bloodman-sheet button {
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: var(--bm-white);
+}
+
+.bloodman-sheet textarea {
+  resize: vertical;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--bm-line);
+  background: var(--bm-white);
+}
+
+.sheet-title {
+  font-family: "Penumbra", "Oswald", sans-serif;
+  font-size: 32px;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.state-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.state-label {
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.state-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.state-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 2px 4px;
+  background: var(--bm-white);
+}
+
+.state-field span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.state-field input {
+  width: 44px;
+  text-align: center;
+  border: none;
+}
+
+.state-name {
+  min-width: 180px;
+  flex: 1;
+}
+
+.sheet-body {
+  display: grid;
+  grid-template-columns: 210px minmax(300px, 1fr) minmax(300px, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.sidebar {
+  background: transparent;
+  border-radius: 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+  box-shadow: none;
+}
+
+.portrait {
+  width: 100%;
+  border-radius: 10px;
+  border: 2px solid var(--bm-line);
+  background: var(--bm-white);
+}
+
+.resource-badges {
+  margin-top: -8px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-self: center;
+}
+
+.resource-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border: 2px solid var(--bm-line);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  gap: 2px;
+}
+
+.resource-circle .value {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.resource-circle input {
+  width: 30px;
+  padding: 2px 4px;
+  text-align: center;
+  border: 1px solid var(--bm-line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.resource-circle .label {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
+.resource-circle.pv {
+  background: var(--bm-red);
+  color: var(--bm-white);
+}
+
+.resource-circle.pp {
+  background: var(--bm-purple);
+  color: var(--bm-white);
+}
+
+.resource-circle.voyage {
+  background: var(--bm-gray);
+  color: var(--bm-black);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  border: 2px solid var(--bm-line);
+  border-radius: 12px;
+  background: var(--bm-white);
+  padding: 8px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--bm-line);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.card-title {
+  font-family: "Oswald", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.6px;
+}
+
+.card-meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.characteristics-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.char-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 140px 110px;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--bm-line);
+  padding: 4px 0;
+}
+
+.char-icon {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--bm-line);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f2f2f2;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.char-name a {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--bm-ink);
+}
+
+.char-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.char-value input {
+  width: 56px;
+  text-align: center;
+}
+
+.char-effective {
+  font-weight: 700;
+  min-width: 32px;
+  text-align: right;
+}
+
+.move-box {
+  width: 38px;
+  text-align: center;
+  font-weight: 700;
+  background: #f2f2f2;
+}
+
+.char-xp {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.xp-check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.xp-check input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+  border: 1px solid var(--bm-line);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.xp-check input:checked {
+  background: var(--bm-black);
+}
+
+.xp-roll {
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--bm-black);
+  color: var(--bm-white);
+  border: 1px solid var(--bm-line);
+  cursor: pointer;
+}
+
+.xp-text {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.card-title i {
+  margin-right: 6px;
+}
+
+.equip-block {
+  margin-top: 8px;
+}
+
+.equip-title {
+  background: var(--bm-black);
+  color: var(--bm-white);
+  padding: 4px 8px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  border-radius: 6px;
+}
+
+.equip-title i {
+  margin-right: 6px;
+}
+
+.equip-subtitle {
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: var(--bm-black);
+}
+
+.item-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  border-bottom: 1px solid #c7c7c7;
+  padding: 4px 2px;
+}
+
+.item-name {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.item-meta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.item-mark {
+  font-weight: 700;
+}
+
+.item-notes {
+  width: 100%;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.weapon-roll {
+  color: #111111;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.item-delete {
+  cursor: pointer;
+}
+
+.item-use {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: var(--bm-black);
+  color: var(--bm-white);
+}
+
+.ammo-row {
+  display: grid;
+  grid-template-columns: 1fr 60px;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ammo-row input {
+  width: 100%;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.field.wide {
+  grid-column: span 2;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.notes-card textarea,
+.aptitudes-card textarea,
+.powers-card textarea {
+  width: 100%;
+}
+
+.notes-card textarea {
+  min-height: 120px;
+}
+
+.aptitudes-card textarea,
+.powers-card textarea {
+  min-height: 80px;
+}
+
+.bloodman-item {
+  font-family: "Oswald", sans-serif;
+  color: var(--bm-ink);
+  background: var(--bm-white);
+  border: 2px solid var(--bm-line);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px 10px;
+  grid-template-columns: 140px 1fr;
+}
+
+.bloodman-item label {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+  align-self: center;
+}
+
+.bloodman-item input,
+.bloodman-item textarea,
+.bloodman-item select {
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+@media (max-width: 980px) {
+  .sheet-body {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .identity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

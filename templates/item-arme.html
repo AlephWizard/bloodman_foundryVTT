@@ -1,0 +1,28 @@
+<form class="bloodman-item">
+  <label>NOM</label>
+  <input name="name" value="{{item.name}}" />
+
+  <label>TYPE D'ARME</label>
+  <select name="system.weaponType">
+    {{#select item.system.weaponType}}
+      <option value="jet">Arme de jet</option>
+      <option value="poing">Arme de poing</option>
+      <option value="tactique">Arme tactique</option>
+      <option value="blanche">Arme blanche</option>
+    {{/select}}
+  </select>
+
+  <label>DÉ DE DÉGÂTS</label>
+  <select name="system.damageDie">
+    {{#select item.system.damageDie}}
+      <option value="d4">d4</option>
+      <option value="d6">d6</option>
+      <option value="d8">d8</option>
+      <option value="d10">d10</option>
+      <option value="d12">d12</option>
+    {{/select}}
+  </select>
+
+  <label>NOTES</label>
+  <textarea name="system.notes">{{item.system.notes}}</textarea>
+</form>
