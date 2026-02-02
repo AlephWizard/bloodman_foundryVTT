@@ -1,7 +1,73 @@
-<form class="bloodman-item">
-  <label>NOM</label>
-  <input name="name" value="{{item.name}}" />
+<form class="bloodman-item ability-item">
+  <div class="item-header">
+    <img class="item-image" src="{{item.img}}" data-edit="img" />
+    <div class="item-name-field">
+      <label>NOM</label>
+      <input name="name" value="{{item.name}}" />
+    </div>
+  </div>
 
-  <label>NOTES</label>
-  <textarea name="system.notes">{{item.system.notes}}</textarea>
+  <label class="full-row">NOTE</label>
+  <textarea class="full-row" name="system.note">{{item.system.note}}</textarea>
+
+  <div class="ability-row full-row">
+    <div class="ability-section">
+      <label class="inline-label">DE DE DEGAT :</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.damageEnabled" value="true" data-dtype="Boolean" {{#if item.system.damageEnabled}}checked{{/if}} />
+          OUI
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.damageEnabled" value="false" data-dtype="Boolean" {{#unless item.system.damageEnabled}}checked{{/unless}} />
+          NON
+        </label>
+      </div>
+      <select name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
+        {{#select item.system.damageDie}}
+          <option value="d4">d4</option>
+          <option value="d6">d6</option>
+          <option value="d8">d8</option>
+          <option value="d10">d10</option>
+          <option value="d12">d12</option>
+          <option value="2d4">2d4</option>
+          <option value="2d6">2d6</option>
+          <option value="2d8">2d8</option>
+          <option value="2d10">2d10</option>
+          <option value="2d12">2d12</option>
+          <option value="1d10+1d4">1d10+1d4</option>
+          <option value="1d10+1d8">1d10+1d8</option>
+        {{/select}}
+      </select>
+    </div>
+
+    <div class="ability-divider"></div>
+
+    <div class="ability-section">
+      <label class="inline-label">BONUS/MALUS :</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.bonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.bonusEnabled}}checked{{/if}} />
+          OUI
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.bonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.bonusEnabled}}checked{{/unless}} />
+          NON
+        </label>
+      </div>
+      <div class="bonus-controls">
+        <div class="bonus-grid {{#unless item.system.bonusEnabled}}is-disabled{{/unless}}">
+          <label><span>MEL</span><input type="number" name="system.bonuses.MEL" value="{{item.system.bonuses.MEL}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>VIS</span><input type="number" name="system.bonuses.VIS" value="{{item.system.bonuses.VIS}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>ESP</span><input type="number" name="system.bonuses.ESP" value="{{item.system.bonuses.ESP}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>PHY</span><input type="number" name="system.bonuses.PHY" value="{{item.system.bonuses.PHY}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>MOU</span><input type="number" name="system.bonuses.MOU" value="{{item.system.bonuses.MOU}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>ADR</span><input type="number" name="system.bonuses.ADR" value="{{item.system.bonuses.ADR}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>PER</span><input type="number" name="system.bonuses.PER" value="{{item.system.bonuses.PER}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>SOC</span><input type="number" name="system.bonuses.SOC" value="{{item.system.bonuses.SOC}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>SAV</span><input type="number" name="system.bonuses.SAV" value="{{item.system.bonuses.SAV}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+        </div>
+      </div>
+    </div>
+  </div>
 </form>

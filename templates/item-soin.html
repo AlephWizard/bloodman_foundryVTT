@@ -1,11 +1,13 @@
 <form class="bloodman-item">
-  <label>NOM</label>
-  <input name="name" value="{{item.name}}" />
+  <div class="item-header">
+    <img class="item-image" src="{{item.img}}" data-edit="img" />
+    <div class="item-name-field">
+      <label>NOM</label>
+      <input name="name" value="{{item.name}}" />
+    </div>
+  </div>
 
-  <label>MARQUAGE</label>
-  <input type="text" name="system.mark" value="{{item.system.mark}}" />
-
-  <label>DÉ DE SOIN</label>
+  <label>DE DE SOIN</label>
   <select name="system.healDie">
     {{#select item.system.healDie}}
       <option value="d4">d4</option>
@@ -15,9 +17,6 @@
       <option value="d12">d12</option>
     {{/select}}
   </select>
-
-  <label>PETITES NOTES</label>
-  <input type="text" name="system.noteSmall" value="{{item.system.noteSmall}}" />
 
   <label>NOTES</label>
   <textarea name="system.notes">{{item.system.notes}}</textarea>

@@ -1,7 +1,7 @@
 {
   "id": "bloodman",
   "title": "Bloodman",
-  "description": "Bloodman system for Foundry VTT v13 (flat additive modifiers).",
+  "description": "One game to rule them all",
   "version": "0.13.0",
   "compatibility": {
     "minimum": 13,
@@ -9,7 +9,7 @@
   },
   "authors": [
     {
-      "name": "Bloodman"
+      "name": "AbelGuillouet&Codex"
     }
   ],
   "esmodules": [
@@ -21,10 +21,10 @@
   "media": [
     {
       "type": "setup",
-      "thumbnail": "systems/bloodman/Images/system-thumbnail.jpg"
+      "thumbnail": "systems/bloodman/images/system-thumbnail.jpg"
     }
   ],
-  "background": "systems/bloodman/Images/system-background.jpg",
+  "background": "systems/bloodman/images/system-background.jpg",
   "languages": [
     {
       "lang": "fr",

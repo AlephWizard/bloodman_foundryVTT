@@ -1,4 +1,4 @@
-import { doCharacteristicRoll, doDamageRoll, doGrowthRoll, doHealRoll } from "./rollHelpers.mjs";
+import { doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll } from "./rollHelpers.mjs";
 
 const CHARACTERISTICS = [
   { key: "MEL", label: "MÊLÉE", icon: "fa-hand-fist" },
@@ -19,7 +19,7 @@ function buildDefaultCharacteristics() {
 }
 
 function buildDefaultModifiers() {
-  const modifiers = { label: "", all: 0, HAL: 0 };
+  const modifiers = { label: "", all: 0 };
   for (const c of CHARACTERISTICS) modifiers[c.key] = 0;
   return modifiers;
 }
@@ -33,8 +33,8 @@ function buildDefaultResources() {
   };
 }
 
-function buildDefaultAmmoPool() {
-  return [{ type: "", value: 0 }];
+function buildDefaultAmmo() {
+  return { type: "", value: 0 };
 }
 
 function buildDefaultProfile() {
@@ -88,11 +88,7 @@ Hooks.once("ready", async () => {
       }
     }
 
-    if (!actor.system.modifiers) {
-      updates["system.modifiers"] = buildDefaultModifiers();
-    } else if (actor.system.modifiers.HAL == null) {
-      updates["system.modifiers.HAL"] = 0;
-    }
+    if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
 
     if (!actor.system.resources || actor.system.resources.voyage == null || actor.system.resources.move == null) {
       updates["system.resources"] = foundry.utils.mergeObject(
@@ -102,7 +98,12 @@ Hooks.once("ready", async () => {
       );
     }
 
-    if (!Array.isArray(actor.system.ammoPool)) updates["system.ammoPool"] = buildDefaultAmmoPool();
+    if (!actor.system.ammo) {
+      const legacy = Array.isArray(actor.system.ammoPool) ? actor.system.ammoPool[0] : null;
+      updates["system.ammo"] = legacy
+        ? { type: legacy.type || "", value: Number(legacy.value) || 0 }
+        : buildDefaultAmmo();
+    }
     if (actor.prototypeToken && actor.prototypeToken.actorLink === false) {
       updates["prototypeToken.actorLink"] = true;
     }
@@ -121,6 +122,32 @@ Hooks.once("ready", async () => {
   }
 });
 
+function getItemBonusTotals(actor) {
+  const totals = {};
+  for (const c of CHARACTERISTICS) totals[c.key] = 0;
+  if (!actor?.items) return totals;
+  for (const item of actor.items) {
+    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
+    if (!item.system?.bonusEnabled) continue;
+    if (item.system?.bonuses) {
+      for (const c of CHARACTERISTICS) {
+        if (!Object.prototype.hasOwnProperty.call(item.system.bonuses, c.key)) continue;
+        const bonus = Number(item.system.bonuses[c.key]);
+        if (Number.isFinite(bonus)) totals[c.key] += bonus;
+      }
+    }
+    const legacyKey = (item.system?.charKey || "").toString().toUpperCase();
+    const legacyBonus = Number(item.system?.charBonus);
+    if (Number.isInteger(legacyBonus) && totals[legacyKey] != null) totals[legacyKey] += legacyBonus;
+  }
+  return totals;
+}
+
+Hooks.on("preCreateToken", (doc) => {
+  if (doc.actor?.type !== "personnage") return;
+  doc.updateSource({ actorLink: true });
+});
+
 Hooks.on("preUpdateActor", (actor, updateData) => {
   if (actor.type !== "personnage") return;
 
@@ -130,71 +157,76 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
     return Number(value);
   };
 
+  const itemBonuses = getItemBonusTotals(actor);
   const getEffective = key => {
     const base = getUpdatedNumber(`system.characteristics.${key}.base`, actor.system.characteristics?.[key]?.base || 0);
     const globalMod = getUpdatedNumber("system.modifiers.all", actor.system.modifiers?.all || 0);
     const keyMod = getUpdatedNumber(`system.modifiers.${key}`, actor.system.modifiers?.[key] || 0);
-    return Number(base) + Number(globalMod) + Number(keyMod);
+    const itemBonus = Number(itemBonuses?.[key] || 0);
+    return Number(base) + Number(globalMod) + Number(keyMod) + itemBonus;
   };
 
   const pvMax = Math.round(getEffective("PHY") / 5);
   const ppMax = Math.round(getEffective("ESP") / 5);
+  const storedPvMax = getUpdatedNumber("system.resources.pv.max", actor.system.resources?.pv?.max);
+  const storedPpMax = getUpdatedNumber("system.resources.pp.max", actor.system.resources?.pp?.max);
+  const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : pvMax;
+  const finalPpMax = Number.isFinite(storedPpMax) ? storedPpMax : ppMax;
 
   const pvCurrentPath = "system.resources.pv.current";
   const ppCurrentPath = "system.resources.pp.current";
 
   if (foundry.utils.getProperty(updateData, pvCurrentPath) != null) {
-    const nextValue = Math.min(getUpdatedNumber(pvCurrentPath, 0), pvMax);
+    const nextValue = Math.min(getUpdatedNumber(pvCurrentPath, 0), finalPvMax);
     foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, nextValue));
   }
 
   if (foundry.utils.getProperty(updateData, ppCurrentPath) != null) {
-    const nextValue = Math.min(getUpdatedNumber(ppCurrentPath, 0), ppMax);
+    const nextValue = Math.min(getUpdatedNumber(ppCurrentPath, 0), finalPpMax);
     foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, nextValue));
   }
 });
 
 Hooks.on("updateActor", async (actor, changes) => {
   if (actor.type !== "personnage") return;
-  if (foundry.utils.getProperty(changes, "system.modifiers.label") === "Blessé") return;
   if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
   const hasCharChange = foundry.utils.getProperty(changes, "system.characteristics") != null;
   const hasModChange = foundry.utils.getProperty(changes, "system.modifiers") != null;
   if (!hasCharChange && !hasModChange) return;
 
+  const itemBonuses = getItemBonusTotals(actor);
   const base = Number(actor.system.characteristics?.MOU?.base || 0);
   const globalMod = Number(actor.system.modifiers?.all || 0);
   const keyMod = Number(actor.system.modifiers?.MOU || 0);
-  const effective = base + globalMod + keyMod;
+  const effective = base + globalMod + keyMod + Number(itemBonuses.MOU || 0);
   const moveValue = Math.round(effective / 5);
 
   await actor.update({ "system.resources.move.value": moveValue });
 
   const phyEffective = Number(actor.system.characteristics?.PHY?.base || 0)
     + Number(actor.system.modifiers?.all || 0)
-    + Number(actor.system.modifiers?.PHY || 0);
+    + Number(actor.system.modifiers?.PHY || 0)
+    + Number(itemBonuses.PHY || 0);
   const espEffective = Number(actor.system.characteristics?.ESP?.base || 0)
     + Number(actor.system.modifiers?.all || 0)
-    + Number(actor.system.modifiers?.ESP || 0);
-  const pvMax = Math.round(phyEffective / 5);
-  const ppMax = Math.round(espEffective / 5);
+    + Number(actor.system.modifiers?.ESP || 0)
+    + Number(itemBonuses.ESP || 0);
+  const derivedPvMax = Math.round(phyEffective / 5);
+  const derivedPpMax = Math.round(espEffective / 5);
+  const pvMax = Number.isFinite(actor.system.resources?.pv?.max) ? Number(actor.system.resources.pv.max) : derivedPvMax;
+  const ppMax = Number.isFinite(actor.system.resources?.pp?.max) ? Number(actor.system.resources.pp.max) : derivedPpMax;
   const pvCurrent = Number(actor.system.resources?.pv?.current || 0);
   const ppCurrent = Number(actor.system.resources?.pp?.current || 0);
 
   const resourceUpdates = {};
+  const pvMaxChange = foundry.utils.getProperty(changes, "system.resources.pv.max") != null;
+  const ppMaxChange = foundry.utils.getProperty(changes, "system.resources.pp.max") != null;
+  if (!pvMaxChange && derivedPvMax !== pvMax) resourceUpdates["system.resources.pv.max"] = derivedPvMax;
+  if (!ppMaxChange && derivedPpMax !== ppMax) resourceUpdates["system.resources.pp.max"] = derivedPpMax;
   if (pvCurrent > pvMax) resourceUpdates["system.resources.pv.current"] = pvMax;
   if (ppCurrent > ppMax) resourceUpdates["system.resources.pp.current"] = ppMax;
   if (Object.keys(resourceUpdates).length) await actor.update(resourceUpdates);
 
-  if (Number(actor.system.resources?.pv?.current || 0) <= 0) {
-    const isAlready = actor.system.modifiers?.label === "Blessé" && Number(actor.system.modifiers?.HAL || 0) === -30;
-    if (!isAlready) {
-      await actor.update({
-        "system.modifiers.HAL": -30,
-        "system.modifiers.label": "Blessé"
-      });
-    }
-  }
 });
 
 class BloodmanActorSheet extends ActorSheet {
@@ -204,7 +236,8 @@ class BloodmanActorSheet extends ActorSheet {
       template: "systems/bloodman/templates/actor-personnage.html",
       width: 1050,
       height: 760,
-      submitOnChange: true
+      submitOnChange: true,
+      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "carac" }]
     });
   }
 
@@ -212,16 +245,19 @@ class BloodmanActorSheet extends ActorSheet {
     const data = super.getData();
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
 
+    const itemBonuses = getItemBonusTotals(data.actor);
     const characteristics = CHARACTERISTICS.map(c => {
       const base = Number(data.actor.system.characteristics?.[c.key]?.base || 0);
       const xp = Array.isArray(data.actor.system.characteristics?.[c.key]?.xp)
         ? data.actor.system.characteristics[c.key].xp
         : [false, false, false];
       const flat = Number(modifiers.all || 0) + Number(modifiers[c.key] || 0);
-      const effective = base + flat;
+      const itemBonus = Number(itemBonuses[c.key] || 0);
+      const effective = base + flat + itemBonus;
       const xpReady = xp.every(Boolean);
-      return { key: c.key, label: c.label, icon: c.icon, base, effective, xp, xpReady };
+      return { key: c.key, label: c.label, icon: c.icon, base, effective, itemBonus, xp, xpReady };
     });
+    const totalPoints = characteristics.reduce((sum, c) => sum + Number(c.base || 0), 0);
 
     const phy = characteristics.find(c => c.key === "PHY")?.effective ?? 0;
     const esp = characteristics.find(c => c.key === "ESP")?.effective ?? 0;
@@ -231,8 +267,12 @@ class BloodmanActorSheet extends ActorSheet {
     const resources = foundry.utils.mergeObject(buildDefaultResources(), data.actor.system.resources || {}, {
       inplace: false
     });
-    resources.pv.max = Math.round(phy / 5);
-    resources.pp.max = Math.round(esp / 5);
+    if (resources.pv.max == null || Number.isNaN(Number(resources.pv.max))) {
+      resources.pv.max = Math.round(phy / 5);
+    }
+    if (resources.pp.max == null || Number.isNaN(Number(resources.pp.max))) {
+      resources.pp.max = Math.round(esp / 5);
+    }
     resources.move.value = moveValue;
 
     const moveChar = characteristics.find(c => c.key === "MOU");
@@ -247,21 +287,34 @@ class BloodmanActorSheet extends ActorSheet {
     const equipment = foundry.utils.mergeObject(buildDefaultEquipment(), data.actor.system.equipment || {}, {
       inplace: false
     });
-    const ammo = Array.isArray(data.actor.system.ammoPool) ? data.actor.system.ammoPool : buildDefaultAmmoPool();
+    const ammo = foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false });
+
+    const itemBuckets = {
+      arme: [],
+      objet: [],
+      soin: [],
+      protection: [],
+      aptitude: [],
+      pouvoir: []
+    };
+    for (const item of this.actor.items) {
+      if (itemBuckets[item.type]) itemBuckets[item.type].push(item);
+    }
 
     return {
       ...data,
       characteristics,
+      totalPoints,
       modifiers,
       resources,
       profile,
       equipment,
-      weapons: this.actor.items.filter(i => i.type === "arme"),
-      objects: this.actor.items.filter(i => i.type === "objet"),
-      soins: this.actor.items.filter(i => i.type === "soin"),
-      protections: this.actor.items.filter(i => i.type === "protection"),
-      aptitudes: this.actor.items.filter(i => i.type === "aptitude"),
-      pouvoirs: this.actor.items.filter(i => i.type === "pouvoir"),
+      weapons: itemBuckets.arme,
+      objects: itemBuckets.objet,
+      soins: itemBuckets.soin,
+      protections: itemBuckets.protection,
+      aptitudes: itemBuckets.aptitude,
+      pouvoirs: itemBuckets.pouvoir,
       ammo
     };
   }
@@ -272,18 +325,24 @@ class BloodmanActorSheet extends ActorSheet {
     html.find(".char-icon").click(ev => {
       const row = ev.currentTarget.closest(".char-row");
       const key = row?.dataset?.key;
-      this.tryGrowthRoll(key);
+      this.handleCharacteristicRoll(key);
     });
 
     html.find(".char-roll").click(ev => {
       const key = ev.currentTarget.dataset.key;
-      doCharacteristicRoll(this.actor, key);
+      this.handleCharacteristicRoll(key);
     });
 
     html.find(".weapon-roll").click(ev => {
       const li = ev.currentTarget.closest(".item");
       const item = this.actor.items.get(li.dataset.itemId);
       this.rollDamage(item);
+    });
+
+    html.find(".ability-roll").click(ev => {
+      const li = ev.currentTarget.closest(".item");
+      const item = this.actor.items.get(li.dataset.itemId);
+      this.rollAbilityDamage(item);
     });
 
     html.find(".item-delete").click(ev => {
@@ -308,10 +367,9 @@ class BloodmanActorSheet extends ActorSheet {
       const row = ev.currentTarget.closest(".char-row");
       const key = row?.dataset?.key;
       if (!key) return;
-      if (!ev.currentTarget.checked) return;
       const checks = Array.from(row.querySelectorAll("input[type='checkbox']"));
       const ready = checks.length === 3 && checks.every(input => input.checked);
-      if (ready) this.promptGrowthRoll(key);
+      if (ready) setTimeout(() => this.promptGrowthRoll(key), 0);
     });
 
     html.find(".xp-roll").click(ev => {
@@ -320,8 +378,32 @@ class BloodmanActorSheet extends ActorSheet {
     });
   }
 
+  async handleCharacteristicRoll(key) {
+    if (!key) return;
+    await doCharacteristicRoll(this.actor, key);
+    await this.markXpProgress(key);
+  }
+
+  async markXpProgress(key) {
+    const xp = Array.isArray(this.actor.system.characteristics?.[key]?.xp)
+      ? [...this.actor.system.characteristics[key].xp]
+      : [false, false, false];
+    const index = xp.findIndex(value => !value);
+    if (index === -1) return;
+    xp[index] = true;
+    await this.actor.update({ [`system.characteristics.${key}.xp`]: xp });
+    if (xp.length === 3 && xp.every(Boolean)) this.promptGrowthRoll(key);
+  }
+
   async rollDamage(item) {
     await doDamageRoll(this.actor, item);
+  }
+
+  async rollAbilityDamage(item) {
+    if (!item) return;
+    const die = (item.system.damageDie || "d4").toString();
+    const formula = /^\d/.test(die) ? die : `1${die}`;
+    await doDirectDamageRoll(this.actor, formula, item.name);
   }
 
   async useItem(item) {
@@ -334,19 +416,11 @@ class BloodmanActorSheet extends ActorSheet {
     await doGrowthRoll(this.actor, key);
   }
 
-  tryGrowthRoll(key) {
-    if (!key) return;
-    const xp = this.actor.system.characteristics?.[key]?.xp || [];
-    const ready = Array.isArray(xp) && xp.length === 3 && xp.every(Boolean);
-    if (!ready) return;
-    this.promptGrowthRoll(key);
-  }
-
   promptGrowthRoll(key) {
     const label = CHARACTERISTICS.find(c => c.key === key)?.label || key;
     new Dialog({
-      title: "G d'expérience",
-      content: `<p>Lancer un G d'expérience pour <strong>${label}</strong> ?</p>`,
+      title: "Jet d'expérience",
+      content: `<p>Lancer un jet d'expérience pour <strong>${label}</strong> ?</p>`,
       buttons: {
         roll: {
           label: "Lancer",
@@ -369,9 +443,29 @@ class BloodmanItemSheet extends ItemSheet {
   static get defaultOptions() {
     return mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "item"],
-      width: 540,
+      width: 640,
       height: 260,
       submitOnChange: true
     });
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+
+    if (this.item.type !== "aptitude" && this.item.type !== "pouvoir") return;
+
+    html.find(".damage-roll").click(() => {
+      this.rollAbilityDamage();
+    });
+  }
+
+  async rollAbilityDamage() {
+    if (!this.item.actor) {
+      ui.notifications?.warn("Cette aptitude/pouvoir n'est pas lié à un acteur.");
+      return;
+    }
+    const die = (this.item.system.damageDie || "d4").toString();
+    const formula = /^\d/.test(die) ? die : `1${die}`;
+    await doDirectDamageRoll(this.item.actor, formula, this.item.name);
   }
 }
