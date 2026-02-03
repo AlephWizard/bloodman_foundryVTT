@@ -72,6 +72,22 @@
   padding: 8px 0;
 }
 
+.npc-role-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 0 10px;
+}
+
+.npc-role-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
 .bloodman-sheet .state-label {
   font-weight: 700;
   letter-spacing: 0.6px;
@@ -276,6 +292,14 @@
   grid-template-columns: 24px 44px 1fr 140px 110px;
 }
 
+.npc-sheet .char-row {
+  grid-template-columns: 24px 1fr 140px;
+}
+
+.npc-sheet .char-row.move-row {
+  grid-template-columns: 24px 44px 1fr 140px;
+}
+
 .move-slot {
   display: flex;
   justify-content: center;
@@ -354,6 +378,9 @@
 }
 
 .xp-roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 6px;

@@ -59,10 +59,51 @@ function buildDefaultEquipment() {
   };
 }
 
+function getPlayerCountOnScene() {
+  const scene = globalThis.canvas?.scene || game.scenes?.active;
+  if (!scene) {
+    const activePlayers = game.users?.filter(user => user.active && !user.isGM).length || 0;
+    return Math.max(1, activePlayers);
+  }
+  const tokens = scene.tokens?.contents || Array.from(scene.tokens || []);
+  const actorIds = new Set();
+  for (const token of tokens) {
+    const actor = token.actor;
+    if (actor?.type === "personnage") actorIds.add(actor.id);
+  }
+  const count = actorIds.size;
+  if (count > 0) return count;
+  const activePlayers = game.users?.filter(user => user.active && !user.isGM).length || 0;
+  return Math.max(1, activePlayers);
+}
+
+function getDerivedPvMax(actor, phyEffective, roleOverride) {
+  if (actor?.type !== "personnage-non-joueur") return Math.round(phyEffective / 5);
+  const role = ((roleOverride ?? actor.system?.npcRole) || "").toString();
+  if (role === "sbire") return Math.round(phyEffective / 10);
+  if (role === "sbire-fort") return Math.round(phyEffective / 5);
+  if (role === "boss-seul") return Math.round(phyEffective / 5) * getPlayerCountOnScene();
+  return Math.round(phyEffective / 5);
+}
+
+function normalizeWeaponType(value) {
+  const raw = (value || "").toString().toLowerCase();
+  if (!raw) return "";
+  if (raw.includes("distance")) return "arme à distance";
+  if (raw.includes("corps")) return "arme de corps à corps";
+  if (raw.includes("blanche")) return "arme de corps à corps";
+  if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return "arme à distance";
+  return value;
+}
+
 Hooks.once("init", () => {
   Actors.unregisterSheet("core", ActorSheet);
   Actors.registerSheet("bloodman", BloodmanActorSheet, {
     types: ["personnage"],
+    makeDefault: true
+  });
+  Actors.registerSheet("bloodman", BloodmanNpcSheet, {
+    types: ["personnage-non-joueur"],
     makeDefault: true
   });
 
@@ -75,7 +116,10 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", async () => {
   for (const actor of game.actors) {
-    if (actor.type !== "personnage") continue;
+    if (!actor.isOwner) continue;
+    const isCharacter = actor.type === "personnage";
+    const isNpc = actor.type === "personnage-non-joueur";
+    if (!isCharacter && !isNpc) continue;
 
     const updates = {};
 
@@ -104,20 +148,40 @@ Hooks.once("ready", async () => {
         ? { type: legacy.type || "", value: Number(legacy.value) || 0 }
         : buildDefaultAmmo();
     }
-    if (actor.prototypeToken && actor.prototypeToken.actorLink === false) {
-      updates["prototypeToken.actorLink"] = true;
+    if (actor.prototypeToken) {
+      if (isCharacter && actor.prototypeToken.actorLink === false) {
+        updates["prototypeToken.actorLink"] = true;
+      }
+      if (isNpc && actor.prototypeToken.actorLink !== false) {
+        updates["prototypeToken.actorLink"] = false;
+      }
     }
 
     if (Object.keys(updates).length) await actor.update(updates);
     await applyItemResourceBonuses(actor);
+
+    for (const item of actor.items) {
+      if (item.type !== "arme") continue;
+      const normalized = normalizeWeaponType(item.system?.weaponType);
+      if (normalized && normalized !== item.system?.weaponType) {
+        await item.update({ "system.weaponType": normalized });
+      }
+      if (!normalized && !item.system?.weaponType) {
+        await item.update({ "system.weaponType": "arme à distance" });
+      }
+    }
   }
 
   if (game.user.isGM) {
     for (const scene of game.scenes) {
       for (const token of scene.tokens) {
-        if (token.actorLink) continue;
-        if (token.actor?.type !== "personnage") continue;
-        await token.update({ actorLink: true });
+        const actorType = token.actor?.type;
+        if (actorType === "personnage" && !token.actorLink) {
+          await token.update({ actorLink: true });
+        }
+        if (actorType === "personnage-non-joueur" && token.actorLink) {
+          await token.update({ actorLink: false });
+        }
       }
     }
   }
@@ -177,7 +241,9 @@ function getItemResourceBonusTotals(actor) {
 }
 
 async function applyItemResourceBonuses(actor) {
-  if (!actor || actor.type !== "personnage" || !actor.isOwner) return;
+  const isCharacter = actor?.type === "personnage";
+  const isNpc = actor?.type === "personnage-non-joueur";
+  if (!actor || (!isCharacter && !isNpc) || !actor.isOwner) return;
   const totals = getItemResourceBonusTotals(actor);
   const currentPv = Number(actor.system.resources?.pv?.current || 0);
   const currentPp = Number(actor.system.resources?.pp?.current || 0);
@@ -242,12 +308,13 @@ function buildItemDisplayData(item) {
 }
 
 Hooks.on("preCreateToken", (doc) => {
-  if (doc.actor?.type !== "personnage") return;
-  doc.updateSource({ actorLink: true });
+  const actorType = doc.actor?.type;
+  if (actorType === "personnage") doc.updateSource({ actorLink: true });
+  if (actorType === "personnage-non-joueur") doc.updateSource({ actorLink: false });
 });
 
 Hooks.on("preUpdateActor", (actor, updateData) => {
-  if (actor.type !== "personnage") return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
 
   const getUpdatedNumber = (path, fallback) => {
     const value = foundry.utils.getProperty(updateData, path);
@@ -266,8 +333,11 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
     return Number(base) + Number(globalMod) + Number(keyMod) + itemBonus;
   };
 
-  const pvMax = Math.round(getEffective("PHY") / 5) + Number(storedPvBonus || 0);
-  const ppMax = Math.round(getEffective("ESP") / 5) + Number(storedPpBonus || 0);
+  const phyEffective = getEffective("PHY");
+  const espEffective = getEffective("ESP");
+  const roleOverride = foundry.utils.getProperty(updateData, "system.npcRole");
+  const pvMax = getDerivedPvMax(actor, phyEffective, roleOverride) + Number(storedPvBonus || 0);
+  const ppMax = Math.round(espEffective / 5) + Number(storedPpBonus || 0);
   const storedPvMax = getUpdatedNumber("system.resources.pv.max", actor.system.resources?.pv?.max);
   const storedPpMax = getUpdatedNumber("system.resources.pp.max", actor.system.resources?.pp?.max);
   const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : pvMax;
@@ -290,11 +360,12 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
 });
 
 Hooks.on("updateActor", async (actor, changes) => {
-  if (actor.type !== "personnage") return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
   if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
   const hasCharChange = foundry.utils.getProperty(changes, "system.characteristics") != null;
   const hasModChange = foundry.utils.getProperty(changes, "system.modifiers") != null;
-  if (!hasCharChange && !hasModChange) return;
+  const hasNpcRoleChange = foundry.utils.getProperty(changes, "system.npcRole") != null;
+  if (!hasCharChange && !hasModChange && !hasNpcRoleChange) return;
 
   const itemBonuses = getItemBonusTotals(actor);
   const base = Number(actor.system.characteristics?.MOU?.base || 0);
@@ -313,7 +384,7 @@ Hooks.on("updateActor", async (actor, changes) => {
     + Number(actor.system.modifiers?.all || 0)
     + Number(actor.system.modifiers?.ESP || 0)
     + Number(itemBonuses.ESP || 0);
-  const derivedPvMax = Math.round(phyEffective / 5);
+  const derivedPvMax = getDerivedPvMax(actor, phyEffective);
   const derivedPpMax = Math.round(espEffective / 5);
   const storedPvBonus = Number(actor.system.resources?.pv?.itemBonus || 0);
   const storedPpBonus = Number(actor.system.resources?.pp?.itemBonus || 0);
@@ -339,7 +410,7 @@ Hooks.on("updateActor", async (actor, changes) => {
 
 class BloodmanActorSheet extends ActorSheet {
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
       template: "systems/bloodman/templates/actor-personnage.html",
       width: 1050,
@@ -371,12 +442,13 @@ class BloodmanActorSheet extends ActorSheet {
     const esp = characteristics.find(c => c.key === "ESP")?.effective ?? 0;
     const mou = characteristics.find(c => c.key === "MOU")?.effective ?? 0;
     const moveValue = Math.round(mou / 5);
+    const pvBase = getDerivedPvMax(this.actor, phy);
 
     const resources = foundry.utils.mergeObject(buildDefaultResources(), data.actor.system.resources || {}, {
       inplace: false
     });
     if (resources.pv.max == null || Number.isNaN(Number(resources.pv.max))) {
-      resources.pv.max = Math.round(phy / 5);
+      resources.pv.max = pvBase;
     }
     if (resources.pp.max == null || Number.isNaN(Number(resources.pp.max))) {
       resources.pp.max = Math.round(esp / 5);
@@ -412,6 +484,8 @@ class BloodmanActorSheet extends ActorSheet {
     const aptitudes = itemBuckets.aptitude.map(buildItemDisplayData);
     const pouvoirs = itemBuckets.pouvoir.map(buildItemDisplayData);
 
+    const npcRole = data.actor.system.npcRole || "";
+
     return {
       ...data,
       characteristics,
@@ -419,6 +493,10 @@ class BloodmanActorSheet extends ActorSheet {
       modifiers,
       resources,
       profile,
+      npcRole,
+      npcRoleSbire: npcRole === "sbire",
+      npcRoleSbireFort: npcRole === "sbire-fort",
+      npcRoleBossSeul: npcRole === "boss-seul",
       equipment,
       weapons: itemBuckets.arme,
       objects: itemBuckets.objet,
@@ -474,12 +552,20 @@ class BloodmanActorSheet extends ActorSheet {
       this.useItem(item);
     });
 
-    html.find(".xp-check input").change(ev => {
-      const row = ev.currentTarget.closest(".char-row");
+    html.find(".xp-check input").change(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const input = ev.currentTarget;
+      const row = input.closest(".char-row");
       const key = row?.dataset?.key;
-      if (!key) return;
-      const checks = Array.from(row.querySelectorAll("input[type='checkbox']"));
-      const ready = checks.length === 3 && checks.every(input => input.checked);
+      const index = Number(input.dataset.index);
+      if (!key || !Number.isFinite(index)) return;
+      const xp = Array.isArray(this.actor.system.characteristics?.[key]?.xp)
+        ? [...this.actor.system.characteristics[key].xp]
+        : [false, false, false];
+      xp[index] = Boolean(input.checked);
+      await this.actor.update({ [`system.characteristics.${key}.xp`]: xp });
+      const ready = xp.length === 3 && xp.every(Boolean);
       if (ready) setTimeout(() => this.promptGrowthRoll(key), 0);
     });
 
@@ -546,13 +632,35 @@ class BloodmanActorSheet extends ActorSheet {
   }
 }
 
+class BloodmanNpcSheet extends BloodmanActorSheet {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      template: "systems/bloodman/templates/actor-personnage-non-joueur.html"
+    });
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+
+    html.find(".npc-role-toggle").change(ev => {
+      const input = ev.currentTarget;
+      const role = input.dataset.role || "";
+      const nextRole = input.checked ? role : "";
+      if (input.checked) {
+        html.find(".npc-role-toggle").not(input).prop("checked", false);
+      }
+      this.actor.update({ "system.npcRole": nextRole });
+    });
+  }
+}
+
 class BloodmanItemSheet extends ItemSheet {
   get template() {
     return `systems/bloodman/templates/item-${this.item.type}.html`;
   }
 
   static get defaultOptions() {
-    return mergeObject(super.defaultOptions, {
+    return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "item"],
       width: 640,
       height: 260,

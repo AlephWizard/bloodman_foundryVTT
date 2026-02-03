@@ -42,6 +42,79 @@ export async function doCharacteristicRoll(actor, key) {
 
 async function applyDamageToTargets(sourceActor, total) {
   const targets = Array.from(game.user.targets || []);
+  if (!targets.length) return;
+
+  const promptDamageSplit = async (totalDamage, targetTokens) => {
+    if (targetTokens.length <= 1) return null;
+    const base = Math.floor(totalDamage / targetTokens.length);
+    const remainder = totalDamage - base * targetTokens.length;
+    const defaults = targetTokens.map((token, index) => ({
+      id: token.id,
+      name: token.name,
+      value: base + (index < remainder ? 1 : 0)
+    }));
+
+    const rows = defaults
+      .map(
+        entry => `<div class="split-row">
+          <label>${entry.name}</label>
+          <input type="number" min="0" step="1" data-target-id="${entry.id}" value="${entry.value}" />
+        </div>`
+      )
+      .join("");
+
+    const content = `<form class="damage-split">
+      <p>Répartir ${totalDamage} dégâts entre ${targetTokens.length} cibles.</p>
+      <div class="split-grid">${rows}</div>
+    </form>`;
+
+    return new Promise(resolve => {
+      let resolved = false;
+      const finish = value => {
+        if (resolved) return;
+        resolved = true;
+        resolve(value);
+      };
+
+      new Dialog({
+        title: "Répartition des dégâts",
+        content,
+        buttons: {
+          apply: {
+            label: "Appliquer",
+            callback: html => {
+              const allocations = {};
+              let sum = 0;
+              html.find("input[data-target-id]").each((_, input) => {
+                const value = Number(input.value);
+                const safe = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+                allocations[input.dataset.targetId] = safe;
+                sum += safe;
+              });
+              if (sum !== totalDamage) {
+                ui.notifications?.warn(`La répartition doit totaliser ${totalDamage}.`);
+                return false;
+              }
+              finish(allocations);
+            }
+          },
+          cancel: {
+            label: "Annuler",
+            callback: () => finish(null)
+          }
+        },
+        default: "apply",
+        close: () => finish(null)
+      }).render(true);
+    });
+  };
+
+  let allocations = null;
+  if (targets.length > 1) {
+    allocations = await promptDamageSplit(total, targets);
+    if (!allocations) return;
+  }
+
   for (const token of targets) {
     const targetActor = token.actor;
     if (!targetActor) continue;
@@ -50,10 +123,12 @@ async function applyDamageToTargets(sourceActor, total) {
       continue;
     }
 
+    const share = allocations ? Number(allocations[token.id] || 0) : total;
+    if (!Number.isFinite(share) || share <= 0) continue;
     const pa = targetActor.items
       .filter(i => i.type === "protection")
       .reduce((sum, i) => sum + Number(i.system.pa || 0), 0);
-    const finalDamage = Math.max(0, total - pa);
+    const finalDamage = Math.max(0, share - pa);
     const current = Number(targetActor.system.resources?.pv?.current || 0);
     const nextValue = Math.max(0, current - finalDamage);
 
@@ -68,17 +143,22 @@ async function applyDamageToTargets(sourceActor, total) {
 
 export async function doDamageRoll(actor, item) {
   const die = item.system.damageDie || "d4";
-  const rawType = (item.system.weaponType || "poing").toString().toLowerCase();
-  const weaponType = rawType.includes("blanche")
-    ? "blanche"
-    : rawType.includes("tactique")
-      ? "tactique"
-      : rawType.includes("jet")
-        ? "jet"
-        : rawType.includes("poing")
-          ? "poing"
-          : rawType;
-  const consumesAmmo = weaponType === "jet" || weaponType === "poing" || weaponType === "tactique";
+  const rawType = (item.system.weaponType || "distance").toString().toLowerCase();
+  const weaponType = rawType.includes("distance")
+    ? "distance"
+    : rawType.includes("corps")
+      ? "corps"
+      : rawType.includes("blanche")
+        ? "corps"
+        : rawType.includes("tactique")
+          ? "distance"
+          : rawType.includes("jet")
+            ? "distance"
+            : rawType.includes("poing")
+              ? "distance"
+              : rawType;
+  const infiniteAmmo = Boolean(item.system.infiniteAmmo);
+  const consumesAmmo = weaponType === "distance" && !infiniteAmmo;
   if (consumesAmmo) {
     const currentAmmo = Number(actor.system.ammo?.value);
     if (!Number.isFinite(currentAmmo) || currentAmmo <= 0) {

@@ -34,7 +34,8 @@
   ],
   "documentTypes": {
     "Actor": {
-      "personnage": {}
+      "personnage": {},
+      "personnage-non-joueur": {}
     },
     "Item": {
       "arme": {},

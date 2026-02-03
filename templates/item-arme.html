@@ -10,10 +10,8 @@
   <label>TYPE D'ARME</label>
   <select name="system.weaponType">
     {{#select item.system.weaponType}}
-      <option value="jet">Arme de jet</option>
-      <option value="poing">Arme de poing</option>
-      <option value="tactique">Arme tactique</option>
-      <option value="blanche">Arme blanche</option>
+      <option value="arme de corps &agrave; corps">Arme de corps &agrave; corps</option>
+      <option value="arme &agrave; distance">Arme &agrave; distance</option>
     {{/select}}
   </select>
 
@@ -27,6 +25,18 @@
       <option value="d12">d12</option>
     {{/select}}
   </select>
+
+  <label>MUNITIONS INFINIES</label>
+  <div class="toggle-group">
+    <label class="toggle-option">
+      <input type="radio" name="system.infiniteAmmo" value="true" data-dtype="Boolean" {{#if item.system.infiniteAmmo}}checked{{/if}} />
+      OUI
+    </label>
+    <label class="toggle-option">
+      <input type="radio" name="system.infiniteAmmo" value="false" data-dtype="Boolean" {{#unless item.system.infiniteAmmo}}checked{{/unless}} />
+      NON
+    </label>
+  </div>
 
   <label>NOTES</label>
   <textarea name="system.notes">{{item.system.notes}}</textarea>

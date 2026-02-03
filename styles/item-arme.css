@@ -46,3 +46,17 @@
   border-radius: 6px;
   padding: 4px 6px;
 }
+
+.item-arme .toggle-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.item-arme .toggle-option {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 700;
+  font-size: 12px;
+}
