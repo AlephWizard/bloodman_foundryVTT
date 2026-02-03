@@ -1,0 +1,132 @@
+.item-aptitude {
+  font-family: "Oswald", sans-serif;
+  color: var(--bm-ink);
+  background: var(--bm-white);
+  border: 2px solid var(--bm-line);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px 10px;
+  grid-template-columns: 140px 1fr;
+}
+
+.item-aptitude .item-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-aptitude .item-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: var(--bm-white);
+}
+
+.item-aptitude .item-name-field {
+  flex: 1;
+}
+
+.item-aptitude label {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+  align-self: center;
+}
+
+.item-aptitude input,
+.item-aptitude textarea,
+.item-aptitude select {
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.item-aptitude .full-row {
+  grid-column: 1 / -1;
+}
+
+.item-aptitude textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.item-aptitude .ability-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.item-aptitude .ability-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-aptitude .inline-label {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  font-size: 12px;
+}
+
+.item-aptitude .toggle-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.item-aptitude .toggle-option {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.item-aptitude .ability-divider {
+  width: 2px;
+  align-self: stretch;
+  background: var(--bm-line);
+  border-radius: 2px;
+}
+
+.item-aptitude .bonus-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.item-aptitude .bonus-input {
+  width: 60px;
+}
+
+.item-aptitude .bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.item-aptitude .bonus-grid label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.item-aptitude .bonus-grid input {
+  width: 52px;
+  text-align: center;
+}
+
+.item-aptitude .bonus-grid.is-disabled {
+  opacity: 0.6;
+}

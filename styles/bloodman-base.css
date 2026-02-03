@@ -1,0 +1,29 @@
+@import url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600;700&display=swap");
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css");
+
+@font-face {
+  font-family: "Penumbra";
+  src: url("../Images/Penumbra.woff2") format("woff2"),
+    url("../Images/Penumbra.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bm-green: #1dbb3c;
+  --bm-black: #0f0f0f;
+  --bm-red: #c72d2d;
+  --bm-purple: #6f2dbd;
+  --bm-gray: #e7e7e7;
+  --bm-ink: #121212;
+  --bm-line: #111111;
+  --bm-white: #ffffff;
+}
+
+.bloodman.sheet.actor,
+.bloodman.sheet.item,
+.bloodman.sheet.actor .window-content,
+.bloodman.sheet.item .window-content {
+  background: unset;
+}

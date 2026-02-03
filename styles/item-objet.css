@@ -1,0 +1,48 @@
+.item-objet {
+  font-family: "Oswald", sans-serif;
+  color: var(--bm-ink);
+  background: var(--bm-white);
+  border: 2px solid var(--bm-line);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 6px 10px;
+  grid-template-columns: 140px 1fr;
+}
+
+.item-objet .item-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-objet .item-image {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: var(--bm-white);
+}
+
+.item-objet .item-name-field {
+  flex: 1;
+}
+
+.item-objet label {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+  align-self: center;
+}
+
+.item-objet input,
+.item-objet textarea,
+.item-objet select {
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 4px 6px;
+}

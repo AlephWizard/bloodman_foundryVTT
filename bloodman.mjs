@@ -26,8 +26,8 @@ function buildDefaultModifiers() {
 
 function buildDefaultResources() {
   return {
-    pv: { current: 0, max: 0 },
-    pp: { current: 0, max: 0 },
+    pv: { current: 0, max: 0, itemBonus: 0 },
+    pp: { current: 0, max: 0, itemBonus: 0 },
     voyage: { current: 0, max: 0 },
     move: { value: 0 }
   };
@@ -109,6 +109,7 @@ Hooks.once("ready", async () => {
     }
 
     if (Object.keys(updates).length) await actor.update(updates);
+    await applyItemResourceBonuses(actor);
   }
 
   if (game.user.isGM) {
@@ -120,6 +121,24 @@ Hooks.once("ready", async () => {
       }
     }
   }
+});
+
+Hooks.on("createItem", (item) => {
+  if (!item?.actor) return;
+  if (item.type !== "aptitude" && item.type !== "pouvoir") return;
+  applyItemResourceBonuses(item.actor);
+});
+
+Hooks.on("updateItem", (item) => {
+  if (!item?.actor) return;
+  if (item.type !== "aptitude" && item.type !== "pouvoir") return;
+  applyItemResourceBonuses(item.actor);
+});
+
+Hooks.on("deleteItem", (item) => {
+  if (!item?.actor) return;
+  if (item.type !== "aptitude" && item.type !== "pouvoir") return;
+  applyItemResourceBonuses(item.actor);
 });
 
 function getItemBonusTotals(actor) {
@@ -143,6 +162,85 @@ function getItemBonusTotals(actor) {
   return totals;
 }
 
+function getItemResourceBonusTotals(actor) {
+  const totals = { pv: 0, pp: 0 };
+  if (!actor?.items) return totals;
+  for (const item of actor.items) {
+    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
+    if (!item.system?.bonusEnabled) continue;
+    const pvBonus = Number(item.system?.resourceBonuses?.pv);
+    const ppBonus = Number(item.system?.resourceBonuses?.pp);
+    if (Number.isFinite(pvBonus)) totals.pv += pvBonus;
+    if (Number.isFinite(ppBonus)) totals.pp += ppBonus;
+  }
+  return totals;
+}
+
+async function applyItemResourceBonuses(actor) {
+  if (!actor || actor.type !== "personnage" || !actor.isOwner) return;
+  const totals = getItemResourceBonusTotals(actor);
+  const currentPv = Number(actor.system.resources?.pv?.current || 0);
+  const currentPp = Number(actor.system.resources?.pp?.current || 0);
+  const currentPvMax = Number(actor.system.resources?.pv?.max || 0);
+  const currentPpMax = Number(actor.system.resources?.pp?.max || 0);
+  const storedPv = Number(actor.system.resources?.pv?.itemBonus || 0);
+  const storedPp = Number(actor.system.resources?.pp?.itemBonus || 0);
+  const deltaPv = totals.pv - storedPv;
+  const deltaPp = totals.pp - storedPp;
+
+  const updates = {};
+  const nextPvMax = currentPvMax + deltaPv;
+  const nextPpMax = currentPpMax + deltaPp;
+  if (deltaPv !== 0) {
+    updates["system.resources.pv.max"] = Math.max(0, nextPvMax);
+    updates["system.resources.pv.current"] = Math.min(currentPv, Math.max(0, nextPvMax));
+  }
+  if (deltaPp !== 0) {
+    updates["system.resources.pp.max"] = Math.max(0, nextPpMax);
+    updates["system.resources.pp.current"] = Math.min(currentPp, Math.max(0, nextPpMax));
+  }
+  if (storedPv !== totals.pv) updates["system.resources.pv.itemBonus"] = totals.pv;
+  if (storedPp !== totals.pp) updates["system.resources.pp.itemBonus"] = totals.pp;
+
+  if (Object.keys(updates).length) await actor.update(updates);
+}
+
+function buildItemDisplayData(item) {
+  const data = item.toObject();
+  const bonusEnabled = Boolean(item.system?.bonusEnabled);
+  const displayBonuses = [];
+  const displayResourceBonuses = [];
+
+  if (bonusEnabled) {
+    const bonuses = item.system?.bonuses || {};
+    for (const c of CHARACTERISTICS) {
+      const value = Number(bonuses[c.key]);
+      if (Number.isFinite(value) && value !== 0) displayBonuses.push({ key: c.key, value });
+    }
+
+    const legacyKey = (item.system?.charKey || "").toString().toUpperCase();
+    const legacyValue = Number(item.system?.charBonus);
+    if (legacyKey && Number.isFinite(legacyValue) && legacyValue !== 0) {
+      const exists = displayBonuses.some(bonus => bonus.key === legacyKey);
+      if (!exists) displayBonuses.push({ key: legacyKey, value: legacyValue });
+    }
+
+    const pvBonus = Number(item.system?.resourceBonuses?.pv);
+    const ppBonus = Number(item.system?.resourceBonuses?.pp);
+    if (Number.isFinite(pvBonus) && pvBonus !== 0) displayResourceBonuses.push({ key: "PV", value: pvBonus });
+    if (Number.isFinite(ppBonus) && ppBonus !== 0) displayResourceBonuses.push({ key: "PP", value: ppBonus });
+  }
+
+  if (item.system?.damageEnabled && item.system?.damageDie) {
+    const rawDie = item.system.damageDie.toString();
+    data.displayDamageDie = /^\d/.test(rawDie) ? rawDie : `1${rawDie}`;
+  }
+
+  data.displayBonuses = displayBonuses;
+  data.displayResourceBonuses = displayResourceBonuses;
+  return data;
+}
+
 Hooks.on("preCreateToken", (doc) => {
   if (doc.actor?.type !== "personnage") return;
   doc.updateSource({ actorLink: true });
@@ -158,6 +256,8 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
   };
 
   const itemBonuses = getItemBonusTotals(actor);
+  const storedPvBonus = getUpdatedNumber("system.resources.pv.itemBonus", actor.system.resources?.pv?.itemBonus || 0);
+  const storedPpBonus = getUpdatedNumber("system.resources.pp.itemBonus", actor.system.resources?.pp?.itemBonus || 0);
   const getEffective = key => {
     const base = getUpdatedNumber(`system.characteristics.${key}.base`, actor.system.characteristics?.[key]?.base || 0);
     const globalMod = getUpdatedNumber("system.modifiers.all", actor.system.modifiers?.all || 0);
@@ -166,23 +266,25 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
     return Number(base) + Number(globalMod) + Number(keyMod) + itemBonus;
   };
 
-  const pvMax = Math.round(getEffective("PHY") / 5);
-  const ppMax = Math.round(getEffective("ESP") / 5);
+  const pvMax = Math.round(getEffective("PHY") / 5) + Number(storedPvBonus || 0);
+  const ppMax = Math.round(getEffective("ESP") / 5) + Number(storedPpBonus || 0);
   const storedPvMax = getUpdatedNumber("system.resources.pv.max", actor.system.resources?.pv?.max);
   const storedPpMax = getUpdatedNumber("system.resources.pp.max", actor.system.resources?.pp?.max);
   const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : pvMax;
   const finalPpMax = Number.isFinite(storedPpMax) ? storedPpMax : ppMax;
+  const allowedPvMax = Math.max(0, finalPvMax);
+  const allowedPpMax = Math.max(0, finalPpMax);
 
   const pvCurrentPath = "system.resources.pv.current";
   const ppCurrentPath = "system.resources.pp.current";
 
   if (foundry.utils.getProperty(updateData, pvCurrentPath) != null) {
-    const nextValue = Math.min(getUpdatedNumber(pvCurrentPath, 0), finalPvMax);
+    const nextValue = Math.min(getUpdatedNumber(pvCurrentPath, 0), allowedPvMax);
     foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, nextValue));
   }
 
   if (foundry.utils.getProperty(updateData, ppCurrentPath) != null) {
-    const nextValue = Math.min(getUpdatedNumber(ppCurrentPath, 0), finalPpMax);
+    const nextValue = Math.min(getUpdatedNumber(ppCurrentPath, 0), allowedPpMax);
     foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, nextValue));
   }
 });
@@ -213,18 +315,24 @@ Hooks.on("updateActor", async (actor, changes) => {
     + Number(itemBonuses.ESP || 0);
   const derivedPvMax = Math.round(phyEffective / 5);
   const derivedPpMax = Math.round(espEffective / 5);
-  const pvMax = Number.isFinite(actor.system.resources?.pv?.max) ? Number(actor.system.resources.pv.max) : derivedPvMax;
-  const ppMax = Number.isFinite(actor.system.resources?.pp?.max) ? Number(actor.system.resources.pp.max) : derivedPpMax;
+  const storedPvBonus = Number(actor.system.resources?.pv?.itemBonus || 0);
+  const storedPpBonus = Number(actor.system.resources?.pp?.itemBonus || 0);
+  const derivedPvTotal = derivedPvMax + storedPvBonus;
+  const derivedPpTotal = derivedPpMax + storedPpBonus;
+  const pvMax = Number.isFinite(actor.system.resources?.pv?.max) ? Number(actor.system.resources.pv.max) : derivedPvTotal;
+  const ppMax = Number.isFinite(actor.system.resources?.pp?.max) ? Number(actor.system.resources.pp.max) : derivedPpTotal;
   const pvCurrent = Number(actor.system.resources?.pv?.current || 0);
   const ppCurrent = Number(actor.system.resources?.pp?.current || 0);
+  const allowedPvMax = Math.max(0, pvMax);
+  const allowedPpMax = Math.max(0, ppMax);
 
   const resourceUpdates = {};
   const pvMaxChange = foundry.utils.getProperty(changes, "system.resources.pv.max") != null;
   const ppMaxChange = foundry.utils.getProperty(changes, "system.resources.pp.max") != null;
-  if (!pvMaxChange && derivedPvMax !== pvMax) resourceUpdates["system.resources.pv.max"] = derivedPvMax;
-  if (!ppMaxChange && derivedPpMax !== ppMax) resourceUpdates["system.resources.pp.max"] = derivedPpMax;
-  if (pvCurrent > pvMax) resourceUpdates["system.resources.pv.current"] = pvMax;
-  if (ppCurrent > ppMax) resourceUpdates["system.resources.pp.current"] = ppMax;
+  if (!pvMaxChange && derivedPvTotal !== pvMax) resourceUpdates["system.resources.pv.max"] = derivedPvTotal;
+  if (!ppMaxChange && derivedPpTotal !== ppMax) resourceUpdates["system.resources.pp.max"] = derivedPpTotal;
+  if (pvCurrent > allowedPvMax) resourceUpdates["system.resources.pv.current"] = allowedPvMax;
+  if (ppCurrent > allowedPpMax) resourceUpdates["system.resources.pp.current"] = allowedPpMax;
   if (Object.keys(resourceUpdates).length) await actor.update(resourceUpdates);
 
 });
@@ -301,6 +409,9 @@ class BloodmanActorSheet extends ActorSheet {
       if (itemBuckets[item.type]) itemBuckets[item.type].push(item);
     }
 
+    const aptitudes = itemBuckets.aptitude.map(buildItemDisplayData);
+    const pouvoirs = itemBuckets.pouvoir.map(buildItemDisplayData);
+
     return {
       ...data,
       characteristics,
@@ -313,8 +424,8 @@ class BloodmanActorSheet extends ActorSheet {
       objects: itemBuckets.objet,
       soins: itemBuckets.soin,
       protections: itemBuckets.protection,
-      aptitudes: itemBuckets.aptitude,
-      pouvoirs: itemBuckets.pouvoir,
+      aptitudes,
+      pouvoirs,
       ammo
     };
   }
