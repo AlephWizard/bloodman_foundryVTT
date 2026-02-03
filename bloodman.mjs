@@ -59,6 +59,10 @@ function buildDefaultEquipment() {
   };
 }
 
+function isMissingTokenImage(src) {
+  return !src || src === "icons/svg/mystery-man.svg";
+}
+
 function getPlayerCountOnScene() {
   const scene = globalThis.canvas?.scene || game.scenes?.active;
   if (!scene) {
@@ -155,6 +159,10 @@ Hooks.once("ready", async () => {
       if (isNpc && actor.prototypeToken.actorLink !== false) {
         updates["prototypeToken.actorLink"] = false;
       }
+      const protoSrc = foundry.utils.getProperty(actor.prototypeToken, "texture.src");
+      if (isMissingTokenImage(protoSrc) && actor.img) {
+        updates["prototypeToken.texture.src"] = actor.img;
+      }
     }
 
     if (Object.keys(updates).length) await actor.update(updates);
@@ -181,6 +189,12 @@ Hooks.once("ready", async () => {
         }
         if (actorType === "personnage-non-joueur" && token.actorLink) {
           await token.update({ actorLink: false });
+        }
+        if (actorType === "personnage" || actorType === "personnage-non-joueur") {
+          const tokenSrc = foundry.utils.getProperty(token, "texture.src");
+          if (isMissingTokenImage(tokenSrc) && token.actor?.img) {
+            await token.update({ "texture.src": token.actor.img });
+          }
         }
       }
     }

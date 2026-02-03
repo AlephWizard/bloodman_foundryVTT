@@ -1,6 +1,13 @@
 <form class="bloodman-sheet">
   <header class="sheet-header">
     <div class="sheet-title">BLOODMAN</div>
+    <div class="voyage-banner">
+      <i class="fa-solid fa-compass"></i>
+      <input class="voyage-input" type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
+      <span class="voyage-sep">/</span>
+      <input class="voyage-input" type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
+      <span class="voyage-label">XP VOYAGE</span>
+    </div>
     <nav class="sheet-tabs tabs" data-group="primary">
       <a class="item" data-tab="carac">Personnage</a>
       <a class="item" data-tab="identite">Identite</a>
@@ -32,34 +39,26 @@
       <div class="tab-grid">
         <aside class="sidebar">
           <img src="{{actor.img}}" data-edit="img" class="portrait" />
-
-          <div class="resource-badges">
-            <div class="resource-circle pv">
-              <div class="value">
-                <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" max="{{resources.pv.max}}" />
-                <span>/</span>
-                <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" />
-              </div>
-              <div class="label">PV</div>
-            </div>
-            <div class="resource-circle pp">
-              <div class="value">
-                <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" max="{{resources.pp.max}}" />
-                <span>/</span>
-                <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" />
-              </div>
-              <div class="label">PP</div>
-            </div>
-            <div class="resource-circle voyage">
-              <div class="value">
-                <input type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
-                <span>/</span>
-                <input type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
-              </div>
-              <div class="label">XP</div>
-            </div>
-          </div>
         </aside>
+
+        <div class="resource-badges">
+          <div class="resource-circle pv">
+            <div class="value">
+              <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" max="{{resources.pv.max}}" />
+              <span>/</span>
+              <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" />
+            </div>
+            <div class="label">PV</div>
+          </div>
+          <div class="resource-circle pp">
+            <div class="value">
+              <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" max="{{resources.pp.max}}" />
+              <span>/</span>
+              <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" />
+            </div>
+            <div class="label">PP</div>
+          </div>
+        </div>
 
         <section class="column center">
           <section class="card characteristics-card">
@@ -78,14 +77,19 @@
               {{#each characteristics}}
                 <div class="char-row {{#if this.showMoveValue}}move-row{{/if}}" data-key="{{this.key}}">
                   <div class="char-icon"><i class="fa-solid {{this.icon}}"></i></div>
-                  {{#if this.showMoveValue}}
-                    <div class="move-slot">
-                      <input type="number" class="move-box" value="{{this.moveValue}}" readonly />
-                    </div>
-                  {{/if}}
-                  <div class="char-name"><a class="char-roll" data-key="{{this.key}}">{{this.label}}</a></div>
-                  <div class="char-value">
+                  <div class="char-base">
                     <input type="number" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" min="0" max="100" />
+                    <span class="char-max">/100</span>
+                  </div>
+                  <div class="char-name">
+                    <a class="char-roll" data-key="{{this.key}}">{{this.label}}</a>
+                    {{#if this.showMoveValue}}
+                      <span class="move-slot">
+                        <input type="number" class="move-box" value="{{this.moveValue}}" readonly />
+                      </span>
+                    {{/if}}
+                  </div>
+                  <div class="char-score">
                     {{#if this.itemBonus}}
                       <span class="char-bonus">{{#if (gt this.itemBonus 0)}}+{{/if}}{{this.itemBonus}}</span>
                     {{/if}}
