@@ -7,37 +7,55 @@
     </div>
   </div>
 
-  <label>TYPE D'ARME</label>
-  <select name="system.weaponType">
-    {{#select item.system.weaponType}}
-      <option value="arme de corps &agrave; corps">Arme de corps &agrave; corps</option>
-      <option value="arme &agrave; distance">Arme &agrave; distance</option>
-    {{/select}}
-  </select>
+  <label class="full-row">NOTES</label>
+  <textarea class="full-row" name="system.notes">{{item.system.notes}}</textarea>
 
-  <label>DE DE DEGATS</label>
-  <select name="system.damageDie">
-    {{#select item.system.damageDie}}
-      <option value="d4">d4</option>
-      <option value="d6">d6</option>
-      <option value="d8">d8</option>
-      <option value="d10">d10</option>
-      <option value="d12">d12</option>
-    {{/select}}
-  </select>
+  <div class="weapon-row full-row">
+    <div class="weapon-section">
+      <label class="inline-label">DE DE DEGATS :</label>
+      <select name="system.damageDie">
+        {{#select item.system.damageDie}}
+          <option value="d4">d4</option>
+          <option value="d6">d6</option>
+          <option value="d8">d8</option>
+          <option value="d10">d10</option>
+          <option value="d12">d12</option>
+        {{/select}}
+      </select>
+    </div>
 
-  <label>MUNITIONS INFINIES</label>
-  <div class="toggle-group">
-    <label class="toggle-option">
-      <input type="radio" name="system.infiniteAmmo" value="true" data-dtype="Boolean" {{#if item.system.infiniteAmmo}}checked{{/if}} />
-      OUI
-    </label>
-    <label class="toggle-option">
-      <input type="radio" name="system.infiniteAmmo" value="false" data-dtype="Boolean" {{#unless item.system.infiniteAmmo}}checked{{/unless}} />
-      NON
-    </label>
+    <div class="weapon-divider"></div>
+
+    <div class="weapon-section">
+      <label class="inline-label">TYPE D'ARME :</label>
+      <div class="weapon-type-group">
+        <label class="weapon-type-option">
+          <input type="radio" name="system.weaponType" value="arme à distance" {{checked weaponTypeDistance}} />
+          <i class="fa-solid fa-crosshairs"></i>
+          Distance
+        </label>
+        <label class="weapon-type-option">
+          <input type="radio" name="system.weaponType" value="arme de corps à corps" {{checked weaponTypeMelee}} />
+          <i class="fa-solid fa-hand-fist"></i>
+          Corps à corps
+        </label>
+      </div>
+    </div>
+
+    <div class="weapon-divider"></div>
+
+    <div class="weapon-section">
+      <label class="inline-label">MUNITIONS INFINIES :</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.infiniteAmmo" value="true" data-dtype="Boolean" {{#if item.system.infiniteAmmo}}checked{{/if}} />
+          OUI
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.infiniteAmmo" value="false" data-dtype="Boolean" {{#unless item.system.infiniteAmmo}}checked{{/unless}} />
+          NON
+        </label>
+      </div>
+    </div>
   </div>
-
-  <label>NOTES</label>
-  <textarea name="system.notes">{{item.system.notes}}</textarea>
 </form>
