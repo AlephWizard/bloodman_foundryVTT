@@ -1,4 +1,4 @@
-import { doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll } from "./rollHelpers.mjs";
+import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType } from "./rollHelpers.mjs";
 
 const CHARACTERISTICS = [
   { key: "MEL", label: "MÊLÉE", icon: "fa-hand-fist" },
@@ -11,6 +11,8 @@ const CHARACTERISTICS = [
   { key: "SOC", label: "SOCIAL", icon: "fa-users" },
   { key: "SAV", label: "SAVOIR", icon: "fa-book-open" }
 ];
+
+const SYSTEM_SOCKET = "system.bloodman";
 
 function buildDefaultCharacteristics() {
   const characteristics = {};
@@ -90,20 +92,26 @@ function getDerivedPvMax(actor, phyEffective, roleOverride) {
   return Math.round(phyEffective / 5);
 }
 
-function normalizeWeaponType(value) {
-  const raw = (value || "").toString().toLowerCase();
-  if (!raw) return "";
-  if (raw.includes("distance")) return "arme à distance";
-  if (raw.includes("corps")) return "arme de corps à corps";
-  if (raw.includes("blanche")) return "arme de corps à corps";
-  if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return "arme à distance";
-  return value;
+
+function registerDamageSocketHandlers() {
+  if (globalThis.__bmDamageSocketReady || !game.socket) return;
+  game.socket.on(SYSTEM_SOCKET, async data => {
+    if (!data || data.type !== "applyDamage") return;
+    if (!game.user.isGM) return;
+    const token = data.tokenUuid ? await fromUuid(data.tokenUuid) : null;
+    const targetActor = token?.actor || (data.actorId ? game.actors.get(data.actorId) : null);
+    if (!targetActor) return;
+    const share = Number(data.damage);
+    if (!Number.isFinite(share) || share <= 0) return;
+    await applyDamageToActor(targetActor, share);
+  });
+  globalThis.__bmDamageSocketReady = true;
 }
 
 Hooks.once("init", () => {
   game.settings.register("bloodman", "chaosDice", {
     name: "Des du chaos",
-    scope: "client",
+    scope: "world",
     config: false,
     type: Number,
     default: 0,
@@ -130,6 +138,7 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
+  registerDamageSocketHandlers();
   for (const actor of game.actors) {
     if (!actor.isOwner) continue;
     const isCharacter = actor.type === "personnage";
@@ -224,6 +233,7 @@ function getChaosValue() {
 }
 
 async function setChaosValue(nextValue) {
+  if (!game.user.isGM) return;
   const clamped = clampChaosValue(nextValue);
   await game.settings.set("bloodman", "chaosDice", clamped);
   updateChaosDiceUI(clamped);
@@ -269,6 +279,7 @@ function positionChaosDiceUI() {
 }
 
 function ensureChaosDiceUI() {
+  if (!game.user.isGM) return;
   if (document.getElementById("bm-chaos-dice")) return;
   const target = document.getElementById("ui-bottom") || document.body;
   if (!target) return;
@@ -831,12 +842,9 @@ class BloodmanItemSheet extends ItemSheet {
   async getData(options) {
     const data = await super.getData(options);
     if (this.item.type === "arme") {
-      const weaponType = (this.item.system?.weaponType || "").toString().toLowerCase();
-      let isDistance = weaponType.includes("distance");
-      let isMelee = weaponType.includes("corps") || weaponType.includes("blanche");
-      if (!isDistance && !isMelee) isDistance = true;
-      data.weaponTypeDistance = isDistance;
-      data.weaponTypeMelee = isMelee;
+      const weaponType = getWeaponCategory(this.item.system?.weaponType);
+      data.weaponTypeDistance = weaponType === "distance";
+      data.weaponTypeMelee = weaponType === "corps";
     }
     return data;
   }

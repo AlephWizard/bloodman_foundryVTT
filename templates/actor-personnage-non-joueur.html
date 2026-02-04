@@ -54,7 +54,9 @@
 
       <div class="tab-grid">
         <aside class="sidebar">
-          <img src="{{actor.img}}" data-edit="img" class="portrait" />
+          <div class="portrait-frame">
+            <img src="{{actor.img}}" data-edit="img" class="portrait" />
+          </div>
         </aside>
 
         <div class="resource-badges">
@@ -161,7 +163,7 @@
             </div>
             <div class="field">
               <label>HISTORIQUE</label>
-              <textarea name="system.profile.historique" rows="6">{{profile.historique}}</textarea>
+              <textarea name="system.profile.historique" rows="4">{{profile.historique}}</textarea>
             </div>
           </div>
         </div>
@@ -306,7 +308,7 @@
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-pen"></i> NOTES</span>
         </div>
-        <textarea name="system.profile.notes" rows="8">{{profile.notes}}</textarea>
+        <textarea name="system.profile.notes" rows="6">{{profile.notes}}</textarea>
       </section>
     </section>
   </section>

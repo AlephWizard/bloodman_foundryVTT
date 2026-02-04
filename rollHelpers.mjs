@@ -1,11 +1,34 @@
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
+const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
+const SYSTEM_SOCKET = "system.bloodman";
+const WEAPON_TYPE_DISTANCE = "arme Ã  distance";
+const WEAPON_TYPE_MELEE = "arme de corps Ã  corps";
+
+function isBonusItem(item) {
+  return BONUS_ITEM_TYPES.has(item?.type);
+}
+
+export function normalizeWeaponType(value) {
+  const raw = (value ?? "").toString().toLowerCase();
+  if (!raw) return "";
+  if (raw.includes("distance")) return WEAPON_TYPE_DISTANCE;
+  if (raw.includes("corps") || raw.includes("blanche")) return WEAPON_TYPE_MELEE;
+  if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return WEAPON_TYPE_DISTANCE;
+  return (value ?? "").toString();
+}
+
+export function getWeaponCategory(value) {
+  const normalized = normalizeWeaponType(value).toLowerCase();
+  if (normalized.includes("corps") || normalized.includes("blanche")) return "corps";
+  return "distance";
+}
 
 function getItemBonus(actor, key) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
-    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
+    if (!isBonusItem(item)) continue;
     if (!item.system?.bonusEnabled) continue;
     if (item.system?.bonuses && Object.prototype.hasOwnProperty.call(item.system.bonuses, key)) {
       const bonus = Number(item.system.bonuses[key]);
@@ -24,7 +47,7 @@ function getRawDamageBonus(actor) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
-    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
+    if (!isBonusItem(item)) continue;
     if (!item.system?.rawBonusEnabled) continue;
     const bonus = Number(item.system?.rawBonuses?.deg);
     if (Number.isFinite(bonus)) total += bonus;
@@ -40,6 +63,17 @@ function getEffectiveCharacteristic(actor, key) {
   return base + globalMod + keyMod + itemBonus;
 }
 
+function getProtectionPA(actor) {
+  if (!actor?.items) return 0;
+  let total = 0;
+  for (const item of actor.items) {
+    if (item.type !== "protection") continue;
+    const pa = Number(item.system?.pa || 0);
+    if (Number.isFinite(pa)) total += pa;
+  }
+  return total;
+}
+
 export async function doCharacteristicRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
 
@@ -50,6 +84,37 @@ export async function doCharacteristicRoll(actor, key) {
     flavor: `<b>${actor.name}</b> – ${key}<br>${r.total} / ${effective} → <b>${success ? "RÉUSSITE" : "ÉCHEC"}</b>`
   });
   return { roll: r, success, effective };
+}
+
+async function requestDamageFromGM(token, damage) {
+  if (!game.socket) return;
+  const tokenUuid = token?.document?.uuid;
+  const actorId = token?.actor?.id;
+  game.socket.emit(SYSTEM_SOCKET, {
+    type: "applyDamage",
+    tokenUuid,
+    actorId,
+    damage
+  });
+}
+
+export async function applyDamageToActor(targetActor, damage) {
+  if (!targetActor) return null;
+  const share = Number(damage);
+  if (!Number.isFinite(share) || share <= 0) return null;
+  const pa = getProtectionPA(targetActor);
+  const finalDamage = Math.max(0, share - pa);
+  const current = Number(targetActor.system.resources?.pv?.current || 0);
+  const nextValue = Math.max(0, current - finalDamage);
+
+  await targetActor.update({ "system.resources.pv.current": nextValue });
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+    content: `<strong>${targetActor.name}</strong> subit ${finalDamage} dégâts (PA ${pa})`
+  });
+
+  return { finalDamage, pa };
 }
 
 async function applyDamageToTargets(sourceActor, total) {
@@ -130,45 +195,19 @@ async function applyDamageToTargets(sourceActor, total) {
   for (const token of targets) {
     const targetActor = token.actor;
     if (!targetActor) continue;
-    if (!targetActor.isOwner) {
-      ui.notifications?.warn(`Pas de droits pour modifier ${targetActor.name}.`);
-      continue;
-    }
-
     const share = allocations ? Number(allocations[token.id] || 0) : total;
     if (!Number.isFinite(share) || share <= 0) continue;
-    const pa = targetActor.items
-      .filter(i => i.type === "protection")
-      .reduce((sum, i) => sum + Number(i.system.pa || 0), 0);
-    const finalDamage = Math.max(0, share - pa);
-    const current = Number(targetActor.system.resources?.pv?.current || 0);
-    const nextValue = Math.max(0, current - finalDamage);
-
-    await targetActor.update({ "system.resources.pv.current": nextValue });
-
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-      content: `<strong>${targetActor.name}</strong> subit ${finalDamage} dégâts (PA ${pa})`
-    });
+    if (!targetActor.isOwner) {
+      await requestDamageFromGM(token, share);
+      continue;
+    }
+    await applyDamageToActor(targetActor, share);
   }
 }
 
 export async function doDamageRoll(actor, item) {
   const die = item.system.damageDie || "d4";
-  const rawType = (item.system.weaponType || "distance").toString().toLowerCase();
-  const weaponType = rawType.includes("distance")
-    ? "distance"
-    : rawType.includes("corps")
-      ? "corps"
-      : rawType.includes("blanche")
-        ? "corps"
-        : rawType.includes("tactique")
-          ? "distance"
-          : rawType.includes("jet")
-            ? "distance"
-            : rawType.includes("poing")
-              ? "distance"
-              : rawType;
+  const weaponType = getWeaponCategory(item.system?.weaponType);
   const infiniteAmmo = Boolean(item.system.infiniteAmmo);
   const consumesAmmo = weaponType === "distance" && !infiniteAmmo;
   if (consumesAmmo) {

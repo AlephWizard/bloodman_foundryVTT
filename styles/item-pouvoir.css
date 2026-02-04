@@ -4,9 +4,9 @@
   background: var(--bm-white);
   border: 2px solid var(--bm-line);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   display: grid;
-  gap: 6px 10px;
+  gap: 4px 8px;
   grid-template-columns: 140px 1fr;
 }
 
@@ -14,12 +14,12 @@
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .item-pouvoir .item-image {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   object-fit: cover;
   border: 1px solid var(--bm-line);
   border-radius: 6px;
@@ -32,13 +32,13 @@
 
 .item-pouvoir .item-name-field input {
   width: 100%;
-  height: 32px;
+  height: 28px;
 }
 
 .item-pouvoir label {
   font-weight: 700;
   letter-spacing: 0.5px;
-  font-size: 12px;
+  font-size: 11px;
   align-self: center;
 }
 
@@ -49,7 +49,7 @@
   font-size: 14px;
   border: 1px solid var(--bm-line);
   border-radius: 6px;
-  padding: 4px 6px;
+  padding: 3px 5px;
 }
 
 .item-pouvoir .full-row {
@@ -57,51 +57,51 @@
 }
 
 .item-pouvoir textarea {
-  min-height: 120px;
+  min-height: 100px;
   resize: vertical;
 }
 
 .item-pouvoir .power-cost-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .item-pouvoir .power-cost-input {
-  width: 70px;
+  width: 60px;
   text-align: center;
 }
 
 .item-pouvoir .ability-row {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) 2px minmax(230px, 1.3fr) 2px minmax(160px, 1fr);
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
 }
 
 .item-pouvoir .ability-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 
 .item-pouvoir .inline-label {
   font-weight: 700;
   letter-spacing: 0.3px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .item-pouvoir .toggle-group {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .item-pouvoir .toggle-option {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
   font-weight: 700;
   font-size: 11px;
@@ -130,20 +130,20 @@
 
 .item-pouvoir .bonus-controls {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
 .item-pouvoir .bonus-input {
-  width: 60px;
+  width: 54px;
 }
 
 .item-pouvoir .bonus-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(86px, 1fr));
-  gap: 6px 10px;
+  gap: 4px 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .item-pouvoir .bonus-grid label {
@@ -155,7 +155,7 @@
 }
 
 .item-pouvoir .bonus-grid input {
-  width: 44px;
+  width: 40px;
   text-align: center;
 }
 
@@ -164,11 +164,11 @@
 }
 
 .item-pouvoir .bonus-grid-compact input {
-  width: 38px;
+  width: 34px;
 }
 
 .item-pouvoir select {
-  width: 70px;
+  width: 64px;
 }
 
 .item-pouvoir .bonus-grid.is-disabled {

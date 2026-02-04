@@ -4,9 +4,9 @@
   background: var(--bm-white);
   border: 2px solid var(--bm-line);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   display: grid;
-  gap: 6px 10px;
+  gap: 4px 8px;
   grid-template-columns: 140px 1fr;
 }
 
@@ -14,12 +14,12 @@
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .item-objet .item-image {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   object-fit: cover;
   border: 1px solid var(--bm-line);
   border-radius: 6px;
@@ -33,7 +33,7 @@
 .item-objet label {
   font-weight: 700;
   letter-spacing: 0.5px;
-  font-size: 12px;
+  font-size: 11px;
   align-self: center;
 }
 
@@ -44,5 +44,5 @@
   font-size: 14px;
   border: 1px solid var(--bm-line);
   border-radius: 6px;
-  padding: 4px 6px;
+  padding: 3px 5px;
 }
