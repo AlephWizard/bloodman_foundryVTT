@@ -18,7 +18,7 @@
   --bm-gray: #e7e7e7;
   --bm-ink: #121212;
   --bm-line: #111111;
-  --bm-white: #f6f5f2;
+  --bm-white: #ffffff;
 }
 
 .bloodman.sheet.actor,
@@ -26,54 +26,4 @@
 .bloodman.sheet.actor .window-content,
 .bloodman.sheet.item .window-content {
   background: unset;
-}
-
-#bm-chaos-dice {
-  position: fixed;
-  right: 18px;
-  bottom: 72px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  z-index: 60;
-  pointer-events: auto;
-  user-select: none;
-  font-family: "Oswald", sans-serif;
-}
-
-#bm-chaos-dice .bm-chaos-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: 2px solid #000000;
-  background: #0f0f0f;
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 16px;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-}
-
-#bm-chaos-dice .bm-chaos-icon {
-  position: relative;
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#bm-chaos-dice .bm-chaos-icon img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-#bm-chaos-dice .bm-chaos-value {
-  position: absolute;
-  color: #ffffff;
-  font-weight: 800;
-  font-size: 16px;
-  line-height: 1;
 }

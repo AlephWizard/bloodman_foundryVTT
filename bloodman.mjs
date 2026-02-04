@@ -101,17 +101,6 @@ function normalizeWeaponType(value) {
 }
 
 Hooks.once("init", () => {
-  game.settings.register("bloodman", "chaosDice", {
-    name: "Des du chaos",
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 0,
-    onChange: value => {
-      updateChaosDiceUI(typeof value === "number" ? value : Number(value));
-    }
-  });
-
   Actors.unregisterSheet("core", ActorSheet);
   Actors.registerSheet("bloodman", BloodmanActorSheet, {
     types: ["personnage"],
@@ -191,8 +180,6 @@ Hooks.once("ready", async () => {
     }
   }
 
-  ensureChaosDiceUI();
-
   if (game.user.isGM) {
     for (const scene of game.scenes) {
       for (const token of scene.tokens) {
@@ -213,117 +200,6 @@ Hooks.once("ready", async () => {
     }
   }
 });
-
-function clampChaosValue(value) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function getChaosValue() {
-  return clampChaosValue(Number(game.settings.get("bloodman", "chaosDice")));
-}
-
-async function setChaosValue(nextValue) {
-  const clamped = clampChaosValue(nextValue);
-  await game.settings.set("bloodman", "chaosDice", clamped);
-  updateChaosDiceUI(clamped);
-}
-
-function updateChaosDiceUI(value) {
-  const root = document.getElementById("bm-chaos-dice");
-  if (!root) return;
-  const display = root.querySelector(".bm-chaos-value");
-  if (display) display.textContent = String(clampChaosValue(value));
-}
-
-function getVisibleRect(element) {
-  if (!element) return null;
-  const rect = element.getBoundingClientRect();
-  if (!rect || rect.width === 0 || rect.height === 0) return null;
-  return rect;
-}
-
-function positionChaosDiceUI() {
-  const root = document.getElementById("bm-chaos-dice");
-  if (!root) return;
-  const chatRect = getVisibleRect(document.getElementById("chat-form"));
-  const hotbarRect = getVisibleRect(document.getElementById("hotbar"));
-  const gap = 10;
-
-  if (chatRect) {
-    const rootRect = root.getBoundingClientRect();
-    const width = rootRect.width || 46;
-    const left = Math.max(12, Math.round(chatRect.left - width - gap));
-    const bottom = 12;
-    root.style.left = `${left}px`;
-    root.style.right = "auto";
-    root.style.bottom = `${bottom}px`;
-    return;
-  }
-
-  const anchorTop = hotbarRect?.top;
-  if (typeof anchorTop === "number") {
-    const bottomOffset = Math.max(12, Math.round(window.innerHeight - anchorTop + 6));
-    root.style.bottom = `${bottomOffset}px`;
-  }
-}
-
-function ensureChaosDiceUI() {
-  if (document.getElementById("bm-chaos-dice")) return;
-  const target = document.getElementById("ui-bottom") || document.body;
-  if (!target) return;
-
-  const container = document.createElement("div");
-  container.id = "bm-chaos-dice";
-  container.className = "bm-chaos-dice";
-  container.title = "Des du chaos";
-  container.innerHTML = `
-    <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="Augmenter les des du chaos">+</button>
-    <div class="bm-chaos-icon" aria-hidden="true">
-      <img src="systems/bloodman/images/d20_destin.svg" alt="" />
-      <span class="bm-chaos-value">0</span>
-    </div>
-    <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="Diminuer les des du chaos">-</button>
-  `;
-
-  target.appendChild(container);
-
-  const minus = container.querySelector(".bm-chaos-minus");
-  const plus = container.querySelector(".bm-chaos-plus");
-
-  minus?.addEventListener("click", async () => {
-    const current = getChaosValue();
-    await setChaosValue(current - 1);
-  });
-
-  plus?.addEventListener("click", async () => {
-    const current = getChaosValue();
-    await setChaosValue(current + 1);
-  });
-
-  updateChaosDiceUI(getChaosValue());
-  positionChaosDiceUI();
-
-  if (!window.__bmChaosDiceObserver) {
-    const observer = new ResizeObserver(() => positionChaosDiceUI());
-    const sidebar = document.getElementById("sidebar");
-    const tabs = document.getElementById("sidebar-tabs");
-    const chatForm = document.getElementById("chat-form");
-    const hotbar = document.getElementById("hotbar");
-    if (sidebar) observer.observe(sidebar);
-    if (tabs) observer.observe(tabs);
-    if (chatForm) observer.observe(chatForm);
-    if (hotbar) observer.observe(hotbar);
-    window.addEventListener("resize", positionChaosDiceUI);
-
-    if (sidebar) {
-      const mutation = new MutationObserver(() => positionChaosDiceUI());
-      mutation.observe(sidebar, { attributes: true, attributeFilter: ["class", "style"] });
-      window.__bmChaosDiceMutation = mutation;
-    }
-    window.__bmChaosDiceObserver = observer;
-  }
-}
 
 Hooks.on("createItem", (item) => {
   if (!item?.actor) return;
@@ -369,18 +245,11 @@ function getItemResourceBonusTotals(actor) {
   if (!actor?.items) return totals;
   for (const item of actor.items) {
     if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
-    if (item.system?.bonusEnabled) {
-      const pvBonus = Number(item.system?.resourceBonuses?.pv);
-      const ppBonus = Number(item.system?.resourceBonuses?.pp);
-      if (Number.isFinite(pvBonus)) totals.pv += pvBonus;
-      if (Number.isFinite(ppBonus)) totals.pp += ppBonus;
-    }
-    if (item.system?.rawBonusEnabled) {
-      const pvBonus = Number(item.system?.rawBonuses?.pv);
-      const ppBonus = Number(item.system?.rawBonuses?.pp);
-      if (Number.isFinite(pvBonus)) totals.pv += pvBonus;
-      if (Number.isFinite(ppBonus)) totals.pp += ppBonus;
-    }
+    if (!item.system?.bonusEnabled) continue;
+    const pvBonus = Number(item.system?.resourceBonuses?.pv);
+    const ppBonus = Number(item.system?.resourceBonuses?.pp);
+    if (Number.isFinite(pvBonus)) totals.pv += pvBonus;
+    if (Number.isFinite(ppBonus)) totals.pp += ppBonus;
   }
   return totals;
 }
@@ -414,27 +283,6 @@ async function applyItemResourceBonuses(actor) {
   if (storedPp !== totals.pp) updates["system.resources.pp.itemBonus"] = totals.pp;
 
   if (Object.keys(updates).length) await actor.update(updates);
-}
-
-async function applyPowerCost(actor, item) {
-  if (!actor || !item) return true;
-  if (item.type !== "pouvoir") return true;
-  if (!item.system?.damageEnabled || !item.system?.powerCostEnabled) return true;
-  if (!actor.isOwner) return false;
-  const cost = Number(item.system?.powerCost);
-  if (!Number.isFinite(cost) || cost <= 0) return true;
-  const current = Number(actor.system.resources?.pp?.current || 0);
-  if (current < cost) {
-    ui.notifications?.warn("Pas assez de points de puissance pour lancer ce pouvoir.");
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<strong>${actor.name}</strong> inflige 0 dégâts (${item.name})`
-    });
-    return false;
-  }
-  const nextValue = Math.max(0, current - cost);
-  await actor.update({ "system.resources.pp.current": nextValue });
-  return true;
 }
 
 function buildItemDisplayData(item) {
@@ -580,8 +428,7 @@ class BloodmanActorSheet extends ActorSheet {
       classes: ["bloodman", "sheet", "actor"],
       template: "systems/bloodman/templates/actor-personnage.html",
       width: 1050,
-      height: 820,
-      resizable: true,
+      height: 760,
       submitOnChange: true,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "carac" }]
     });
@@ -765,8 +612,6 @@ class BloodmanActorSheet extends ActorSheet {
 
   async rollAbilityDamage(item) {
     if (!item) return;
-    const canRoll = await applyPowerCost(this.actor, item);
-    if (!canRoll) return;
     const die = (item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
     await doDirectDamageRoll(this.actor, formula, item.name);
@@ -828,25 +673,11 @@ class BloodmanItemSheet extends ItemSheet {
     return `systems/bloodman/templates/item-${this.item.type}.html`;
   }
 
-  async getData(options) {
-    const data = await super.getData(options);
-    if (this.item.type === "arme") {
-      const weaponType = (this.item.system?.weaponType || "").toString().toLowerCase();
-      let isDistance = weaponType.includes("distance");
-      let isMelee = weaponType.includes("corps") || weaponType.includes("blanche");
-      if (!isDistance && !isMelee) isDistance = true;
-      data.weaponTypeDistance = isDistance;
-      data.weaponTypeMelee = isMelee;
-    }
-    return data;
-  }
-
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "item"],
       width: 640,
-      height: 480,
-      resizable: true,
+      height: 260,
       submitOnChange: true
     });
   }
@@ -866,8 +697,6 @@ class BloodmanItemSheet extends ItemSheet {
       ui.notifications?.warn("Cette aptitude/pouvoir n'est pas lié à un acteur.");
       return;
     }
-    const canRoll = await applyPowerCost(this.item.actor, this.item);
-    if (!canRoll) return;
     const die = (this.item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
     await doDirectDamageRoll(this.item.actor, formula, this.item.name);

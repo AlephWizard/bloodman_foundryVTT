@@ -20,18 +20,6 @@ function getItemBonus(actor, key) {
   return total;
 }
 
-function getRawDamageBonus(actor) {
-  if (!actor?.items) return 0;
-  let total = 0;
-  for (const item of actor.items) {
-    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
-    if (!item.system?.rawBonusEnabled) continue;
-    const bonus = Number(item.system?.rawBonuses?.deg);
-    if (Number.isFinite(bonus)) total += bonus;
-  }
-  return total;
-}
-
 function getEffectiveCharacteristic(actor, key) {
   const base = Number(actor.system.characteristics?.[key]?.base || 0);
   const globalMod = Number(actor.system.modifiers?.all || 0);
@@ -180,9 +168,6 @@ export async function doDamageRoll(actor, item) {
   }
 
   const roll = await new Roll(`1${die}`).roll({ async: true });
-  const rawDamageBonus = getRawDamageBonus(actor);
-  const totalDamage = Math.max(0, roll.total + rawDamageBonus);
-  const sourceName = item?.name ? ` (${item.name})` : "";
 
   if (consumesAmmo) {
     const currentAmmo = Number(actor.system.ammo?.value);
@@ -192,10 +177,10 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<strong>${actor.name}</strong> inflige ${totalDamage} dégâts${sourceName}`
+    flavor: `<strong>${actor.name}</strong> inflige ${roll.total} dégâts`
   });
 
-  await applyDamageToTargets(actor, totalDamage);
+  await applyDamageToTargets(actor, roll.total);
   return roll;
 }
 
@@ -223,15 +208,13 @@ export async function doHealRoll(actor, item) {
 export async function doDirectDamageRoll(actor, formula, sourceName = "") {
   if (!actor) return null;
   const roll = await new Roll(formula).roll({ async: true });
-  const rawDamageBonus = getRawDamageBonus(actor);
-  const totalDamage = Math.max(0, roll.total + rawDamageBonus);
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<strong>${actor.name}</strong> inflige ${totalDamage} dégâts${sourceName ? ` (${sourceName})` : ""}`
+    flavor: `<strong>${actor.name}</strong> inflige ${roll.total} dégâts${sourceName ? ` (${sourceName})` : ""}`
   });
 
-  await applyDamageToTargets(actor, totalDamage);
+  await applyDamageToTargets(actor, roll.total);
   return roll;
 }
 

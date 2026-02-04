@@ -30,11 +30,6 @@
   flex: 1;
 }
 
-.item-arme .item-name-field input {
-  width: 100%;
-  height: 32px;
-}
-
 .item-arme label {
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -52,38 +47,9 @@
   padding: 4px 6px;
 }
 
-.item-arme .full-row {
-  grid-column: 1 / -1;
-}
-
-.item-arme textarea {
-  min-height: 120px;
-  resize: vertical;
-}
-
-.item-arme .weapon-row {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) 2px minmax(230px, 1.3fr) 2px minmax(160px, 1fr);
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.item-arme .weapon-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.item-arme .inline-label {
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  font-size: 12px;
-}
-
 .item-arme .toggle-group {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 
@@ -92,64 +58,5 @@
   gap: 6px;
   align-items: center;
   font-weight: 700;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.item-arme .toggle-option input {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 2px solid #000000;
-  border-radius: 3px;
-  background: var(--bm-white);
-  margin: 0;
-}
-
-.item-arme .toggle-option input:checked {
-  background: #000000;
-}
-
-.item-arme .weapon-divider {
-  width: 2px;
-  align-self: stretch;
-  background: #000000;
-}
-
-.item-arme .weapon-type-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-}
-
-.item-arme .weapon-type-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.item-arme .weapon-type-option i {
-  font-size: 14px;
-}
-
-.item-arme .weapon-type-option input {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 2px solid #000000;
-  border-radius: 3px;
-  background: var(--bm-white);
-  margin: 0;
-}
-
-.item-arme .weapon-type-option input:checked {
-  background: #000000;
-}
-
-.item-arme select {
-  width: 70px;
+  font-size: 12px;
 }
