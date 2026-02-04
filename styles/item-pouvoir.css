@@ -30,6 +30,11 @@
   flex: 1;
 }
 
+.item-pouvoir .item-name-field input {
+  width: 100%;
+  height: 32px;
+}
+
 .item-pouvoir label {
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -52,21 +57,34 @@
 }
 
 .item-pouvoir textarea {
-  min-height: 110px;
+  min-height: 120px;
   resize: vertical;
 }
 
-.item-pouvoir .ability-row {
+.item-pouvoir .power-cost-row {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.item-pouvoir .power-cost-input {
+  width: 70px;
+  text-align: center;
+}
+
+.item-pouvoir .ability-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) 2px minmax(230px, 1.3fr) 2px minmax(160px, 1fr);
+  gap: 12px;
   align-items: flex-start;
 }
 
 .item-pouvoir .ability-section {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .item-pouvoir .inline-label {
@@ -77,7 +95,7 @@
 
 .item-pouvoir .toggle-group {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -86,14 +104,28 @@
   gap: 6px;
   align-items: center;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.item-pouvoir .toggle-option input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #000000;
+  border-radius: 3px;
+  background: var(--bm-white);
+  margin: 0;
+}
+
+.item-pouvoir .toggle-option input:checked {
+  background: #000000;
 }
 
 .item-pouvoir .ability-divider {
   width: 2px;
   align-self: stretch;
-  background: var(--bm-line);
-  border-radius: 2px;
+  background: #000000;
 }
 
 .item-pouvoir .bonus-controls {
@@ -108,7 +140,7 @@
 
 .item-pouvoir .bonus-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  grid-template-columns: repeat(3, minmax(86px, 1fr));
   gap: 6px 10px;
   align-items: center;
   font-size: 12px;
@@ -123,8 +155,20 @@
 }
 
 .item-pouvoir .bonus-grid input {
-  width: 52px;
+  width: 44px;
   text-align: center;
+}
+
+.item-pouvoir .bonus-grid-compact {
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
+}
+
+.item-pouvoir .bonus-grid-compact input {
+  width: 38px;
+}
+
+.item-pouvoir select {
+  width: 70px;
 }
 
 .item-pouvoir .bonus-grid.is-disabled {

@@ -601,6 +601,16 @@
   letter-spacing: 1.4px;
 }
 
+.bloodman-sheet .sheet-logo {
+  height: 36px;
+  width: auto;
+  display: block;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none;
+}
+
 .voyage-banner {
   display: inline-flex;
   align-items: center;
@@ -701,9 +711,13 @@
 .portrait {
   border: 4px solid #000000;
   border-radius: 16px;
-  background: #39d10d;
+  background: transparent;
   height: 100%;
   object-fit: cover;
+}
+
+.portrait[src*="mystery-man.svg"] {
+  opacity: 0;
 }
 
 .resource-badges {
@@ -747,6 +761,13 @@
   font-weight: 800;
   padding: 0;
   text-align: center;
+}
+
+.resource-circle.pv input,
+.resource-circle.pp input,
+.resource-circle.pv .value span,
+.resource-circle.pp .value span {
+  color: #ffffff;
 }
 
 .resource-circle .value span {

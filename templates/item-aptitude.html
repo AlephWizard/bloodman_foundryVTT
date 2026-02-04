@@ -71,5 +71,28 @@
         </div>
       </div>
     </div>
+
+    <div class="ability-divider"></div>
+
+    <div class="ability-section">
+      <label class="inline-label">BONUS/MALUS BRUTE :</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.rawBonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.rawBonusEnabled}}checked{{/if}} />
+          OUI
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.rawBonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.rawBonusEnabled}}checked{{/unless}} />
+          NON
+        </label>
+      </div>
+      <div class="bonus-controls">
+        <div class="bonus-grid bonus-grid-compact {{#unless item.system.rawBonusEnabled}}is-disabled{{/unless}}">
+          <label><span>PV</span><input type="number" name="system.rawBonuses.pv" value="{{item.system.rawBonuses.pv}}" data-dtype="Number" step="1" {{#unless item.system.rawBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>PP</span><input type="number" name="system.rawBonuses.pp" value="{{item.system.rawBonuses.pp}}" data-dtype="Number" step="1" {{#unless item.system.rawBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>DEG</span><input type="number" name="system.rawBonuses.deg" value="{{item.system.rawBonuses.deg}}" data-dtype="Number" step="1" {{#unless item.system.rawBonusEnabled}}disabled{{/unless}} /></label>
+        </div>
+      </div>
+    </div>
   </div>
 </form>

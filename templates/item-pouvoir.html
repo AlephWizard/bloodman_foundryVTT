@@ -7,6 +7,21 @@
     </div>
   </div>
 
+  <div class="power-cost-row full-row">
+    <label class="inline-label">COUT EN PUISSANCE :</label>
+    <input class="power-cost-input" type="number" name="system.powerCost" value="{{item.system.powerCost}}" data-dtype="Number" step="1" {{#unless item.system.powerCostEnabled}}disabled{{/unless}} />
+    <div class="toggle-group">
+      <label class="toggle-option">
+        <input type="radio" name="system.powerCostEnabled" value="true" data-dtype="Boolean" {{#if item.system.powerCostEnabled}}checked{{/if}} />
+        OUI
+      </label>
+      <label class="toggle-option">
+        <input type="radio" name="system.powerCostEnabled" value="false" data-dtype="Boolean" {{#unless item.system.powerCostEnabled}}checked{{/unless}} />
+        NON
+      </label>
+    </div>
+  </div>
+
   <label class="full-row">NOTE</label>
   <textarea class="full-row" name="system.note">{{item.system.note}}</textarea>
 
@@ -68,6 +83,29 @@
           <label><span>SAV</span><input type="number" name="system.bonuses.SAV" value="{{item.system.bonuses.SAV}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
           <label><span>PV</span><input type="number" name="system.resourceBonuses.pv" value="{{item.system.resourceBonuses.pv}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
           <label><span>PP</span><input type="number" name="system.resourceBonuses.pp" value="{{item.system.resourceBonuses.pp}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="ability-divider"></div>
+
+    <div class="ability-section">
+      <label class="inline-label">BONUS/MALUS BRUTE :</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.rawBonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.rawBonusEnabled}}checked{{/if}} />
+          OUI
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.rawBonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.rawBonusEnabled}}checked{{/unless}} />
+          NON
+        </label>
+      </div>
+      <div class="bonus-controls">
+        <div class="bonus-grid bonus-grid-compact {{#unless item.system.rawBonusEnabled}}is-disabled{{/unless}}">
+          <label><span>PV</span><input type="number" name="system.rawBonuses.pv" value="{{item.system.rawBonuses.pv}}" data-dtype="Number" step="1" {{#unless item.system.rawBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>PP</span><input type="number" name="system.rawBonuses.pp" value="{{item.system.rawBonuses.pp}}" data-dtype="Number" step="1" {{#unless item.system.rawBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>DEG</span><input type="number" name="system.rawBonuses.deg" value="{{item.system.rawBonuses.deg}}" data-dtype="Number" step="1" {{#unless item.system.rawBonusEnabled}}disabled{{/unless}} /></label>
         </div>
       </div>
     </div>
