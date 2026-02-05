@@ -44,7 +44,7 @@ function doCharacteristicRoll(actor, key) { /* calcul effective, Roll 1d100, toM
 ### Où regarder pour exemples et modifications rapides
 - `system.json` — métadonnées et types
 - `bloodman.mjs` — logique principale, hooks, sheets, rolls
-- `templates/actor-personnage.html` et `templates/item-arme.html` — bindings et UI
+- `templates/actor-joueur.html` et `templates/item-arme.html` — bindings et UI
 - `lang/fr.json` — I18N (à remplir)
 
 ### Demande de feedback
@@ -54,3 +54,4 @@ Avant d'appliquer des refactors larges (extraction de helpers, i18n complet, ajo
 - Priorité C : ajouter tests/scripts de build.
 
 Merci — proposez la priorité et j'implémente le patch correspondant.
+

@@ -18,6 +18,8 @@ const CHARACTERISTICS = [
 ];
 
 const SYSTEM_SOCKET = "system.bloodman";
+const CARRIED_ITEM_LIMIT = 10;
+const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
 
 function buildDefaultCharacteristics() {
   const characteristics = {};
@@ -62,7 +64,8 @@ function buildDefaultProfile() {
 function buildDefaultEquipment() {
   return {
     monnaies: "",
-    transports: ""
+    transports: "",
+    transportNpcs: []
   };
 }
 
@@ -137,7 +140,7 @@ Hooks.once("init", () => {
 
   Items.unregisterSheet("core", ItemSheet);
   Items.registerSheet("bloodman", BloodmanItemSheet, {
-    types: ["arme", "objet", "soin", "protection", "aptitude", "pouvoir"],
+    types: ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"],
     makeDefault: true
   });
 });
@@ -489,6 +492,41 @@ function buildItemDisplayData(item) {
   return data;
 }
 
+function getTransportNpcRefs(actor) {
+  const refs = actor?.system?.equipment?.transportNpcs;
+  if (!Array.isArray(refs)) return [];
+  return refs
+    .map(ref => (typeof ref === "string" ? ref.trim() : ""))
+    .filter(ref => ref.length > 0);
+}
+
+function resolveTransportNpc(ref) {
+  if (!ref || typeof ref !== "string") return null;
+  const uuidRef = ref.startsWith("Actor.") ? ref : null;
+  const byUuid = uuidRef && typeof fromUuidSync === "function" ? fromUuidSync(uuidRef) : null;
+  const actor = byUuid || game.actors?.get(ref) || null;
+  if (!actor || actor.type !== "personnage-non-joueur") return null;
+  return actor;
+}
+
+function buildTransportNpcDisplayData(actor) {
+  const transportNpcs = [];
+  const seen = new Set();
+  for (const ref of getTransportNpcRefs(actor)) {
+    if (seen.has(ref)) continue;
+    seen.add(ref);
+    const npc = resolveTransportNpc(ref);
+    if (!npc) continue;
+    transportNpcs.push({
+      ref,
+      id: npc.id,
+      name: npc.name,
+      img: npc.img || "icons/svg/mystery-man.svg"
+    });
+  }
+  return transportNpcs;
+}
+
 Hooks.on("preCreateToken", (doc) => {
   const actorType = doc.actor?.type;
   if (actorType === "personnage") doc.updateSource({ actorLink: true });
@@ -594,7 +632,7 @@ class BloodmanActorSheet extends ActorSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
-      template: "systems/bloodman/templates/actor-personnage.html",
+      template: "systems/bloodman/templates/actor-joueur.html",
       width: 1050,
       height: 820,
       resizable: true,
@@ -652,10 +690,12 @@ class BloodmanActorSheet extends ActorSheet {
       inplace: false
     });
     const ammo = foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false });
+    const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
     const itemBuckets = {
       arme: [],
       objet: [],
+      ration: [],
       soin: [],
       protection: [],
       aptitude: [],
@@ -682,6 +722,8 @@ class BloodmanActorSheet extends ActorSheet {
       else weapon.displayWeaponType = weaponTypeDistance;
       return weapon;
     });
+    const carriedItemsCount = itemBuckets.objet.length + itemBuckets.soin.length + itemBuckets.ration.length;
+    const equipmentTwoColumns = carriedItemsCount >= 6;
 
     return {
       ...data,
@@ -697,11 +739,14 @@ class BloodmanActorSheet extends ActorSheet {
       equipment,
       weapons,
       objects: itemBuckets.objet,
+      rations: itemBuckets.ration,
       soins: itemBuckets.soin,
       protections: itemBuckets.protection,
       aptitudes,
       pouvoirs,
-      ammo
+      ammo,
+      transportNpcs,
+      equipmentTwoColumns
     };
   }
 
@@ -734,6 +779,7 @@ class BloodmanActorSheet extends ActorSheet {
     html.find(".item-delete").click(ev => {
       const li = ev.currentTarget.closest(".item");
       const item = this.actor.items.get(li.dataset.itemId);
+      if (!item) return;
       item.delete();
     });
 
@@ -747,6 +793,24 @@ class BloodmanActorSheet extends ActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.actor.items.get(li.dataset.itemId);
       this.useItem(item);
+    });
+
+    html.find(".transport-npc-open").click(ev => {
+      const li = ev.currentTarget.closest(".item");
+      const ref = li?.dataset?.transportNpcRef;
+      const npc = resolveTransportNpc(ref);
+      npc?.sheet?.render(true);
+    });
+
+    html.find(".transport-npc-delete").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = ev.currentTarget.closest(".item");
+      const ref = li?.dataset?.transportNpcRef;
+      if (!ref) return;
+      const refs = getTransportNpcRefs(this.actor);
+      const nextRefs = refs.filter(entry => entry !== ref);
+      await this.actor.update({ "system.equipment.transportNpcs": nextRefs });
     });
 
     html.find(".xp-check input").change(async ev => {
@@ -770,6 +834,51 @@ class BloodmanActorSheet extends ActorSheet {
       const key = ev.currentTarget.dataset.key;
       this.rollGrowth(key);
     });
+  }
+
+  async _onDrop(event) {
+    const data = TextEditor.getDragEventData(event);
+    if (data?.type === "Actor") {
+      const handled = await this._onDropTransportNpc(event, data);
+      if (handled) return;
+    }
+    return super._onDrop(event);
+  }
+
+  async _onDropItem(event, data) {
+    const reachedLimit = await this._reachedCarriedItemsLimit(data);
+    if (reachedLimit) return null;
+    return super._onDropItem(event, data);
+  }
+
+  async _reachedCarriedItemsLimit(data) {
+    if (this.actor.type !== "personnage") return false;
+    const droppedItem = await Item.implementation.fromDropData(data).catch(() => null);
+    if (!droppedItem || !CARRIED_ITEM_TYPES.has(droppedItem.type)) return false;
+
+    const sourceActor = droppedItem.actor;
+    if (sourceActor?.id === this.actor.id) return false;
+
+    const carriedCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
+    if (carriedCount < CARRIED_ITEM_LIMIT) return false;
+
+    ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: CARRIED_ITEM_LIMIT }));
+    return true;
+  }
+
+  async _onDropTransportNpc(event, data) {
+    const transportZone = event.target?.closest?.("[data-transport-drop]");
+    if (!transportZone) return false;
+    const droppedActor = await Actor.implementation.fromDropData(data).catch(() => null);
+    if (!droppedActor || droppedActor.type !== "personnage-non-joueur") return true;
+
+    const ref = droppedActor.uuid || droppedActor.id;
+    if (!ref) return true;
+
+    const refs = getTransportNpcRefs(this.actor);
+    if (refs.includes(ref)) return true;
+    await this.actor.update({ "system.equipment.transportNpcs": [...refs, ref] });
+    return true;
   }
 
   async handleCharacteristicRoll(key) {
@@ -805,6 +914,7 @@ class BloodmanActorSheet extends ActorSheet {
   async useItem(item) {
     if (!item) return;
     if (item.type === "soin") await doHealRoll(this.actor, item);
+    if (item.type === "ration" && item.isOwner) await item.delete();
   }
 
   async rollGrowth(key) {
@@ -835,7 +945,7 @@ class BloodmanActorSheet extends ActorSheet {
 class BloodmanNpcSheet extends BloodmanActorSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      template: "systems/bloodman/templates/actor-personnage-non-joueur.html"
+      template: "systems/bloodman/templates/actor-non-joueur.html"
     });
   }
 

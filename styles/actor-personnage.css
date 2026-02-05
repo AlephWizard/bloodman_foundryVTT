@@ -447,6 +447,13 @@
   gap: 3px;
 }
 
+.item-list.item-list-two-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 14px;
+  max-height: 240px;
+}
+
 .item {
   display: flex;
   flex-wrap: wrap;
@@ -493,6 +500,15 @@
 }
 
 .item-delete {
+  cursor: pointer;
+}
+
+.transport-npc-open {
+  cursor: pointer;
+}
+
+.transport-npc-delete {
+  margin-left: auto;
   cursor: pointer;
 }
 
