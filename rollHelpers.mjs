@@ -96,6 +96,18 @@ function getTokenActor(tokenLike) {
   return tokenLike.actor || tokenLike.document?.actor || tokenLike.object?.actor || null;
 }
 
+function getTokenCurrentPv(tokenLike) {
+  const tokenDocument = getTokenDocument(tokenLike);
+  const actor = getTokenActor(tokenLike);
+  const actorCurrent = Number(actor?.system?.resources?.pv?.current);
+  if (Number.isFinite(actorCurrent)) return actorCurrent;
+  const deltaCurrent = Number(foundry.utils.getProperty(tokenDocument, "delta.system.resources.pv.current"));
+  if (Number.isFinite(deltaCurrent)) return deltaCurrent;
+  const actorDataCurrent = Number(foundry.utils.getProperty(tokenDocument, "actorData.system.resources.pv.current"));
+  if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
+  return NaN;
+}
+
 function getActiveGMIds() {
   return game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
 }
@@ -128,7 +140,7 @@ function buildDamageRequestPayload(token, damage) {
   const actorUuid = worldActorUuid || targetActor?.uuid;
   const targetActorLink = Boolean(tokenDocument?.actorLink);
   const targetName = resolveCombatTargetName(tokenDocument?.name || token?.name, targetActor?.name, "");
-  const targetPvCurrent = Number(targetActor?.system?.resources?.pv?.current ?? NaN);
+  const targetPvCurrent = Number(getTokenCurrentPv(token));
   const targetPA = Number(getProtectionPA(targetActor));
   return {
     requestId,
@@ -211,11 +223,34 @@ async function applyDamageToTargets(sourceActor, total) {
     if (targetTokens.length <= 1) return null;
     const base = Math.floor(totalDamage / targetTokens.length);
     const remainder = totalDamage - base * targetTokens.length;
-    const defaults = targetTokens.map((token, index) => ({
+    const defaults = targetTokens.map((token, index) => {
+      const targetActor = getTokenActor(token);
+      const displayName = resolveCombatTargetName(
+        token?.name || token?.document?.name,
+        targetActor?.name,
+        "Cible"
+      );
+      return {
       id: token.id,
-      name: token.name,
+      name: displayName,
       value: base + (index < remainder ? 1 : 0)
-    }));
+      };
+    });
+
+    const byName = new Map();
+    for (const entry of defaults) {
+      const count = byName.get(entry.name) || 0;
+      byName.set(entry.name, count + 1);
+    }
+    for (const [name, count] of byName.entries()) {
+      if (count <= 1) continue;
+      let index = 0;
+      for (const entry of defaults) {
+        if (entry.name !== name) continue;
+        index += 1;
+        entry.name = `${name} #${index}`;
+      }
+    }
 
     const rows = defaults
       .map(
@@ -291,7 +326,11 @@ async function applyDamageToTargets(sourceActor, total) {
       safeWarn(t("BLOODMAN.Notifications.NoActiveGMApplyDamage"));
       continue;
     }
-    const targetName = token?.name || token?.document?.name || "";
+    const targetName = resolveCombatTargetName(
+      token?.name || token?.document?.name,
+      targetActor?.name,
+      "Cible"
+    );
     await applyDamageToActor(targetActor, share, { targetName });
   }
 }

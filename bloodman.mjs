@@ -118,6 +118,7 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active) {
   const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
     .map(normalizeStatusValue)
     .filter(Boolean);
+  const icon = effectDef.img || effectDef.icon || effectDef.texture?.src || "";
 
   if (typeof tokenDoc.toggleStatusEffect === "function") {
     for (const id of ids) {
@@ -134,16 +135,26 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active) {
     }
   }
 
-  const tokenActor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
-  if (tokenActor && typeof tokenActor.toggleStatusEffect === "function") {
+  const tokenObj = tokenDoc.object || null;
+  if (tokenObj && typeof tokenObj.toggleEffect === "function" && icon) {
+    try {
+      await tokenObj.toggleEffect(icon, { active, overlay: false });
+      if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
+    } catch (_error) {
+      // fallback on actor/document data below
+    }
+  }
+
+  const tokenActor = tokenDoc.actor || null;
+  const worldActor = tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null;
+  const actorForFallback = tokenActor || (tokenDoc.actorLink ? worldActor : null);
+  const sameActorTokensCount = actorForFallback?.id ? getTokenDocumentsForActor(actorForFallback).length : 0;
+  const actorFallbackAllowed = tokenDoc.actorLink ? sameActorTokensCount <= 1 : Boolean(tokenActor);
+  if (actorFallbackAllowed && actorForFallback && typeof actorForFallback.toggleStatusEffect === "function") {
     for (const id of ids) {
       try {
-        await tokenActor.toggleStatusEffect(id, { active, overlay: false });
-        if (tokenHasStatusEffect(tokenDoc, effectDef)) {
-          if (active) return true;
-        } else if (!active) {
-          return true;
-        }
+        await actorForFallback.toggleStatusEffect(id, { active, overlay: false });
+        if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
       } catch (_error) {
         // fallback on document data below
       }
@@ -169,7 +180,6 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active) {
     if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
   }
 
-  const icon = effectDef.img || effectDef.icon || effectDef.texture?.src || "";
   if (!icon) return false;
   const nextEffects = new Set(getTokenEffectsList(tokenDoc));
   const hasIcon = nextEffects.has(icon);
@@ -234,6 +244,7 @@ async function syncZeroPvStatusForActor(actor) {
   const pvCurrent = Number(actor.system?.resources?.pv?.current);
   if (!Number.isFinite(pvCurrent)) return;
   for (const tokenDoc of getTokenDocumentsForActor(actor)) {
+    if (!tokenDoc?.actorLink) continue;
     await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
   }
 }
@@ -443,16 +454,6 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     } catch (error) {
       console.error("[bloodman] damage:update tokenDoc failed", error);
     }
-    if (tokenActor) {
-      const actorCurrent = Number(tokenActor.system?.resources?.pv?.current);
-      if (!Number.isFinite(actorCurrent) || actorCurrent !== nextValue) {
-        try {
-          await tokenActor.update({ "system.resources.pv.current": nextValue });
-        } catch (error) {
-          console.error("[bloodman] damage:update tokenActor failed", error);
-        }
-      }
-    }
     ChatMessage.create({
       speaker: { alias: fallbackName },
       content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
@@ -479,7 +480,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     const pa = Number.isFinite(fallbackPA) ? fallbackPA : 0;
     const finalDamage = Math.max(0, share - pa);
     ChatMessage.create({
-      speaker: ChatMessage.getSpeaker(),
+      speaker: { alias: fallbackName },
       content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
     });
     return;
