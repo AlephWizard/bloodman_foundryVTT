@@ -1,164 +1,80 @@
-.item-aptitude {
-  font-family: "Oswald", sans-serif;
-  color: var(--bm-ink);
-  background: var(--bm-white);
-  border: 2px solid var(--bm-line);
-  border-radius: 12px;
-  padding: 10px;
-  display: grid;
-  gap: 4px 8px;
-  grid-template-columns: 140px 1fr;
+.item-aptitude.bm-item-sheet {
+  gap: 12px;
 }
 
-.item-aptitude .item-header {
-  grid-column: 1 / -1;
+.item-aptitude.bm-item-sheet .bm-ability-damage {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-}
-
-.item-aptitude .item-image {
-  width: 34px;
-  height: 34px;
-  object-fit: cover;
-  border: 1px solid var(--bm-line);
-  border-radius: 6px;
-  background: var(--bm-white);
-}
-
-.item-aptitude .item-name-field {
-  flex: 1;
-}
-
-.item-aptitude .item-name-field input {
-  width: 100%;
-  height: 28px;
-}
-
-.item-aptitude label {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  font-size: 11px;
-  align-self: center;
-}
-
-.item-aptitude input,
-.item-aptitude textarea,
-.item-aptitude select {
-  font-family: inherit;
-  font-size: 14px;
-  border: 1px solid var(--bm-line);
-  border-radius: 6px;
-  padding: 3px 5px;
-}
-
-.item-aptitude .full-row {
-  grid-column: 1 / -1;
-}
-
-.item-aptitude textarea {
-  min-height: 100px;
-  resize: vertical;
-}
-
-.item-aptitude .ability-row {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) 2px minmax(230px, 1.3fr) 2px minmax(160px, 1fr);
   gap: 10px;
-  align-items: flex-start;
 }
 
-.item-aptitude .ability-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
+.item-aptitude.bm-item-sheet .bm-ability-damage select {
+  width: 160px;
+  max-width: 100%;
 }
 
-.item-aptitude .inline-label {
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  font-size: 11px;
+.item-aptitude.bm-item-sheet .ability-row-two {
+  display: grid;
+  grid-template-columns: 1fr 4px 1fr;
+  gap: 12px;
+  align-items: start;
 }
 
-.item-aptitude .toggle-group {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.item-aptitude .toggle-option {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  font-weight: 700;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.item-aptitude .toggle-option input {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 2px solid #000000;
-  border-radius: 3px;
-  background: var(--bm-white);
-  margin: 0;
-}
-
-.item-aptitude .toggle-option input:checked {
-  background: #000000;
-}
-
-.item-aptitude .ability-divider {
+.item-aptitude.bm-item-sheet .ability-divider {
   width: 2px;
   align-self: stretch;
   background: #000000;
+  border-radius: 2px;
 }
 
-.item-aptitude .bonus-controls {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.item-aptitude .bonus-input {
-  width: 54px;
-}
-
-.item-aptitude .bonus-grid {
+.item-aptitude.bm-item-sheet .ability-section {
   display: grid;
-  grid-template-columns: repeat(3, minmax(86px, 1fr));
-  gap: 4px 8px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.item-aptitude.bm-item-sheet .bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
   align-items: center;
-  font-size: 11px;
 }
 
-.item-aptitude .bonus-grid label {
-  display: flex;
+.item-aptitude.bm-item-sheet .bonus-grid label {
+  display: grid;
+  grid-template-columns: auto 64px;
+  gap: 8px;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
-.item-aptitude .bonus-grid input {
-  width: 40px;
-  text-align: center;
+.item-aptitude.bm-item-sheet .bonus-grid span {
+  line-height: 1;
 }
 
-.item-aptitude .bonus-grid-compact {
-  grid-template-columns: repeat(3, minmax(70px, 1fr));
-}
-
-.item-aptitude .bonus-grid-compact input {
-  width: 34px;
-}
-
-.item-aptitude select {
+.item-aptitude.bm-item-sheet .bonus-grid input {
   width: 64px;
+  height: 30px;
 }
 
-.item-aptitude .bonus-grid.is-disabled {
-  opacity: 0.6;
+.item-aptitude.bm-item-sheet .bonus-grid-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.item-aptitude.bm-item-sheet .bonus-grid.is-disabled {
+  opacity: 0.55;
+}
+
+@media (max-width: 820px) {
+  .item-aptitude.bm-item-sheet .ability-row-two {
+    grid-template-columns: 1fr;
+  }
+
+  .item-aptitude.bm-item-sheet .ability-divider {
+    display: none;
+  }
 }

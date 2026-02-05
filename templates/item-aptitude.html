@@ -1,48 +1,53 @@
-<form class="bloodman-item ability-item item-aptitude">
-  <div class="item-header">
-    <img class="item-image" src="{{item.img}}" data-edit="img" />
-    <div class="item-name-field">
-      <label>{{localize "BLOODMAN.Common.Name"}}</label>
-      <input name="name" value="{{item.name}}" />
+<form class="bloodman-item ability-item item-aptitude bm-item-sheet">
+  <div class="bm-item-top">
+    <div class="bm-item-img">
+      <img class="bm-item-img-el" src="{{item.img}}" data-edit="img" />
+    </div>
+
+    <div class="bm-item-fields">
+      <div class="bm-item-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Name"}}</div>
+        <input class="bm-item-input" name="name" value="{{item.name}}" />
+      </div>
+
+      <div class="bm-item-row bm-item-row-note">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
+        <textarea class="bm-item-textarea" name="system.note">{{item.system.note}}</textarea>
+      </div>
     </div>
   </div>
 
-  <label class="full-row">{{localize "BLOODMAN.Common.Note"}}</label>
-  <textarea class="full-row" name="system.note">{{item.system.note}}</textarea>
-
-  <div class="ability-row full-row">
-    <div class="ability-section">
-      <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
-      <div class="toggle-group">
-        <label class="toggle-option">
-          <input type="radio" name="system.damageEnabled" value="true" data-dtype="Boolean" {{#if item.system.damageEnabled}}checked{{/if}} />
-          {{localize "BLOODMAN.Common.Yes"}}
-        </label>
-        <label class="toggle-option">
-          <input type="radio" name="system.damageEnabled" value="false" data-dtype="Boolean" {{#unless item.system.damageEnabled}}checked{{/unless}} />
-          {{localize "BLOODMAN.Common.No"}}
-        </label>
-      </div>
-      <select name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
-        {{#select item.system.damageDie}}
-          <option value="d4">d4</option>
-          <option value="d6">d6</option>
-          <option value="d8">d8</option>
-          <option value="d10">d10</option>
-          <option value="d12">d12</option>
-          <option value="2d4">2d4</option>
-          <option value="2d6">2d6</option>
-          <option value="2d8">2d8</option>
-          <option value="2d10">2d10</option>
-          <option value="2d12">2d12</option>
-          <option value="1d10+1d4">1d10+1d4</option>
-          <option value="1d10+1d8">1d10+1d8</option>
-        {{/select}}
-      </select>
+  <div class="bm-ability-damage">
+    <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
+    <div class="toggle-group">
+      <label class="toggle-option">
+        <input type="radio" name="system.damageEnabled" value="true" data-dtype="Boolean" {{#if item.system.damageEnabled}}checked{{/if}} />
+        {{localize "BLOODMAN.Common.Yes"}}
+      </label>
+      <label class="toggle-option">
+        <input type="radio" name="system.damageEnabled" value="false" data-dtype="Boolean" {{#unless item.system.damageEnabled}}checked{{/unless}} />
+        {{localize "BLOODMAN.Common.No"}}
+      </label>
     </div>
+    <select name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
+      {{#select item.system.damageDie}}
+        <option value="d4">d4</option>
+        <option value="d6">d6</option>
+        <option value="d8">d8</option>
+        <option value="d10">d10</option>
+        <option value="d12">d12</option>
+        <option value="2d4">2d4</option>
+        <option value="2d6">2d6</option>
+        <option value="2d8">2d8</option>
+        <option value="2d10">2d10</option>
+        <option value="2d12">2d12</option>
+        <option value="1d10+1d4">1d10+1d4</option>
+        <option value="1d10+1d8">1d10+1d8</option>
+      {{/select}}
+    </select>
+  </div>
 
-    <div class="ability-divider"></div>
-
+  <div class="ability-row ability-row-two">
     <div class="ability-section">
       <label class="inline-label">{{localize "BLOODMAN.Items.BonusLabel"}}</label>
       <div class="toggle-group">

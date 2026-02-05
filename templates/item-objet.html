@@ -1,14 +1,19 @@
-<form class="bloodman-item item-objet">
-  <div class="item-header">
-    <img class="item-image" src="{{item.img}}" data-edit="img" />
-    <div class="item-name-field">
-      <label>{{localize "BLOODMAN.Common.Name"}}</label>
-      <input name="name" value="{{item.name}}" />
+<form class="bloodman-item item-objet bm-item-sheet">
+  <div class="bm-item-top">
+    <div class="bm-item-img">
+      <img class="bm-item-img-el" src="{{item.img}}" data-edit="img" />
     </div>
-  </div>
 
-  <div class="note-field">
-    <label class="full-row">{{localize "BLOODMAN.Common.Note"}}</label>
-    <textarea class="full-row" name="system.note">{{item.system.note}}</textarea>
+    <div class="bm-item-fields">
+      <div class="bm-item-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Name"}}</div>
+        <input class="bm-item-input" name="name" value="{{item.name}}" />
+      </div>
+
+      <div class="bm-item-row bm-item-row-note">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
+        <textarea class="bm-item-textarea" name="system.note">{{item.system.note}}</textarea>
+      </div>
+    </div>
   </div>
 </form>

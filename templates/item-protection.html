@@ -1,15 +1,24 @@
-<form class="bloodman-item item-protection">
-  <div class="item-header">
-    <img class="item-image" src="{{item.img}}" data-edit="img" />
-    <div class="item-name-field">
-      <label>{{localize "BLOODMAN.Common.Name"}}</label>
-      <input name="name" value="{{item.name}}" />
+<form class="bloodman-item item-protection bm-item-sheet">
+  <div class="bm-item-top">
+    <div class="bm-item-img">
+      <img class="bm-item-img-el" src="{{item.img}}" data-edit="img" />
+    </div>
+
+    <div class="bm-item-fields">
+      <div class="bm-item-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Name"}}</div>
+        <input class="bm-item-input" name="name" value="{{item.name}}" />
+      </div>
+
+      <div class="bm-item-row">
+        <div class="bm-item-tag">PA</div>
+        <input class="bm-item-input bm-item-input-narrow" type="number" name="system.pa" value="{{item.system.pa}}" />
+      </div>
+
+      <div class="bm-item-row bm-item-row-note">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
+        <textarea class="bm-item-textarea" name="system.notes">{{item.system.notes}}</textarea>
+      </div>
     </div>
   </div>
-
-  <label>PA</label>
-  <input type="number" name="system.pa" value="{{item.system.pa}}" />
-
-  <label>{{localize "BLOODMAN.Common.Notes"}}</label>
-  <textarea name="system.notes">{{item.system.notes}}</textarea>
 </form>

@@ -95,10 +95,10 @@
       "Title": "NOTES"
     },
     "Items": {
-      "DamageDieLabel": "DÉ DE DÉGÂTS :",
+      "DamageDieLabel": "DÉ DE DÉGÂT :",
       "HealDieLabel": "DÉ DE SOIN",
-      "BonusLabel": "BONUS/MALUS :",
-      "RawBonusLabel": "BONUS/MALUS BRUTE :",
+      "BonusLabel": "BONUS/MALUS CARACS",
+      "RawBonusLabel": "BONUS/MALUS BRUTE",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :"
     },
     "Rolls": {
@@ -124,6 +124,11 @@
         "Title": "Jet d'expérience",
         "Prompt": "Lancer un jet d'expérience pour <strong>{label}</strong> ?"
       },
+      "DamageConfig": {
+        "Title": "Configuration du jet de dégâts",
+        "RawBonusLabel": "Dégâts bruts +",
+        "PenetrationLabel": "Pénétration +"
+      },
       "DamageSplit": {
         "Title": "Répartition des dégâts",
         "Prompt": "Répartir {damage} dégâts entre {targets} cibles."
@@ -131,6 +136,7 @@
     },
     "Notifications": {
       "NoAmmo": "Aucune munition disponible.",
+      "WeaponDamageDisabled": "Cette arme n'a pas de dé de dégâts.",
       "NotEnoughPP": "Pas assez de points de puissance pour lancer ce pouvoir.",
       "NotEnoughPPReroll": "Pas assez de points de puissance pour relancer cette caracteristique ({cost} PP requis).",
       "NotEnoughChaosReroll": "Pas assez de des du chaos pour relancer.",

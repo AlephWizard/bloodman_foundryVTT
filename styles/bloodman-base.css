@@ -27,6 +27,157 @@
   background: unset;
 }
 
+.bloodman-item.bm-item-sheet {
+  font-family: "Oswald", sans-serif;
+  color: #000000;
+  background: #ffffff;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-top {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-img {
+  width: 90px;
+  height: 90px;
+  border: 3px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-img-el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: 0;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-row-note {
+  align-items: start;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-tag {
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-input,
+.bloodman-item.bm-item-sheet .bm-item-textarea {
+  width: 100%;
+  border: 3px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #000000;
+  font-family: inherit;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-input {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-textarea {
+  height: 60px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 400;
+  resize: none;
+}
+
+.bloodman-item.bm-item-sheet select,
+.bloodman-item.bm-item-sheet input[type="number"] {
+  border: 3px solid #000000;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #000000;
+  font-family: inherit;
+}
+
+.bloodman-item.bm-item-sheet select {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.bloodman-item.bm-item-sheet input[type="number"] {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.bloodman-item.bm-item-sheet .toggle-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.bloodman-item.bm-item-sheet .toggle-option {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.bloodman-item.bm-item-sheet .toggle-option input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #000000;
+  border-radius: 6px;
+  background: #ffffff;
+  margin: 0;
+}
+
+.bloodman-item.bm-item-sheet .toggle-option input:checked {
+  background: #000000;
+}
+
+.bloodman-item.bm-item-sheet select:disabled,
+.bloodman-item.bm-item-sheet input:disabled,
+.bloodman-item.bm-item-sheet textarea:disabled {
+  opacity: 0.55;
+}
+
+.bloodman-item.bm-item-sheet .inline-label {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
 #bm-chaos-dice {
   position: fixed;
   right: 18px;
@@ -75,4 +226,201 @@
   font-weight: 800;
   font-size: 16px;
   line-height: 1;
+}
+
+.bm-damage-config {
+  display: grid;
+  gap: 12px;
+  margin: 2px 0 0;
+  font-family: "Oswald", sans-serif;
+  background: #0f0e0e;
+  color: #ffffff;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+.bm-damage-config .bm-damage-config-top {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.bm-damage-config .bm-damage-config-icon-wrap {
+  border: 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 148px;
+  background: #0f0e0e;
+  outline: none;
+  box-shadow: none;
+}
+
+.bm-damage-config .bm-damage-config-icon-wrap,
+.bm-damage-config .bm-damage-config-icon-wrap * {
+  color: #ffffff;
+}
+
+.bm-damage-config .bm-damage-config-icon-ring {
+  width: 122px;
+  height: 122px;
+  border: 0;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.bm-damage-config .bm-damage-config-icon-ring::before,
+.bm-damage-config .bm-damage-config-icon-ring::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+}
+
+.bm-damage-config .bm-damage-config-icon-ring i {
+  font-size: 84px;
+  color: #ffffff;
+  z-index: 1;
+  background: transparent;
+}
+
+.bm-damage-config .bm-damage-config-fields {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.bm-damage-config .bm-damage-config-row {
+  display: grid;
+  gap: 8px;
+}
+
+.bm-damage-config .bm-damage-config-inline {
+  grid-template-columns: minmax(0, 1fr) 92px;
+  align-items: center;
+}
+
+.bm-damage-config label {
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.bm-damage-config .bm-damage-config-inline label {
+  justify-self: end;
+  text-align: right;
+  white-space: nowrap !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  font-weight: 300;
+  font-size: 16px;
+  opacity: 0.95;
+}
+
+.bm-damage-config select,
+.bm-damage-config input {
+  width: 100%;
+  height: 48px;
+  border: 4px solid #ffffff;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-family: "Oswald", sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: #ffffff;
+  background: #0f0e0e;
+}
+
+.bm-damage-config select {
+  color-scheme: dark;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #ffffff 50%),
+    linear-gradient(135deg, #ffffff 50%, transparent 50%),
+    linear-gradient(to right, #0f0e0e, #0f0e0e);
+  background-position:
+    calc(100% - 18px) 20px,
+    calc(100% - 10px) 20px,
+    100% 0;
+  background-size: 8px 8px, 8px 8px, 3em 3em;
+  background-repeat: no-repeat;
+  padding-right: 36px;
+}
+
+.bm-damage-config input[type="number"] {
+  text-align: center;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons {
+  margin-top: 12px;
+  display: block;
+  background: #0f0e0e !important;
+  padding: 0;
+  border: 0 !important;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button {
+  width: 100%;
+  height: 56px;
+  border: 4px solid #ffffff !important;
+  border-radius: 14px;
+  background: #0f0e0e !important;
+  color: #ffffff !important;
+  font-family: "Oswald", sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  padding: 0 10px;
+  text-transform: uppercase;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button:hover,
+.window-app.bloodman-damage-dialog .dialog-buttons button:focus,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:focus {
+  background: #0f0e0e;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.window-app.bloodman-damage-dialog .window-content,
+.window-app.dialog.bloodman-damage-dialog .window-content {
+  background: #0f0e0e !important;
+  padding: 12px;
+}
+
+.window-app.bloodman-damage-dialog select,
+.window-app.dialog.bloodman-damage-dialog select {
+  background-color: #0f0e0e !important;
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-dialog select option,
+.window-app.dialog.bloodman-damage-dialog select option {
+  background: #0f0e0e !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 720px) {
+  .bm-damage-config .bm-damage-config-top {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-damage-config .bm-damage-config-icon-wrap {
+    min-height: 120px;
+  }
 }

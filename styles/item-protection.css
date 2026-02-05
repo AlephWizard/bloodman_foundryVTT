@@ -1,48 +1,13 @@
-.item-protection {
-  font-family: "Oswald", sans-serif;
-  color: var(--bm-ink);
-  background: var(--bm-white);
-  border: 2px solid var(--bm-line);
-  border-radius: 12px;
-  padding: 10px;
-  display: grid;
-  gap: 4px 8px;
-  grid-template-columns: 140px 1fr;
+.item-protection.bm-item-sheet .bm-item-input-narrow {
+  max-width: 140px;
 }
 
-.item-protection .item-header {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+@media (max-width: 620px) {
+  .item-protection.bm-item-sheet .bm-item-top {
+    grid-template-columns: 1fr;
+  }
 
-.item-protection .item-image {
-  width: 34px;
-  height: 34px;
-  object-fit: cover;
-  border: 1px solid var(--bm-line);
-  border-radius: 6px;
-  background: var(--bm-white);
-}
-
-.item-protection .item-name-field {
-  flex: 1;
-}
-
-.item-protection label {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  font-size: 11px;
-  align-self: center;
-}
-
-.item-protection input,
-.item-protection textarea,
-.item-protection select {
-  font-family: inherit;
-  font-size: 14px;
-  border: 1px solid var(--bm-line);
-  border-radius: 6px;
-  padding: 3px 5px;
+  .item-protection.bm-item-sheet .bm-item-img {
+    justify-self: center;
+  }
 }

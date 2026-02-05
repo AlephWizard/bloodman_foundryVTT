@@ -1,19 +1,36 @@
-<form class="bloodman-item item-arme">
-  <div class="item-header">
-    <img class="item-image" src="{{item.img}}" data-edit="img" />
-    <div class="item-name-field">
-      <label>{{localize "BLOODMAN.Common.Name"}}</label>
-      <input name="name" value="{{item.name}}" />
+<form class="bloodman-item item-arme bm-item-sheet">
+  <div class="bm-item-top">
+    <div class="bm-item-img">
+      <img class="bm-item-img-el" src="{{item.img}}" data-edit="img" />
+    </div>
+
+    <div class="bm-item-fields">
+      <div class="bm-item-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Name"}}</div>
+        <input class="bm-item-input" name="name" value="{{item.name}}" />
+      </div>
+
+      <div class="bm-item-row bm-item-row-note">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
+        <textarea class="bm-item-textarea" name="system.notes">{{item.system.notes}}</textarea>
+      </div>
     </div>
   </div>
 
-  <label class="full-row">{{localize "BLOODMAN.Common.Notes"}}</label>
-  <textarea class="full-row" name="system.notes">{{item.system.notes}}</textarea>
-
-  <div class="weapon-row full-row">
+  <div class="weapon-row">
     <div class="weapon-section">
       <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
-      <select name="system.damageDie">
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.damageEnabled" value="true" data-dtype="Boolean" {{checked weaponDamageEnabled}} />
+          {{localize "BLOODMAN.Common.Yes"}}
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.damageEnabled" value="false" data-dtype="Boolean" {{#unless weaponDamageEnabled}}checked{{/unless}} />
+          {{localize "BLOODMAN.Common.No"}}
+        </label>
+      </div>
+      <select name="system.damageDie" {{#unless weaponDamageEnabled}}disabled{{/unless}}>
         {{#select item.system.damageDie}}
           <option value="d4">d4</option>
           <option value="d6">d6</option>
@@ -31,12 +48,10 @@
       <div class="weapon-type-group">
         <label class="weapon-type-option">
           <input type="radio" name="system.weaponType" value="distance" {{checked weaponTypeDistance}} />
-          <i class="fa-solid fa-crosshairs"></i>
           {{localize "BLOODMAN.Equipment.WeaponType.Distance"}}
         </label>
         <label class="weapon-type-option">
           <input type="radio" name="system.weaponType" value="corps" {{checked weaponTypeMelee}} />
-          <i class="fa-solid fa-hand-fist"></i>
           {{localize "BLOODMAN.Equipment.WeaponType.Melee"}}
         </label>
       </div>

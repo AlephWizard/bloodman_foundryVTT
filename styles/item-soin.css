@@ -1,81 +1,25 @@
-.item-soin {
-  font-family: "Oswald", sans-serif;
-  color: var(--bm-ink);
-  background: var(--bm-white);
-  border: 2px solid var(--bm-line);
-  border-radius: 12px;
-  padding: 10px;
-  display: grid;
-  gap: 4px 8px;
-  grid-template-columns: 140px 1fr;
+.item-soin.bm-item-sheet {
+  gap: 12px;
 }
 
-.item-soin .item-header {
-  grid-column: 1 / -1;
+.item-soin.bm-item-sheet .bm-item-heal {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 
-.item-soin .item-image {
-  width: 34px;
-  height: 34px;
-  object-fit: cover;
-  border: 1px solid var(--bm-line);
-  border-radius: 6px;
-  background: var(--bm-white);
+.item-soin.bm-item-sheet .bm-item-heal select {
+  width: 160px;
+  max-width: 100%;
 }
 
-.item-soin .item-name-field {
-  flex: 1;
-}
+@media (max-width: 620px) {
+  .item-soin.bm-item-sheet .bm-item-top {
+    grid-template-columns: 1fr;
+  }
 
-.item-soin .heal-field,
-.item-soin .note-field {
-  display: grid;
-  gap: 4px;
-}
-
-.item-soin .heal-field {
-  grid-template-columns: auto 72px;
-  align-items: center;
-  column-gap: 8px;
-}
-
-.item-soin label {
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  font-size: 11px;
-  align-self: center;
-}
-
-.item-soin input,
-.item-soin textarea,
-.item-soin select {
-  font-family: inherit;
-  font-size: 14px;
-  border: 1px solid var(--bm-line);
-  border-radius: 6px;
-  padding: 3px 5px;
-}
-
-.item-soin .item-name-field input {
-  width: 100%;
-  height: 28px;
-}
-
-.item-soin select {
-  width: 100%;
-  position: relative;
-  z-index: 1;
-}
-
-.item-soin textarea {
-  width: 100%;
-  min-height: 100px;
-  resize: vertical;
-}
-
-.item-soin .full-row {
-  grid-column: 1 / -1;
+  .item-soin.bm-item-sheet .bm-item-img {
+    justify-self: center;
+  }
 }

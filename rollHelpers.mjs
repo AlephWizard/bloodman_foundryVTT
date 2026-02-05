@@ -3,10 +3,32 @@ const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SO
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
+const DAMAGE_CONFIG_OPTIONS = [
+  { label: "1D4", formula: "1d4" },
+  { label: "1D6", formula: "1d6" },
+  { label: "1D8", formula: "1d8" },
+  { label: "2D4", formula: "2d4" },
+  { label: "1D10", formula: "1d10" },
+  { label: "1D12", formula: "1d12" },
+  { label: "2D6", formula: "2d6" },
+  { label: "1D10+1D4", formula: "1d10+1d4" },
+  { label: "2D8", formula: "2d8" },
+  { label: "1D10+1D8", formula: "1d10+1d8" },
+  { label: "2D10", formula: "2d10" },
+  { label: "2D12", formula: "2d12" }
+];
 
 function t(key, data = null) {
   if (!globalThis.game?.i18n) return key;
   return data ? game.i18n.format(key, data) : game.i18n.localize(key);
+}
+
+function tl(key, fallback, data = null) {
+  if (!globalThis.game?.i18n) return fallback || key;
+  const localized = data ? game.i18n.format(key, data) : game.i18n.localize(key);
+  // Foundry returns the key itself if the localization entry is missing.
+  if (!localized || localized === key) return fallback || key;
+  return localized;
 }
 
 function safeWarn(message) {
@@ -112,6 +134,139 @@ function getActiveGMIds() {
   return game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
 }
 
+function toNonNegativeInt(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(0, Math.floor(numeric));
+}
+
+function normalizeDamageFormula(formula) {
+  const raw = String(formula || "").trim().toLowerCase().replace(/\s+/g, "");
+  if (!raw) return "";
+  return raw.replace(/^d(\d+)$/, "1d$1");
+}
+
+function getDamageOptionByFormula(formula) {
+  const normalized = normalizeDamageFormula(formula);
+  if (!normalized) return null;
+  return DAMAGE_CONFIG_OPTIONS.find(option => option.formula === normalized) || null;
+}
+
+function getDefaultDamageOption(formula) {
+  return getDamageOptionByFormula(formula) || DAMAGE_CONFIG_OPTIONS[0];
+}
+
+function getRollValues(roll) {
+  const values = [];
+  for (const die of roll?.dice || []) {
+    for (const result of die?.results || []) {
+      const value = Number(result?.result);
+      if (Number.isFinite(value)) values.push(value);
+    }
+  }
+  return values;
+}
+
+async function promptDamageConfiguration({
+  actor,
+  sourceName = "",
+  defaultFormula = "1d4",
+  defaultBonus = 0,
+  defaultPenetration = 0
+} = {}) {
+  const selectedDefault = getDefaultDamageOption(defaultFormula);
+  const initialBonus = toNonNegativeInt(defaultBonus, 0);
+  const initialPenetration = toNonNegativeInt(defaultPenetration, 0);
+  const titleSource = sourceName ? ` (${sourceName})` : "";
+  // Prevent the trailing "+" from wrapping to a new line in narrow layouts.
+  const rawBonusLabel = tl("BLOODMAN.Dialogs.DamageConfig.RawBonusLabel", "Degats bruts +").replace(/\s\+$/, "&nbsp;+");
+  const penetrationLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationLabel", "Penetration +").replace(/\s\+$/, "&nbsp;+");
+
+  const options = DAMAGE_CONFIG_OPTIONS
+    .map(option => `<option value="${option.formula}" ${option.formula === selectedDefault.formula ? "selected" : ""}>${option.label}</option>`)
+    .join("");
+
+  const content = `<form class="bm-damage-config">
+    <div class="bm-damage-config-top">
+      <div class="bm-damage-config-icon-wrap" aria-hidden="true">
+        <div class="bm-damage-config-icon-ring">
+          <i class="fa-solid fa-skull"></i>
+        </div>
+      </div>
+        <div class="bm-damage-config-fields">
+          <div class="bm-damage-config-row">
+            <select name="degats">${options}</select>
+          </div>
+          <div class="bm-damage-config-row bm-damage-config-inline">
+          <label>${rawBonusLabel}</label>
+          <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" />
+          </div>
+          <div class="bm-damage-config-row bm-damage-config-inline">
+          <label>${penetrationLabel}</label>
+          <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" />
+          </div>
+        </div>
+      </div>
+  </form>`;
+
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    new Dialog(
+      {
+        title: `${tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats")}${titleSource}`,
+        content,
+        buttons: {
+        roll: {
+          label: "LANCER",
+          callback: html => {
+            const selectedFormula = normalizeDamageFormula(html.find("select[name='degats']").val());
+            const option = getDamageOptionByFormula(selectedFormula);
+            if (!option) {
+              safeWarn(tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide."));
+              return false;
+            }
+
+            const bonusRaw = html.find("input[name='bonus_brut']").val();
+            const penetrationRaw = html.find("input[name='penetration']").val();
+            const bonus = Number(bonusRaw);
+            const penetration = Number(penetrationRaw);
+            if (!Number.isFinite(bonus) || bonus < 0) {
+              safeWarn(tl("BLOODMAN.Notifications.InvalidRawDamageBonus", "La valeur Degats bruts + doit etre un nombre entier >= 0."));
+              return false;
+            }
+            if (!Number.isFinite(penetration) || penetration < 0) {
+              safeWarn(tl("BLOODMAN.Notifications.InvalidPenetration", "La valeur Penetration + doit etre un nombre entier >= 0."));
+              return false;
+            }
+
+            const config = {
+              degats: option.label,
+              formula: option.formula,
+              bonusBrut: Math.floor(bonus),
+              penetration: Math.floor(penetration),
+              attaquant_id: actor?.id || ""
+            };
+            finish(config);
+          }
+        }
+        },
+        default: "roll",
+        close: () => finish(null)
+      },
+      {
+        classes: ["bloodman-damage-dialog"],
+        width: 520
+      }
+    ).render(true);
+  });
+}
+
 function isGenericTokenName(name) {
   if (!name) return false;
   return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
@@ -127,7 +282,7 @@ function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
   return fallback;
 }
 
-function buildDamageRequestPayload(token, damage) {
+function buildDamageRequestPayload(token, damage, options = {}) {
   const tokenDocument = getTokenDocument(token);
   const targetActor = getTokenActor(token);
   const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
@@ -142,6 +297,14 @@ function buildDamageRequestPayload(token, damage) {
   const targetName = resolveCombatTargetName(tokenDocument?.name || token?.name, targetActor?.name, "");
   const targetPvCurrent = Number(getTokenCurrentPv(token));
   const targetPA = Number(getProtectionPA(targetActor));
+  const penetration = toNonNegativeInt(options.penetration, 0);
+  const bonusBrut = toNonNegativeInt(options.bonusBrut, 0);
+  const damageFormula = normalizeDamageFormula(options.formula);
+  const damageLabel = String(options.degats || "").trim().toUpperCase();
+  const attackerId = String(options.attaquant_id || options.attackerId || "").trim();
+  const attackerName = String(options.attackerName || "").trim();
+  const rollResults = Array.isArray(options.rollResults) ? options.rollResults : [];
+
   return {
     requestId,
     type: "applyDamage",
@@ -154,7 +317,18 @@ function buildDamageRequestPayload(token, damage) {
     targetName,
     targetPvCurrent,
     targetPA,
-    damage
+    damage,
+    penetration,
+    bonusBrut,
+    damageFormula,
+    damageLabel,
+    attackerId,
+    attackerName,
+    rollResults,
+    degats: damageLabel || damageFormula.toUpperCase(),
+    bonus_brut: bonusBrut,
+    cible_id: tokenId || actorId || "",
+    attaquant_id: attackerId
   };
 }
 
@@ -171,11 +345,16 @@ export async function doCharacteristicRoll(actor, key) {
   return { roll: r, success, effective };
 }
 
-async function requestDamageFromGM(token, damage) {
-  if (!game.socket) return;
-  const payload = buildDamageRequestPayload(token, damage);
+async function requestDamageFromGM(token, damage, options = {}) {
+  if (!game.socket) return false;
+  const payload = buildDamageRequestPayload(token, damage, options);
   console.debug("[bloodman] damage:send", payload);
-  game.socket.emit(SYSTEM_SOCKET, payload);
+  try {
+    game.socket.emit(SYSTEM_SOCKET, payload);
+  } catch (error) {
+    console.error("[bloodman] damage:socket emit failed", error);
+    return false;
+  }
 
   const gmIds = getActiveGMIds();
   if (gmIds.length) {
@@ -187,16 +366,20 @@ async function requestDamageFromGM(token, damage) {
       });
     } catch (error) {
       console.error("[bloodman] damage:fallback chat failed", error);
+      return false;
     }
   }
+  return true;
 }
 
 export async function applyDamageToActor(targetActor, damage, options = {}) {
   if (!targetActor) return null;
   const share = Number(damage);
   if (!Number.isFinite(share) || share <= 0) return null;
-  const pa = getProtectionPA(targetActor);
-  const finalDamage = Math.max(0, share - pa);
+  const penetration = toNonNegativeInt(options.penetration, 0);
+  const paInitial = getProtectionPA(targetActor);
+  const paEffective = Math.max(0, paInitial - penetration);
+  const finalDamage = Math.max(0, share - paEffective);
   const current = Number(targetActor.system.resources?.pv?.current || 0);
   const nextValue = Math.max(0, current - finalDamage);
   const displayName = resolveCombatTargetName(options?.targetName, targetActor?.name, targetActor?.name || "Cible");
@@ -205,19 +388,29 @@ export async function applyDamageToActor(targetActor, damage, options = {}) {
 
   ChatMessage.create({
     speaker: { alias: displayName },
-    content: t("BLOODMAN.Rolls.Damage.Take", { name: displayName, amount: finalDamage, pa })
+    content: t("BLOODMAN.Rolls.Damage.Take", { name: displayName, amount: finalDamage, pa: paEffective })
   });
 
-  return { finalDamage, pa };
+  return {
+    finalDamage,
+    penetration,
+    pa: paEffective,
+    paInitial,
+    paEffective,
+    hpBefore: current,
+    hpAfter: nextValue
+  };
 }
 
-async function applyDamageToTargets(sourceActor, total) {
+async function applyDamageToTargets(sourceActor, total, options = {}) {
   const targets = Array.from(game.user.targets || []);
   if (!targets.length) {
     safeWarn(t("BLOODMAN.Notifications.NoTargetSelected"));
-    return;
+    return [];
   }
   const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
+  const penetration = toNonNegativeInt(options.penetration, 0);
+  const outputs = [];
 
   const promptDamageSplit = async (totalDamage, targetTokens) => {
     if (targetTokens.length <= 1) return null;
@@ -310,14 +503,20 @@ async function applyDamageToTargets(sourceActor, total) {
   let allocations = null;
   if (targets.length > 1) {
     allocations = await promptDamageSplit(total, targets);
-    if (!allocations) return;
+    if (!allocations) return outputs;
   }
 
   for (const token of targets) {
     const share = allocations ? Number(allocations[token.id] || 0) : total;
     if (!Number.isFinite(share) || share <= 0) continue;
     if (!game.user.isGM && hasActiveGM) {
-      await requestDamageFromGM(token, share);
+      const ok = await requestDamageFromGM(token, share, {
+        ...options,
+        penetration
+      });
+      if (!ok) {
+        safeWarn(tl("BLOODMAN.Notifications.DamageRequestFailed", "Le message de degats n'a pas pu etre transmis au MJ."));
+      }
       continue;
     }
     const targetActor = getTokenActor(token);
@@ -331,11 +530,45 @@ async function applyDamageToTargets(sourceActor, total) {
       targetActor?.name,
       "Cible"
     );
-    await applyDamageToActor(targetActor, share, { targetName });
+    const result = await applyDamageToActor(targetActor, share, { targetName, penetration });
+    if (!result) {
+      safeWarn(tl("BLOODMAN.Notifications.DamageApplyFailed", "Impossible d'appliquer les degats a la cible."));
+      continue;
+    }
+
+    const output = {
+      degats_selectionnes: String(options.degats || options.damageLabel || options.formula || "").toUpperCase(),
+      jet_de: Array.isArray(options.rollResults) ? options.rollResults : [],
+      bonus_brut: toNonNegativeInt(options.bonusBrut, 0),
+      penetration: result.penetration,
+      armure_initiale: result.paInitial,
+      armure_effective: result.paEffective,
+      degats_totaux: result.finalDamage,
+      points_de_vie_avant: result.hpBefore,
+      points_de_vie_apres: result.hpAfter,
+      icones_a_afficher: [],
+      erreur: null
+    };
+
+    if (Number.isFinite(result.hpAfter) && result.hpAfter <= 0) {
+      output.icones_a_afficher.push(targetActor.type === "personnage-non-joueur" ? "mort" : "sang");
+    }
+    if (result.finalDamage >= 5) output.icones_a_afficher.push("degats_forts");
+
+    if (!Number.isFinite(output.points_de_vie_apres)) {
+      output.erreur = tl("BLOODMAN.Notifications.DamageApplyFailed", "Impossible d'appliquer les degats a la cible.");
+    }
+    console.debug("[bloodman] damage:output", output);
+    outputs.push(output);
   }
+  return outputs;
 }
 
 export async function doDamageRoll(actor, item) {
+  if (item?.system?.damageEnabled === false) {
+    ui.notifications?.warn(tl("BLOODMAN.Notifications.WeaponDamageDisabled", "Cette arme n'a pas de dé de dégâts."));
+    return null;
+  }
   const die = item.system.damageDie || "d4";
   const weaponType = getWeaponCategory(item.system?.weaponType);
   const infiniteAmmo = Boolean(item.system.infiniteAmmo);
@@ -348,9 +581,31 @@ export async function doDamageRoll(actor, item) {
     }
   }
 
-  const roll = await new Roll(`1${die}`).evaluate();
-  const rawDamageBonus = getRawDamageBonus(actor);
-  const totalDamage = Math.max(0, roll.total + rawDamageBonus);
+  const rawDie = die.toString();
+  const defaultFormula = normalizeDamageFormula(/^\d/.test(rawDie) ? rawDie : `1${rawDie}`) || "1d4";
+  const defaultBonus = getRawDamageBonus(actor);
+  const config = await promptDamageConfiguration({
+    actor,
+    sourceName: item?.name || "",
+    defaultFormula,
+    defaultBonus,
+    defaultPenetration: 0
+  });
+  if (!config) return null;
+
+  const targetIds = Array.from(game.user.targets || []).map(token => token?.id).filter(Boolean);
+  const backendInput = {
+    degats: config.degats,
+    bonus_brut: config.bonusBrut,
+    penetration: config.penetration,
+    cible_id: targetIds[0] || "",
+    attaquant_id: actor?.id || ""
+  };
+  console.debug("[bloodman] damage:input", backendInput);
+
+  const roll = await new Roll(config.formula).evaluate();
+  const rollResults = getRollValues(roll);
+  const totalDamage = Math.max(0, Number(roll.total || 0) + config.bonusBrut);
   const source = item?.name ? ` (${item.name})` : "";
 
   if (consumesAmmo) {
@@ -361,10 +616,17 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: t("BLOODMAN.Rolls.Damage.Deal", { name: actor.name, amount: totalDamage, source })
+    flavor: `${t("BLOODMAN.Rolls.Damage.Deal", { name: actor.name, amount: totalDamage, source })}<br><small>${config.degats} + ${config.bonusBrut} | PEN ${config.penetration}</small>`
   });
 
-  await applyDamageToTargets(actor, totalDamage);
+  await applyDamageToTargets(actor, totalDamage, {
+    ...config,
+    rollResults,
+    attackerId: actor?.id || "",
+    attackerName: actor?.name || "",
+    sourceName: item?.name || "",
+    inputPayload: backendInput
+  });
   return roll;
 }
 
@@ -389,22 +651,61 @@ export async function doHealRoll(actor, item) {
   return roll;
 }
 
-export async function doDirectDamageRoll(actor, formula, sourceName = "") {
+export async function doDirectDamageRoll(actor, formula, sourceName = "", options = {}) {
   if (!actor) return null;
-  const roll = await new Roll(formula).evaluate();
-  const rawDamageBonus = getRawDamageBonus(actor);
-  const totalDamage = Math.max(0, roll.total + rawDamageBonus);
+  const defaultFormula = normalizeDamageFormula(formula) || "1d4";
+  const defaultBonus = getRawDamageBonus(actor);
+  const config = await promptDamageConfiguration({
+    actor,
+    sourceName,
+    defaultFormula,
+    defaultBonus,
+    defaultPenetration: 0
+  });
+  if (!config) return null;
+
+  if (typeof options.beforeRoll === "function") {
+    let allowed = false;
+    try {
+      allowed = Boolean(await options.beforeRoll(config));
+    } catch (error) {
+      console.error("[bloodman] damage:beforeRoll failed", error);
+      allowed = false;
+    }
+    if (!allowed) return null;
+  }
+
+  const targetIds = Array.from(game.user.targets || []).map(token => token?.id).filter(Boolean);
+  const backendInput = {
+    degats: config.degats,
+    bonus_brut: config.bonusBrut,
+    penetration: config.penetration,
+    cible_id: targetIds[0] || "",
+    attaquant_id: actor?.id || ""
+  };
+  console.debug("[bloodman] damage:input", backendInput);
+
+  const roll = await new Roll(config.formula).evaluate();
+  const rollResults = getRollValues(roll);
+  const totalDamage = Math.max(0, Number(roll.total || 0) + config.bonusBrut);
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: t("BLOODMAN.Rolls.Damage.Deal", {
+    flavor: `${t("BLOODMAN.Rolls.Damage.Deal", {
       name: actor.name,
       amount: totalDamage,
       source: sourceName ? ` (${sourceName})` : ""
-    })
+    })}<br><small>${config.degats} + ${config.bonusBrut} | PEN ${config.penetration}</small>`
   });
 
-  await applyDamageToTargets(actor, totalDamage);
+  await applyDamageToTargets(actor, totalDamage, {
+    ...config,
+    rollResults,
+    attackerId: actor?.id || "",
+    attackerName: actor?.name || "",
+    sourceName: sourceName || "",
+    inputPayload: backendInput
+  });
   return roll;
 }
 

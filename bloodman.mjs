@@ -433,6 +433,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
   const { tokenActor, uuidActor, worldActor } = await resolveDamageActors(tokenDoc, data);
   const share = Number(data.damage);
   if (!Number.isFinite(share) || share <= 0) return;
+  const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration ?? data.penetration_plus, 0)));
   const tokenIsLinked = data.targetActorLink === true || tokenDoc?.actorLink === true;
   const fallbackCurrent = Number(data.targetPvCurrent);
   const fallbackPA = Number(data.targetPA);
@@ -445,10 +446,11 @@ async function handleIncomingDamageRequest(data, source = "socket") {
   if (tokenDoc && !tokenIsLinked) {
     const current = resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent);
     if (!Number.isFinite(current)) return;
-    const pa = Number.isFinite(fallbackPA) ? fallbackPA : 0;
-    const finalDamage = Math.max(0, share - pa);
+    const paInitial = Number.isFinite(fallbackPA) ? fallbackPA : 0;
+    const paEffective = Math.max(0, paInitial - penetration);
+    const finalDamage = Math.max(0, share - paEffective);
     const nextValue = Math.max(0, current - finalDamage);
-    console.debug("[bloodman] damage:apply token-unlinked", { current, pa, share, finalDamage, nextValue, tokenId: tokenDoc.id });
+    console.debug("[bloodman] damage:apply token-unlinked", { current, paInitial, paEffective, penetration, share, finalDamage, nextValue, tokenId: tokenDoc.id });
     try {
       await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
     } catch (error) {
@@ -456,32 +458,61 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     }
     ChatMessage.create({
       speaker: { alias: fallbackName },
-      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
+      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa: paEffective })
+    });
+    console.debug("[bloodman] damage:output", {
+      degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
+      jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
+      bonus_brut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
+      penetration,
+      armure_initiale: paInitial,
+      armure_effective: paEffective,
+      degats_totaux: finalDamage,
+      points_de_vie_avant: current,
+      points_de_vie_apres: nextValue,
+      icones_a_afficher: nextValue <= 0 ? [(tokenActor?.type === "personnage-non-joueur" ? "mort" : "sang")] : [],
+      erreur: null
     });
     return;
   }
 
   if (tokenActor) {
     console.debug("[bloodman] damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
-    await applyDamageToActor(tokenActor, share, { targetName: fallbackName });
+    const result = await applyDamageToActor(tokenActor, share, { targetName: fallbackName, penetration });
+    if (result) {
+      console.debug("[bloodman] damage:output", {
+        degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
+        jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
+        bonus_brut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
+        penetration: result.penetration,
+        armure_initiale: result.paInitial,
+        armure_effective: result.paEffective,
+        degats_totaux: result.finalDamage,
+        points_de_vie_avant: result.hpBefore,
+        points_de_vie_apres: result.hpAfter,
+        icones_a_afficher: result.hpAfter <= 0 ? [(tokenActor.type === "personnage-non-joueur" ? "mort" : "sang")] : [],
+        erreur: null
+      });
+    }
     return;
   }
   if (uuidActor) {
     console.debug("[bloodman] damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
-    await applyDamageToActor(uuidActor, share, { targetName: fallbackName });
+    await applyDamageToActor(uuidActor, share, { targetName: fallbackName, penetration });
     return;
   }
   if (worldActor) {
     console.debug("[bloodman] damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
-    await applyDamageToActor(worldActor, share, { targetName: fallbackName });
+    await applyDamageToActor(worldActor, share, { targetName: fallbackName, penetration });
     return;
   }
   if (Number.isFinite(fallbackCurrent)) {
-    const pa = Number.isFinite(fallbackPA) ? fallbackPA : 0;
-    const finalDamage = Math.max(0, share - pa);
+    const paInitial = Number.isFinite(fallbackPA) ? fallbackPA : 0;
+    const paEffective = Math.max(0, paInitial - penetration);
+    const finalDamage = Math.max(0, share - paEffective);
     ChatMessage.create({
       speaker: { alias: fallbackName },
-      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
+      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa: paEffective })
     });
     return;
   }
@@ -1469,11 +1500,10 @@ class BloodmanActorSheet extends ActorSheet {
 
   async rollAbilityDamage(item) {
     if (!item) return;
-    const canRoll = await applyPowerCost(this.actor, item);
-    if (!canRoll) return;
     const die = (item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
-    const result = await doDirectDamageRoll(this.actor, formula, item.name);
+    const beforeRoll = async () => applyPowerCost(this.actor, item);
+    const result = await doDirectDamageRoll(this.actor, formula, item.name, { beforeRoll });
     if (!result) return;
     this.markItemReroll(item.id);
     this.render(false);
@@ -1665,6 +1695,8 @@ class BloodmanItemSheet extends ItemSheet {
       const weaponType = getWeaponCategory(this.item.system?.weaponType);
       data.weaponTypeDistance = weaponType === "distance";
       data.weaponTypeMelee = weaponType === "corps";
+      // Weapons predate the damageEnabled flag; treat missing as enabled for backward compatibility.
+      data.weaponDamageEnabled = this.item.system?.damageEnabled !== false;
     }
     return data;
   }
@@ -1672,8 +1704,8 @@ class BloodmanItemSheet extends ItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "item"],
-      width: 640,
-      height: 480,
+      width: 700,
+      height: 460,
       resizable: true,
       submitOnChange: true
     });
@@ -1694,10 +1726,9 @@ class BloodmanItemSheet extends ItemSheet {
       ui.notifications?.warn(t("BLOODMAN.Notifications.AbilityNoActor"));
       return;
     }
-    const canRoll = await applyPowerCost(this.item.actor, this.item);
-    if (!canRoll) return;
     const die = (this.item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
-    await doDirectDamageRoll(this.item.actor, formula, this.item.name);
+    const beforeRoll = async () => applyPowerCost(this.item.actor, this.item);
+    await doDirectDamageRoll(this.item.actor, formula, this.item.name, { beforeRoll });
   }
 }
