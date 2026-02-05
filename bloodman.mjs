@@ -5,6 +5,14 @@ function t(key, data = null) {
   return data ? game.i18n.format(key, data) : game.i18n.localize(key);
 }
 
+function safeWarn(message) {
+  try {
+    ui.notifications?.warn(message);
+  } catch (error) {
+    console.warn("[bloodman] notify.warn failed", message, error);
+  }
+}
+
 const CHARACTERISTICS = [
   { key: "MEL", labelKey: "BLOODMAN.Characteristics.Keys.MEL", icon: "fa-hand-fist" },
   { key: "VIS", labelKey: "BLOODMAN.Characteristics.Keys.VIS", icon: "fa-crosshairs" },
@@ -109,6 +117,128 @@ function getDerivedPvMax(actor, phyEffective, roleOverride) {
   return Math.round(phyEffective / 5);
 }
 
+const PROCESSED_DAMAGE_REQUESTS = new Map();
+
+function rememberDamageRequest(requestId) {
+  if (!requestId) return;
+  const now = Date.now();
+  PROCESSED_DAMAGE_REQUESTS.set(requestId, now);
+  for (const [key, value] of PROCESSED_DAMAGE_REQUESTS.entries()) {
+    if (now - value > 2 * 60 * 1000) PROCESSED_DAMAGE_REQUESTS.delete(key);
+  }
+}
+
+function wasDamageRequestProcessed(requestId) {
+  if (!requestId) return false;
+  return PROCESSED_DAMAGE_REQUESTS.has(requestId);
+}
+
+async function handleIncomingDamageRequest(data, source = "socket") {
+  if (!data || !game.user.isGM) return;
+  const requestId = typeof data.requestId === "string" ? data.requestId : "";
+  if (requestId && wasDamageRequestProcessed(requestId)) return;
+  if (requestId) rememberDamageRequest(requestId);
+
+  console.debug("[bloodman] damage:recv", { source, ...data });
+
+  let tokenDoc = null;
+  if (data.tokenUuid) {
+    const resolved = await fromUuid(data.tokenUuid).catch(() => null);
+    tokenDoc = resolved?.document || resolved || null;
+  }
+  if (!tokenDoc && data.sceneId && data.tokenId) {
+    const scene = game.scenes?.get(data.sceneId);
+    tokenDoc = scene?.tokens?.get(data.tokenId) || null;
+  }
+  if (!tokenDoc && data.tokenId) {
+    tokenDoc = canvas?.scene?.tokens?.get(data.tokenId) || null;
+  }
+  if (!tokenDoc && data.tokenId) {
+    for (const scene of game.scenes || []) {
+      const candidate = scene?.tokens?.get(data.tokenId);
+      if (candidate) {
+        tokenDoc = candidate;
+        break;
+      }
+    }
+  }
+  let tokenActor = tokenDoc?.actor || null;
+  if (!tokenActor && tokenDoc && typeof tokenDoc.getActor === "function") {
+    tokenActor = await tokenDoc.getActor().catch(() => null);
+  }
+  if (!tokenActor && tokenDoc?.object?.actor) tokenActor = tokenDoc.object.actor;
+  const uuidActor = data.actorUuid ? await fromUuid(data.actorUuid).catch(() => null) : null;
+  const worldActor = data.actorId ? game.actors.get(data.actorId) : null;
+  const share = Number(data.damage);
+  if (!Number.isFinite(share) || share <= 0) return;
+  const tokenIsLinked = data.targetActorLink === true || tokenDoc?.actorLink === true;
+  const fallbackCurrent = Number(data.targetPvCurrent);
+  const fallbackPA = Number(data.targetPA);
+  const fallbackName = (data.targetName || tokenDoc?.name || "Cible").toString();
+
+  if (tokenDoc && !tokenIsLinked) {
+    const tokenDeltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
+    const tokenActorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
+    const tokenActorCurrent = Number(tokenActor?.system?.resources?.pv?.current);
+    const current = Number.isFinite(fallbackCurrent)
+      ? fallbackCurrent
+      : (Number.isFinite(tokenActorCurrent)
+        ? tokenActorCurrent
+        : (Number.isFinite(tokenDeltaCurrent) ? tokenDeltaCurrent : tokenActorDataCurrent));
+    if (!Number.isFinite(current)) return;
+    const pa = Number.isFinite(fallbackPA) ? fallbackPA : 0;
+    const finalDamage = Math.max(0, share - pa);
+    const nextValue = Math.max(0, current - finalDamage);
+    console.debug("[bloodman] damage:apply token-unlinked", { current, pa, share, finalDamage, nextValue, tokenId: tokenDoc.id });
+    try {
+      await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
+    } catch (error) {
+      console.error("[bloodman] damage:update tokenDoc failed", error);
+    }
+    if (tokenActor) {
+      const actorCurrent = Number(tokenActor.system?.resources?.pv?.current);
+      if (!Number.isFinite(actorCurrent) || actorCurrent !== nextValue) {
+        try {
+          await tokenActor.update({ "system.resources.pv.current": nextValue });
+        } catch (error) {
+          console.error("[bloodman] damage:update tokenActor failed", error);
+        }
+      }
+    }
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker(),
+      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
+    });
+    return;
+  }
+
+  if (tokenActor) {
+    console.debug("[bloodman] damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
+    await applyDamageToActor(tokenActor, share);
+    return;
+  }
+  if (uuidActor) {
+    console.debug("[bloodman] damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
+    await applyDamageToActor(uuidActor, share);
+    return;
+  }
+  if (worldActor) {
+    console.debug("[bloodman] damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
+    await applyDamageToActor(worldActor, share);
+    return;
+  }
+  if (Number.isFinite(fallbackCurrent)) {
+    const pa = Number.isFinite(fallbackPA) ? fallbackPA : 0;
+    const finalDamage = Math.max(0, share - pa);
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker(),
+      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
+    });
+    return;
+  }
+  safeWarn(t("BLOODMAN.Notifications.DamageTargetResolveFailed"));
+}
+
 
 function registerDamageSocketHandlers() {
   if (globalThis.__bmDamageSocketReady || !game.socket) return;
@@ -122,12 +252,7 @@ function registerDamageSocketHandlers() {
       return;
     }
     if (data.type !== "applyDamage") return;
-    const token = data.tokenUuid ? await fromUuid(data.tokenUuid) : null;
-    const targetActor = token?.actor || (data.actorId ? game.actors.get(data.actorId) : null);
-    if (!targetActor) return;
-    const share = Number(data.damage);
-    if (!Number.isFinite(share) || share <= 0) return;
-    await applyDamageToActor(targetActor, share);
+    await handleIncomingDamageRequest(data, "socket");
   });
   globalThis.__bmDamageSocketReady = true;
 }
@@ -378,6 +503,14 @@ Hooks.on("createItem", (item) => {
   if (!item?.actor) return;
   if (item.type !== "aptitude" && item.type !== "pouvoir") return;
   applyItemResourceBonuses(item.actor);
+});
+
+Hooks.on("createChatMessage", async (message) => {
+  if (!game.user.isGM) return;
+  const payload = foundry.utils.getProperty(message, "flags.bloodman.damageRequest");
+  if (!payload) return;
+  await handleIncomingDamageRequest(payload, "chat");
+  if (message.isOwner) await message.delete().catch(() => null);
 });
 
 Hooks.on("updateItem", (item) => {
@@ -976,7 +1109,7 @@ class BloodmanActorSheet extends ActorSheet {
   async rollLuck() {
     if (this.actor.type !== "personnage") return;
 
-    const roll = await new Roll("2d100").roll({ async: true });
+    const roll = await new Roll("2d100").evaluate();
     const results = roll?.dice?.[0]?.results || [];
     const chanceValue = Number(results[0]?.result || 0);
     const luckValue = Number(results[1]?.result || 0);
@@ -1186,7 +1319,7 @@ class BloodmanActorSheet extends ActorSheet {
     if (item.type === "soin") {
       const die = (item.system?.healDie || "d4").toString();
       const formula = /^\d/.test(die) ? die : `1${die}`;
-      const roll = await new Roll(formula).roll({ async: true });
+      const roll = await new Roll(formula).evaluate();
       const current = toFiniteNumber(this.actor.system.resources?.pv?.current, 0);
       const max = toFiniteNumber(this.actor.system.resources?.pv?.max, current);
       const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;

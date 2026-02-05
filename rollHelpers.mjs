@@ -8,6 +8,14 @@ function t(key, data = null) {
   return data ? game.i18n.format(key, data) : game.i18n.localize(key);
 }
 
+function safeWarn(message) {
+  try {
+    ui.notifications?.warn(message);
+  } catch (error) {
+    console.warn("[bloodman] notify.warn failed", message, error);
+  }
+}
+
 function isBonusItem(item) {
   return BONUS_ITEM_TYPES.has(item?.type);
 }
@@ -77,10 +85,20 @@ function getProtectionPA(actor) {
   return total;
 }
 
+function getTokenDocument(tokenLike) {
+  if (!tokenLike) return null;
+  return tokenLike.document || tokenLike;
+}
+
+function getTokenActor(tokenLike) {
+  if (!tokenLike) return null;
+  return tokenLike.actor || tokenLike.document?.actor || tokenLike.object?.actor || null;
+}
+
 export async function doCharacteristicRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
 
-  const r = await new Roll("1d100").roll({ async: true });
+  const r = await new Roll("1d100").evaluate();
   const success = r.total <= effective;
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
   r.toMessage({
@@ -92,14 +110,49 @@ export async function doCharacteristicRoll(actor, key) {
 
 async function requestDamageFromGM(token, damage) {
   if (!game.socket) return;
-  const tokenUuid = token?.document?.uuid;
-  const actorId = token?.actor?.id;
-  game.socket.emit(SYSTEM_SOCKET, {
+  const tokenDocument = getTokenDocument(token);
+  const targetActor = getTokenActor(token);
+  const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+  const tokenUuid = tokenDocument?.uuid;
+  const tokenId = tokenDocument?.id || token?.id;
+  const sceneId = tokenDocument?.parent?.id || token?.scene?.id || tokenDocument?.scene?.id || canvas?.scene?.id;
+  const worldActorId = tokenDocument?.actorId || targetActor?.id || "";
+  const actorId = worldActorId || targetActor?.id;
+  const worldActorUuid = worldActorId ? game.actors?.get(worldActorId)?.uuid : "";
+  const actorUuid = worldActorUuid || targetActor?.uuid;
+  const targetActorLink = Boolean(tokenDocument?.actorLink);
+  const targetName = tokenDocument?.name || token?.name || targetActor?.name || "";
+  const targetPvCurrent = Number(targetActor?.system?.resources?.pv?.current ?? NaN);
+  const targetPA = Number(getProtectionPA(targetActor));
+  const payload = {
+    requestId,
     type: "applyDamage",
     tokenUuid,
+    tokenId,
+    sceneId,
     actorId,
+    actorUuid,
+    targetActorLink,
+    targetName,
+    targetPvCurrent,
+    targetPA,
     damage
-  });
+  };
+  console.debug("[bloodman] damage:send", payload);
+  game.socket.emit(SYSTEM_SOCKET, payload);
+
+  const gmIds = game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
+  if (gmIds.length) {
+    try {
+      await ChatMessage.create({
+        content: "<span style='display:none'>bloodman-damage-request</span>",
+        whisper: gmIds,
+        flags: { bloodman: { damageRequest: payload } }
+      });
+    } catch (error) {
+      console.error("[bloodman] damage:fallback chat failed", error);
+    }
+  }
 }
 
 export async function applyDamageToActor(targetActor, damage) {
@@ -123,7 +176,11 @@ export async function applyDamageToActor(targetActor, damage) {
 
 async function applyDamageToTargets(sourceActor, total) {
   const targets = Array.from(game.user.targets || []);
-  if (!targets.length) return;
+  if (!targets.length) {
+    safeWarn(t("BLOODMAN.Notifications.NoTargetSelected"));
+    return;
+  }
+  const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
 
   const promptDamageSplit = async (totalDamage, targetTokens) => {
     if (targetTokens.length <= 1) return null;
@@ -197,12 +254,16 @@ async function applyDamageToTargets(sourceActor, total) {
   }
 
   for (const token of targets) {
-    const targetActor = token.actor;
-    if (!targetActor) continue;
     const share = allocations ? Number(allocations[token.id] || 0) : total;
     if (!Number.isFinite(share) || share <= 0) continue;
-    if (!targetActor.isOwner) {
+    if (!game.user.isGM && hasActiveGM) {
       await requestDamageFromGM(token, share);
+      continue;
+    }
+    const targetActor = getTokenActor(token);
+    if (!targetActor) continue;
+    if (!targetActor.isOwner && !game.user.isGM) {
+      safeWarn(t("BLOODMAN.Notifications.NoActiveGMApplyDamage"));
       continue;
     }
     await applyDamageToActor(targetActor, share);
@@ -222,7 +283,7 @@ export async function doDamageRoll(actor, item) {
     }
   }
 
-  const roll = await new Roll(`1${die}`).roll({ async: true });
+  const roll = await new Roll(`1${die}`).evaluate();
   const rawDamageBonus = getRawDamageBonus(actor);
   const totalDamage = Math.max(0, roll.total + rawDamageBonus);
   const source = item?.name ? ` (${item.name})` : "";
@@ -244,7 +305,7 @@ export async function doDamageRoll(actor, item) {
 
 export async function doHealRoll(actor, item) {
   const die = item.system.healDie || "d4";
-  const roll = await new Roll(`1${die}`).roll({ async: true });
+  const roll = await new Roll(`1${die}`).evaluate();
 
   const current = Number(actor.system.resources?.pv?.current || 0);
   const max = Number(actor.system.resources?.pv?.max || 0);
@@ -265,7 +326,7 @@ export async function doHealRoll(actor, item) {
 
 export async function doDirectDamageRoll(actor, formula, sourceName = "") {
   if (!actor) return null;
-  const roll = await new Roll(formula).roll({ async: true });
+  const roll = await new Roll(formula).evaluate();
   const rawDamageBonus = getRawDamageBonus(actor);
   const totalDamage = Math.max(0, roll.total + rawDamageBonus);
 
@@ -286,7 +347,7 @@ export async function doGrowthRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
   const base = Number(actor.system.characteristics?.[key]?.base || 0);
 
-  const roll = await new Roll("1d100").roll({ async: true });
+  const roll = await new Roll("1d100").evaluate();
   const success = roll.total > effective;
   const xpPath = `system.characteristics.${key}.xp`;
   const basePath = `system.characteristics.${key}.base`;

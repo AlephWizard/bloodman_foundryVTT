@@ -134,6 +134,9 @@
       "NotEnoughPP": "Pas assez de points de puissance pour lancer ce pouvoir.",
       "NotEnoughPPReroll": "Pas assez de points de puissance pour relancer cette caracteristique ({cost} PP requis).",
       "NotEnoughChaosReroll": "Pas assez de des du chaos pour relancer.",
+      "NoActiveGMApplyDamage": "Aucun GM actif pour appliquer les degats.",
+      "NoTargetSelected": "Aucune cible selectionnee.",
+      "DamageTargetResolveFailed": "Le GM n'a pas pu resoudre la cible pour appliquer les degats.",
       "AbilityNoActor": "Cette aptitude/pouvoir n'est pas lié à un acteur.",
       "DamageSplitTotal": "La répartition doit totaliser {total}.",
       "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum."
