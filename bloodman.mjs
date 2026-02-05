@@ -13,6 +13,20 @@ function safeWarn(message) {
   }
 }
 
+function isGenericTokenName(name) {
+  if (!name) return false;
+  return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
+}
+
+function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
+  const tokenLabel = String(tokenName || "").trim();
+  const actorLabel = String(actorName || "").trim();
+  if (tokenLabel && !isGenericTokenName(tokenLabel)) return tokenLabel;
+  if (actorLabel) return actorLabel;
+  if (tokenLabel) return tokenLabel;
+  return fallback;
+}
+
 const CHARACTERISTICS = [
   { key: "MEL", labelKey: "BLOODMAN.Characteristics.Keys.MEL", icon: "fa-hand-fist" },
   { key: "VIS", labelKey: "BLOODMAN.Characteristics.Keys.VIS", icon: "fa-crosshairs" },
@@ -32,6 +46,7 @@ const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
+const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
 
 function toFiniteNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -90,10 +105,14 @@ function isMissingTokenImage(src) {
   return !src || src === "icons/svg/mystery-man.svg";
 }
 
+function getActiveNonGMCount() {
+  return game.users?.filter(user => user.active && !user.isGM).length || 0;
+}
+
 function getPlayerCountOnScene() {
   const scene = globalThis.canvas?.scene || game.scenes?.active;
   if (!scene) {
-    const activePlayers = game.users?.filter(user => user.active && !user.isGM).length || 0;
+    const activePlayers = getActiveNonGMCount();
     return Math.max(1, activePlayers);
   }
   const tokens = scene.tokens?.contents || Array.from(scene.tokens || []);
@@ -104,7 +123,7 @@ function getPlayerCountOnScene() {
   }
   const count = actorIds.size;
   if (count > 0) return count;
-  const activePlayers = game.users?.filter(user => user.active && !user.isGM).length || 0;
+  const activePlayers = getActiveNonGMCount();
   return Math.max(1, activePlayers);
 }
 
@@ -124,13 +143,58 @@ function rememberDamageRequest(requestId) {
   const now = Date.now();
   PROCESSED_DAMAGE_REQUESTS.set(requestId, now);
   for (const [key, value] of PROCESSED_DAMAGE_REQUESTS.entries()) {
-    if (now - value > 2 * 60 * 1000) PROCESSED_DAMAGE_REQUESTS.delete(key);
+    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_DAMAGE_REQUESTS.delete(key);
   }
 }
 
 function wasDamageRequestProcessed(requestId) {
   if (!requestId) return false;
   return PROCESSED_DAMAGE_REQUESTS.has(requestId);
+}
+
+async function resolveDamageTokenDocument(data) {
+  if (!data) return null;
+  if (data.tokenUuid) {
+    const resolved = await fromUuid(data.tokenUuid).catch(() => null);
+    const tokenDoc = resolved?.document || resolved || null;
+    if (tokenDoc) return tokenDoc;
+  }
+  if (data.sceneId && data.tokenId) {
+    const scene = game.scenes?.get(data.sceneId);
+    const tokenDoc = scene?.tokens?.get(data.tokenId) || null;
+    if (tokenDoc) return tokenDoc;
+  }
+  if (data.tokenId) {
+    const activeTokenDoc = canvas?.scene?.tokens?.get(data.tokenId) || null;
+    if (activeTokenDoc) return activeTokenDoc;
+    for (const scene of game.scenes || []) {
+      const candidate = scene?.tokens?.get(data.tokenId);
+      if (candidate) return candidate;
+    }
+  }
+  return null;
+}
+
+async function resolveDamageActors(tokenDoc, data) {
+  let tokenActor = tokenDoc?.actor || null;
+  if (!tokenActor && tokenDoc && typeof tokenDoc.getActor === "function") {
+    tokenActor = await tokenDoc.getActor().catch(() => null);
+  }
+  if (!tokenActor && tokenDoc?.object?.actor) tokenActor = tokenDoc.object.actor;
+
+  const uuidActor = data?.actorUuid ? await fromUuid(data.actorUuid).catch(() => null) : null;
+  const worldActor = data?.actorId ? game.actors.get(data.actorId) : null;
+  return { tokenActor, uuidActor, worldActor };
+}
+
+function resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent) {
+  if (Number.isFinite(fallbackCurrent)) return fallbackCurrent;
+  const tokenActorCurrent = Number(tokenActor?.system?.resources?.pv?.current);
+  if (Number.isFinite(tokenActorCurrent)) return tokenActorCurrent;
+  const tokenDeltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
+  if (Number.isFinite(tokenDeltaCurrent)) return tokenDeltaCurrent;
+  const tokenActorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
+  return tokenActorDataCurrent;
 }
 
 async function handleIncomingDamageRequest(data, source = "socket") {
@@ -141,50 +205,21 @@ async function handleIncomingDamageRequest(data, source = "socket") {
 
   console.debug("[bloodman] damage:recv", { source, ...data });
 
-  let tokenDoc = null;
-  if (data.tokenUuid) {
-    const resolved = await fromUuid(data.tokenUuid).catch(() => null);
-    tokenDoc = resolved?.document || resolved || null;
-  }
-  if (!tokenDoc && data.sceneId && data.tokenId) {
-    const scene = game.scenes?.get(data.sceneId);
-    tokenDoc = scene?.tokens?.get(data.tokenId) || null;
-  }
-  if (!tokenDoc && data.tokenId) {
-    tokenDoc = canvas?.scene?.tokens?.get(data.tokenId) || null;
-  }
-  if (!tokenDoc && data.tokenId) {
-    for (const scene of game.scenes || []) {
-      const candidate = scene?.tokens?.get(data.tokenId);
-      if (candidate) {
-        tokenDoc = candidate;
-        break;
-      }
-    }
-  }
-  let tokenActor = tokenDoc?.actor || null;
-  if (!tokenActor && tokenDoc && typeof tokenDoc.getActor === "function") {
-    tokenActor = await tokenDoc.getActor().catch(() => null);
-  }
-  if (!tokenActor && tokenDoc?.object?.actor) tokenActor = tokenDoc.object.actor;
-  const uuidActor = data.actorUuid ? await fromUuid(data.actorUuid).catch(() => null) : null;
-  const worldActor = data.actorId ? game.actors.get(data.actorId) : null;
+  const tokenDoc = await resolveDamageTokenDocument(data);
+  const { tokenActor, uuidActor, worldActor } = await resolveDamageActors(tokenDoc, data);
   const share = Number(data.damage);
   if (!Number.isFinite(share) || share <= 0) return;
   const tokenIsLinked = data.targetActorLink === true || tokenDoc?.actorLink === true;
   const fallbackCurrent = Number(data.targetPvCurrent);
   const fallbackPA = Number(data.targetPA);
-  const fallbackName = (data.targetName || tokenDoc?.name || "Cible").toString();
+  const fallbackName = resolveCombatTargetName(
+    data.targetName || tokenDoc?.name,
+    tokenActor?.name || uuidActor?.name || worldActor?.name,
+    "Cible"
+  );
 
   if (tokenDoc && !tokenIsLinked) {
-    const tokenDeltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
-    const tokenActorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
-    const tokenActorCurrent = Number(tokenActor?.system?.resources?.pv?.current);
-    const current = Number.isFinite(fallbackCurrent)
-      ? fallbackCurrent
-      : (Number.isFinite(tokenActorCurrent)
-        ? tokenActorCurrent
-        : (Number.isFinite(tokenDeltaCurrent) ? tokenDeltaCurrent : tokenActorDataCurrent));
+    const current = resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent);
     if (!Number.isFinite(current)) return;
     const pa = Number.isFinite(fallbackPA) ? fallbackPA : 0;
     const finalDamage = Math.max(0, share - pa);
@@ -214,17 +249,17 @@ async function handleIncomingDamageRequest(data, source = "socket") {
 
   if (tokenActor) {
     console.debug("[bloodman] damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
-    await applyDamageToActor(tokenActor, share);
+    await applyDamageToActor(tokenActor, share, { targetName: fallbackName });
     return;
   }
   if (uuidActor) {
     console.debug("[bloodman] damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
-    await applyDamageToActor(uuidActor, share);
+    await applyDamageToActor(uuidActor, share, { targetName: fallbackName });
     return;
   }
   if (worldActor) {
     console.debug("[bloodman] damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
-    await applyDamageToActor(worldActor, share);
+    await applyDamageToActor(worldActor, share, { targetName: fallbackName });
     return;
   }
   if (Number.isFinite(fallbackCurrent)) {

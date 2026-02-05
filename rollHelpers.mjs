@@ -2,6 +2,7 @@
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
+const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 
 function t(key, data = null) {
   if (!globalThis.game?.i18n) return key;
@@ -95,6 +96,55 @@ function getTokenActor(tokenLike) {
   return tokenLike.actor || tokenLike.document?.actor || tokenLike.object?.actor || null;
 }
 
+function getActiveGMIds() {
+  return game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
+}
+
+function isGenericTokenName(name) {
+  if (!name) return false;
+  return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
+}
+
+function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
+  const tokenLabel = String(tokenName || "").trim();
+  const actorLabel = String(actorName || "").trim();
+  if (tokenLabel && !isGenericTokenName(tokenLabel)) return tokenLabel;
+  if (actorLabel) return actorLabel;
+  if (tokenLabel) return tokenLabel;
+  return fallback;
+}
+
+function buildDamageRequestPayload(token, damage) {
+  const tokenDocument = getTokenDocument(token);
+  const targetActor = getTokenActor(token);
+  const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+  const tokenUuid = tokenDocument?.uuid;
+  const tokenId = tokenDocument?.id || token?.id;
+  const sceneId = tokenDocument?.parent?.id || token?.scene?.id || tokenDocument?.scene?.id || canvas?.scene?.id;
+  const worldActorId = tokenDocument?.actorId || targetActor?.id || "";
+  const actorId = worldActorId || targetActor?.id;
+  const worldActorUuid = worldActorId ? game.actors?.get(worldActorId)?.uuid : "";
+  const actorUuid = worldActorUuid || targetActor?.uuid;
+  const targetActorLink = Boolean(tokenDocument?.actorLink);
+  const targetName = resolveCombatTargetName(tokenDocument?.name || token?.name, targetActor?.name, "");
+  const targetPvCurrent = Number(targetActor?.system?.resources?.pv?.current ?? NaN);
+  const targetPA = Number(getProtectionPA(targetActor));
+  return {
+    requestId,
+    type: "applyDamage",
+    tokenUuid,
+    tokenId,
+    sceneId,
+    actorId,
+    actorUuid,
+    targetActorLink,
+    targetName,
+    targetPvCurrent,
+    targetPA,
+    damage
+  };
+}
+
 export async function doCharacteristicRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
 
@@ -110,42 +160,15 @@ export async function doCharacteristicRoll(actor, key) {
 
 async function requestDamageFromGM(token, damage) {
   if (!game.socket) return;
-  const tokenDocument = getTokenDocument(token);
-  const targetActor = getTokenActor(token);
-  const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  const tokenUuid = tokenDocument?.uuid;
-  const tokenId = tokenDocument?.id || token?.id;
-  const sceneId = tokenDocument?.parent?.id || token?.scene?.id || tokenDocument?.scene?.id || canvas?.scene?.id;
-  const worldActorId = tokenDocument?.actorId || targetActor?.id || "";
-  const actorId = worldActorId || targetActor?.id;
-  const worldActorUuid = worldActorId ? game.actors?.get(worldActorId)?.uuid : "";
-  const actorUuid = worldActorUuid || targetActor?.uuid;
-  const targetActorLink = Boolean(tokenDocument?.actorLink);
-  const targetName = tokenDocument?.name || token?.name || targetActor?.name || "";
-  const targetPvCurrent = Number(targetActor?.system?.resources?.pv?.current ?? NaN);
-  const targetPA = Number(getProtectionPA(targetActor));
-  const payload = {
-    requestId,
-    type: "applyDamage",
-    tokenUuid,
-    tokenId,
-    sceneId,
-    actorId,
-    actorUuid,
-    targetActorLink,
-    targetName,
-    targetPvCurrent,
-    targetPA,
-    damage
-  };
+  const payload = buildDamageRequestPayload(token, damage);
   console.debug("[bloodman] damage:send", payload);
   game.socket.emit(SYSTEM_SOCKET, payload);
 
-  const gmIds = game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
+  const gmIds = getActiveGMIds();
   if (gmIds.length) {
     try {
       await ChatMessage.create({
-        content: "<span style='display:none'>bloodman-damage-request</span>",
+        content: DAMAGE_REQUEST_CHAT_MARKUP,
         whisper: gmIds,
         flags: { bloodman: { damageRequest: payload } }
       });
@@ -155,7 +178,7 @@ async function requestDamageFromGM(token, damage) {
   }
 }
 
-export async function applyDamageToActor(targetActor, damage) {
+export async function applyDamageToActor(targetActor, damage, options = {}) {
   if (!targetActor) return null;
   const share = Number(damage);
   if (!Number.isFinite(share) || share <= 0) return null;
@@ -163,12 +186,13 @@ export async function applyDamageToActor(targetActor, damage) {
   const finalDamage = Math.max(0, share - pa);
   const current = Number(targetActor.system.resources?.pv?.current || 0);
   const nextValue = Math.max(0, current - finalDamage);
+  const displayName = resolveCombatTargetName(options?.targetName, targetActor?.name, targetActor?.name || "Cible");
 
   await targetActor.update({ "system.resources.pv.current": nextValue });
 
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-    content: t("BLOODMAN.Rolls.Damage.Take", { name: targetActor.name, amount: finalDamage, pa })
+    content: t("BLOODMAN.Rolls.Damage.Take", { name: displayName, amount: finalDamage, pa })
   });
 
   return { finalDamage, pa };
@@ -266,7 +290,8 @@ async function applyDamageToTargets(sourceActor, total) {
       safeWarn(t("BLOODMAN.Notifications.NoActiveGMApplyDamage"));
       continue;
     }
-    await applyDamageToActor(targetActor, share);
+    const targetName = token?.name || token?.document?.name || "";
+    await applyDamageToActor(targetActor, share, { targetName });
   }
 }
 
