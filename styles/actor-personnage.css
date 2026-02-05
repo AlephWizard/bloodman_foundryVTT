@@ -565,6 +565,28 @@
   color: var(--bm-white);
 }
 
+.item-reroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 5px;
+  min-height: 18px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: #f2f2f2;
+  color: var(--bm-black);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 .ammo-row {
   display: grid;
   grid-template-columns: 1fr 56px;

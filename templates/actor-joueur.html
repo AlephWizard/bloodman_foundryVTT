@@ -94,7 +94,9 @@
                       <button type="button" class="char-reroll" data-key="{{this.key}}">
                         <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
                       </button>
-                      <button type="button" class="char-reroll-clear" data-key="{{this.key}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                      {{#if this.showRerollClear}}
+                        <button type="button" class="char-reroll-clear" data-key="{{this.key}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                      {{/if}}
                     {{/if}}
                   </div>
                   <div class="char-score">
@@ -187,6 +189,11 @@
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-meta">{{#if this.displayWeaponType}}{{this.displayWeaponType}}{{else}}{{localize "BLOODMAN.Equipment.WeaponType.Distance"}}{{/if}}</span>
                 <span class="weapon-roll">1{{this.system.damageDie}}</span>
+                {{#if this.showItemReroll}}
+                  <button type="button" class="item-reroll">
+                    <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                  </button>
+                {{/if}}
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
@@ -238,6 +245,11 @@
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-use">{{#if this.system.healDie}}1{{this.system.healDie}}{{else}}1d4{{/if}}</span>
+                {{#if this.showItemReroll}}
+                  <button type="button" class="item-reroll">
+                    <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                  </button>
+                {{/if}}
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
@@ -290,6 +302,11 @@
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
+                {{#if this.showItemReroll}}
+                  <button type="button" class="item-reroll">
+                    <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                  </button>
+                {{/if}}
                 {{#if this.displayBonuses.length}}
                   {{#each this.displayBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
                 {{/if}}
@@ -313,6 +330,11 @@
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
+                {{#if this.showItemReroll}}
+                  <button type="button" class="item-reroll">
+                    <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                  </button>
+                {{/if}}
                 {{#if this.displayBonuses.length}}
                   {{#each this.displayBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
                 {{/if}}

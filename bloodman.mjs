@@ -21,6 +21,9 @@ const SYSTEM_SOCKET = "system.bloodman";
 const CARRIED_ITEM_LIMIT = 10;
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
 const CHARACTERISTIC_REROLL_PP_COST = 4;
+const CHAOS_PER_PLAYER_REROLL = 1;
+const CHAOS_COST_NPC_REROLL = 1;
+const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 
 function toFiniteNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -110,8 +113,15 @@ function getDerivedPvMax(actor, phyEffective, roleOverride) {
 function registerDamageSocketHandlers() {
   if (globalThis.__bmDamageSocketReady || !game.socket) return;
   game.socket.on(SYSTEM_SOCKET, async data => {
-    if (!data || data.type !== "applyDamage") return;
+    if (!data) return;
     if (!game.user.isGM) return;
+    if (data.type === "adjustChaosDice") {
+      const delta = Number(data.delta);
+      if (!Number.isFinite(delta) || delta === 0) return;
+      await setChaosValue(getChaosValue() + delta);
+      return;
+    }
+    if (data.type !== "applyDamage") return;
     const token = data.tokenUuid ? await fromUuid(data.tokenUuid) : null;
     const targetActor = token?.actor || (data.actorId ? game.actors.get(data.actorId) : null);
     if (!targetActor) return;
@@ -131,6 +141,9 @@ Hooks.once("init", () => {
     default: 0,
     onChange: value => {
       updateChaosDiceUI(typeof value === "number" ? value : Number(value));
+      for (const app of Object.values(ui.windows || {})) {
+        if (app instanceof BloodmanNpcSheet) app.render(false);
+      }
     }
   });
 
@@ -251,6 +264,17 @@ async function setChaosValue(nextValue) {
   const clamped = clampChaosValue(nextValue);
   await game.settings.set("bloodman", "chaosDice", clamped);
   updateChaosDiceUI(clamped);
+}
+
+async function requestChaosDelta(delta) {
+  const numeric = Number(delta);
+  if (!Number.isFinite(numeric) || numeric === 0) return;
+  if (game.user.isGM) {
+    await setChaosValue(getChaosValue() + numeric);
+    return;
+  }
+  if (!game.socket) return;
+  game.socket.emit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric });
 }
 
 function updateChaosDiceUI(value) {
@@ -464,6 +488,7 @@ async function applyPowerCost(actor, item) {
 
 function buildItemDisplayData(item) {
   const data = item.toObject();
+  data._id = data._id ?? item.id;
   const bonusEnabled = Boolean(item.system?.bonusEnabled);
   const displayBonuses = [];
   const displayResourceBonuses = [];
@@ -655,7 +680,20 @@ class BloodmanActorSheet extends ActorSheet {
     const data = super.getData();
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
     const rerollKey = this._lastCharacteristicRollKey || "";
-    const canUseCharacteristicReroll = data.actor.type === "personnage";
+    const characteristicRerollActive = this.isRerollWindowActive(this._lastCharacteristicRollAt);
+    const itemRerollActive = this.isRerollWindowActive(this._lastItemReroll?.at);
+    const activeRerollKey = characteristicRerollActive ? rerollKey : "";
+    const lastItemRerollId = itemRerollActive ? (this._lastItemReroll?.itemId || "") : "";
+    const isPlayerActor = data.actor.type === "personnage";
+    const isNpcActor = data.actor.type === "personnage-non-joueur";
+    const chaosValue = getChaosValue();
+    const hasChaosForReroll = isNpcActor && game.user.isGM && chaosValue > 0;
+    const canUseCharacteristicReroll = (isPlayerActor || hasChaosForReroll) && characteristicRerollActive;
+    const canUseItemReroll = (isPlayerActor || hasChaosForReroll) && itemRerollActive;
+    const shouldShowItemReroll = itemId => {
+      if (!canUseItemReroll) return false;
+      return itemId === lastItemRerollId;
+    };
 
     const itemBonuses = getItemBonusTotals(data.actor);
     const characteristics = CHARACTERISTICS.map(c => {
@@ -668,8 +706,9 @@ class BloodmanActorSheet extends ActorSheet {
       const itemBonus = Number(itemBonuses[c.key] || 0);
       const effective = base + flat + itemBonus;
       const xpReady = xp.every(Boolean);
-      const showReroll = canUseCharacteristicReroll && rerollKey === c.key;
-      return { key: c.key, label, icon: c.icon, base, effective, itemBonus, xp, xpReady, showReroll };
+      const showReroll = canUseCharacteristicReroll && activeRerollKey === c.key;
+      const showRerollClear = isPlayerActor && showReroll;
+      return { key: c.key, label, icon: c.icon, base, effective, itemBonus, xp, xpReady, showReroll, showRerollClear };
     });
     const totalPoints = characteristics.reduce((sum, c) => sum + Number(c.base || 0), 0);
 
@@ -716,8 +755,16 @@ class BloodmanActorSheet extends ActorSheet {
       if (itemBuckets[item.type]) itemBuckets[item.type].push(item);
     }
 
-    const aptitudes = itemBuckets.aptitude.map(buildItemDisplayData);
-    const pouvoirs = itemBuckets.pouvoir.map(buildItemDisplayData);
+    const aptitudes = itemBuckets.aptitude.map(item => {
+      const dataItem = buildItemDisplayData(item);
+      dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
+      return dataItem;
+    });
+    const pouvoirs = itemBuckets.pouvoir.map(item => {
+      const dataItem = buildItemDisplayData(item);
+      dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
+      return dataItem;
+    });
 
     const npcRole = data.actor.system.npcRole || "";
 
@@ -731,7 +778,15 @@ class BloodmanActorSheet extends ActorSheet {
       else if (normalized === "distance") weapon.displayWeaponType = weaponTypeDistance;
       else if (weapon.system?.weaponType) weapon.displayWeaponType = weapon.system.weaponType;
       else weapon.displayWeaponType = weaponTypeDistance;
+      weapon.showItemReroll = shouldShowItemReroll(item.id);
       return weapon;
+    });
+
+    const soins = itemBuckets.soin.map(item => {
+      const heal = item.toObject();
+      heal._id = heal._id ?? item.id;
+      heal.showItemReroll = shouldShowItemReroll(item.id);
+      return heal;
     });
     const carriedItemsCount = itemBuckets.objet.length + itemBuckets.soin.length + itemBuckets.ration.length;
     const equipmentTwoColumns = carriedItemsCount >= 6;
@@ -751,7 +806,7 @@ class BloodmanActorSheet extends ActorSheet {
       weapons,
       objects: itemBuckets.objet,
       rations: itemBuckets.ration,
-      soins: itemBuckets.soin,
+      soins,
       protections: itemBuckets.protection,
       aptitudes,
       pouvoirs,
@@ -816,6 +871,14 @@ class BloodmanActorSheet extends ActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.actor.items.get(li.dataset.itemId);
       this.useItem(item);
+    });
+
+    html.find(".item-reroll").click(ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = ev.currentTarget.closest(".item");
+      const itemId = li?.dataset?.itemId;
+      this.rerollItemRoll(itemId);
     });
 
     html.find(".transport-npc-open").click(ev => {
@@ -906,29 +969,49 @@ class BloodmanActorSheet extends ActorSheet {
 
   async handleCharacteristicRoll(key) {
     if (!key) return;
-    this._lastCharacteristicRollKey = key;
+    this.markCharacteristicReroll(key);
     await doCharacteristicRoll(this.actor, key);
     await this.markXpProgress(key);
     this.render(false);
   }
 
   async rerollCharacteristic(key) {
-    if (!key || this.actor.type !== "personnage") return;
-    if (this._lastCharacteristicRollKey !== key) return;
+    if (!key) return;
 
-    const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
-    if (!Number.isFinite(currentPP) || currentPP < CHARACTERISTIC_REROLL_PP_COST) {
-      ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
+    if (this.actor.type === "personnage") {
+      if (this._lastCharacteristicRollKey !== key || !this.isRerollWindowActive(this._lastCharacteristicRollAt)) return;
+      const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
+      if (!Number.isFinite(currentPP) || currentPP < CHARACTERISTIC_REROLL_PP_COST) {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
+        return;
+      }
+
+      await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+      await doCharacteristicRoll(this.actor, key);
+      await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
+      this.markCharacteristicReroll(key);
+      this.render(false);
       return;
     }
 
-    await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+    if (this.actor.type !== "personnage-non-joueur" || !game.user.isGM) return;
+    if (this._lastCharacteristicRollKey !== key || !this.isRerollWindowActive(this._lastCharacteristicRollAt)) return;
+    const currentChaos = getChaosValue();
+    if (currentChaos < CHAOS_COST_NPC_REROLL) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
+      this.render(false);
+      return;
+    }
+
+    await setChaosValue(currentChaos - CHAOS_COST_NPC_REROLL);
     await doCharacteristicRoll(this.actor, key);
+    this.markCharacteristicReroll(key);
+    this.render(false);
   }
 
   clearCharacteristicReroll(key) {
     if (!key || this._lastCharacteristicRollKey !== key) return;
-    this._lastCharacteristicRollKey = "";
+    this.clearCharacteristicRerollState();
     this.render(false);
   }
 
@@ -944,7 +1027,11 @@ class BloodmanActorSheet extends ActorSheet {
   }
 
   async rollDamage(item) {
-    await doDamageRoll(this.actor, item);
+    if (!item) return;
+    const result = await doDamageRoll(this.actor, item);
+    if (!result) return;
+    this.markItemReroll(item.id);
+    this.render(false);
   }
 
   async rollAbilityDamage(item) {
@@ -953,13 +1040,138 @@ class BloodmanActorSheet extends ActorSheet {
     if (!canRoll) return;
     const die = (item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
-    await doDirectDamageRoll(this.actor, formula, item.name);
+    const result = await doDirectDamageRoll(this.actor, formula, item.name);
+    if (!result) return;
+    this.markItemReroll(item.id);
+    this.render(false);
   }
 
   async useItem(item) {
     if (!item) return;
-    if (item.type === "soin") await doHealRoll(this.actor, item);
+    if (item.type === "soin") {
+      const result = await doHealRoll(this.actor, item);
+      if (result && this.actor.items.get(item.id)) this.markItemReroll(item.id);
+    }
     if (item.type === "ration" && item.isOwner) await item.delete();
+  }
+
+  async rerollItemRoll(itemId) {
+    if (!itemId) return;
+    const item = this.actor.items.get(itemId);
+    if (!item) return;
+    const isPlayerActor = this.actor.type === "personnage";
+    const isNpcActor = this.actor.type === "personnage-non-joueur";
+
+    if (isPlayerActor) {
+      if (this._lastItemReroll?.itemId !== itemId || !this.isRerollWindowActive(this._lastItemReroll?.at)) return;
+      const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
+      if (currentPP < CHARACTERISTIC_REROLL_PP_COST) {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
+        return;
+      }
+      await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+      const rolled = await this.performItemRerollRoll(item);
+      if (!rolled) return;
+      await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
+      this.markItemReroll(item.id);
+      this.render(false);
+      return;
+    }
+
+    if (!isNpcActor || !game.user.isGM) return;
+    if (this._lastItemReroll?.itemId !== itemId || !this.isRerollWindowActive(this._lastItemReroll?.at)) return;
+    const currentChaos = getChaosValue();
+    if (currentChaos < CHAOS_COST_NPC_REROLL) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
+      this.render(false);
+      return;
+    }
+    const rolled = await this.performItemRerollRoll(item);
+    if (!rolled) return;
+    await setChaosValue(currentChaos - CHAOS_COST_NPC_REROLL);
+    this.markItemReroll(item.id);
+    this.render(false);
+  }
+
+  isRerollWindowActive(timestamp) {
+    const value = Number(timestamp);
+    if (!Number.isFinite(value) || value <= 0) return false;
+    return Date.now() - value < REROLL_VISIBILITY_MS;
+  }
+
+  scheduleRerollExpiry(kind) {
+    const timerKey = kind === "item" ? "_itemRerollTimer" : "_charRerollTimer";
+    if (this[timerKey]) {
+      clearTimeout(this[timerKey]);
+      this[timerKey] = null;
+    }
+
+    const timestamp = kind === "item" ? this._lastItemReroll?.at : this._lastCharacteristicRollAt;
+    if (!this.isRerollWindowActive(timestamp)) return;
+    const remaining = Math.max(0, REROLL_VISIBILITY_MS - (Date.now() - Number(timestamp)));
+    this[timerKey] = setTimeout(() => {
+      if (kind === "item") this._lastItemReroll = null;
+      else this.clearCharacteristicRerollState();
+      this.render(false);
+    }, remaining);
+  }
+
+  markCharacteristicReroll(key) {
+    if (!key) return;
+    this._lastCharacteristicRollKey = key;
+    this._lastCharacteristicRollAt = Date.now();
+    this.scheduleRerollExpiry("characteristic");
+  }
+
+  clearCharacteristicRerollState() {
+    this._lastCharacteristicRollKey = "";
+    this._lastCharacteristicRollAt = 0;
+    if (this._charRerollTimer) {
+      clearTimeout(this._charRerollTimer);
+      this._charRerollTimer = null;
+    }
+  }
+
+  markItemReroll(itemId) {
+    if (!itemId) return;
+    this._lastItemReroll = { itemId, at: Date.now() };
+    this.scheduleRerollExpiry("item");
+  }
+
+  async performItemRerollRoll(item) {
+    if (!item) return false;
+
+    if (item.type === "arme") {
+      const die = (item.system?.damageDie || "d4").toString();
+      const formula = /^\d/.test(die) ? die : `1${die}`;
+      const result = await doDirectDamageRoll(this.actor, formula, item.name);
+      return Boolean(result);
+    }
+
+    if (item.type === "aptitude" || item.type === "pouvoir") {
+      if (!item.system?.damageEnabled || !item.system?.damageDie) return false;
+      const die = item.system.damageDie.toString();
+      const formula = /^\d/.test(die) ? die : `1${die}`;
+      const result = await doDirectDamageRoll(this.actor, formula, item.name);
+      return Boolean(result);
+    }
+
+    if (item.type === "soin") {
+      const die = (item.system?.healDie || "d4").toString();
+      const formula = /^\d/.test(die) ? die : `1${die}`;
+      const roll = await new Roll(formula).roll({ async: true });
+      const current = toFiniteNumber(this.actor.system.resources?.pv?.current, 0);
+      const max = toFiniteNumber(this.actor.system.resources?.pv?.max, current);
+      const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
+      await this.actor.update({ "system.resources.pv.current": nextValue });
+      roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total })
+      });
+      return true;
+    }
+
+    return false;
   }
 
   async rollGrowth(key) {

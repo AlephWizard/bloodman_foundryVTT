@@ -4,68 +4,67 @@
   background: var(--bm-white);
   border: 2px solid var(--bm-line);
   border-radius: 12px;
-  padding: 14px;
+  padding: 10px;
   display: grid;
-  gap: 12px;
-  grid-template-columns: 1fr;
+  gap: 4px 8px;
+  grid-template-columns: 140px 1fr;
 }
 
 .item-objet .item-header {
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  align-items: end;
-  gap: 16px;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .item-objet .item-image {
-  width: 160px;
-  height: 160px;
+  width: 34px;
+  height: 34px;
   object-fit: cover;
-  border: 3px solid var(--bm-black);
-  border-radius: 16px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
   background: var(--bm-white);
 }
 
 .item-objet .item-name-field {
-  display: grid;
-  gap: 6px;
-  align-self: end;
+  flex: 1;
 }
 
 .item-objet .note-field {
+  grid-column: 1 / -1;
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .item-objet label {
   font-weight: 700;
-  letter-spacing: 0.8px;
-  font-size: 15px;
+  letter-spacing: 0.5px;
+  font-size: 11px;
   align-self: center;
-  text-transform: uppercase;
 }
 
 .item-objet input,
 .item-objet textarea,
 .item-objet select {
   font-family: inherit;
-  font-size: 18px;
-  border: 2px solid var(--bm-black);
-  border-radius: 16px;
-  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 3px 5px;
 }
 
-.item-objet input {
-  min-height: 52px;
-  font-weight: 700;
+.item-objet .item-name-field input {
+  width: 100%;
+  height: 28px;
 }
 
 .item-objet textarea {
+  grid-column: 1 / -1;
   width: 100%;
-  min-height: 210px;
+  min-height: 100px;
   resize: vertical;
 }
 
 .item-objet .full-row {
-  width: 100%;
+  grid-column: 1 / -1;
 }
