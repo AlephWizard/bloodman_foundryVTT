@@ -537,6 +537,16 @@ function registerDamageSocketHandlers() {
   globalThis.__bmDamageSocketReady = true;
 }
 
+function getFixedInitiativeScore(actor) {
+  if (!actor) return 0;
+  const itemBonuses = getItemBonusTotals(actor);
+  const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
+  const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
+  const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
+  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0);
+  return Math.max(0, Math.round(effective));
+}
+
 Hooks.once("init", () => {
   game.settings.register("bloodman", "chaosDice", {
     name: t("BLOODMAN.Settings.ChaosDiceName"),
@@ -567,6 +577,36 @@ Hooks.once("init", () => {
     types: ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"],
     makeDefault: true
   });
+
+  const combatantDoc = CONFIG?.Combatant?.documentClass;
+  if (combatantDoc?.prototype) {
+    const originalGetInitiativeRoll = combatantDoc.prototype.getInitiativeRoll;
+    const originalGetFormula = combatantDoc.prototype._getInitiativeFormula || combatantDoc.prototype.getInitiativeFormula;
+
+    combatantDoc.prototype._getInitiativeFormula = function () {
+      const actor = this.actor;
+      if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
+        return String(getFixedInitiativeScore(actor));
+      }
+      return typeof originalGetFormula === "function" ? originalGetFormula.call(this) : "0";
+    };
+
+    combatantDoc.prototype.getInitiativeRoll = async function (formula) {
+      const actor = this.actor;
+      if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
+        const score = getFixedInitiativeScore(actor);
+        const roll = new Roll(String(score));
+        await roll.evaluate();
+        return roll;
+      }
+      if (typeof originalGetInitiativeRoll === "function") {
+        return originalGetInitiativeRoll.call(this, formula);
+      }
+      const fallback = new Roll("0");
+      await fallback.evaluate();
+      return fallback;
+    };
+  }
 });
 
 Hooks.once("ready", async () => {

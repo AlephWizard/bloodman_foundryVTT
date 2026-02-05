@@ -336,13 +336,24 @@ export async function doCharacteristicRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
 
   const r = await new Roll("1d100").evaluate();
-  const success = r.total <= effective;
+  const rollTotal = Number(r.total) || 0;
+  const isCritSuccess = rollTotal >= 1 && rollTotal <= 5;
+  const isCritFailure = rollTotal >= 96 && rollTotal <= 100;
+  const success = isCritSuccess ? true : isCritFailure ? false : rollTotal <= effective;
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
+  const critLabel = isCritSuccess
+    ? t("BLOODMAN.Rolls.CriticalSuccess")
+    : isCritFailure
+      ? t("BLOODMAN.Rolls.CriticalFailure")
+      : "";
+  const critLine = critLabel
+    ? `<br><span class="bm-crit ${isCritSuccess ? "bm-crit-success" : "bm-crit-failure"}"><b>${critLabel}</b></span>`
+    : "";
   r.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${actor.name}</b> – ${key}<br>${r.total} / ${effective} → <b>${outcome}</b>`
+    flavor: `<b>${actor.name}</b> – ${key}<br>${rollTotal} / ${effective} → <b>${outcome}</b>${critLine}`
   });
-  return { roll: r, success, effective };
+  return { roll: r, success, effective, critical: isCritSuccess ? "success" : isCritFailure ? "failure" : "" };
 }
 
 async function requestDamageFromGM(token, damage, options = {}) {
@@ -736,3 +747,4 @@ export async function doGrowthRoll(actor, key) {
 
   return { roll, success, effective, grew: success };
 }
+
