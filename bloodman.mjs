@@ -20,6 +20,12 @@ const CHARACTERISTICS = [
 const SYSTEM_SOCKET = "system.bloodman";
 const CARRIED_ITEM_LIMIT = 10;
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
+const CHARACTERISTIC_REROLL_PP_COST = 4;
+
+function toFiniteNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
+}
 
 function buildDefaultCharacteristics() {
   const characteristics = {};
@@ -538,8 +544,8 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
 
   const getUpdatedNumber = (path, fallback) => {
     const value = foundry.utils.getProperty(updateData, path);
-    if (value == null) return fallback;
-    return Number(value);
+    if (value == null) return toFiniteNumber(fallback, 0);
+    return toFiniteNumber(value, fallback);
   };
 
   const itemBonuses = getItemBonusTotals(actor);
@@ -560,8 +566,8 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
   const ppMax = Math.round(espEffective / 5) + Number(storedPpBonus || 0);
   const storedPvMax = getUpdatedNumber("system.resources.pv.max", actor.system.resources?.pv?.max);
   const storedPpMax = getUpdatedNumber("system.resources.pp.max", actor.system.resources?.pp?.max);
-  const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : pvMax;
-  const finalPpMax = Number.isFinite(storedPpMax) ? storedPpMax : ppMax;
+  const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : toFiniteNumber(pvMax, 0);
+  const finalPpMax = Number.isFinite(storedPpMax) ? storedPpMax : toFiniteNumber(ppMax, 0);
   const allowedPvMax = Math.max(0, finalPvMax);
   const allowedPpMax = Math.max(0, finalPpMax);
 
@@ -569,51 +575,55 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
   const ppCurrentPath = "system.resources.pp.current";
 
   if (foundry.utils.getProperty(updateData, pvCurrentPath) != null) {
-    const nextValue = Math.min(getUpdatedNumber(pvCurrentPath, 0), allowedPvMax);
-    foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, nextValue));
+    const requested = getUpdatedNumber(pvCurrentPath, 0);
+    const nextValue = Math.min(requested, allowedPvMax);
+    foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, toFiniteNumber(nextValue, 0)));
   }
 
   if (foundry.utils.getProperty(updateData, ppCurrentPath) != null) {
-    const nextValue = Math.min(getUpdatedNumber(ppCurrentPath, 0), allowedPpMax);
-    foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, nextValue));
+    const requested = getUpdatedNumber(ppCurrentPath, 0);
+    const nextValue = Math.min(requested, allowedPpMax);
+    foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, toFiniteNumber(nextValue, 0)));
   }
 });
 
 Hooks.on("updateActor", async (actor, changes) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
   if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
-  const hasCharChange = foundry.utils.getProperty(changes, "system.characteristics") != null;
+  const hasCharBaseChange = CHARACTERISTICS.some(c => {
+    return foundry.utils.getProperty(changes, `system.characteristics.${c.key}.base`) != null;
+  });
   const hasModChange = foundry.utils.getProperty(changes, "system.modifiers") != null;
   const hasNpcRoleChange = foundry.utils.getProperty(changes, "system.npcRole") != null;
-  if (!hasCharChange && !hasModChange && !hasNpcRoleChange) return;
+  if (!hasCharBaseChange && !hasModChange && !hasNpcRoleChange) return;
 
   const itemBonuses = getItemBonusTotals(actor);
-  const base = Number(actor.system.characteristics?.MOU?.base || 0);
-  const globalMod = Number(actor.system.modifiers?.all || 0);
-  const keyMod = Number(actor.system.modifiers?.MOU || 0);
-  const effective = base + globalMod + keyMod + Number(itemBonuses.MOU || 0);
+  const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
+  const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
+  const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
+  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0);
   const moveValue = Math.round(effective / 5);
 
   await actor.update({ "system.resources.move.value": moveValue });
 
-  const phyEffective = Number(actor.system.characteristics?.PHY?.base || 0)
-    + Number(actor.system.modifiers?.all || 0)
-    + Number(actor.system.modifiers?.PHY || 0)
-    + Number(itemBonuses.PHY || 0);
-  const espEffective = Number(actor.system.characteristics?.ESP?.base || 0)
-    + Number(actor.system.modifiers?.all || 0)
-    + Number(actor.system.modifiers?.ESP || 0)
-    + Number(itemBonuses.ESP || 0);
+  const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
+    + toFiniteNumber(actor.system.modifiers?.all, 0)
+    + toFiniteNumber(actor.system.modifiers?.PHY, 0)
+    + toFiniteNumber(itemBonuses.PHY, 0);
+  const espEffective = toFiniteNumber(actor.system.characteristics?.ESP?.base, 0)
+    + toFiniteNumber(actor.system.modifiers?.all, 0)
+    + toFiniteNumber(actor.system.modifiers?.ESP, 0)
+    + toFiniteNumber(itemBonuses.ESP, 0);
   const derivedPvMax = getDerivedPvMax(actor, phyEffective);
   const derivedPpMax = Math.round(espEffective / 5);
-  const storedPvBonus = Number(actor.system.resources?.pv?.itemBonus || 0);
-  const storedPpBonus = Number(actor.system.resources?.pp?.itemBonus || 0);
+  const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
+  const storedPpBonus = toFiniteNumber(actor.system.resources?.pp?.itemBonus, 0);
   const derivedPvTotal = derivedPvMax + storedPvBonus;
   const derivedPpTotal = derivedPpMax + storedPpBonus;
-  const pvMax = Number.isFinite(actor.system.resources?.pv?.max) ? Number(actor.system.resources.pv.max) : derivedPvTotal;
-  const ppMax = Number.isFinite(actor.system.resources?.pp?.max) ? Number(actor.system.resources.pp.max) : derivedPpTotal;
-  const pvCurrent = Number(actor.system.resources?.pv?.current || 0);
-  const ppCurrent = Number(actor.system.resources?.pp?.current || 0);
+  const pvMax = toFiniteNumber(actor.system.resources?.pv?.max, derivedPvTotal);
+  const ppMax = toFiniteNumber(actor.system.resources?.pp?.max, derivedPpTotal);
+  const pvCurrent = toFiniteNumber(actor.system.resources?.pv?.current, 0);
+  const ppCurrent = toFiniteNumber(actor.system.resources?.pp?.current, 0);
   const allowedPvMax = Math.max(0, pvMax);
   const allowedPpMax = Math.max(0, ppMax);
 
@@ -644,6 +654,8 @@ class BloodmanActorSheet extends ActorSheet {
   getData() {
     const data = super.getData();
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
+    const rerollKey = this._lastCharacteristicRollKey || "";
+    const canUseCharacteristicReroll = data.actor.type === "personnage";
 
     const itemBonuses = getItemBonusTotals(data.actor);
     const characteristics = CHARACTERISTICS.map(c => {
@@ -656,7 +668,8 @@ class BloodmanActorSheet extends ActorSheet {
       const itemBonus = Number(itemBonuses[c.key] || 0);
       const effective = base + flat + itemBonus;
       const xpReady = xp.every(Boolean);
-      return { key: c.key, label, icon: c.icon, base, effective, itemBonus, xp, xpReady };
+      const showReroll = canUseCharacteristicReroll && rerollKey === c.key;
+      return { key: c.key, label, icon: c.icon, base, effective, itemBonus, xp, xpReady, showReroll };
     });
     const totalPoints = characteristics.reduce((sum, c) => sum + Number(c.base || 0), 0);
 
@@ -669,12 +682,10 @@ class BloodmanActorSheet extends ActorSheet {
     const resources = foundry.utils.mergeObject(buildDefaultResources(), data.actor.system.resources || {}, {
       inplace: false
     });
-    if (resources.pv.max == null || Number.isNaN(Number(resources.pv.max))) {
-      resources.pv.max = pvBase;
-    }
-    if (resources.pp.max == null || Number.isNaN(Number(resources.pp.max))) {
-      resources.pp.max = Math.round(esp / 5);
-    }
+    resources.pv.max = Math.max(0, toFiniteNumber(resources.pv.max, pvBase));
+    resources.pp.max = Math.max(0, toFiniteNumber(resources.pp.max, Math.round(esp / 5)));
+    resources.pv.current = Math.max(0, Math.min(toFiniteNumber(resources.pv.current, 0), resources.pv.max));
+    resources.pp.current = Math.max(0, Math.min(toFiniteNumber(resources.pp.current, 0), resources.pp.max));
     resources.move.value = moveValue;
 
     const moveChar = characteristics.find(c => c.key === "MOU");
@@ -762,6 +773,18 @@ class BloodmanActorSheet extends ActorSheet {
     html.find(".char-roll").click(ev => {
       const key = ev.currentTarget.dataset.key;
       this.handleCharacteristicRoll(key);
+    });
+
+    html.find(".char-reroll").click(ev => {
+      const key = ev.currentTarget.dataset.key;
+      this.rerollCharacteristic(key);
+    });
+
+    html.find(".char-reroll-clear").click(ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const key = ev.currentTarget.dataset.key;
+      this.clearCharacteristicReroll(key);
     });
 
     html.find(".weapon-roll").click(ev => {
@@ -883,8 +906,30 @@ class BloodmanActorSheet extends ActorSheet {
 
   async handleCharacteristicRoll(key) {
     if (!key) return;
+    this._lastCharacteristicRollKey = key;
     await doCharacteristicRoll(this.actor, key);
     await this.markXpProgress(key);
+    this.render(false);
+  }
+
+  async rerollCharacteristic(key) {
+    if (!key || this.actor.type !== "personnage") return;
+    if (this._lastCharacteristicRollKey !== key) return;
+
+    const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
+    if (!Number.isFinite(currentPP) || currentPP < CHARACTERISTIC_REROLL_PP_COST) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
+      return;
+    }
+
+    await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+    await doCharacteristicRoll(this.actor, key);
+  }
+
+  clearCharacteristicReroll(key) {
+    if (!key || this._lastCharacteristicRollKey !== key) return;
+    this._lastCharacteristicRollKey = "";
+    this.render(false);
   }
 
   async markXpProgress(key) {

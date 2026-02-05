@@ -335,6 +335,46 @@
   color: var(--bm-ink);
 }
 
+.char-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.char-reroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--bm-line);
+  background: #f2f2f2;
+  color: var(--bm-black);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.char-reroll-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-white);
+  color: var(--bm-black);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .char-value {
   display: flex;
   align-items: center;

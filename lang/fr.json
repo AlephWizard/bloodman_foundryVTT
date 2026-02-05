@@ -6,6 +6,7 @@
       "Cancel": "Annuler",
       "Apply": "Appliquer",
       "Roll": "Lancer",
+      "Reroll": "Relance",
       "Eat": "Manger",
       "Delete": "Supprimer",
       "Total": "Total",
@@ -126,6 +127,7 @@
     "Notifications": {
       "NoAmmo": "Aucune munition disponible.",
       "NotEnoughPP": "Pas assez de points de puissance pour lancer ce pouvoir.",
+      "NotEnoughPPReroll": "Pas assez de points de puissance pour relancer cette caracteristique ({cost} PP requis).",
       "AbilityNoActor": "Cette aptitude/pouvoir n'est pas lié à un acteur.",
       "DamageSplitTotal": "La répartition doit totaliser {total}.",
       "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum."
@@ -144,3 +146,4 @@
   "TYPES.Item.protection": "Protection",
   "TYPES.Item.soin": "Soin"
 }
+

@@ -90,6 +90,12 @@
                         <input type="number" class="move-box" value="{{this.moveValue}}" readonly />
                       </span>
                     {{/if}}
+                    {{#if this.showReroll}}
+                      <button type="button" class="char-reroll" data-key="{{this.key}}">
+                        <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                      </button>
+                      <button type="button" class="char-reroll-clear" data-key="{{this.key}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                    {{/if}}
                   </div>
                   <div class="char-score">
                     {{#if this.itemBonus}}
