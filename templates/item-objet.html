@@ -2,11 +2,11 @@
   <div class="item-header">
     <img class="item-image" src="{{item.img}}" data-edit="img" />
     <div class="item-name-field">
-      <label>NOM</label>
+      <label>{{localize "BLOODMAN.Common.Name"}}</label>
       <input name="name" value="{{item.name}}" />
     </div>
   </div>
 
-  <label class="full-row">NOTE</label>
+  <label class="full-row">{{localize "BLOODMAN.Common.Note"}}</label>
   <textarea class="full-row" name="system.note">{{item.system.note}}</textarea>
 </form>

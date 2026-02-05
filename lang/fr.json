@@ -1,1 +1,135 @@
-{}
+{
+  "BLOODMAN": {
+    "Common": {
+      "Yes": "Oui",
+      "No": "Non",
+      "Cancel": "Annuler",
+      "Apply": "Appliquer",
+      "Roll": "Lancer",
+      "Delete": "Supprimer",
+      "Total": "Total",
+      "Name": "NOM",
+      "Note": "NOTE",
+      "Notes": "NOTES"
+    },
+    "Tabs": {
+      "Character": "Personnage",
+      "Identity": "Identité",
+      "Equipment": "Équipement",
+      "AbilitiesPowers": "Aptitudes & Pouvoirs",
+      "Notes": "Notes"
+    },
+    "StateBar": {
+      "States": "ÉTATS",
+      "All": "ALL",
+      "StateNamePlaceholder": "Nom de l'état"
+    },
+    "Npc": {
+      "Role": "RÔLE",
+      "RoleSbire": "Sbire",
+      "RoleSbireFort": "Sbire fort",
+      "RoleBossSeul": "Boss seul"
+    },
+    "Resources": {
+      "VoyageXP": "XP VOYAGE",
+      "PV": "PV",
+      "PP": "PP"
+    },
+    "Characteristics": {
+      "Title": "CARACTÉRISTIQUES",
+      "PointsHint": "410 points à répartir : 30 min / 65 max",
+      "XP": "XP",
+      "GrowthAriaLabel": "Jet d'expérience",
+      "Keys": {
+        "MEL": "MÊLÉE",
+        "VIS": "VISÉE",
+        "ESP": "ESPRIT",
+        "PHY": "PHYSIQUE",
+        "MOU": "MOUVEMENT",
+        "ADR": "ADRESSE",
+        "PER": "PERCEPTION",
+        "SOC": "SOCIAL",
+        "SAV": "SAVOIR"
+      }
+    },
+    "Identity": {
+      "Title": "IDENTITÉ",
+      "Fields": {
+        "Name": "NOM",
+        "Archetype": "ARCHÉTYPE",
+        "Vice": "VICE",
+        "Weight": "POIDS",
+        "Height": "TAILLE",
+        "Age": "ÂGE",
+        "Origin": "ORIGINE",
+        "History": "HISTORIQUE"
+      }
+    },
+    "Equipment": {
+      "Title": "ÉQUIPEMENTS",
+      "Weapons": "ARMES",
+      "Ammunition": "MUNITIONS",
+      "Protections": "PROTECTIONS",
+      "Objects": "OBJETS",
+      "Currencies": "MONNAIES",
+      "Transports": "TRANSPORTS",
+      "AmmoTypePlaceholder": "Type",
+      "WeaponType": {
+        "Label": "TYPE D'ARME :",
+        "Distance": "Distance",
+        "Melee": "Corps à corps"
+      }
+    },
+    "Abilities": {
+      "Title": "APTITUDES"
+    },
+    "Powers": {
+      "Title": "POUVOIRS",
+      "PowerCostLabel": "COÛT EN PUISSANCE :"
+    },
+    "Notes": {
+      "Title": "NOTES"
+    },
+    "Items": {
+      "DamageDieLabel": "DÉ DE DÉGÂTS :",
+      "HealDieLabel": "DÉ DE SOIN",
+      "BonusLabel": "BONUS/MALUS :",
+      "RawBonusLabel": "BONUS/MALUS BRUTE :",
+      "InfiniteAmmoLabel": "MUNITIONS INFINIES :"
+    },
+    "Rolls": {
+      "Success": "RÉUSSITE",
+      "Failure": "ÉCHEC",
+      "Damage": {
+        "Deal": "<strong>{name}</strong> inflige {amount} dégâts{source}",
+        "Take": "<strong>{name}</strong> subit {amount} dégâts (PA {pa})",
+        "Zero": "<strong>{name}</strong> inflige 0 dégâts ({item})"
+      },
+      "Heal": {
+        "Gain": "<strong>{name}</strong> récupère {amount} PV"
+      },
+      "Growth": {
+        "Chat": "<strong>{name}</strong> Jet d'expérience {key}: {roll} / {effective} -> {result}"
+      }
+    },
+    "Dialogs": {
+      "Growth": {
+        "Title": "Jet d'expérience",
+        "Prompt": "Lancer un jet d'expérience pour <strong>{label}</strong> ?"
+      },
+      "DamageSplit": {
+        "Title": "Répartition des dégâts",
+        "Prompt": "Répartir {damage} dégâts entre {targets} cibles."
+      }
+    },
+    "Notifications": {
+      "NoAmmo": "Aucune munition disponible.",
+      "NotEnoughPP": "Pas assez de points de puissance pour lancer ce pouvoir.",
+      "AbilityNoActor": "Cette aptitude/pouvoir n'est pas lié à un acteur.",
+      "DamageSplitTotal": "La répartition doit totaliser {total}."
+    },
+    "Settings": {
+      "ChaosDiceName": "Dés du chaos"
+    }
+  }
+}

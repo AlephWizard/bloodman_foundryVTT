@@ -2,12 +2,12 @@
   <div class="item-header">
     <img class="item-image" src="{{item.img}}" data-edit="img" />
     <div class="item-name-field">
-      <label>NOM</label>
+      <label>{{localize "BLOODMAN.Common.Name"}}</label>
       <input name="name" value="{{item.name}}" />
     </div>
   </div>
 
-  <label>DE DE SOIN</label>
+  <label>{{localize "BLOODMAN.Items.HealDieLabel"}}</label>
   <select name="system.healDie">
     {{#select item.system.healDie}}
       <option value="d4">d4</option>
@@ -18,6 +18,6 @@
     {{/select}}
   </select>
 
-  <label>NOTES</label>
+  <label>{{localize "BLOODMAN.Common.Notes"}}</label>
   <textarea name="system.notes">{{item.system.notes}}</textarea>
 </form>

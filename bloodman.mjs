@@ -1,15 +1,20 @@
 import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType } from "./rollHelpers.mjs";
 
+function t(key, data = null) {
+  if (!globalThis.game?.i18n) return key;
+  return data ? game.i18n.format(key, data) : game.i18n.localize(key);
+}
+
 const CHARACTERISTICS = [
-  { key: "MEL", label: "MÊLÉE", icon: "fa-hand-fist" },
-  { key: "VIS", label: "VISÉE", icon: "fa-crosshairs" },
-  { key: "ESP", label: "ESPRIT", icon: "fa-brain" },
-  { key: "PHY", label: "PHYSIQUE", icon: "fa-heart-pulse" },
-  { key: "MOU", label: "MOUVEMENT", icon: "fa-person-running" },
-  { key: "ADR", label: "ADRESSE", icon: "fa-hand" },
-  { key: "PER", label: "PERCEPTION", icon: "fa-eye" },
-  { key: "SOC", label: "SOCIAL", icon: "fa-users" },
-  { key: "SAV", label: "SAVOIR", icon: "fa-book-open" }
+  { key: "MEL", labelKey: "BLOODMAN.Characteristics.Keys.MEL", icon: "fa-hand-fist" },
+  { key: "VIS", labelKey: "BLOODMAN.Characteristics.Keys.VIS", icon: "fa-crosshairs" },
+  { key: "ESP", labelKey: "BLOODMAN.Characteristics.Keys.ESP", icon: "fa-brain" },
+  { key: "PHY", labelKey: "BLOODMAN.Characteristics.Keys.PHY", icon: "fa-heart-pulse" },
+  { key: "MOU", labelKey: "BLOODMAN.Characteristics.Keys.MOU", icon: "fa-person-running" },
+  { key: "ADR", labelKey: "BLOODMAN.Characteristics.Keys.ADR", icon: "fa-hand" },
+  { key: "PER", labelKey: "BLOODMAN.Characteristics.Keys.PER", icon: "fa-eye" },
+  { key: "SOC", labelKey: "BLOODMAN.Characteristics.Keys.SOC", icon: "fa-users" },
+  { key: "SAV", labelKey: "BLOODMAN.Characteristics.Keys.SAV", icon: "fa-book-open" }
 ];
 
 const SYSTEM_SOCKET = "system.bloodman";
@@ -110,7 +115,7 @@ function registerDamageSocketHandlers() {
 
 Hooks.once("init", () => {
   game.settings.register("bloodman", "chaosDice", {
-    name: "Des du chaos",
+    name: t("BLOODMAN.Settings.ChaosDiceName"),
     scope: "world",
     config: false,
     type: Number,
@@ -195,7 +200,7 @@ Hooks.once("ready", async () => {
         await item.update({ "system.weaponType": normalized });
       }
       if (!normalized && !item.system?.weaponType) {
-        await item.update({ "system.weaponType": "arme à distance" });
+        await item.update({ "system.weaponType": "distance" });
       }
     }
   }
@@ -436,10 +441,10 @@ async function applyPowerCost(actor, item) {
   if (!Number.isFinite(cost) || cost <= 0) return true;
   const current = Number(actor.system.resources?.pp?.current || 0);
   if (current < cost) {
-    ui.notifications?.warn("Pas assez de points de puissance pour lancer ce pouvoir.");
+    ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPP"));
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<strong>${actor.name}</strong> inflige 0 dégâts (${item.name})`
+      content: t("BLOODMAN.Rolls.Damage.Zero", { name: actor.name, item: item.name })
     });
     return false;
   }
@@ -604,6 +609,7 @@ class BloodmanActorSheet extends ActorSheet {
 
     const itemBonuses = getItemBonusTotals(data.actor);
     const characteristics = CHARACTERISTICS.map(c => {
+      const label = t(c.labelKey) || c.key;
       const base = Number(data.actor.system.characteristics?.[c.key]?.base || 0);
       const xp = Array.isArray(data.actor.system.characteristics?.[c.key]?.xp)
         ? data.actor.system.characteristics[c.key].xp
@@ -612,7 +618,7 @@ class BloodmanActorSheet extends ActorSheet {
       const itemBonus = Number(itemBonuses[c.key] || 0);
       const effective = base + flat + itemBonus;
       const xpReady = xp.every(Boolean);
-      return { key: c.key, label: c.label, icon: c.icon, base, effective, itemBonus, xp, xpReady };
+      return { key: c.key, label, icon: c.icon, base, effective, itemBonus, xp, xpReady };
     });
     const totalPoints = characteristics.reduce((sum, c) => sum + Number(c.base || 0), 0);
 
@@ -664,6 +670,19 @@ class BloodmanActorSheet extends ActorSheet {
 
     const npcRole = data.actor.system.npcRole || "";
 
+    const weaponTypeDistance = t("BLOODMAN.Equipment.WeaponType.Distance");
+    const weaponTypeMelee = t("BLOODMAN.Equipment.WeaponType.Melee");
+    const weapons = itemBuckets.arme.map(item => {
+      const weapon = item.toObject();
+      weapon._id = weapon._id ?? item.id;
+      const normalized = normalizeWeaponType(weapon.system?.weaponType);
+      if (normalized === "corps") weapon.displayWeaponType = weaponTypeMelee;
+      else if (normalized === "distance") weapon.displayWeaponType = weaponTypeDistance;
+      else if (weapon.system?.weaponType) weapon.displayWeaponType = weapon.system.weaponType;
+      else weapon.displayWeaponType = weaponTypeDistance;
+      return weapon;
+    });
+
     return {
       ...data,
       characteristics,
@@ -676,7 +695,7 @@ class BloodmanActorSheet extends ActorSheet {
       npcRoleSbireFort: npcRole === "sbire-fort",
       npcRoleBossSeul: npcRole === "boss-seul",
       equipment,
-      weapons: itemBuckets.arme,
+      weapons,
       objects: itemBuckets.objet,
       soins: itemBuckets.soin,
       protections: itemBuckets.protection,
@@ -794,17 +813,18 @@ class BloodmanActorSheet extends ActorSheet {
   }
 
   promptGrowthRoll(key) {
-    const label = CHARACTERISTICS.find(c => c.key === key)?.label || key;
+    const labelKey = CHARACTERISTICS.find(c => c.key === key)?.labelKey || "";
+    const label = labelKey ? t(labelKey) : key;
     new Dialog({
-      title: "Jet d'expérience",
-      content: `<p>Lancer un jet d'expérience pour <strong>${label}</strong> ?</p>`,
+      title: t("BLOODMAN.Dialogs.Growth.Title"),
+      content: `<p>${t("BLOODMAN.Dialogs.Growth.Prompt", { label })}</p>`,
       buttons: {
         roll: {
-          label: "Lancer",
+          label: t("BLOODMAN.Common.Roll"),
           callback: async () => this.rollGrowth(key)
         },
         cancel: {
-          label: "Annuler"
+          label: t("BLOODMAN.Common.Cancel")
         }
       },
       default: "roll"
@@ -871,7 +891,7 @@ class BloodmanItemSheet extends ItemSheet {
 
   async rollAbilityDamage() {
     if (!this.item.actor) {
-      ui.notifications?.warn("Cette aptitude/pouvoir n'est pas lié à un acteur.");
+      ui.notifications?.warn(t("BLOODMAN.Notifications.AbilityNoActor"));
       return;
     }
     const canRoll = await applyPowerCost(this.item.actor, this.item);

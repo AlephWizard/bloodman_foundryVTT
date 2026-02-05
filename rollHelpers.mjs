@@ -2,8 +2,11 @@
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
-const WEAPON_TYPE_DISTANCE = "arme Ã  distance";
-const WEAPON_TYPE_MELEE = "arme de corps Ã  corps";
+
+function t(key, data = null) {
+  if (!globalThis.game?.i18n) return key;
+  return data ? game.i18n.format(key, data) : game.i18n.localize(key);
+}
 
 function isBonusItem(item) {
   return BONUS_ITEM_TYPES.has(item?.type);
@@ -12,15 +15,15 @@ function isBonusItem(item) {
 export function normalizeWeaponType(value) {
   const raw = (value ?? "").toString().toLowerCase();
   if (!raw) return "";
-  if (raw.includes("distance")) return WEAPON_TYPE_DISTANCE;
-  if (raw.includes("corps") || raw.includes("blanche")) return WEAPON_TYPE_MELEE;
-  if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return WEAPON_TYPE_DISTANCE;
-  return (value ?? "").toString();
+  if (raw === "distance" || raw.includes("distance")) return "distance";
+  if (raw === "corps" || raw.includes("corps") || raw.includes("blanche") || raw.includes("mêlée") || raw.includes("melee")) return "corps";
+  if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return "distance";
+  return (value ?? "").toString().trim();
 }
 
 export function getWeaponCategory(value) {
-  const normalized = normalizeWeaponType(value).toLowerCase();
-  if (normalized.includes("corps") || normalized.includes("blanche")) return "corps";
+  const normalized = normalizeWeaponType(value);
+  if (normalized === "corps") return "corps";
   return "distance";
 }
 
@@ -79,9 +82,10 @@ export async function doCharacteristicRoll(actor, key) {
 
   const r = await new Roll("1d100").roll({ async: true });
   const success = r.total <= effective;
+  const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
   r.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${actor.name}</b> – ${key}<br>${r.total} / ${effective} → <b>${success ? "RÉUSSITE" : "ÉCHEC"}</b>`
+    flavor: `<b>${actor.name}</b> – ${key}<br>${r.total} / ${effective} → <b>${outcome}</b>`
   });
   return { roll: r, success, effective };
 }
@@ -111,7 +115,7 @@ export async function applyDamageToActor(targetActor, damage) {
 
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-    content: `<strong>${targetActor.name}</strong> subit ${finalDamage} dégâts (PA ${pa})`
+    content: t("BLOODMAN.Rolls.Damage.Take", { name: targetActor.name, amount: finalDamage, pa })
   });
 
   return { finalDamage, pa };
@@ -141,7 +145,7 @@ async function applyDamageToTargets(sourceActor, total) {
       .join("");
 
     const content = `<form class="damage-split">
-      <p>Répartir ${totalDamage} dégâts entre ${targetTokens.length} cibles.</p>
+      <p>${t("BLOODMAN.Dialogs.DamageSplit.Prompt", { damage: totalDamage, targets: targetTokens.length })}</p>
       <div class="split-grid">${rows}</div>
     </form>`;
 
@@ -154,11 +158,11 @@ async function applyDamageToTargets(sourceActor, total) {
       };
 
       new Dialog({
-        title: "Répartition des dégâts",
+        title: t("BLOODMAN.Dialogs.DamageSplit.Title"),
         content,
         buttons: {
           apply: {
-            label: "Appliquer",
+            label: t("BLOODMAN.Common.Apply"),
             callback: html => {
               const allocations = {};
               let sum = 0;
@@ -169,14 +173,14 @@ async function applyDamageToTargets(sourceActor, total) {
                 sum += safe;
               });
               if (sum !== totalDamage) {
-                ui.notifications?.warn(`La répartition doit totaliser ${totalDamage}.`);
+                ui.notifications?.warn(t("BLOODMAN.Notifications.DamageSplitTotal", { total: totalDamage }));
                 return false;
               }
               finish(allocations);
             }
           },
           cancel: {
-            label: "Annuler",
+            label: t("BLOODMAN.Common.Cancel"),
             callback: () => finish(null)
           }
         },
@@ -213,7 +217,7 @@ export async function doDamageRoll(actor, item) {
   if (consumesAmmo) {
     const currentAmmo = Number(actor.system.ammo?.value);
     if (!Number.isFinite(currentAmmo) || currentAmmo <= 0) {
-      ui.notifications?.warn("Aucune munition disponible.");
+      ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
       return null;
     }
   }
@@ -221,7 +225,7 @@ export async function doDamageRoll(actor, item) {
   const roll = await new Roll(`1${die}`).roll({ async: true });
   const rawDamageBonus = getRawDamageBonus(actor);
   const totalDamage = Math.max(0, roll.total + rawDamageBonus);
-  const sourceName = item?.name ? ` (${item.name})` : "";
+  const source = item?.name ? ` (${item.name})` : "";
 
   if (consumesAmmo) {
     const currentAmmo = Number(actor.system.ammo?.value);
@@ -231,7 +235,7 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<strong>${actor.name}</strong> inflige ${totalDamage} dégâts${sourceName}`
+    flavor: t("BLOODMAN.Rolls.Damage.Deal", { name: actor.name, amount: totalDamage, source })
   });
 
   await applyDamageToTargets(actor, totalDamage);
@@ -250,7 +254,7 @@ export async function doHealRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<strong>${actor.name}</strong> récupère ${roll.total} PV`
+    flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: actor.name, amount: roll.total })
   });
 
   if (item?.isOwner) {
@@ -267,7 +271,11 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "") {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<strong>${actor.name}</strong> inflige ${totalDamage} dégâts${sourceName ? ` (${sourceName})` : ""}`
+    flavor: t("BLOODMAN.Rolls.Damage.Deal", {
+      name: actor.name,
+      amount: totalDamage,
+      source: sourceName ? ` (${sourceName})` : ""
+    })
   });
 
   await applyDamageToTargets(actor, totalDamage);
@@ -290,7 +298,13 @@ export async function doGrowthRoll(actor, key) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<strong>${actor.name}</strong> Jet d'experience ${key}: ${roll.total} / ${effective} -> ${success ? "REUSSITE" : "ECHEC"}`
+    flavor: t("BLOODMAN.Rolls.Growth.Chat", {
+      name: actor.name,
+      key,
+      roll: roll.total,
+      effective,
+      result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
+    })
   });
 
   return { roll, success, effective, grew: success };

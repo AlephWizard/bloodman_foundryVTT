@@ -2,25 +2,25 @@
   <div class="item-header">
     <img class="item-image" src="{{item.img}}" data-edit="img" />
     <div class="item-name-field">
-      <label>NOM</label>
+      <label>{{localize "BLOODMAN.Common.Name"}}</label>
       <input name="name" value="{{item.name}}" />
     </div>
   </div>
 
-  <label class="full-row">NOTE</label>
+  <label class="full-row">{{localize "BLOODMAN.Common.Note"}}</label>
   <textarea class="full-row" name="system.note">{{item.system.note}}</textarea>
 
   <div class="ability-row full-row">
     <div class="ability-section">
-      <label class="inline-label">DE DE DEGAT :</label>
+      <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
       <div class="toggle-group">
         <label class="toggle-option">
           <input type="radio" name="system.damageEnabled" value="true" data-dtype="Boolean" {{#if item.system.damageEnabled}}checked{{/if}} />
-          OUI
+          {{localize "BLOODMAN.Common.Yes"}}
         </label>
         <label class="toggle-option">
           <input type="radio" name="system.damageEnabled" value="false" data-dtype="Boolean" {{#unless item.system.damageEnabled}}checked{{/unless}} />
-          NON
+          {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
       <select name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
@@ -44,15 +44,15 @@
     <div class="ability-divider"></div>
 
     <div class="ability-section">
-      <label class="inline-label">BONUS/MALUS :</label>
+      <label class="inline-label">{{localize "BLOODMAN.Items.BonusLabel"}}</label>
       <div class="toggle-group">
         <label class="toggle-option">
           <input type="radio" name="system.bonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.bonusEnabled}}checked{{/if}} />
-          OUI
+          {{localize "BLOODMAN.Common.Yes"}}
         </label>
         <label class="toggle-option">
           <input type="radio" name="system.bonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.bonusEnabled}}checked{{/unless}} />
-          NON
+          {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
       <div class="bonus-controls">
@@ -75,15 +75,15 @@
     <div class="ability-divider"></div>
 
     <div class="ability-section">
-      <label class="inline-label">BONUS/MALUS BRUTE :</label>
+      <label class="inline-label">{{localize "BLOODMAN.Items.RawBonusLabel"}}</label>
       <div class="toggle-group">
         <label class="toggle-option">
           <input type="radio" name="system.rawBonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.rawBonusEnabled}}checked{{/if}} />
-          OUI
+          {{localize "BLOODMAN.Common.Yes"}}
         </label>
         <label class="toggle-option">
           <input type="radio" name="system.rawBonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.rawBonusEnabled}}checked{{/unless}} />
-          NON
+          {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
       <div class="bonus-controls">

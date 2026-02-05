@@ -2,17 +2,17 @@
   <div class="item-header">
     <img class="item-image" src="{{item.img}}" data-edit="img" />
     <div class="item-name-field">
-      <label>NOM</label>
+      <label>{{localize "BLOODMAN.Common.Name"}}</label>
       <input name="name" value="{{item.name}}" />
     </div>
   </div>
 
-  <label class="full-row">NOTES</label>
+  <label class="full-row">{{localize "BLOODMAN.Common.Notes"}}</label>
   <textarea class="full-row" name="system.notes">{{item.system.notes}}</textarea>
 
   <div class="weapon-row full-row">
     <div class="weapon-section">
-      <label class="inline-label">DE DE DEGATS :</label>
+      <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
       <select name="system.damageDie">
         {{#select item.system.damageDie}}
           <option value="d4">d4</option>
@@ -27,17 +27,17 @@
     <div class="weapon-divider"></div>
 
     <div class="weapon-section">
-      <label class="inline-label">TYPE D'ARME :</label>
+      <label class="inline-label">{{localize "BLOODMAN.Equipment.WeaponType.Label"}}</label>
       <div class="weapon-type-group">
         <label class="weapon-type-option">
-          <input type="radio" name="system.weaponType" value="arme à distance" {{checked weaponTypeDistance}} />
+          <input type="radio" name="system.weaponType" value="distance" {{checked weaponTypeDistance}} />
           <i class="fa-solid fa-crosshairs"></i>
-          Distance
+          {{localize "BLOODMAN.Equipment.WeaponType.Distance"}}
         </label>
         <label class="weapon-type-option">
-          <input type="radio" name="system.weaponType" value="arme de corps à corps" {{checked weaponTypeMelee}} />
+          <input type="radio" name="system.weaponType" value="corps" {{checked weaponTypeMelee}} />
           <i class="fa-solid fa-hand-fist"></i>
-          Corps à corps
+          {{localize "BLOODMAN.Equipment.WeaponType.Melee"}}
         </label>
       </div>
     </div>
@@ -45,15 +45,15 @@
     <div class="weapon-divider"></div>
 
     <div class="weapon-section">
-      <label class="inline-label">MUNITIONS INFINIES :</label>
+      <label class="inline-label">{{localize "BLOODMAN.Items.InfiniteAmmoLabel"}}</label>
       <div class="toggle-group">
         <label class="toggle-option">
           <input type="radio" name="system.infiniteAmmo" value="true" data-dtype="Boolean" {{#if item.system.infiniteAmmo}}checked{{/if}} />
-          OUI
+          {{localize "BLOODMAN.Common.Yes"}}
         </label>
         <label class="toggle-option">
           <input type="radio" name="system.infiniteAmmo" value="false" data-dtype="Boolean" {{#unless item.system.infiniteAmmo}}checked{{/unless}} />
-          NON
+          {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
     </div>

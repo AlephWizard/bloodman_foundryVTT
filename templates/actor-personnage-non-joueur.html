@@ -6,24 +6,24 @@
       <input class="voyage-input" type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
       <span class="voyage-sep">/</span>
       <input class="voyage-input" type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
-      <span class="voyage-label">XP VOYAGE</span>
+      <span class="voyage-label">{{localize "BLOODMAN.Resources.VoyageXP"}}</span>
     </div>
     <nav class="sheet-tabs tabs" data-group="primary">
-      <a class="item" data-tab="carac">Personnage</a>
-      <a class="item" data-tab="identite">Identite</a>
-      <a class="item" data-tab="equipement">Equipement</a>
-      <a class="item" data-tab="pouvoirs">Aptitudes & Pouvoirs</a>
-      <a class="item" data-tab="notes">Notes</a>
+      <a class="item" data-tab="carac">{{localize "BLOODMAN.Tabs.Character"}}</a>
+      <a class="item" data-tab="identite">{{localize "BLOODMAN.Tabs.Identity"}}</a>
+      <a class="item" data-tab="equipement">{{localize "BLOODMAN.Tabs.Equipment"}}</a>
+      <a class="item" data-tab="pouvoirs">{{localize "BLOODMAN.Tabs.AbilitiesPowers"}}</a>
+      <a class="item" data-tab="notes">{{localize "BLOODMAN.Tabs.Notes"}}</a>
     </nav>
   </header>
 
   <section class="sheet-body">
     <section class="tab" data-group="primary" data-tab="carac">
       <div class="state-bar">
-        <span class="state-label">ETATS</span>
+        <span class="state-label">{{localize "BLOODMAN.StateBar.States"}}</span>
         <div class="state-inputs">
           <div class="state-field">
-            <span>ALL</span>
+            <span>{{localize "BLOODMAN.StateBar.All"}}</span>
             <input type="number" name="system.modifiers.all" value="{{modifiers.all}}" />
           </div>
           {{#each characteristics}}
@@ -33,22 +33,22 @@
             </div>
           {{/each}}
         </div>
-        <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="Nom de l'etat" />
+        <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="{{localize 'BLOODMAN.StateBar.StateNamePlaceholder'}}" />
       </div>
 
       <div class="npc-role-bar">
-        <span class="state-label">ROLE</span>
+        <span class="state-label">{{localize "BLOODMAN.Npc.Role"}}</span>
         <label class="npc-role-option">
           <input type="checkbox" class="npc-role-toggle" data-role="sbire" {{checked npcRoleSbire}} />
-          Sbire
+          {{localize "BLOODMAN.Npc.RoleSbire"}}
         </label>
         <label class="npc-role-option">
           <input type="checkbox" class="npc-role-toggle" data-role="sbire-fort" {{checked npcRoleSbireFort}} />
-          Sbire fort
+          {{localize "BLOODMAN.Npc.RoleSbireFort"}}
         </label>
         <label class="npc-role-option">
           <input type="checkbox" class="npc-role-toggle" data-role="boss-seul" {{checked npcRoleBossSeul}} />
-          Boss seul
+          {{localize "BLOODMAN.Npc.RoleBossSeul"}}
         </label>
       </div>
 
@@ -66,7 +66,7 @@
               <span>/</span>
               <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" />
             </div>
-            <div class="label">PV</div>
+            <div class="label">{{localize "BLOODMAN.Resources.PV"}}</div>
           </div>
           <div class="resource-circle pp">
             <div class="value">
@@ -74,18 +74,18 @@
               <span>/</span>
               <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" />
             </div>
-            <div class="label">PP</div>
+            <div class="label">{{localize "BLOODMAN.Resources.PP"}}</div>
           </div>
         </div>
 
         <section class="column center">
           <section class="card characteristics-card">
             <div class="card-header">
-              <span class="card-title"><i class="fa-solid fa-list"></i> CARACTERISTIQUES</span>
+              <span class="card-title"><i class="fa-solid fa-list"></i> {{localize "BLOODMAN.Characteristics.Title"}}</span>
               <div class="card-meta">
-                <span>410 points &agrave; r&eacute;partir : 30 min / 65 max</span>
+                <span>{{localize "BLOODMAN.Characteristics.PointsHint"}}</span>
                 <div class="card-total">
-                  <span>Total</span>
+                  <span>{{localize "BLOODMAN.Common.Total"}}</span>
                   <input type="number" value="{{totalPoints}}" readonly />
                 </div>
               </div>
@@ -125,44 +125,44 @@
     <section class="tab" data-group="primary" data-tab="identite">
       <section class="card identity-card">
         <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-id-card"></i> IDENTITE</span>
+          <span class="card-title"><i class="fa-solid fa-id-card"></i> {{localize "BLOODMAN.Identity.Title"}}</span>
         </div>
         <div class="identity-grid">
           <div class="identity-left">
             <div class="field">
-              <label>NOM</label>
+              <label>{{localize "BLOODMAN.Identity.Fields.Name"}}</label>
               <input type="text" name="name" value="{{actor.name}}" />
             </div>
             <div class="field">
-              <label>ARCHETYPE</label>
+              <label>{{localize "BLOODMAN.Identity.Fields.Archetype"}}</label>
               <input type="text" name="system.profile.archetype" value="{{profile.archetype}}" />
             </div>
             <div class="field">
-              <label>VICE</label>
+              <label>{{localize "BLOODMAN.Identity.Fields.Vice"}}</label>
               <input type="text" name="system.profile.vice" value="{{profile.vice}}" />
             </div>
             <div class="field-row">
               <div class="field small">
-                <label>POIDS</label>
+                <label>{{localize "BLOODMAN.Identity.Fields.Weight"}}</label>
                 <input type="text" name="system.profile.poids" value="{{profile.poids}}" />
               </div>
               <div class="field small">
-                <label>TAILLE</label>
+                <label>{{localize "BLOODMAN.Identity.Fields.Height"}}</label>
                 <input type="text" name="system.profile.taille" value="{{profile.taille}}" />
               </div>
               <div class="field small">
-                <label>AGE</label>
+                <label>{{localize "BLOODMAN.Identity.Fields.Age"}}</label>
                 <input type="text" name="system.profile.age" value="{{profile.age}}" />
               </div>
             </div>
           </div>
           <div class="identity-right">
             <div class="field origin-field">
-              <label>ORIGINE</label>
+              <label>{{localize "BLOODMAN.Identity.Fields.Origin"}}</label>
               <input type="text" name="system.profile.origine" value="{{profile.origine}}" />
             </div>
             <div class="field">
-              <label>HISTORIQUE</label>
+              <label>{{localize "BLOODMAN.Identity.Fields.History"}}</label>
               <textarea name="system.profile.historique" rows="4">{{profile.historique}}</textarea>
             </div>
           </div>
@@ -173,19 +173,19 @@
     <section class="tab" data-group="primary" data-tab="equipement">
       <section class="card equipment-card">
         <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-toolbox"></i> EQUIPEMENTS</span>
+          <span class="card-title"><i class="fa-solid fa-toolbox"></i> {{localize "BLOODMAN.Equipment.Title"}}</span>
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-gun"></i> ARMES</div>
+          <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
           <ol class="item-list weapon-list">
             {{#each weapons}}
               <li class="item weapon-item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
-                <span class="item-meta">{{#if this.system.weaponType}}{{this.system.weaponType}}{{else}}poing{{/if}}</span>
+                <span class="item-meta">{{#if this.displayWeaponType}}{{this.displayWeaponType}}{{else}}{{localize "BLOODMAN.Equipment.WeaponType.Distance"}}{{/if}}</span>
                 <span class="weapon-roll">1{{this.system.damageDie}}</span>
-                <a class="item-delete" title="Supprimer">&times;</a>
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -193,22 +193,22 @@
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-bullseye"></i> MUNITIONS</div>
+          <div class="equip-title"><i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}</div>
           <div class="ammo-row">
-            <input type="text" name="system.ammo.type" value="{{ammo.type}}" placeholder="Type" />
+            <input type="text" name="system.ammo.type" value="{{ammo.type}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}" />
             <input type="number" name="system.ammo.value" value="{{ammo.value}}" />
           </div>
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> PROTECTIONS</div>
+          <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> {{localize "BLOODMAN.Equipment.Protections"}}</div>
           <ol class="item-list">
             {{#each protections}}
               <li class="item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-meta">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
-                <a class="item-delete" title="Supprimer">&times;</a>
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -216,7 +216,7 @@
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-box-open"></i> OBJETS</div>
+          <div class="equip-title"><i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}</div>
           <ol class="item-list">
             {{#each objects}}
               <li class="item" data-item-id="{{this._id}}">
@@ -224,7 +224,7 @@
                 <span class="item-name item-edit">{{this.name}}</span>
                 {{#if this.system.mark}}<span class="item-mark">{{this.system.mark}}</span>{{/if}}
                 {{#if this.system.noteSmall}}<span class="item-meta">{{this.system.noteSmall}}</span>{{/if}}
-                <a class="item-delete" title="Supprimer">&times;</a>
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -236,7 +236,7 @@
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-use">{{#if this.system.healDie}}1{{this.system.healDie}}{{else}}1d4{{/if}}</span>
-                <a class="item-delete" title="Supprimer">&times;</a>
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -244,12 +244,12 @@
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-coins"></i> MONNAIES</div>
+          <div class="equip-title"><i class="fa-solid fa-coins"></i> {{localize "BLOODMAN.Equipment.Currencies"}}</div>
           <input type="text" name="system.equipment.monnaies" value="{{equipment.monnaies}}" />
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-truck"></i> TRANSPORTS</div>
+          <div class="equip-title"><i class="fa-solid fa-truck"></i> {{localize "BLOODMAN.Equipment.Transports"}}</div>
           <input type="text" name="system.equipment.transports" value="{{equipment.transports}}" />
         </div>
       </section>
@@ -258,7 +258,7 @@
     <section class="tab" data-group="primary" data-tab="pouvoirs">
       <section class="card aptitudes-card">
         <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-hand-fist"></i> APTITUDES</span>
+          <span class="card-title"><i class="fa-solid fa-hand-fist"></i> {{localize "BLOODMAN.Abilities.Title"}}</span>
         </div>
         <ol class="item-list">
           {{#each aptitudes}}
@@ -272,7 +272,7 @@
                 {{#if this.displayResourceBonuses.length}}
                   {{#each this.displayResourceBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
                 {{/if}}
-                <a class="item-delete" title="Supprimer">&times;</a>
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -281,7 +281,7 @@
 
       <section class="card powers-card">
         <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-bolt"></i> POUVOIRS</span>
+          <span class="card-title"><i class="fa-solid fa-bolt"></i> {{localize "BLOODMAN.Powers.Title"}}</span>
         </div>
         <ol class="item-list">
           {{#each pouvoirs}}
@@ -295,7 +295,7 @@
                 {{#if this.displayResourceBonuses.length}}
                   {{#each this.displayResourceBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
                 {{/if}}
-                <a class="item-delete" title="Supprimer">&times;</a>
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -306,7 +306,7 @@
     <section class="tab" data-group="primary" data-tab="notes">
       <section class="card notes-card">
         <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-pen"></i> NOTES</span>
+          <span class="card-title"><i class="fa-solid fa-pen"></i> {{localize "BLOODMAN.Notes.Title"}}</span>
         </div>
         <textarea name="system.profile.notes" rows="6">{{profile.notes}}</textarea>
       </section>

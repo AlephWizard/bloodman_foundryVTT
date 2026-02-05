@@ -2,7 +2,7 @@
   <div class="item-header">
     <img class="item-image" src="{{item.img}}" data-edit="img" />
     <div class="item-name-field">
-      <label>NOM</label>
+      <label>{{localize "BLOODMAN.Common.Name"}}</label>
       <input name="name" value="{{item.name}}" />
     </div>
   </div>
@@ -10,6 +10,6 @@
   <label>PA</label>
   <input type="number" name="system.pa" value="{{item.system.pa}}" />
 
-  <label>NOTES</label>
+  <label>{{localize "BLOODMAN.Common.Notes"}}</label>
   <textarea name="system.notes">{{item.system.notes}}</textarea>
 </form>
