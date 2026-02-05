@@ -1,12 +1,17 @@
 <form class="bloodman-sheet">
   <header class="sheet-header">
     <img class="sheet-logo" src="systems/bloodman/images/bloodman_logo.svg" alt="Bloodman" />
-    <div class="voyage-banner">
-      <i class="fa-solid fa-compass"></i>
-      <input class="voyage-input" type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
-      <span class="voyage-sep">/</span>
-      <input class="voyage-input" type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
-      <span class="voyage-label">{{localize "BLOODMAN.Resources.VoyageXP"}}</span>
+    <div class="voyage-tools">
+      <div class="voyage-banner">
+        <i class="fa-solid fa-compass"></i>
+        <input class="voyage-input" type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
+        <span class="voyage-sep">/</span>
+        <input class="voyage-input" type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
+        <span class="voyage-label">{{localize "BLOODMAN.Resources.VoyageXP"}}</span>
+      </div>
+      <button type="button" class="luck-roll luck-roll-header" aria-label="{{localize 'BLOODMAN.Common.LuckRoll'}}" title="{{localize 'BLOODMAN.Common.LuckRoll'}}">
+        <i class="fa-solid fa-clover" aria-hidden="true"></i>
+      </button>
     </div>
     <nav class="sheet-tabs tabs" data-group="primary">
       <a class="item" data-tab="carac">{{localize "BLOODMAN.Tabs.Character"}}</a>
@@ -21,6 +26,7 @@
     <section class="tab" data-group="primary" data-tab="carac">
       <div class="state-bar">
         <span class="state-label">{{localize "BLOODMAN.StateBar.States"}}</span>
+        <i class="fa-solid fa-ankh state-ankh" aria-hidden="true"></i>
         <div class="state-inputs">
           <div class="state-field">
             <span>{{localize "BLOODMAN.StateBar.All"}}</span>

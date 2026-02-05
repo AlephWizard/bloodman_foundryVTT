@@ -819,6 +819,12 @@ class BloodmanActorSheet extends ActorSheet {
   activateListeners(html) {
     super.activateListeners(html);
 
+    html.find(".luck-roll").click(ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.rollLuck();
+    });
+
     html.find(".char-icon").click(ev => {
       const row = ev.currentTarget.closest(".char-row");
       const key = row?.dataset?.key;
@@ -965,6 +971,27 @@ class BloodmanActorSheet extends ActorSheet {
     if (refs.includes(ref)) return true;
     await this.actor.update({ "system.equipment.transportNpcs": [...refs, ref] });
     return true;
+  }
+
+  async rollLuck() {
+    if (this.actor.type !== "personnage") return;
+
+    const roll = await new Roll("2d100").roll({ async: true });
+    const results = roll?.dice?.[0]?.results || [];
+    const chanceValue = Number(results[0]?.result || 0);
+    const luckValue = Number(results[1]?.result || 0);
+    const success = luckValue <= chanceValue;
+    const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
+
+    roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      flavor: t("BLOODMAN.Rolls.Luck.Chat", {
+        name: this.actor.name,
+        chance: chanceValue,
+        roll: luckValue,
+        result: outcome
+      })
+    });
   }
 
   async handleCharacteristicRoll(key) {

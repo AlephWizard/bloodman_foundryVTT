@@ -7,6 +7,8 @@
       "Apply": "Appliquer",
       "Roll": "Lancer",
       "Reroll": "Relance",
+      "Luck": "Chance",
+      "LuckRoll": "Jet de chance",
       "Eat": "Manger",
       "Delete": "Supprimer",
       "Total": "Total",
@@ -109,6 +111,9 @@
       },
       "Heal": {
         "Gain": "<strong>{name}</strong> récupère {amount} PV"
+      },
+      "Luck": {
+        "Chat": "<strong>{name}</strong> Jet de chance : Valeur {chance} / Lancer {roll} -> <strong>{result}</strong>"
       },
       "Growth": {
         "Chat": "<strong>{name}</strong> Jet d'expérience {key}: {roll} / {effective} -> {result}"

@@ -699,11 +699,18 @@
   outline: none;
 }
 
+.voyage-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 12px;
+}
+
 .voyage-banner {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 12px;
+  margin-left: 0;
   padding: 4px 8px;
   border: 2px solid #000000;
   border-radius: 10px;
@@ -712,6 +719,10 @@
   font-weight: 700;
   font-size: 11px;
   letter-spacing: 0.4px;
+}
+
+.sheet-header > .voyage-banner {
+  margin-left: 12px;
 }
 
 .voyage-banner i {
@@ -734,6 +745,38 @@
 
 .voyage-sep {
   font-weight: 800;
+}
+
+.bloodman-sheet button.luck-roll-header {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 0;
+  box-shadow: none;
+  min-width: 0;
+  min-height: 0;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.bloodman-sheet button.luck-roll-header i {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.bloodman-sheet button.luck-roll-header:hover,
+.bloodman-sheet button.luck-roll-header:focus-visible {
+  opacity: 0.85;
+  outline: none;
 }
 
 .bloodman-sheet .sheet-tabs {
@@ -771,6 +814,12 @@
 .bloodman-sheet .state-label {
   font-size: 13px;
   letter-spacing: 0.6px;
+}
+
+.state-ankh {
+  color: #000000;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .bloodman-sheet .state-field {
