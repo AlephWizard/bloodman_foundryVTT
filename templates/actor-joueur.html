@@ -232,7 +232,7 @@
 
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}</div>
-          <ol class="item-list {{#if equipmentTwoColumns}}item-list-two-columns{{/if}}">
+          <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each objects}}
               <li class="item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />
@@ -245,7 +245,7 @@
             {{/each}}
           </ol>
 
-          <ol class="item-list {{#if equipmentTwoColumns}}item-list-two-columns{{/if}}">
+          <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each soins}}
               <li class="item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />
@@ -262,7 +262,7 @@
             {{/each}}
           </ol>
 
-          <ol class="item-list {{#if equipmentTwoColumns}}item-list-two-columns{{/if}}">
+          <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each rations}}
               <li class="item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />
@@ -302,7 +302,7 @@
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-hand-fist"></i> {{localize "BLOODMAN.Abilities.Title"}}</span>
         </div>
-        <ol class="item-list">
+        <ol class="item-list {{#if aptitudesTwoColumns}}item-list-two-columns{{/if}}">
           {{#each aptitudes}}
               <li class="item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />
@@ -330,7 +330,7 @@
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-bolt"></i> {{localize "BLOODMAN.Powers.Title"}}</span>
         </div>
-        <ol class="item-list">
+        <ol class="item-list {{#if pouvoirsTwoColumns}}item-list-two-columns{{/if}}">
           {{#each pouvoirs}}
               <li class="item" data-item-id="{{this._id}}">
                 <img class="item-icon" src="{{this.img}}" />

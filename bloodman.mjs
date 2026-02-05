@@ -1,5 +1,10 @@
 import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType } from "./rollHelpers.mjs";
 
+const BaseActorSheet = foundry?.appv1?.sheets?.ActorSheet ?? ActorSheet;
+const BaseItemSheet = foundry?.appv1?.sheets?.ItemSheet ?? ItemSheet;
+const ActorsCollection = foundry?.documents?.collections?.Actors ?? Actors;
+const ItemsCollection = foundry?.documents?.collections?.Items ?? Items;
+
 function t(key, data = null) {
   if (!globalThis.game?.i18n) return key;
   return data ? game.i18n.format(key, data) : game.i18n.localize(key);
@@ -76,13 +81,6 @@ function getDeadStatusEffect() {
     };
 }
 
-function getTokenEffectsList(tokenDoc) {
-  const effects = tokenDoc?.effects;
-  if (Array.isArray(effects)) return [...effects];
-  if (effects instanceof Set) return [...effects];
-  return [];
-}
-
 function getTokenStatusesList(tokenDoc) {
   const statuses = tokenDoc?.statuses;
   if (Array.isArray(statuses)) return [...statuses].map(normalizeStatusValue).filter(Boolean);
@@ -95,6 +93,16 @@ function tokenHasStatusEffect(tokenDoc, effectDef) {
   const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
     .map(normalizeStatusValue)
     .filter(Boolean);
+  const actor = tokenDoc.actor || null;
+  if (actor && typeof actor.hasStatusEffect === "function") {
+    for (const id of ids) {
+      try {
+        if (actor.hasStatusEffect(id)) return true;
+      } catch (_error) {
+        // continue with other checks
+      }
+    }
+  }
   if (ids.length) {
     const tokenStatuses = new Set(getTokenStatusesList(tokenDoc));
     if (ids.some(id => tokenStatuses.has(id))) return true;
@@ -108,9 +116,7 @@ function tokenHasStatusEffect(tokenDoc, effectDef) {
       }
     }
   }
-  const icon = effectDef.img || effectDef.icon || effectDef.texture?.src || "";
-  if (!icon) return false;
-  return getTokenEffectsList(tokenDoc).includes(icon);
+  return false;
 }
 
 async function setTokenStatusEffect(tokenDoc, effectDef, active) {
@@ -118,75 +124,61 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active) {
   const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
     .map(normalizeStatusValue)
     .filter(Boolean);
-  const icon = effectDef.img || effectDef.icon || effectDef.texture?.src || "";
+  const primaryId = ids[0];
+  if (!primaryId) return false;
+  const actor = tokenDoc.actor || null;
 
-  if (typeof tokenDoc.toggleStatusEffect === "function") {
-    for (const id of ids) {
-      const has = typeof tokenDoc.hasStatusEffect === "function"
-        ? tokenDoc.hasStatusEffect(id)
-        : false;
-      if (typeof has === "boolean" && has === active) return true;
-      try {
-        await tokenDoc.toggleStatusEffect(id, { active, overlay: false });
-        if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
-      } catch (_error) {
-        // fallback on legacy path below
-      }
+  const preferActor = tokenDoc.actorLink !== false && actor && typeof actor.toggleStatusEffect === "function";
+  if (preferActor) {
+    const currentStatuses = getTokenStatusesList(tokenDoc);
+    if (currentStatuses.some(id => ids.includes(id))) {
+      const nextStatuses = currentStatuses.filter(id => !ids.includes(id));
+      await tokenDoc.update({ statuses: nextStatuses }).catch(() => null);
     }
-  }
-
-  const tokenObj = tokenDoc.object || null;
-  if (tokenObj && typeof tokenObj.toggleEffect === "function" && icon) {
+    const has = typeof actor.hasStatusEffect === "function"
+      ? actor.hasStatusEffect(primaryId)
+      : false;
+    if (typeof has === "boolean" && has === active) return true;
     try {
-      await tokenObj.toggleEffect(icon, { active, overlay: false });
+      await actor.toggleStatusEffect(primaryId, { active, overlay: false });
       if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
     } catch (_error) {
-      // fallback on actor/document data below
+      // fallback on token/document data below
     }
+    return tokenHasStatusEffect(tokenDoc, effectDef) === active;
   }
+
+  // Avoid deprecated token toggle APIs; rely on status sets below for unlinked tokens.
 
   const tokenActor = tokenDoc.actor || null;
   const worldActor = tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null;
   const actorForFallback = tokenActor || (tokenDoc.actorLink ? worldActor : null);
   const sameActorTokensCount = actorForFallback?.id ? getTokenDocumentsForActor(actorForFallback).length : 0;
-  const actorFallbackAllowed = tokenDoc.actorLink ? sameActorTokensCount <= 1 : Boolean(tokenActor);
+  const actorFallbackAllowed = tokenDoc.actorLink ? sameActorTokensCount <= 1 : false;
   if (actorFallbackAllowed && actorForFallback && typeof actorForFallback.toggleStatusEffect === "function") {
-    for (const id of ids) {
-      try {
-        await actorForFallback.toggleStatusEffect(id, { active, overlay: false });
-        if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
-      } catch (_error) {
-        // fallback on document data below
-      }
+    try {
+      await actorForFallback.toggleStatusEffect(primaryId, { active, overlay: false });
+      if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
+    } catch (_error) {
+      // fallback on document data below
     }
   }
 
   if (ids.length) {
     const nextStatuses = new Set(getTokenStatusesList(tokenDoc));
     let changed = false;
-    for (const id of ids) {
-      if (!id) continue;
-      const has = nextStatuses.has(id);
-      if (active && !has) {
-        nextStatuses.add(id);
-        changed = true;
-      }
-      if (!active && has) {
-        nextStatuses.delete(id);
-        changed = true;
-      }
+    const has = nextStatuses.has(primaryId);
+    if (active && !has) {
+      nextStatuses.add(primaryId);
+      changed = true;
+    }
+    if (!active && has) {
+      nextStatuses.delete(primaryId);
+      changed = true;
     }
     if (changed) await tokenDoc.update({ statuses: [...nextStatuses] }).catch(() => null);
     if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
   }
-
-  if (!icon) return false;
-  const nextEffects = new Set(getTokenEffectsList(tokenDoc));
-  const hasIcon = nextEffects.has(icon);
-  if (hasIcon === active) return true;
-  if (active) nextEffects.add(icon);
-  else nextEffects.delete(icon);
-  await tokenDoc.update({ effects: [...nextEffects] }).catch(() => null);
   return tokenHasStatusEffect(tokenDoc, effectDef) === active;
 }
 
@@ -197,15 +189,56 @@ function getTokenActorType(tokenDoc) {
   return worldActorType || "";
 }
 
+function isPvBarAttribute(attribute) {
+  if (!attribute) return false;
+  return /(^|\\.)resources\\.pv(\\.|$)/.test(String(attribute));
+}
+
+function getTokenBarPvValue(tokenDoc) {
+  const bar1Value = Number(foundry.utils.getProperty(tokenDoc, "bar1.value"));
+  const bar1Attr = foundry.utils.getProperty(tokenDoc, "bar1.attribute");
+  if (Number.isFinite(bar1Value) && isPvBarAttribute(bar1Attr)) return bar1Value;
+  const bar2Value = Number(foundry.utils.getProperty(tokenDoc, "bar2.value"));
+  const bar2Attr = foundry.utils.getProperty(tokenDoc, "bar2.attribute");
+  if (Number.isFinite(bar2Value) && isPvBarAttribute(bar2Attr)) return bar2Value;
+  return NaN;
+}
+
 function getTokenCurrentPv(tokenDoc) {
-  const actorCurrent = Number(tokenDoc?.actor?.system?.resources?.pv?.current);
-  if (Number.isFinite(actorCurrent)) return actorCurrent;
   const deltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
-  if (Number.isFinite(deltaCurrent)) return deltaCurrent;
   const actorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
-  if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
+  const actorCurrent = Number(tokenDoc?.actor?.system?.resources?.pv?.current);
+  const barCurrent = getTokenBarPvValue(tokenDoc);
+  const isLinked = tokenDoc?.actorLink === true;
+  if (isLinked) {
+    if (Number.isFinite(actorCurrent)) return actorCurrent;
+    if (Number.isFinite(deltaCurrent)) return deltaCurrent;
+    if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
+  } else {
+    if (Number.isFinite(deltaCurrent)) return deltaCurrent;
+    if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
+    if (Number.isFinite(barCurrent)) return barCurrent;
+    if (Number.isFinite(actorCurrent)) return actorCurrent;
+  }
+  if (Number.isFinite(barCurrent)) return barCurrent;
   const worldActorCurrent = Number(game.actors?.get(tokenDoc?.actorId)?.system?.resources?.pv?.current);
   return worldActorCurrent;
+}
+
+function getTokenPvFromUpdate(tokenDoc, changes) {
+  const deltaCurrent = foundry.utils.getProperty(changes, "delta.system.resources.pv.current");
+  if (deltaCurrent != null) return Number(deltaCurrent);
+  const actorDataCurrent = foundry.utils.getProperty(changes, "actorData.system.resources.pv.current");
+  if (actorDataCurrent != null) return Number(actorDataCurrent);
+  const legacyCurrent = foundry.utils.getProperty(changes, "system.resources.pv.current");
+  if (legacyCurrent != null) return Number(legacyCurrent);
+  const bar1Value = foundry.utils.getProperty(changes, "bar1.value");
+  const bar1Attr = foundry.utils.getProperty(tokenDoc, "bar1.attribute");
+  if (bar1Value != null && isPvBarAttribute(bar1Attr)) return Number(bar1Value);
+  const bar2Value = foundry.utils.getProperty(changes, "bar2.value");
+  const bar2Attr = foundry.utils.getProperty(tokenDoc, "bar2.attribute");
+  if (bar2Value != null && isPvBarAttribute(bar2Attr)) return Number(bar2Value);
+  return null;
 }
 
 async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
@@ -216,14 +249,36 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
   const dead = getDeadStatusEffect();
 
   if (actorType === "personnage") {
-    const bleedApplied = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess);
-    if (!bleedApplied) console.warn("[bloodman] status:bleeding not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
-    if (dead) await setTokenStatusEffect(tokenDoc, dead, false);
+    const hasBleed = bleeding ? tokenHasStatusEffect(tokenDoc, bleeding) : false;
+    if (bleeding && hasBleed !== isZeroOrLess) {
+      const bleedApplied = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess);
+      if (!bleedApplied) console.warn("[bloodman] status:bleeding not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
+    }
+    if (dead) {
+      const hasDead = tokenHasStatusEffect(tokenDoc, dead);
+      if (hasDead) await setTokenStatusEffect(tokenDoc, dead, false);
+    }
   } else {
-    const deadApplied = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess);
-    if (!deadApplied) console.warn("[bloodman] status:dead not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
-    if (bleeding) await setTokenStatusEffect(tokenDoc, bleeding, false);
+    if (dead) {
+      const hasDead = tokenHasStatusEffect(tokenDoc, dead);
+      if (hasDead !== isZeroOrLess) {
+        const deadApplied = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess);
+        if (!deadApplied) console.warn("[bloodman] status:dead not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
+      }
+    }
+    if (bleeding) {
+      const hasBleed = tokenHasStatusEffect(tokenDoc, bleeding);
+      if (hasBleed) await setTokenStatusEffect(tokenDoc, bleeding, false);
+    }
   }
+
+  if (typeof tokenDoc?.object?.drawEffects === "function") {
+    tokenDoc.object.drawEffects();
+  }
+}
+
+if (!globalThis.__bmSyncZeroPvStatusForToken) {
+  globalThis.__bmSyncZeroPvStatusForToken = syncZeroPvStatusForToken;
 }
 
 function getTokenDocumentsForActor(actor) {
@@ -421,6 +476,195 @@ function resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent) {
   return tokenActorDataCurrent;
 }
 
+function getRerollTargetKey(target) {
+  if (!target) return "";
+  return target.tokenUuid || target.tokenId || target.actorId || "";
+}
+
+function isDamageRerollContextReady(context) {
+  if (!context || !Array.isArray(context.targets) || context.targets.length === 0) return false;
+  if (context.used) return false;
+  return context.targets.every(target => Number.isFinite(Number(target.hpBefore)));
+}
+
+function buildRerollAllocations(context, totalDamage) {
+  const targets = Array.isArray(context?.targets) ? context.targets : [];
+  if (targets.length === 0) return [];
+  if (targets.length === 1) {
+    return [{ ...targets[0], share: Math.max(0, Math.floor(totalDamage)) }];
+  }
+  const originalTotal = Number(context.totalDamage || 0);
+  let remaining = Math.max(0, Math.floor(totalDamage));
+  const allocations = targets.map((target, index) => {
+    let share = 0;
+    if (Number.isFinite(originalTotal) && originalTotal > 0) {
+      if (index === targets.length - 1) {
+        share = remaining;
+      } else {
+        const ratio = Number(target.share || 0) / originalTotal;
+        share = Math.max(0, Math.floor(totalDamage * ratio));
+        remaining = Math.max(0, remaining - share);
+      }
+    } else {
+      share = index === targets.length - 1 ? remaining : 0;
+      remaining = Math.max(0, remaining - share);
+    }
+    return { ...target, share };
+  });
+  return allocations;
+}
+
+function getRollValuesFromRoll(roll) {
+  const values = [];
+  for (const die of roll?.dice || []) {
+    for (const result of die?.results || []) {
+      const value = Number(result?.result);
+      if (Number.isFinite(value)) values.push(value);
+    }
+  }
+  return values;
+}
+
+function emitDamageAppliedMessage(data, result, tokenDoc, share) {
+  const attackerUserId = String(data.attackerUserId || "");
+  if (!attackerUserId || !game.socket || !result || !tokenDoc) return;
+  game.socket.emit(SYSTEM_SOCKET, {
+    type: "damageApplied",
+    rerollUsed: Boolean(data.rerollUsed),
+    attackerUserId,
+    attackerId: String(data.attackerId || data.attaquant_id || ""),
+    rollId: String(data.rollId || ""),
+    itemId: String(data.itemId || ""),
+    itemName: String(data.itemName || ""),
+    damageFormula: String(data.damageFormula || ""),
+    damageLabel: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
+    bonusBrut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
+    penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration ?? data.penetration_plus, 0))),
+    totalDamage: Number(data.totalDamage),
+    target: {
+      tokenId: tokenDoc.id,
+      tokenUuid: tokenDoc.uuid,
+      sceneId: tokenDoc.parent?.id || tokenDoc.scene?.id || "",
+      actorId: tokenDoc.actorId || "",
+      targetActorLink: Boolean(tokenDoc.actorLink),
+      targetName: resolveCombatTargetName(tokenDoc.name, tokenDoc.actor?.name, tokenDoc.name || ""),
+      share: Math.max(0, Math.floor(Number(share) || 0)),
+      hpBefore: Number(result.hpBefore),
+      hpAfter: Number(result.hpAfter),
+      finalDamage: Number(result.finalDamage)
+    }
+  });
+}
+
+async function handleDamageAppliedMessage(data) {
+  if (!data || data.attackerUserId !== game.user?.id) return;
+  const actor = data.attackerId ? game.actors?.get(data.attackerId) : null;
+  if (!actor) return;
+  const rollId = String(data.rollId || "");
+  const itemId = String(data.itemId || "");
+  const target = data.target || {};
+  const key = getRerollTargetKey(target);
+
+  let context = actor._lastDamageReroll;
+  if (!context || context.rollId !== rollId) {
+    context = {
+      rollId,
+      itemId,
+      itemName: String(data.itemName || ""),
+      attackerId: actor.id,
+      attackerUserId: String(data.attackerUserId || ""),
+      formula: String(data.damageFormula || "1d4"),
+      degats: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
+      bonusBrut: Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0))),
+      penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0))),
+      totalDamage: Number(data.totalDamage),
+      targets: []
+    };
+  }
+  if (data.rerollUsed) context.used = true;
+  if (!context.itemId) context.itemId = itemId;
+  if (!context.itemName && data.itemName) context.itemName = String(data.itemName);
+  if (!context.formula && data.damageFormula) context.formula = String(data.damageFormula);
+  if (!context.degats && (data.damageLabel || data.degats)) context.degats = String(data.damageLabel || data.degats).trim().toUpperCase();
+  if (!Number.isFinite(Number(context.bonusBrut)) && Number.isFinite(Number(data.bonusBrut ?? data.bonus_brut))) {
+    context.bonusBrut = Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0)));
+  }
+  if (!Number.isFinite(Number(context.penetration)) && Number.isFinite(Number(data.penetration))) {
+    context.penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
+  }
+  if (!Number.isFinite(Number(context.totalDamage)) && Number.isFinite(Number(data.totalDamage))) {
+    context.totalDamage = Number(data.totalDamage);
+  }
+
+  if (key) {
+    const existing = context.targets.find(entry => getRerollTargetKey(entry) === key);
+    if (existing) Object.assign(existing, target);
+    else context.targets.push(target);
+  }
+
+  actor._lastDamageReroll = context;
+  actor._lastItemReroll = {
+    itemId: context.itemId,
+    rollId: context.rollId,
+    at: Date.now(),
+    damage: context
+  };
+  if (actor.sheet?.rendered) actor.sheet.render(false);
+}
+
+async function handleDamageRerollRequest(data) {
+  if (!data || !game.user.isGM) return;
+  data.rerollUsed = true;
+  const targets = Array.isArray(data.targets) ? data.targets : [];
+  if (!targets.length) return;
+  const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
+
+  for (const target of targets) {
+    const tokenDoc = await resolveDamageTokenDocument(target);
+    const targetActor = tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null);
+    const hpBefore = Number(target.hpBefore);
+    if (Number.isFinite(hpBefore)) {
+      if (targetActor) {
+        await targetActor.update({ "system.resources.pv.current": hpBefore });
+      } else if (tokenDoc) {
+        await tokenDoc.update({ "delta.system.resources.pv.current": hpBefore });
+      }
+      if (tokenDoc) {
+        const actorType = getTokenActorType(tokenDoc);
+        if (actorType) await syncZeroPvStatusForToken(tokenDoc, actorType, hpBefore);
+      }
+    }
+
+    const share = Math.max(0, Math.floor(Number(target.share || 0)));
+    if (!share) continue;
+    const targetName = resolveCombatTargetName(
+      target.targetName || tokenDoc?.name,
+      targetActor?.name,
+      "Cible"
+    );
+    let result = null;
+    if (targetActor) {
+      result = await applyDamageToActor(targetActor, share, { targetName, penetration });
+    } else if (tokenDoc && Number.isFinite(hpBefore)) {
+      const nextValue = Math.max(0, hpBefore - share);
+      await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
+      ChatMessage.create({
+        speaker: { alias: targetName },
+        content: t("BLOODMAN.Rolls.Damage.Take", { name: targetName, amount: share, pa: 0 })
+      });
+      result = { hpBefore, hpAfter: nextValue, finalDamage: share };
+    }
+
+    if (result && tokenDoc) {
+      const actorType = getTokenActorType(tokenDoc);
+      if (actorType && Number.isFinite(result.hpAfter)) {
+        await syncZeroPvStatusForToken(tokenDoc, actorType, result.hpAfter);
+      }
+      emitDamageAppliedMessage(data, result, tokenDoc, share);
+    }
+  }
+}
+
 async function handleIncomingDamageRequest(data, source = "socket") {
   if (!data || !game.user.isGM) return;
   const requestId = typeof data.requestId === "string" ? data.requestId : "";
@@ -460,6 +704,15 @@ async function handleIncomingDamageRequest(data, source = "socket") {
       speaker: { alias: fallbackName },
       content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa: paEffective })
     });
+    const result = {
+      finalDamage,
+      penetration,
+      paInitial,
+      paEffective,
+      hpBefore: current,
+      hpAfter: nextValue
+    };
+    emitDamageAppliedMessage(data, result, tokenDoc, share);
     console.debug("[bloodman] damage:output", {
       degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
       jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
@@ -480,6 +733,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     console.debug("[bloodman] damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
     const result = await applyDamageToActor(tokenActor, share, { targetName: fallbackName, penetration });
     if (result) {
+      if (tokenDoc) emitDamageAppliedMessage(data, result, tokenDoc, share);
       console.debug("[bloodman] damage:output", {
         degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
         jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
@@ -524,6 +778,14 @@ function registerDamageSocketHandlers() {
   if (globalThis.__bmDamageSocketReady || !game.socket) return;
   game.socket.on(SYSTEM_SOCKET, async data => {
     if (!data) return;
+    if (data.type === "damageApplied") {
+      await handleDamageAppliedMessage(data);
+      return;
+    }
+    if (data.type === "rerollDamage") {
+      if (game.user.isGM) await handleDamageRerollRequest(data);
+      return;
+    }
     if (!game.user.isGM) return;
     if (data.type === "adjustChaosDice") {
       const delta = Number(data.delta);
@@ -537,6 +799,10 @@ function registerDamageSocketHandlers() {
   globalThis.__bmDamageSocketReady = true;
 }
 
+function getCombatantActor(combatant) {
+  return combatant?.token?.actor || combatant?.actor || null;
+}
+
 function getFixedInitiativeScore(actor) {
   if (!actor) return 0;
   const itemBonuses = getItemBonusTotals(actor);
@@ -545,6 +811,53 @@ function getFixedInitiativeScore(actor) {
   const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
   const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0);
   return Math.max(0, Math.round(effective));
+}
+
+function getInitiativeFormulaForActor(actor) {
+  const score = getFixedInitiativeScore(actor);
+  // Tie-breaker: lower 1d10 wins (adds a slightly higher fraction).
+  return `(${score}) + (10 - 1d10) / 100`;
+}
+
+function getCombatantDisplayName(combatant) {
+  if (!combatant) return "";
+  const tokenName = combatant.token?.name;
+  const actor = combatant.actor || combatant.token?.actor || null;
+  const actorName = actor?.name || "";
+  if (actor?.type === "personnage") {
+    return actorName || combatant.name || "";
+  }
+  return resolveCombatTargetName(tokenName, actorName, combatant.name || "");
+}
+
+function focusActiveCombatantToken(combat) {
+  if (!combat || !canvas?.tokens) return;
+  if (combat.round == null || combat.round <= 0) return;
+  if (combat.scene && canvas?.scene && combat.scene.id !== canvas.scene.id) return;
+  const combatant = combat.combatant;
+  const tokenDoc = combatant?.token;
+  const tokenObj = tokenDoc?.object;
+  if (!tokenDoc || !tokenObj) return;
+  if (!tokenDoc.isOwner && !game.user.isGM) return;
+  if (tokenObj.controlled) return;
+  canvas.tokens.activate();
+  tokenObj.control({ releaseOthers: true });
+}
+
+async function syncCombatantNameForToken(tokenDoc) {
+  if (!tokenDoc) return;
+  const actorType = tokenDoc.actor?.type || "";
+  const displayName = actorType === "personnage"
+    ? (tokenDoc.actor?.name || tokenDoc.name || "")
+    : resolveCombatTargetName(tokenDoc.name, tokenDoc.actor?.name, tokenDoc.name || "");
+  if (!displayName) return;
+  for (const combat of game.combats || []) {
+    for (const combatant of combat.combatants || []) {
+      if (combatant.tokenId !== tokenDoc.id) continue;
+      if (combatant.name === displayName) continue;
+      await combatant.update({ name: displayName });
+    }
+  }
 }
 
 Hooks.once("init", () => {
@@ -562,18 +875,18 @@ Hooks.once("init", () => {
     }
   });
 
-  Actors.unregisterSheet("core", ActorSheet);
-  Actors.registerSheet("bloodman", BloodmanActorSheet, {
+  ActorsCollection.unregisterSheet("core", BaseActorSheet);
+  ActorsCollection.registerSheet("bloodman", BloodmanActorSheet, {
     types: ["personnage"],
     makeDefault: true
   });
-  Actors.registerSheet("bloodman", BloodmanNpcSheet, {
+  ActorsCollection.registerSheet("bloodman", BloodmanNpcSheet, {
     types: ["personnage-non-joueur"],
     makeDefault: true
   });
 
-  Items.unregisterSheet("core", ItemSheet);
-  Items.registerSheet("bloodman", BloodmanItemSheet, {
+  ItemsCollection.unregisterSheet("core", BaseItemSheet);
+  ItemsCollection.registerSheet("bloodman", BloodmanItemSheet, {
     types: ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"],
     makeDefault: true
   });
@@ -584,27 +897,25 @@ Hooks.once("init", () => {
     const originalGetFormula = combatantDoc.prototype._getInitiativeFormula || combatantDoc.prototype.getInitiativeFormula;
 
     combatantDoc.prototype._getInitiativeFormula = function () {
-      const actor = this.actor;
+      const actor = getCombatantActor(this);
       if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
-        return String(getFixedInitiativeScore(actor));
+        return getInitiativeFormulaForActor(actor);
       }
-      return typeof originalGetFormula === "function" ? originalGetFormula.call(this) : "0";
+      const fallback = typeof originalGetFormula === "function" ? originalGetFormula.call(this) : "0";
+      return fallback ? String(fallback) : "0";
     };
 
-    combatantDoc.prototype.getInitiativeRoll = async function (formula) {
-      const actor = this.actor;
+    combatantDoc.prototype.getInitiativeRoll = function (formula) {
+      const RollClass = foundry?.dice?.Roll || Roll;
+      const actor = getCombatantActor(this);
       if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
-        const score = getFixedInitiativeScore(actor);
-        const roll = new Roll(String(score));
-        await roll.evaluate();
-        return roll;
+        return new RollClass(getInitiativeFormulaForActor(actor));
       }
       if (typeof originalGetInitiativeRoll === "function") {
         return originalGetInitiativeRoll.call(this, formula);
       }
-      const fallback = new Roll("0");
-      await fallback.evaluate();
-      return fallback;
+      const normalized = String(formula ?? "0").trim();
+      return new RollClass(normalized || "0");
     };
   }
 });
@@ -675,6 +986,15 @@ Hooks.once("ready", async () => {
   ensureChaosDiceUI();
 
   if (game.user.isGM) {
+    for (const combat of game.combats || []) {
+      for (const combatant of combat.combatants || []) {
+        const name = getCombatantDisplayName(combatant);
+        if (name && name !== combatant.name) {
+          await combatant.update({ name });
+        }
+      }
+    }
+
     for (const scene of game.scenes) {
       for (const token of scene.tokens) {
         const actorType = getTokenActorType(token);
@@ -1020,6 +1340,28 @@ Hooks.on("preCreateToken", (doc) => {
   if (actorType === "personnage-non-joueur") doc.updateSource({ actorLink: false });
 });
 
+Hooks.on("preCreateCombatant", (combatant) => {
+  const name = getCombatantDisplayName(combatant);
+  if (name && name !== combatant.name) {
+    combatant.updateSource({ name });
+  }
+});
+
+Hooks.on("updateCombat", (combat, changes) => {
+  if (!changes) return;
+  if (changes.round != null || changes.turn != null || changes.active != null) {
+    focusActiveCombatantToken(combat);
+  }
+});
+
+Hooks.on("combatTurnChange", (combat) => {
+  focusActiveCombatantToken(combat);
+});
+
+Hooks.on("combatStart", (combat) => {
+  focusActiveCombatantToken(combat);
+});
+
 Hooks.on("preUpdateActor", (actor, updateData) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
 
@@ -1120,27 +1462,36 @@ Hooks.on("updateActor", async (actor, changes) => {
 });
 
 Hooks.on("updateActor", async (actor, changes) => {
-  if (!game.user.isGM) return;
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  if (!game.user.isGM && !actor.isOwner) return;
   const hasPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
   if (!hasPvChange) return;
+  if (actor.isToken) {
+    const tokenDoc = actor.token || actor.parent || null;
+    const pvCurrent = Number(actor.system?.resources?.pv?.current);
+    if (tokenDoc && Number.isFinite(pvCurrent)) {
+      await syncZeroPvStatusForToken(tokenDoc, actor.type, pvCurrent);
+    }
+    return;
+  }
   await syncZeroPvStatusForActor(actor);
 });
 
 Hooks.on("updateToken", async (tokenDoc, changes) => {
-  if (!game.user.isGM) return;
+  if (!game.user.isGM && !tokenDoc?.isOwner) return;
+  if (foundry.utils.getProperty(changes, "name") != null) {
+    await syncCombatantNameForToken(tokenDoc);
+  }
   const actorType = getTokenActorType(tokenDoc);
   if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
-  const hasPvDeltaChange = foundry.utils.getProperty(changes, "delta.system.resources.pv.current") != null;
-  const hasPvActorDataChange = foundry.utils.getProperty(changes, "actorData.system.resources.pv.current") != null;
-  const hasLegacyPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
-  if (!hasPvDeltaChange && !hasPvActorDataChange && !hasLegacyPvChange) return;
-  const pvCurrent = getTokenCurrentPv(tokenDoc);
+  const pvFromUpdate = getTokenPvFromUpdate(tokenDoc, changes);
+  if (pvFromUpdate == null) return;
+  const pvCurrent = Number.isFinite(pvFromUpdate) ? pvFromUpdate : getTokenCurrentPv(tokenDoc);
   if (!Number.isFinite(pvCurrent)) return;
   await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
 });
 
-class BloodmanActorSheet extends ActorSheet {
+class BloodmanActorSheet extends BaseActorSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
@@ -1158,9 +1509,11 @@ class BloodmanActorSheet extends ActorSheet {
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
     const rerollKey = this._lastCharacteristicRollKey || "";
     const characteristicRerollActive = this.isRerollWindowActive(this._lastCharacteristicRollAt);
-    const itemRerollActive = this.isRerollWindowActive(this._lastItemReroll?.at);
+    const itemRerollState = this.getItemRerollState();
+    const itemRerollReady = this.isDamageRerollReady(itemRerollState?.damage);
+    const itemRerollActive = itemRerollReady && this.isRerollWindowActive(itemRerollState?.at);
     const activeRerollKey = characteristicRerollActive ? rerollKey : "";
-    const lastItemRerollId = itemRerollActive ? (this._lastItemReroll?.itemId || "") : "";
+    const lastItemRerollId = itemRerollActive ? (itemRerollState?.itemId || "") : "";
     const isPlayerActor = data.actor.type === "personnage";
     const isNpcActor = data.actor.type === "personnage-non-joueur";
     const chaosValue = getChaosValue();
@@ -1242,6 +1595,8 @@ class BloodmanActorSheet extends ActorSheet {
       dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
       return dataItem;
     });
+    const aptitudesTwoColumns = aptitudes.length >= 2;
+    const pouvoirsTwoColumns = pouvoirs.length >= 2;
 
     const npcRole = data.actor.system.npcRole || "";
 
@@ -1266,7 +1621,7 @@ class BloodmanActorSheet extends ActorSheet {
       return heal;
     });
     const carriedItemsCount = itemBuckets.objet.length + itemBuckets.soin.length + itemBuckets.ration.length;
-    const equipmentTwoColumns = carriedItemsCount >= 6;
+    const equipmentThreeColumns = carriedItemsCount >= 2;
 
     return {
       ...data,
@@ -1289,7 +1644,9 @@ class BloodmanActorSheet extends ActorSheet {
       pouvoirs,
       ammo,
       transportNpcs,
-      equipmentTwoColumns
+      equipmentThreeColumns,
+      aptitudesTwoColumns,
+      pouvoirsTwoColumns
     };
   }
 
@@ -1534,7 +1891,7 @@ class BloodmanActorSheet extends ActorSheet {
     if (!item) return;
     const result = await doDamageRoll(this.actor, item);
     if (!result) return;
-    this.markItemReroll(item.id);
+    if (result?.context) this.markItemReroll(item.id, result.context);
     this.render(false);
   }
 
@@ -1543,9 +1900,9 @@ class BloodmanActorSheet extends ActorSheet {
     const die = (item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
     const beforeRoll = async () => applyPowerCost(this.actor, item);
-    const result = await doDirectDamageRoll(this.actor, formula, item.name, { beforeRoll });
+    const result = await doDirectDamageRoll(this.actor, formula, item.name, { beforeRoll, itemId: item.id });
     if (!result) return;
-    this.markItemReroll(item.id);
+    if (result?.context) this.markItemReroll(item.id, result.context);
     this.render(false);
   }
 
@@ -1553,7 +1910,7 @@ class BloodmanActorSheet extends ActorSheet {
     if (!item) return;
     if (item.type === "soin") {
       const result = await doHealRoll(this.actor, item);
-      if (result && this.actor.items.get(item.id)) this.markItemReroll(item.id);
+      if (result && this.actor.items.get(item.id)) this.render(false);
     }
     if (item.type === "ration" && item.isOwner) await item.delete();
   }
@@ -1562,38 +1919,144 @@ class BloodmanActorSheet extends ActorSheet {
     if (!itemId) return;
     const item = this.actor.items.get(itemId);
     if (!item) return;
+    const state = this.getItemRerollState();
+    const context = state?.damage;
+    if (!context || state?.itemId !== itemId) return;
+    if (!this.isRerollWindowActive(state?.at)) return;
+    if (!this.isDamageRerollReady(context)) return;
+
     const isPlayerActor = this.actor.type === "personnage";
     const isNpcActor = this.actor.type === "personnage-non-joueur";
+    if (!isPlayerActor && !isNpcActor) return;
 
     if (isPlayerActor) {
-      if (this._lastItemReroll?.itemId !== itemId || !this.isRerollWindowActive(this._lastItemReroll?.at)) return;
       const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
       if (currentPP < CHARACTERISTIC_REROLL_PP_COST) {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
         return;
       }
       await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
-      const rolled = await this.performItemRerollRoll(item);
-      if (!rolled) return;
-      await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
-      this.markItemReroll(item.id);
+    } else {
+      if (!game.user.isGM) return;
+      const currentChaos = getChaosValue();
+      if (currentChaos < CHAOS_COST_NPC_REROLL) {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
+        this.render(false);
+        return;
+      }
+      await setChaosValue(currentChaos - CHAOS_COST_NPC_REROLL);
+    }
+
+    const roll = await new Roll(context.formula || "1d4").evaluate();
+    const rollResults = getRollValuesFromRoll(roll);
+    const totalDamage = Math.max(0, Number(roll.total || 0) + Math.max(0, Number(context.bonusBrut || 0)));
+    const allocations = buildRerollAllocations(context, totalDamage);
+    const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
+
+    const damageLabel = context.degats || context.formula || "";
+    roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      flavor: `${t("BLOODMAN.Rolls.Damage.Deal", {
+        name: this.actor.name,
+        amount: totalDamage,
+        source: context.itemName ? ` (${context.itemName})` : ""
+      })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration} | ${t("BLOODMAN.Common.Reroll")}</small>`
+    });
+
+    if (!game.user.isGM && hasActiveGM) {
+      context.used = true;
+      game.socket.emit(SYSTEM_SOCKET, {
+        type: "rerollDamage",
+        rerollUsed: true,
+        attackerUserId: game.user?.id || "",
+        attackerId: context.attackerId || this.actor.id,
+        rollId: context.rollId,
+        itemId: context.itemId || itemId,
+        itemName: context.itemName || item.name,
+        damageFormula: context.formula,
+        damageLabel: context.degats,
+        bonusBrut: context.bonusBrut,
+        penetration: context.penetration,
+        totalDamage,
+        rollResults,
+        targets: allocations
+      });
+      this.clearItemRerollState();
       this.render(false);
       return;
     }
 
-    if (!isNpcActor || !game.user.isGM) return;
-    if (this._lastItemReroll?.itemId !== itemId || !this.isRerollWindowActive(this._lastItemReroll?.at)) return;
-    const currentChaos = getChaosValue();
-    if (currentChaos < CHAOS_COST_NPC_REROLL) {
-      ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
-      this.render(false);
-      return;
+    for (const target of allocations) {
+      const tokenDoc = await resolveDamageTokenDocument(target);
+      const targetActor = tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null);
+      const hpBefore = Number(target.hpBefore);
+      if (Number.isFinite(hpBefore)) {
+        if (targetActor) {
+          await targetActor.update({ "system.resources.pv.current": hpBefore });
+        } else if (tokenDoc) {
+          await tokenDoc.update({ "delta.system.resources.pv.current": hpBefore });
+        }
+        if (tokenDoc) {
+          const actorType = getTokenActorType(tokenDoc);
+          if (actorType) await syncZeroPvStatusForToken(tokenDoc, actorType, hpBefore);
+        }
+      }
+
+      const share = Math.max(0, Math.floor(Number(target.share || 0)));
+      if (!share) continue;
+      const targetName = resolveCombatTargetName(
+        target.targetName || tokenDoc?.name,
+        targetActor?.name,
+        "Cible"
+      );
+      let result = null;
+      if (targetActor) {
+        result = await applyDamageToActor(targetActor, share, { targetName, penetration: Math.max(0, Number(context.penetration || 0)) });
+      } else if (tokenDoc && Number.isFinite(hpBefore)) {
+        const nextValue = Math.max(0, hpBefore - share);
+        await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
+        ChatMessage.create({
+          speaker: { alias: targetName },
+          content: t("BLOODMAN.Rolls.Damage.Take", { name: targetName, amount: share, pa: 0 })
+        });
+        result = { hpBefore, hpAfter: nextValue, finalDamage: share };
+      }
+
+      if (result && tokenDoc) {
+        const actorType = getTokenActorType(tokenDoc);
+        if (actorType && Number.isFinite(result.hpAfter)) {
+          await syncZeroPvStatusForToken(tokenDoc, actorType, result.hpAfter);
+        }
+      }
     }
-    const rolled = await this.performItemRerollRoll(item);
-    if (!rolled) return;
-    await setChaosValue(currentChaos - CHAOS_COST_NPC_REROLL);
-    this.markItemReroll(item.id);
+
+    this.clearItemRerollState();
     this.render(false);
+  }
+
+  getItemRerollState() {
+    return this.actor?._lastItemReroll || this._lastItemReroll || null;
+  }
+
+  setItemRerollState(state) {
+    this._lastItemReroll = state;
+    if (this.actor) this.actor._lastItemReroll = state;
+  }
+
+  clearItemRerollState() {
+    this._lastItemReroll = null;
+    if (this.actor) {
+      this.actor._lastItemReroll = null;
+      this.actor._lastDamageReroll = null;
+    }
+    if (this._itemRerollTimer) {
+      clearTimeout(this._itemRerollTimer);
+      this._itemRerollTimer = null;
+    }
+  }
+
+  isDamageRerollReady(context) {
+    return isDamageRerollContextReady(context);
   }
 
   isRerollWindowActive(timestamp) {
@@ -1609,11 +2072,11 @@ class BloodmanActorSheet extends ActorSheet {
       this[timerKey] = null;
     }
 
-    const timestamp = kind === "item" ? this._lastItemReroll?.at : this._lastCharacteristicRollAt;
+    const timestamp = kind === "item" ? this.getItemRerollState()?.at : this._lastCharacteristicRollAt;
     if (!this.isRerollWindowActive(timestamp)) return;
     const remaining = Math.max(0, REROLL_VISIBILITY_MS - (Date.now() - Number(timestamp)));
     this[timerKey] = setTimeout(() => {
-      if (kind === "item") this._lastItemReroll = null;
+      if (kind === "item") this.clearItemRerollState();
       else this.clearCharacteristicRerollState();
       this.render(false);
     }, remaining);
@@ -1635,9 +2098,11 @@ class BloodmanActorSheet extends ActorSheet {
     }
   }
 
-  markItemReroll(itemId) {
+  markItemReroll(itemId, damageContext = null) {
     if (!itemId) return;
-    this._lastItemReroll = { itemId, at: Date.now() };
+    const damage = damageContext || this.actor?._lastDamageReroll || null;
+    if (this.actor && damage) this.actor._lastDamageReroll = damage;
+    this.setItemRerollState({ itemId, at: Date.now(), damage });
     this.scheduleRerollExpiry("item");
   }
 
@@ -1647,7 +2112,7 @@ class BloodmanActorSheet extends ActorSheet {
     if (item.type === "arme") {
       const die = (item.system?.damageDie || "d4").toString();
       const formula = /^\d/.test(die) ? die : `1${die}`;
-      const result = await doDirectDamageRoll(this.actor, formula, item.name);
+      const result = await doDirectDamageRoll(this.actor, formula, item.name, { itemId: item.id });
       return Boolean(result);
     }
 
@@ -1655,7 +2120,7 @@ class BloodmanActorSheet extends ActorSheet {
       if (!item.system?.damageEnabled || !item.system?.damageDie) return false;
       const die = item.system.damageDie.toString();
       const formula = /^\d/.test(die) ? die : `1${die}`;
-      const result = await doDirectDamageRoll(this.actor, formula, item.name);
+      const result = await doDirectDamageRoll(this.actor, formula, item.name, { itemId: item.id });
       return Boolean(result);
     }
 
@@ -1724,7 +2189,7 @@ class BloodmanNpcSheet extends BloodmanActorSheet {
   }
 }
 
-class BloodmanItemSheet extends ItemSheet {
+class BloodmanItemSheet extends BaseItemSheet {
   get template() {
     return `systems/bloodman/templates/item-${this.item.type}.html`;
   }

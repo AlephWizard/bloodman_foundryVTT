@@ -131,6 +131,10 @@
         "RawBonusLabel": "Dégâts bruts +",
         "PenetrationLabel": "Pénétration +"
       },
+      "RerollDamage": {
+        "Title": "Relance du jet de degats",
+        "Prompt": "Relancer le jet de degats ? Cout : {cost} {resource}"
+      },
       "DamageSplit": {
         "Title": "Répartition des dégâts",
         "Prompt": "Répartir {damage} dégâts entre {targets} cibles."

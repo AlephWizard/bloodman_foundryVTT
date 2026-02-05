@@ -494,6 +494,13 @@
   max-height: 240px;
 }
 
+.item-list.item-list-three-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px 10px;
+  max-height: 240px;
+}
+
 .item {
   display: flex;
   flex-wrap: wrap;
