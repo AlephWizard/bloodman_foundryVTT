@@ -109,8 +109,9 @@ function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
   const tokenLabel = String(tokenName || "").trim();
   const actorLabel = String(actorName || "").trim();
   if (tokenLabel && !isGenericTokenName(tokenLabel)) return tokenLabel;
-  if (actorLabel) return actorLabel;
+  if (actorLabel && !isGenericTokenName(actorLabel)) return actorLabel;
   if (tokenLabel) return tokenLabel;
+  if (actorLabel) return actorLabel;
   return fallback;
 }
 
@@ -191,7 +192,7 @@ export async function applyDamageToActor(targetActor, damage, options = {}) {
   await targetActor.update({ "system.resources.pv.current": nextValue });
 
   ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+    speaker: { alias: displayName },
     content: t("BLOODMAN.Rolls.Damage.Take", { name: displayName, amount: finalDamage, pa })
   });
 

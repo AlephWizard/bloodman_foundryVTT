@@ -22,9 +22,220 @@ function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
   const tokenLabel = String(tokenName || "").trim();
   const actorLabel = String(actorName || "").trim();
   if (tokenLabel && !isGenericTokenName(tokenLabel)) return tokenLabel;
-  if (actorLabel) return actorLabel;
+  if (actorLabel && !isGenericTokenName(actorLabel)) return actorLabel;
   if (tokenLabel) return tokenLabel;
+  if (actorLabel) return actorLabel;
   return fallback;
+}
+
+function normalizeStatusValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getLocalizedStatusLabel(effect) {
+  if (!effect) return "";
+  const raw = effect.name ?? effect.label ?? "";
+  if (!raw) return "";
+  const hasI18nKey = Boolean(game.i18n?.has?.(raw));
+  const localized = hasI18nKey ? game.i18n.localize(raw) : raw;
+  return normalizeStatusValue(localized);
+}
+
+function findStatusEffect(candidates, labelKeywords = []) {
+  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
+  const wanted = new Set(candidates.map(normalizeStatusValue).filter(Boolean));
+  for (const effect of effects) {
+    const ids = [effect.id, ...(Array.isArray(effect.statuses) ? effect.statuses : [])]
+      .map(normalizeStatusValue)
+      .filter(Boolean);
+    if (ids.some(id => wanted.has(id))) return effect;
+  }
+  if (!labelKeywords.length) return null;
+  const keywords = labelKeywords.map(normalizeStatusValue).filter(Boolean);
+  for (const effect of effects) {
+    const label = getLocalizedStatusLabel(effect);
+    if (!label) continue;
+    if (keywords.some(keyword => label.includes(keyword))) return effect;
+  }
+  return null;
+}
+
+function getBleedingStatusEffect() {
+  return findStatusEffect(PLAYER_ZERO_PV_STATUS_CANDIDATES, ["bleed", "saign"])
+    || { id: "bleeding", statuses: ["bleeding"], img: "icons/svg/blood.svg" };
+}
+
+function getDeadStatusEffect() {
+  const defeated = normalizeStatusValue(CONFIG.specialStatusEffects?.DEFEATED);
+  const candidates = defeated ? [defeated, ...NPC_ZERO_PV_STATUS_CANDIDATES] : NPC_ZERO_PV_STATUS_CANDIDATES;
+  return findStatusEffect(candidates, ["dead", "mort", "defeat"])
+    || {
+      id: defeated || "dead",
+      statuses: [defeated || "dead"],
+      img: "icons/svg/skull.svg"
+    };
+}
+
+function getTokenEffectsList(tokenDoc) {
+  const effects = tokenDoc?.effects;
+  if (Array.isArray(effects)) return [...effects];
+  if (effects instanceof Set) return [...effects];
+  return [];
+}
+
+function getTokenStatusesList(tokenDoc) {
+  const statuses = tokenDoc?.statuses;
+  if (Array.isArray(statuses)) return [...statuses].map(normalizeStatusValue).filter(Boolean);
+  if (statuses instanceof Set) return [...statuses].map(normalizeStatusValue).filter(Boolean);
+  return [];
+}
+
+function tokenHasStatusEffect(tokenDoc, effectDef) {
+  if (!tokenDoc || !effectDef) return false;
+  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
+    .map(normalizeStatusValue)
+    .filter(Boolean);
+  if (ids.length) {
+    const tokenStatuses = new Set(getTokenStatusesList(tokenDoc));
+    if (ids.some(id => tokenStatuses.has(id))) return true;
+  }
+  if (typeof tokenDoc.hasStatusEffect === "function") {
+    for (const id of ids) {
+      try {
+        if (tokenDoc.hasStatusEffect(id)) return true;
+      } catch (_error) {
+        // continue with other checks
+      }
+    }
+  }
+  const icon = effectDef.img || effectDef.icon || effectDef.texture?.src || "";
+  if (!icon) return false;
+  return getTokenEffectsList(tokenDoc).includes(icon);
+}
+
+async function setTokenStatusEffect(tokenDoc, effectDef, active) {
+  if (!tokenDoc || !effectDef) return false;
+  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
+    .map(normalizeStatusValue)
+    .filter(Boolean);
+
+  if (typeof tokenDoc.toggleStatusEffect === "function") {
+    for (const id of ids) {
+      const has = typeof tokenDoc.hasStatusEffect === "function"
+        ? tokenDoc.hasStatusEffect(id)
+        : false;
+      if (typeof has === "boolean" && has === active) return true;
+      try {
+        await tokenDoc.toggleStatusEffect(id, { active, overlay: false });
+        if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
+      } catch (_error) {
+        // fallback on legacy path below
+      }
+    }
+  }
+
+  const tokenActor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+  if (tokenActor && typeof tokenActor.toggleStatusEffect === "function") {
+    for (const id of ids) {
+      try {
+        await tokenActor.toggleStatusEffect(id, { active, overlay: false });
+        if (tokenHasStatusEffect(tokenDoc, effectDef)) {
+          if (active) return true;
+        } else if (!active) {
+          return true;
+        }
+      } catch (_error) {
+        // fallback on document data below
+      }
+    }
+  }
+
+  if (ids.length) {
+    const nextStatuses = new Set(getTokenStatusesList(tokenDoc));
+    let changed = false;
+    for (const id of ids) {
+      if (!id) continue;
+      const has = nextStatuses.has(id);
+      if (active && !has) {
+        nextStatuses.add(id);
+        changed = true;
+      }
+      if (!active && has) {
+        nextStatuses.delete(id);
+        changed = true;
+      }
+    }
+    if (changed) await tokenDoc.update({ statuses: [...nextStatuses] }).catch(() => null);
+    if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
+  }
+
+  const icon = effectDef.img || effectDef.icon || effectDef.texture?.src || "";
+  if (!icon) return false;
+  const nextEffects = new Set(getTokenEffectsList(tokenDoc));
+  const hasIcon = nextEffects.has(icon);
+  if (hasIcon === active) return true;
+  if (active) nextEffects.add(icon);
+  else nextEffects.delete(icon);
+  await tokenDoc.update({ effects: [...nextEffects] }).catch(() => null);
+  return tokenHasStatusEffect(tokenDoc, effectDef) === active;
+}
+
+function getTokenActorType(tokenDoc) {
+  const actorType = tokenDoc?.actor?.type;
+  if (actorType) return actorType;
+  const worldActorType = tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId)?.type : "";
+  return worldActorType || "";
+}
+
+function getTokenCurrentPv(tokenDoc) {
+  const actorCurrent = Number(tokenDoc?.actor?.system?.resources?.pv?.current);
+  if (Number.isFinite(actorCurrent)) return actorCurrent;
+  const deltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
+  if (Number.isFinite(deltaCurrent)) return deltaCurrent;
+  const actorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
+  if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
+  const worldActorCurrent = Number(game.actors?.get(tokenDoc?.actorId)?.system?.resources?.pv?.current);
+  return worldActorCurrent;
+}
+
+async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
+  if (!tokenDoc) return;
+  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
+  const isZeroOrLess = Number(pvCurrent) <= 0;
+  const bleeding = getBleedingStatusEffect();
+  const dead = getDeadStatusEffect();
+
+  if (actorType === "personnage") {
+    const bleedApplied = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess);
+    if (!bleedApplied) console.warn("[bloodman] status:bleeding not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
+    if (dead) await setTokenStatusEffect(tokenDoc, dead, false);
+  } else {
+    const deadApplied = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess);
+    if (!deadApplied) console.warn("[bloodman] status:dead not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
+    if (bleeding) await setTokenStatusEffect(tokenDoc, bleeding, false);
+  }
+}
+
+function getTokenDocumentsForActor(actor) {
+  const actorId = actor?.id;
+  if (!actorId) return [];
+  const docs = [];
+  for (const scene of game.scenes || []) {
+    for (const tokenDoc of scene.tokens || []) {
+      if (tokenDoc.actorId === actorId) docs.push(tokenDoc);
+    }
+  }
+  return docs;
+}
+
+async function syncZeroPvStatusForActor(actor) {
+  const actorType = actor?.type || "";
+  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
+  const pvCurrent = Number(actor.system?.resources?.pv?.current);
+  if (!Number.isFinite(pvCurrent)) return;
+  for (const tokenDoc of getTokenDocumentsForActor(actor)) {
+    await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
+  }
 }
 
 const CHARACTERISTICS = [
@@ -47,6 +258,8 @@ const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
+const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
+const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
 
 function toFiniteNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -241,7 +454,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
       }
     }
     ChatMessage.create({
-      speaker: ChatMessage.getSpeaker(),
+      speaker: { alias: fallbackName },
       content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa })
     });
     return;
@@ -392,7 +605,7 @@ Hooks.once("ready", async () => {
   if (game.user.isGM) {
     for (const scene of game.scenes) {
       for (const token of scene.tokens) {
-        const actorType = token.actor?.type;
+        const actorType = getTokenActorType(token);
         if (actorType === "personnage" && !token.actorLink) {
           await token.update({ actorLink: true });
         }
@@ -400,10 +613,13 @@ Hooks.once("ready", async () => {
           await token.update({ actorLink: false });
         }
         if (actorType === "personnage" || actorType === "personnage-non-joueur") {
+          const tokenActor = token.actor || game.actors?.get(token.actorId) || null;
           const tokenSrc = foundry.utils.getProperty(token, "texture.src");
-          if (isMissingTokenImage(tokenSrc) && token.actor?.img) {
-            await token.update({ "texture.src": token.actor.img });
+          if (isMissingTokenImage(tokenSrc) && tokenActor?.img) {
+            await token.update({ "texture.src": tokenActor.img });
           }
+          const pvCurrent = getTokenCurrentPv(token);
+          if (Number.isFinite(pvCurrent)) await syncZeroPvStatusForToken(token, actorType, pvCurrent);
         }
       }
     }
@@ -829,6 +1045,27 @@ Hooks.on("updateActor", async (actor, changes) => {
   if (ppCurrent > allowedPpMax) resourceUpdates["system.resources.pp.current"] = allowedPpMax;
   if (Object.keys(resourceUpdates).length) await actor.update(resourceUpdates);
 
+});
+
+Hooks.on("updateActor", async (actor, changes) => {
+  if (!game.user.isGM) return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  const hasPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
+  if (!hasPvChange) return;
+  await syncZeroPvStatusForActor(actor);
+});
+
+Hooks.on("updateToken", async (tokenDoc, changes) => {
+  if (!game.user.isGM) return;
+  const actorType = getTokenActorType(tokenDoc);
+  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
+  const hasPvDeltaChange = foundry.utils.getProperty(changes, "delta.system.resources.pv.current") != null;
+  const hasPvActorDataChange = foundry.utils.getProperty(changes, "actorData.system.resources.pv.current") != null;
+  const hasLegacyPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
+  if (!hasPvDeltaChange && !hasPvActorDataChange && !hasLegacyPvChange) return;
+  const pvCurrent = getTokenCurrentPv(tokenDoc);
+  if (!Number.isFinite(pvCurrent)) return;
+  await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
 });
 
 class BloodmanActorSheet extends ActorSheet {
