@@ -2418,8 +2418,10 @@ async function requestChaosDelta(delta) {
 function updateChaosDiceUI(value) {
   const root = document.getElementById("bm-chaos-dice");
   if (!root) return;
+  const chaosValue = clampChaosValue(value);
   const display = root.querySelector(".bm-chaos-value");
-  if (display) display.textContent = String(clampChaosValue(value));
+  if (display) display.textContent = String(chaosValue);
+  root.classList.toggle("is-active", chaosValue > 0);
 }
 
 function getVisibleRect(element) {

@@ -218,6 +218,7 @@
   width: 100%;
   height: 100%;
   display: block;
+  transform-origin: center center;
 }
 
 #bm-chaos-dice .bm-chaos-value {
@@ -226,6 +227,37 @@
   font-weight: 800;
   font-size: 16px;
   line-height: 1;
+  display: inline-block;
+  transform-origin: center center;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-icon img {
+  animation: bm-chaos-bounce 1.35s ease-in-out infinite;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-value {
+  animation: bm-chaos-bounce 1.35s ease-in-out infinite;
+}
+
+@keyframes bm-chaos-bounce {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  12% {
+    transform: scale(1.12) translateY(-2px);
+  }
+  24% {
+    transform: scale(0.95) translateY(1px);
+  }
+  36% {
+    transform: scale(1.06) translateY(-1px);
+  }
+  48% {
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
 }
 
 .bm-damage-config {
