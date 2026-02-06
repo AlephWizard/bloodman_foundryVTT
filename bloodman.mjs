@@ -686,6 +686,175 @@ function getTokenActorType(tokenDoc) {
   return worldActorType || "";
 }
 
+function shouldUseRoundTokenMask(tokenLike) {
+  const tokenDoc = tokenLike?.document || tokenLike;
+  const actorType = getTokenActorType(tokenDoc);
+  return actorType === "personnage" || actorType === "personnage-non-joueur";
+}
+
+function shouldNormalizeTokenVisual(tokenLike) {
+  return shouldUseRoundTokenMask(tokenLike);
+}
+
+function shouldResetTokenScale(scaleValue) {
+  const numeric = Number(scaleValue);
+  if (!Number.isFinite(numeric) || numeric === 0) return true;
+  return Math.abs(numeric) !== 1;
+}
+
+function shouldResetTokenOffset(offsetValue) {
+  const numeric = Number(offsetValue);
+  if (!Number.isFinite(numeric)) return true;
+  return Math.abs(numeric) > 0.0001;
+}
+
+function shouldResetTokenFit(fitValue) {
+  return String(fitValue || "").trim().toLowerCase() !== "cover";
+}
+
+function getTokenSpriteForRoundMask(token) {
+  if (!token) return null;
+  const mesh = token.mesh;
+  if (!mesh || typeof mesh !== "object") return null;
+  if (!mesh.texture) return null;
+  return mesh;
+}
+
+function clearRoundTokenMask(token) {
+  if (!token) return;
+  const sprite = getTokenSpriteForRoundMask(token);
+  const mask = token._bmRoundMask || null;
+  if (sprite?.mask === mask) sprite.mask = null;
+  if (mask) {
+    if (mask.parent) {
+      try {
+        mask.parent.removeChild(mask);
+      } catch (_error) {
+        // non-fatal detach
+      }
+    }
+    mask.visible = false;
+    mask.renderable = false;
+    try {
+      mask.destroy({ children: true });
+    } catch (_error) {
+      // non-fatal cleanup
+    }
+  }
+  token._bmRoundMask = null;
+}
+
+function applyRoundTokenMask(tokenLike) {
+  const token = tokenLike?.object || tokenLike;
+  if (!token) return;
+  const sprite = getTokenSpriteForRoundMask(token);
+  if (!sprite) {
+    clearRoundTokenMask(token);
+    return;
+  }
+  const shouldRound = shouldUseRoundTokenMask(tokenLike);
+  if (!shouldRound) {
+    clearRoundTokenMask(token);
+    return;
+  }
+
+  const PIXI_NS = globalThis.PIXI;
+  if (!PIXI_NS?.Graphics) return;
+
+  const localBounds = sprite.getLocalBounds?.();
+  const boundsX = Number(localBounds?.x);
+  const boundsY = Number(localBounds?.y);
+  const boundsW = Number(localBounds?.width);
+  const boundsH = Number(localBounds?.height);
+  if (!(Number.isFinite(boundsW) && Number.isFinite(boundsH) && boundsW > 0 && boundsH > 0)) {
+    clearRoundTokenMask(token);
+    return;
+  }
+
+  const centerX = boundsX + (boundsW / 2);
+  const centerY = boundsY + (boundsH / 2);
+  const radius = (Math.min(boundsW, boundsH) / 2) * 0.995;
+  if (!(Number.isFinite(centerX) && Number.isFinite(centerY) && radius > 0)) {
+    clearRoundTokenMask(token);
+    return;
+  }
+
+  let mask = token._bmRoundMask || null;
+  if (!mask || mask.destroyed) {
+    mask = new PIXI_NS.Graphics();
+    mask._bmRoundMaskGraphic = true;
+    mask._bmOwnerToken = token;
+    token._bmRoundMask = mask;
+  }
+
+  mask.clear();
+  mask.beginFill(0xffffff, 1);
+  mask.drawCircle(centerX, centerY, radius);
+  mask.endFill();
+
+  if (mask.parent !== sprite) sprite.addChild(mask);
+  sprite.mask = mask;
+
+  // Safety net: never keep a mask that would effectively hide the token.
+  const hasValidRenderArea = Number.isFinite(Number(sprite.width))
+    && Number.isFinite(Number(sprite.height))
+    && Number(sprite.width) > 1
+    && Number(sprite.height) > 1;
+  if (!hasValidRenderArea || sprite.worldAlpha <= 0) {
+    clearRoundTokenMask(token);
+  }
+}
+
+function cleanupOrphanRoundMasks() {
+  const root = canvas?.stage;
+  if (!root?.children) return;
+
+  const stack = [...root.children];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node) continue;
+    if (Array.isArray(node.children) && node.children.length) {
+      stack.push(...node.children);
+    }
+    if (!node._bmRoundMaskGraphic) continue;
+    const owner = node._bmOwnerToken;
+    const ownerAlive = owner && !owner.destroyed;
+    if (ownerAlive) continue;
+    try {
+      node.visible = false;
+      node.renderable = false;
+      node.destroy({ children: true });
+    } catch (_error) {
+      // non-fatal cleanup
+    }
+  }
+}
+
+function scheduleRoundTokenMask(tokenLike) {
+  const apply = () => applyRoundTokenMask(tokenLike?.object || tokenLike);
+  apply();
+  setTimeout(apply, 0);
+  setTimeout(apply, 120);
+  setTimeout(apply, 300);
+}
+
+function getTokenScaleNormalizationUpdates(tokenLike) {
+  if (!shouldNormalizeTokenVisual(tokenLike)) return {};
+  const updates = {};
+  const source = tokenLike?.document || tokenLike;
+  const scaleX = foundry.utils.getProperty(source, "texture.scaleX");
+  const scaleY = foundry.utils.getProperty(source, "texture.scaleY");
+  const offsetX = foundry.utils.getProperty(source, "texture.offsetX");
+  const offsetY = foundry.utils.getProperty(source, "texture.offsetY");
+  const fit = foundry.utils.getProperty(source, "texture.fit");
+  if (shouldResetTokenScale(scaleX)) updates["texture.scaleX"] = 1;
+  if (shouldResetTokenScale(scaleY)) updates["texture.scaleY"] = 1;
+  if (shouldResetTokenOffset(offsetX)) updates["texture.offsetX"] = 0;
+  if (shouldResetTokenOffset(offsetY)) updates["texture.offsetY"] = 0;
+  if (shouldResetTokenFit(fit)) updates["texture.fit"] = "cover";
+  return updates;
+}
+
 function isPvBarAttribute(attribute) {
   if (!attribute) return false;
   return /(^|\\.)resources\\.pv(\\.|$)/.test(String(attribute));
@@ -1002,6 +1171,62 @@ function buildDefaultEquipment() {
 
 function isMissingTokenImage(src) {
   return !src || src === "icons/svg/mystery-man.svg";
+}
+
+const TOKEN_TEXTURE_VALIDITY_CACHE = new Map();
+
+async function canLoadTextureSource(src) {
+  if (!src) return false;
+  const key = String(src).trim();
+  if (!key) return false;
+  if (TOKEN_TEXTURE_VALIDITY_CACHE.has(key)) return TOKEN_TEXTURE_VALIDITY_CACHE.get(key);
+  try {
+    await loadTexture(key);
+    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, true);
+    return true;
+  } catch (_error) {
+    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, false);
+    return false;
+  }
+}
+
+async function needsTokenImageRepair(src) {
+  if (isMissingTokenImage(src)) return true;
+  return !(await canLoadTextureSource(src));
+}
+
+function getTokenActorImage(tokenDoc) {
+  if (!tokenDoc) return "";
+  const direct = tokenDoc.actor?.img;
+  if (direct) return direct;
+  const byId = tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId)?.img : "";
+  return byId || "";
+}
+
+function getSafeTokenTextureFallback(tokenDoc) {
+  const actorImg = getTokenActorImage(tokenDoc);
+  if (actorImg) return actorImg;
+  return "icons/svg/mystery-man.svg";
+}
+
+async function repairTokenTextureSource(tokenLike) {
+  if (!game.user?.isGM) return false;
+  const tokenDoc = tokenLike?.document || tokenLike;
+  if (!tokenDoc?.update) return false;
+  const currentSrc = String(foundry.utils.getProperty(tokenDoc, "texture.src") || "");
+  if (!(await needsTokenImageRepair(currentSrc))) return false;
+
+  const actorSrc = getTokenActorImage(tokenDoc);
+  const fallbackSrc = "icons/svg/mystery-man.svg";
+  const actorSrcValid = actorSrc ? await canLoadTextureSource(actorSrc) : false;
+  const nextSrc = actorSrcValid ? actorSrc : fallbackSrc;
+  if (!nextSrc || nextSrc === currentSrc) return false;
+  try {
+    await tokenDoc.update({ "texture.src": nextSrc });
+    return true;
+  } catch (_error) {
+    return false;
+  }
 }
 
 function getActiveNonGMCount() {
@@ -2318,9 +2543,21 @@ Hooks.once("ready", async () => {
       if (isNpc && actor.prototypeToken.actorLink !== false) {
         updates["prototypeToken.actorLink"] = false;
       }
+      const protoScaleX = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleX");
+      const protoScaleY = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleY");
+      const protoOffsetX = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetX");
+      const protoOffsetY = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetY");
+      const protoFit = foundry.utils.getProperty(actor.prototypeToken, "texture.fit");
+      if (shouldResetTokenScale(protoScaleX)) updates["prototypeToken.texture.scaleX"] = 1;
+      if (shouldResetTokenScale(protoScaleY)) updates["prototypeToken.texture.scaleY"] = 1;
+      if (shouldResetTokenOffset(protoOffsetX)) updates["prototypeToken.texture.offsetX"] = 0;
+      if (shouldResetTokenOffset(protoOffsetY)) updates["prototypeToken.texture.offsetY"] = 0;
+      if (shouldResetTokenFit(protoFit)) updates["prototypeToken.texture.fit"] = "cover";
       const protoSrc = foundry.utils.getProperty(actor.prototypeToken, "texture.src");
-      if (isMissingTokenImage(protoSrc) && actor.img) {
-        updates["prototypeToken.texture.src"] = actor.img;
+      if (await needsTokenImageRepair(protoSrc)) {
+        const actorImgValid = actor.img ? await canLoadTextureSource(actor.img) : false;
+        const nextProtoSrc = actorImgValid ? actor.img : "icons/svg/mystery-man.svg";
+        if (nextProtoSrc && nextProtoSrc !== protoSrc) updates["prototypeToken.texture.src"] = nextProtoSrc;
       }
     }
 
@@ -2354,21 +2591,25 @@ Hooks.once("ready", async () => {
     for (const scene of game.scenes) {
       for (const token of scene.tokens) {
         const actorType = getTokenActorType(token);
-        if (actorType === "personnage" && !token.actorLink) {
-          await token.update({ actorLink: true });
-        }
-        if (actorType === "personnage-non-joueur" && token.actorLink) {
-          await token.update({ actorLink: false });
-        }
+        const tokenUpdates = {};
+        if (actorType === "personnage" && !token.actorLink) tokenUpdates.actorLink = true;
+        if (actorType === "personnage-non-joueur" && token.actorLink) tokenUpdates.actorLink = false;
         if (actorType === "personnage" || actorType === "personnage-non-joueur") {
+          foundry.utils.mergeObject(tokenUpdates, getTokenScaleNormalizationUpdates(token), { inplace: true });
           const tokenActor = token.actor || game.actors?.get(token.actorId) || null;
           const tokenSrc = foundry.utils.getProperty(token, "texture.src");
-          if (isMissingTokenImage(tokenSrc) && tokenActor?.img) {
-            await token.update({ "texture.src": tokenActor.img });
+          if (await needsTokenImageRepair(tokenSrc)) {
+            const actorImg = tokenActor?.img || "";
+            const actorImgValid = actorImg ? await canLoadTextureSource(actorImg) : false;
+            const nextTokenSrc = actorImgValid ? actorImg : "icons/svg/mystery-man.svg";
+            if (nextTokenSrc && nextTokenSrc !== tokenSrc) tokenUpdates["texture.src"] = nextTokenSrc;
           }
+          if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
           const pvCurrent = getTokenCurrentPv(token);
           if (Number.isFinite(pvCurrent)) await syncZeroPvStatusForToken(token, actorType, pvCurrent);
+          continue;
         }
+        if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
       }
     }
     await refreshBossSoloNpcPvMax();
@@ -2749,18 +2990,51 @@ function buildTransportNpcDisplayData(actor) {
 }
 
 Hooks.on("preCreateToken", (doc) => {
-  const actorType = doc.actor?.type;
-  if (actorType === "personnage") doc.updateSource({ actorLink: true });
-  if (actorType === "personnage-non-joueur") doc.updateSource({ actorLink: false });
+  const sourceUpdates = {};
+  const actorType = getTokenActorType(doc);
+  if (actorType === "personnage") sourceUpdates.actorLink = true;
+  if (actorType === "personnage-non-joueur") sourceUpdates.actorLink = false;
+  foundry.utils.mergeObject(sourceUpdates, getTokenScaleNormalizationUpdates(doc), { inplace: true });
+  const tokenSrc = foundry.utils.getProperty(doc, "texture.src");
+  if (isMissingTokenImage(tokenSrc)) {
+    const fallbackSrc = getSafeTokenTextureFallback(doc);
+    if (fallbackSrc && fallbackSrc !== tokenSrc) {
+      sourceUpdates["texture.src"] = fallbackSrc;
+    }
+  }
+  if (Object.keys(sourceUpdates).length) doc.updateSource(sourceUpdates);
+});
+
+Hooks.on("drawToken", token => {
+  void repairTokenTextureSource(token);
+  scheduleRoundTokenMask(token);
+});
+
+Hooks.on("refreshToken", token => {
+  scheduleRoundTokenMask(token);
 });
 
 Hooks.on("createToken", async (tokenDoc) => {
+  if (game.user.isGM) {
+    const normalizationUpdates = getTokenScaleNormalizationUpdates(tokenDoc);
+    if (Object.keys(normalizationUpdates).length) {
+      await tokenDoc.update(normalizationUpdates);
+    }
+  }
+  await repairTokenTextureSource(tokenDoc);
+  scheduleRoundTokenMask(tokenDoc);
   if (!game.user.isGM) return;
   if (getTokenActorType(tokenDoc) !== "personnage") return;
   await refreshBossSoloNpcPvMax();
 });
 
+Hooks.on("preDeleteToken", (tokenDoc) => {
+  clearRoundTokenMask(tokenDoc?.object || canvas?.tokens?.get(tokenDoc?.id));
+});
+
 Hooks.on("deleteToken", async (tokenDoc) => {
+  clearRoundTokenMask(tokenDoc?.object || canvas?.tokens?.get(tokenDoc?.id));
+  cleanupOrphanRoundMasks();
   if (!game.user.isGM) return;
   if (getTokenActorType(tokenDoc) !== "personnage") return;
   await refreshBossSoloNpcPvMax();
@@ -2769,6 +3043,21 @@ Hooks.on("deleteToken", async (tokenDoc) => {
 Hooks.on("canvasReady", async () => {
   if (!game.user.isGM) return;
   await refreshBossSoloNpcPvMax();
+});
+
+Hooks.on("canvasReady", async () => {
+  cleanupOrphanRoundMasks();
+  for (const token of canvas?.tokens?.placeables || []) {
+    if (game.user.isGM) {
+      const tokenDoc = token?.document || token;
+      const normalizationUpdates = getTokenScaleNormalizationUpdates(tokenDoc);
+      if (Object.keys(normalizationUpdates).length) {
+        await tokenDoc.update(normalizationUpdates);
+      }
+    }
+    await repairTokenTextureSource(token);
+    applyRoundTokenMask(token);
+  }
 });
 
 Hooks.on("preCreateCombatant", (combatant) => {
@@ -2927,6 +3216,7 @@ Hooks.on("updateActor", async (actor, changes) => {
 });
 
 Hooks.on("updateToken", async (tokenDoc, changes) => {
+  scheduleRoundTokenMask(tokenDoc);
   if (!game.user.isGM) return;
   if (foundry.utils.getProperty(changes, "name") != null) {
     await syncCombatantNameForToken(tokenDoc);
