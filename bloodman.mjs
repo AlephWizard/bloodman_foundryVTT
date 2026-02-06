@@ -267,6 +267,86 @@ function refreshAllCreateTypeIcons() {
   for (const selectEl of selectNodes) decorateCreateTypeSelect(selectEl);
 }
 
+function canUserRoleEditCharacteristics(role) {
+  const minRole = Number(CONST?.USER_ROLES?.TRUSTED ?? 2);
+  return Number(role ?? 0) >= minRole;
+}
+
+function canCurrentUserEditCharacteristics() {
+  return canUserRoleEditCharacteristics(game.user?.role);
+}
+
+function isBasicPlayerRole(role) {
+  const playerRole = Number(CONST?.USER_ROLES?.PLAYER ?? 1);
+  return Number(role ?? 0) <= playerRole;
+}
+
+function stripUnauthorizedCharacteristicBaseUpdates(updateData) {
+  if (!updateData || typeof updateData !== "object") return false;
+  let blocked = false;
+
+  for (const key of Object.keys(updateData)) {
+    if (!key.startsWith("system.characteristics.") || !key.endsWith(".base")) continue;
+    delete updateData[key];
+    blocked = true;
+  }
+
+  const nestedCharacteristics = foundry.utils.getProperty(updateData, "system.characteristics");
+  if (nestedCharacteristics && typeof nestedCharacteristics === "object") {
+    for (const key of Object.keys(nestedCharacteristics)) {
+      const characteristicUpdate = nestedCharacteristics[key];
+      if (!characteristicUpdate || typeof characteristicUpdate !== "object") continue;
+      if (Object.prototype.hasOwnProperty.call(characteristicUpdate, "base")) {
+        delete characteristicUpdate.base;
+        blocked = true;
+      }
+      if (!Object.keys(characteristicUpdate).length) delete nestedCharacteristics[key];
+    }
+    if (!Object.keys(nestedCharacteristics).length) {
+      if (typeof foundry.utils.unsetProperty === "function") {
+        foundry.utils.unsetProperty(updateData, "system.characteristics");
+      } else if (updateData.system?.characteristics) {
+        delete updateData.system.characteristics;
+      }
+    }
+  }
+
+  return blocked;
+}
+
+function unsetUpdatePath(updateData, path) {
+  if (!updateData || !path) return false;
+  let removed = false;
+  if (Object.prototype.hasOwnProperty.call(updateData, path)) {
+    delete updateData[path];
+    removed = true;
+  }
+  const current = foundry.utils.getProperty(updateData, path);
+  if (current !== undefined) {
+    if (typeof foundry.utils.unsetProperty === "function") {
+      foundry.utils.unsetProperty(updateData, path);
+    } else {
+      const segments = String(path).split(".");
+      let node = updateData;
+      for (let i = 0; i < segments.length - 1; i += 1) {
+        if (!node || typeof node !== "object") break;
+        node = node[segments[i]];
+      }
+      if (node && typeof node === "object") delete node[segments[segments.length - 1]];
+    }
+    removed = true;
+  }
+  return removed;
+}
+
+function stripUpdatePaths(updateData, paths = []) {
+  let blocked = false;
+  for (const path of paths) {
+    if (unsetUpdatePath(updateData, path)) blocked = true;
+  }
+  return blocked;
+}
+
 function isGenericTokenName(name) {
   if (!name) return false;
   return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
@@ -818,6 +898,11 @@ const CHARACTERISTICS = [
   { key: "SOC", labelKey: "BLOODMAN.Characteristics.Keys.SOC", icon: "fa-users" },
   { key: "SAV", labelKey: "BLOODMAN.Characteristics.Keys.SAV", icon: "fa-book-open" }
 ];
+const STATE_MODIFIER_PATHS = [
+  "system.modifiers.all",
+  "system.modifiers.label",
+  ...CHARACTERISTICS.map(char => `system.modifiers.${char.key}`)
+];
 
 const SYSTEM_SOCKET = "system.bloodman";
 const CARRIED_ITEM_LIMIT = 10;
@@ -827,6 +912,12 @@ const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]);
+const VITAL_RESOURCE_PATHS = new Set([
+  "system.resources.pv.current",
+  "system.resources.pv.max",
+  "system.resources.pp.current",
+  "system.resources.pp.max"
+]);
 
 function isDamageRerollItemType(itemType) {
   const type = String(itemType || "").trim().toLowerCase();
@@ -1736,6 +1827,250 @@ async function handleIncomingDamageRequest(data, source = "socket") {
   safeWarn(t("BLOODMAN.Notifications.DamageTargetResolveFailed"));
 }
 
+async function resolveActorForVitalResourceUpdate(data) {
+  const actorBaseId = String(data?.actorBaseId || "");
+  const actorId = String(data?.actorId || "");
+  const worldActorId = actorBaseId || actorId;
+  const worldActor = worldActorId ? (game.actors?.get(worldActorId) || null) : null;
+  const actorUuid = String(data?.actorUuid || "");
+  if (actorUuid) {
+    const resolved = await fromUuid(actorUuid).catch(() => null);
+    const candidate = resolved?.document || resolved || null;
+    const actor = candidate?.documentName === "Actor"
+      ? candidate
+      : (candidate?.actor?.documentName === "Actor" ? candidate.actor : null);
+    if (actor) {
+      // Linked player tokens must update the world actor, not a synthetic token actor.
+      if (actor.type === "personnage" && worldActor) return worldActor;
+      if (actor.type === "personnage" && actor.isToken && Boolean(actor.token?.actorLink) && worldActor) return worldActor;
+      return actor;
+    }
+  }
+  return worldActor;
+}
+
+async function resolveActorForSheetRequest(data) {
+  const actorBaseId = String(data?.actorBaseId || "");
+  const actorId = String(data?.actorId || "");
+  const worldActorId = actorBaseId || actorId;
+  const worldActor = worldActorId ? (game.actors?.get(worldActorId) || null) : null;
+  const actorUuid = String(data?.actorUuid || "");
+  if (actorUuid) {
+    const resolved = await fromUuid(actorUuid).catch(() => null);
+    const candidate = resolved?.document || resolved || null;
+    const actor = candidate?.documentName === "Actor"
+      ? candidate
+      : (candidate?.actor?.documentName === "Actor" ? candidate.actor : null);
+    if (actor) {
+      // Linked player tokens must route updates/deletes to the world actor.
+      if (actor.type === "personnage" && worldActor) return worldActor;
+      if (actor.type === "personnage" && actor.isToken && Boolean(actor.token?.actorLink) && worldActor) return worldActor;
+      return actor;
+    }
+  }
+  return worldActor;
+}
+
+function sanitizeActorUpdateForRole(updateData, role, options = {}) {
+  const sanitized = foundry.utils.deepClone(updateData || {});
+  const basicPlayer = isBasicPlayerRole(role);
+  const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
+  const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
+  if (basicPlayer && !allowCharacteristicBase) {
+    stripUnauthorizedCharacteristicBaseUpdates(sanitized);
+  }
+  if (basicPlayer && !allowVitalResourceUpdate) {
+    stripUpdatePaths(sanitized, Array.from(VITAL_RESOURCE_PATHS));
+  }
+  if (basicPlayer) {
+    stripUpdatePaths(sanitized, STATE_MODIFIER_PATHS);
+  }
+  return sanitized;
+}
+
+function hasActorUpdatePayload(updateData) {
+  if (!updateData || typeof updateData !== "object") return false;
+  return Object.keys(foundry.utils.flattenObject(updateData)).length > 0;
+}
+
+function normalizeVitalResourceValue(actor, path, value) {
+  const numeric = Math.max(0, Math.floor(toFiniteNumber(value, 0)));
+  if (path === "system.resources.pv.current") {
+    const max = toFiniteNumber(actor.system?.resources?.pv?.max, numeric);
+    return Math.min(numeric, Math.max(0, max));
+  }
+  if (path === "system.resources.pp.current") {
+    const max = toFiniteNumber(actor.system?.resources?.pp?.max, numeric);
+    return Math.min(numeric, Math.max(0, max));
+  }
+  return numeric;
+}
+
+async function handleVitalResourceUpdateRequest(data) {
+  if (!game.user.isGM || !data) return;
+  const requesterId = String(data.requesterId || "");
+  const requester = game.users?.get(requesterId);
+  if (!requester) return;
+  const requesterRole = game.users?.get(requesterId)?.role ?? 0;
+  if (!canUserRoleEditCharacteristics(requesterRole)) return;
+
+  const path = String(data.path || "");
+  if (!VITAL_RESOURCE_PATHS.has(path)) return;
+
+  const actor = await resolveActorForVitalResourceUpdate(data);
+  if (!actor) return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+
+  const normalizedValue = normalizeVitalResourceValue(actor, path, data.value);
+  await actor.update({ [path]: normalizedValue });
+}
+
+async function handleActorSheetUpdateRequest(data) {
+  if (!game.user.isGM || !data) return;
+  const requesterId = String(data.requesterId || "");
+  const requester = game.users?.get(requesterId);
+  if (!requester) return;
+  const requesterRole = game.users?.get(requesterId)?.role ?? 0;
+  const actor = await resolveActorForSheetRequest(data);
+  if (!actor) return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  const allowCharacteristicBase = Boolean(data?.options?.allowCharacteristicBase);
+  const allowVitalResourceUpdate = Boolean(data?.options?.allowVitalResourceUpdate);
+  const sanitized = sanitizeActorUpdateForRole(data.updateData || {}, requesterRole, {
+    allowCharacteristicBase,
+    allowVitalResourceUpdate
+  });
+  if (!hasActorUpdatePayload(sanitized)) return;
+  await actor.update(sanitized, {
+    bloodmanAllowCharacteristicBase: allowCharacteristicBase,
+    bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate
+  });
+}
+
+async function handleDeleteItemRequest(data) {
+  if (!game.user.isGM || !data) return;
+  const requesterId = String(data.requesterId || "");
+  const requester = game.users?.get(requesterId);
+  if (!requester) return;
+  const initialActor = await resolveActorForSheetRequest(data);
+  if (!initialActor) return;
+
+  const extractItemIdFromUuid = uuid => {
+    const raw = String(uuid || "");
+    const match = raw.match(/Item\.([^\.]+)$/);
+    return match?.[1] || "";
+  };
+
+  const actorCandidates = [];
+  const addActor = candidate => {
+    if (!candidate) return;
+    if (actorCandidates.some(existing => existing?.id === candidate?.id && existing?.uuid === candidate?.uuid)) return;
+    actorCandidates.push(candidate);
+  };
+
+  addActor(initialActor);
+  const worldActorId = String(data.actorBaseId || data.actorId || "");
+  if (worldActorId) addActor(game.actors?.get(worldActorId) || null);
+  if (initialActor?.isToken && initialActor?.token?.actorId) {
+    addActor(game.actors?.get(initialActor.token.actorId) || null);
+  }
+
+  const requestedItemId = String(data.itemId || "") || extractItemIdFromUuid(data.itemUuid);
+  const candidateItemIds = [];
+  if (requestedItemId) candidateItemIds.push(requestedItemId);
+  const uuidItemId = extractItemIdFromUuid(data.itemUuid);
+  if (uuidItemId && !candidateItemIds.includes(uuidItemId)) candidateItemIds.push(uuidItemId);
+
+  const deleteFromActorById = async (actor, itemId) => {
+    if (!actor || !itemId) return false;
+    if (!actor.items?.has(itemId)) return false;
+    try {
+      await actor.deleteEmbeddedDocuments("Item", [itemId], { render: false });
+      return true;
+    } catch (_error) {
+      const item = actor.items?.get(itemId);
+      if (!item) return false;
+      try {
+        await item.delete();
+        return true;
+      } catch (_fallbackError) {
+        return false;
+      }
+    }
+  };
+
+  for (const actor of actorCandidates) {
+    for (const itemId of candidateItemIds) {
+      if (await deleteFromActorById(actor, itemId)) return;
+    }
+  }
+
+  const itemName = String(data.itemName || "").trim().toLowerCase();
+  const itemType = String(data.itemType || "").trim().toLowerCase();
+  if (itemName) {
+    for (const actor of actorCandidates) {
+      const match = actor?.items?.find(item => {
+        if (!item) return false;
+        if (String(item.name || "").trim().toLowerCase() !== itemName) return false;
+        if (itemType && String(item.type || "").trim().toLowerCase() !== itemType) return false;
+        return true;
+      });
+      if (match && await deleteFromActorById(actor, match.id)) return;
+    }
+  }
+}
+
+function getSocketActorBaseId(actor) {
+  return String(actor?.token?.actorId || actor?.parent?.actorId || actor?.baseActor?.id || actor?.id || "");
+}
+
+function requestVitalResourceUpdate(actor, path, value) {
+  if (!actor || !game.socket) return;
+  if (!VITAL_RESOURCE_PATHS.has(String(path || ""))) return;
+  game.socket.emit(SYSTEM_SOCKET, {
+    type: "updateVitalResources",
+    requesterId: String(game.user?.id || ""),
+    actorUuid: String(actor.uuid || ""),
+    actorId: String(actor.id || ""),
+    actorBaseId: getSocketActorBaseId(actor),
+    path: String(path),
+    value: Math.max(0, Math.floor(toFiniteNumber(value, 0)))
+  });
+}
+
+function requestActorSheetUpdate(actor, updateData, options = {}) {
+  if (!actor || !game.socket || !hasActorUpdatePayload(updateData)) return false;
+  game.socket.emit(SYSTEM_SOCKET, {
+    type: "updateActorSheetData",
+    requesterId: String(game.user?.id || ""),
+    actorUuid: String(actor.uuid || ""),
+    actorId: String(actor.id || ""),
+    actorBaseId: getSocketActorBaseId(actor),
+    updateData,
+    options: {
+      allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
+      allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate)
+    }
+  });
+  return true;
+}
+
+function requestDeleteActorItem(actor, item) {
+  if (!actor || !item || !game.socket) return false;
+  game.socket.emit(SYSTEM_SOCKET, {
+    type: "deleteActorItem",
+    requesterId: String(game.user?.id || ""),
+    actorUuid: String(actor.uuid || ""),
+    actorId: String(actor.id || ""),
+    actorBaseId: getSocketActorBaseId(actor),
+    itemId: String(item.id || ""),
+    itemUuid: String(item.uuid || ""),
+    itemType: String(item.type || ""),
+    itemName: String(item.name || "")
+  });
+  return true;
+}
+
 
 function registerDamageSocketHandlers() {
   if (!game.socket) return;
@@ -1755,6 +2090,18 @@ function registerDamageSocketHandlers() {
     }
     if (data.type === "rerollDamage") {
       if (game.user.isGM) await handleDamageRerollRequest(data);
+      return;
+    }
+    if (data.type === "updateVitalResources") {
+      if (game.user.isGM) await handleVitalResourceUpdateRequest(data);
+      return;
+    }
+    if (data.type === "updateActorSheetData") {
+      if (game.user.isGM) await handleActorSheetUpdateRequest(data);
+      return;
+    }
+    if (data.type === "deleteActorItem") {
+      if (game.user.isGM) await handleDeleteItemRequest(data);
       return;
     }
     if (!game.user.isGM) return;
@@ -2297,14 +2644,13 @@ async function applyItemResourceBonuses(actor) {
   if (storedPv !== totals.pv) updates["system.resources.pv.itemBonus"] = totals.pv;
   if (storedPp !== totals.pp) updates["system.resources.pp.itemBonus"] = totals.pp;
 
-  if (Object.keys(updates).length) await actor.update(updates);
+  if (Object.keys(updates).length) await actor.update(updates, { bloodmanAllowVitalResourceUpdate: true });
 }
 
 async function applyPowerCost(actor, item) {
   if (!actor || !item) return true;
   if (item.type !== "pouvoir") return true;
   if (!item.system?.damageEnabled || !item.system?.powerCostEnabled) return true;
-  if (!actor.isOwner) return false;
   const cost = Number(item.system?.powerCost);
   if (!Number.isFinite(cost) || cost <= 0) return true;
   const current = Number(actor.system.resources?.pp?.current || 0);
@@ -2317,7 +2663,14 @@ async function applyPowerCost(actor, item) {
     return false;
   }
   const nextValue = Math.max(0, current - cost);
-  await actor.update({ "system.resources.pp.current": nextValue });
+  if (actor.isOwner || game.user?.isGM) {
+    await actor.update({ "system.resources.pp.current": nextValue }, { bloodmanAllowVitalResourceUpdate: true });
+  } else {
+    const sent = requestActorSheetUpdate(actor, { "system.resources.pp.current": nextValue }, {
+      allowVitalResourceUpdate: true
+    });
+    if (!sent) return false;
+  }
   return true;
 }
 
@@ -2438,8 +2791,25 @@ Hooks.on("combatStart", (combat) => {
   focusActiveCombatantToken(combat);
 });
 
-Hooks.on("preUpdateActor", (actor, updateData) => {
+Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
+  let blockedRestrictedFields = false;
+  const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
+  const allowVitalResourceUpdate = Boolean(options?.bloodmanAllowVitalResourceUpdate);
+
+  if (isBasicPlayerRole(updaterRole)) {
+    if (!allowCharacteristicBase) {
+      blockedRestrictedFields = stripUnauthorizedCharacteristicBaseUpdates(updateData) || blockedRestrictedFields;
+    }
+    if (!allowVitalResourceUpdate) {
+      blockedRestrictedFields = stripUpdatePaths(updateData, Array.from(VITAL_RESOURCE_PATHS)) || blockedRestrictedFields;
+    }
+    blockedRestrictedFields = stripUpdatePaths(updateData, STATE_MODIFIER_PATHS) || blockedRestrictedFields;
+  }
+
+  // Keep the update silent when restricted fields are stripped so normal
+  // submitOnChange interactions remain fluid for players.
 
   const getUpdatedNumber = (path, fallback) => {
     const value = foundry.utils.getProperty(updateData, path);
@@ -2488,6 +2858,7 @@ Hooks.on("preUpdateActor", (actor, updateData) => {
 
 Hooks.on("updateActor", async (actor, changes) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  if (!game.user.isGM && !actor.isOwner) return;
   if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
   const hasCharBaseChange = CHARACTERISTICS.some(c => {
     return foundry.utils.getProperty(changes, `system.characteristics.${c.key}.base`) != null;
@@ -2580,8 +2951,93 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
   }
 
+  get isEditable() {
+    if (super.isEditable) return true;
+    if (this.actor?.type === "personnage") return true;
+    return false;
+  }
+
+  async applyActorUpdate(updateData, options = {}) {
+    if (!hasActorUpdatePayload(updateData)) return null;
+    if (this.actor?.isOwner || game.user?.isGM) {
+      return this.actor.update(updateData, options);
+    }
+    const sent = requestActorSheetUpdate(this.actor, updateData, {
+      allowCharacteristicBase: Boolean(options?.bloodmanAllowCharacteristicBase),
+      allowVitalResourceUpdate: Boolean(options?.bloodmanAllowVitalResourceUpdate)
+    });
+    if (!sent) safeWarn("Mise à jour impossible: aucun GM actif.");
+    if (sent) {
+      // Keep the local sheet responsive while the GM applies the real update.
+      try {
+        if (typeof this.actor?.updateSource === "function") {
+          this.actor.updateSource(foundry.utils.deepClone(updateData));
+        }
+      } catch (_error) {
+        // Non-fatal optimistic update.
+      }
+    }
+    return null;
+  }
+
+  async deleteActorItem(item) {
+    if (!item) return false;
+    if (this.actor?.isOwner || item.isOwner || game.user?.isGM) {
+      try {
+        await item.delete();
+      } catch (_error) {
+        // Fallback to GM relay when direct deletion fails on synthetic contexts.
+      }
+      const itemId = String(item.id || "");
+      if (itemId && !this.actor?.items?.has(itemId)) return true;
+    }
+    const sent = requestDeleteActorItem(this.actor, item);
+    if (!sent) safeWarn("Suppression impossible: aucun GM actif.");
+    return sent;
+  }
+
+  getItemFromListElement(li) {
+    if (!li || !this.actor?.items) return null;
+    const rawId = String(li.dataset?.itemId || li.getAttribute?.("data-item-id") || "").trim();
+    if (rawId) {
+      const byId = this.actor.items.get(rawId);
+      if (byId) return byId;
+    }
+    const rawType = String(li.dataset?.itemType || li.getAttribute?.("data-item-type") || "").trim().toLowerCase();
+    const nameText = String(li.querySelector?.(".item-name")?.textContent || "").trim();
+    if (!nameText) return null;
+    const candidates = this.actor.items.filter(item => {
+      if (!item) return false;
+      if (rawType && String(item.type || "").trim().toLowerCase() !== rawType) return false;
+      return String(item.name || "").trim() === nameText;
+    });
+    if (!candidates.length) return null;
+    if (candidates.length === 1) return candidates[0];
+    const exactById = rawId ? candidates.find(item => String(item.id || "") === rawId) : null;
+    return exactById || candidates[0];
+  }
+
+  async _updateObject(_event, formData) {
+    if (this.actor?.isOwner || game.user?.isGM) {
+      return super._updateObject(_event, formData);
+    }
+
+    const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
+    const sanitized = sanitizeActorUpdateForRole(formData, game.user?.role, {
+      allowCharacteristicBase
+    });
+    if (!hasActorUpdatePayload(sanitized)) return;
+    await this.applyActorUpdate(sanitized, { bloodmanAllowCharacteristicBase: allowCharacteristicBase });
+  }
+
   getData() {
     const data = super.getData();
+    const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
+    const canEditRestrictedFields = canToggleCharacteristicsEdit;
+    const canEditXpChecks = canToggleCharacteristicsEdit;
+    const canOpenItemSheets = canToggleCharacteristicsEdit;
+    if (!canToggleCharacteristicsEdit) this._characteristicsEditEnabled = false;
+    const characteristicsEditEnabled = canToggleCharacteristicsEdit && Boolean(this._characteristicsEditEnabled);
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
     const isPlayerActor = data.actor.type === "personnage";
     const isNpcActor = data.actor.type === "personnage-non-joueur";
@@ -2709,6 +3165,11 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     return {
       ...data,
+      canToggleCharacteristicsEdit,
+      canEditRestrictedFields,
+      canEditXpChecks,
+      canOpenItemSheets,
+      characteristicsEditEnabled,
       characteristics,
       totalPoints,
       modifiers,
@@ -2736,6 +3197,51 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
+    const basicPlayer = isBasicPlayerRole(game.user?.role);
+    const forceEnableSheetUi = () => {
+      const root = this.element;
+      if (!root?.length) return;
+      if (basicPlayer) {
+        root.find("input, textarea, select, button").prop("disabled", false);
+      }
+      if (canToggleCharacteristicsEdit) {
+        root.find(".char-edit-toggle").prop("disabled", false);
+        root
+          .find("input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']")
+          .prop("disabled", false)
+          .prop("readonly", false);
+      }
+      if (this._characteristicsEditEnabled) {
+        root
+          .find("input[name^='system.characteristics.'][name$='.base']")
+          .prop("disabled", false)
+          .prop("readonly", false);
+      }
+    };
+    forceEnableSheetUi();
+    setTimeout(forceEnableSheetUi, 0);
+
+    html.on("click", ".char-edit-toggle", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!canCurrentUserEditCharacteristics()) return;
+      this._characteristicsEditEnabled = !this._characteristicsEditEnabled;
+      this.render(false);
+    });
+
+    html.on("change", "input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']", async ev => {
+      if (!canCurrentUserEditCharacteristics()) return;
+      if (this.actor?.isOwner) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const input = ev.currentTarget;
+      const path = String(input?.name || "");
+      if (!VITAL_RESOURCE_PATHS.has(path)) return;
+      const nextValue = Math.max(0, Math.floor(toFiniteNumber(input?.value, 0)));
+      requestVitalResourceUpdate(this.actor, path, nextValue);
+    });
 
     html.find(".luck-roll").click(ev => {
       ev.preventDefault();
@@ -2768,32 +3274,36 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     html.find(".weapon-roll").click(ev => {
       const li = ev.currentTarget.closest(".item");
-      const item = this.actor.items.get(li.dataset.itemId);
+      const item = this.getItemFromListElement(li);
       this.rollDamage(item);
     });
 
     html.find(".ability-roll").click(ev => {
       const li = ev.currentTarget.closest(".item");
-      const item = this.actor.items.get(li.dataset.itemId);
+      const item = this.getItemFromListElement(li);
       this.rollAbilityDamage(item);
     });
 
-    html.find(".item-delete").click(ev => {
+    html.find(".item-delete").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
       const li = ev.currentTarget.closest(".item");
-      const item = this.actor.items.get(li.dataset.itemId);
+      const item = this.getItemFromListElement(li);
       if (!item) return;
-      item.delete();
+      await this.deleteActorItem(item);
+      this.render(false);
     });
 
     html.find(".item-edit").click(ev => {
+      if (!canCurrentUserEditCharacteristics()) return;
       const li = ev.currentTarget.closest(".item");
-      const item = this.actor.items.get(li.dataset.itemId);
+      const item = this.getItemFromListElement(li);
       item?.sheet?.render(true);
     });
 
     html.find(".item-use").click(ev => {
       const li = ev.currentTarget.closest(".item");
-      const item = this.actor.items.get(li.dataset.itemId);
+      const item = this.getItemFromListElement(li);
       this.useItem(item);
     });
 
@@ -2828,13 +3338,17 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!ref) return;
       const refs = getTransportNpcRefs(this.actor);
       const nextRefs = refs.filter(entry => entry !== ref);
-      await this.actor.update({ "system.equipment.transportNpcs": nextRefs });
+      await this.applyActorUpdate({ "system.equipment.transportNpcs": nextRefs });
     });
 
     html.find(".xp-check input").change(async ev => {
       ev.preventDefault();
       ev.stopPropagation();
       const input = ev.currentTarget;
+      if (!canCurrentUserEditCharacteristics()) {
+        input.checked = !Boolean(input.checked);
+        return;
+      }
       const row = input.closest(".char-row");
       const key = row?.dataset?.key;
       const index = Number(input.dataset.index);
@@ -2843,7 +3357,8 @@ class BloodmanActorSheet extends BaseActorSheet {
         ? [...this.actor.system.characteristics[key].xp]
         : [false, false, false];
       xp[index] = Boolean(input.checked);
-      await this.actor.update({ [`system.characteristics.${key}.xp`]: xp });
+      await this.applyActorUpdate({ [`system.characteristics.${key}.xp`]: xp });
+      foundry.utils.setProperty(this.actor, `system.characteristics.${key}.xp`, xp);
       const ready = xp.length === 3 && xp.every(Boolean);
       if (ready) setTimeout(() => this.promptGrowthRoll(key), 0);
     });
@@ -2895,7 +3410,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const refs = getTransportNpcRefs(this.actor);
     if (refs.includes(ref)) return true;
-    await this.actor.update({ "system.equipment.transportNpcs": [...refs, ref] });
+    await this.applyActorUpdate({ "system.equipment.transportNpcs": [...refs, ref] });
     return true;
   }
 
@@ -2939,7 +3454,9 @@ class BloodmanActorSheet extends BaseActorSheet {
         return;
       }
 
-      await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+      await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
+        bloodmanAllowVitalResourceUpdate: true
+      });
       await doCharacteristicRoll(this.actor, key);
       await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
       this.markCharacteristicReroll(key);
@@ -2975,7 +3492,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const index = xp.findIndex(value => !value);
     if (index === -1) return;
     xp[index] = true;
-    await this.actor.update({ [`system.characteristics.${key}.xp`]: xp });
+    await this.applyActorUpdate({ [`system.characteristics.${key}.xp`]: xp });
+    foundry.utils.setProperty(this.actor, `system.characteristics.${key}.xp`, xp);
     if (xp.length === 3 && xp.every(Boolean)) this.promptGrowthRoll(key);
   }
 
@@ -3013,10 +3531,28 @@ class BloodmanActorSheet extends BaseActorSheet {
   async useItem(item) {
     if (!item) return;
     if (item.type === "soin") {
-      const result = await doHealRoll(this.actor, item);
-      if (result && this.actor.items.get(item.id)) this.render(false);
+      if (this.actor?.isOwner || game.user?.isGM) {
+        const result = await doHealRoll(this.actor, item);
+        if (result && this.actor.items.get(item.id)) this.render(false);
+      } else {
+        const die = item.system?.healDie || "d4";
+        const formula = /^\d/.test(String(die)) ? String(die) : `1${die}`;
+        const roll = await new Roll(formula).evaluate();
+        const current = toFiniteNumber(this.actor.system?.resources?.pv?.current, 0);
+        const max = toFiniteNumber(this.actor.system?.resources?.pv?.max, current);
+        const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
+        await this.applyActorUpdate({ "system.resources.pv.current": nextValue }, {
+          bloodmanAllowVitalResourceUpdate: true
+        });
+        roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total })
+        });
+        await this.deleteActorItem(item);
+        this.render(false);
+      }
     }
-    if (item.type === "ration" && item.isOwner) await item.delete();
+    if (item.type === "ration") await this.deleteActorItem(item);
   }
 
   async rerollItemRoll(itemId) {
@@ -3065,7 +3601,9 @@ class BloodmanActorSheet extends BaseActorSheet {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
         return;
       }
-      await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+      await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
+        bloodmanAllowVitalResourceUpdate: true
+      });
       const nextPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
       const expectedPP = Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST);
       logDamageRerollValidation("resource-player-pp", {
@@ -3395,7 +3933,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       const current = toFiniteNumber(this.actor.system.resources?.pv?.current, 0);
       const max = toFiniteNumber(this.actor.system.resources?.pv?.max, current);
       const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
-      await this.actor.update({ "system.resources.pv.current": nextValue });
+      await this.applyActorUpdate({ "system.resources.pv.current": nextValue }, {
+        bloodmanAllowVitalResourceUpdate: true
+      });
       roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
         flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total })
@@ -3408,7 +3948,44 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async rollGrowth(key) {
     if (!key) return;
-    await doGrowthRoll(this.actor, key);
+    if (this.actor?.isOwner || game.user?.isGM) {
+      await doGrowthRoll(this.actor, key);
+      this.clearCharacteristicRerollState();
+      this.render(false);
+      return;
+    }
+    const itemBonuses = getItemBonusTotals(this.actor);
+    const base = toFiniteNumber(this.actor.system.characteristics?.[key]?.base, 0);
+    const effective = base
+      + toFiniteNumber(this.actor.system.modifiers?.all, 0)
+      + toFiniteNumber(this.actor.system.modifiers?.[key], 0)
+      + toFiniteNumber(itemBonuses?.[key], 0);
+
+    const roll = await new Roll("1d100").evaluate();
+    const success = Number(roll.total || 0) > effective;
+    const xpPath = `system.characteristics.${key}.xp`;
+    const basePath = `system.characteristics.${key}.base`;
+    await this.applyActorUpdate({
+      [basePath]: base + (success ? 1 : 0),
+      [xpPath]: [false, false, false]
+    }, {
+      bloodmanAllowCharacteristicBase: true
+    });
+    foundry.utils.setProperty(this.actor, basePath, base + (success ? 1 : 0));
+    foundry.utils.setProperty(this.actor, xpPath, [false, false, false]);
+
+    roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      flavor: t("BLOODMAN.Rolls.Growth.Chat", {
+        name: this.actor.name,
+        key,
+        roll: roll.total,
+        effective,
+        result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
+      })
+    });
+    this.clearCharacteristicRerollState();
+    this.render(false);
   }
 
   promptGrowthRoll(key) {
@@ -3448,7 +4025,7 @@ class BloodmanNpcSheet extends BloodmanActorSheet {
       if (input.checked) {
         html.find(".npc-role-toggle").not(input).prop("checked", false);
       }
-      this.actor.update({ "system.npcRole": nextRole });
+      this.applyActorUpdate({ "system.npcRole": nextRole });
     });
   }
 }

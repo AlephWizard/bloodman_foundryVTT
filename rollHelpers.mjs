@@ -134,6 +134,97 @@ function getActiveGMIds() {
   return game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
 }
 
+function hasActorUpdatePayload(updateData) {
+  if (!updateData || typeof updateData !== "object") return false;
+  return Object.keys(foundry.utils.flattenObject(updateData)).length > 0;
+}
+
+function requestActorSheetUpdate(actor, updateData, options = {}) {
+  if (!actor || !game.socket || !hasActorUpdatePayload(updateData)) return false;
+  try {
+    game.socket.emit(SYSTEM_SOCKET, {
+      type: "updateActorSheetData",
+      requesterId: String(game.user?.id || ""),
+      actorUuid: String(actor.uuid || ""),
+      actorId: String(actor.id || ""),
+      actorBaseId: getSocketActorBaseId(actor),
+      updateData,
+      options: {
+        allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
+        allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate)
+      }
+    });
+  } catch (error) {
+    console.error("[bloodman] actor:update socket emit failed", error);
+    return false;
+  }
+  return true;
+}
+
+function getSocketActorBaseId(actor) {
+  return String(actor?.token?.actorId || actor?.parent?.actorId || actor?.baseActor?.id || actor?.id || "");
+}
+
+function requestDeleteActorItem(actor, item) {
+  if (!actor || !item || !game.socket) return false;
+  try {
+    game.socket.emit(SYSTEM_SOCKET, {
+      type: "deleteActorItem",
+      requesterId: String(game.user?.id || ""),
+      actorUuid: String(actor.uuid || ""),
+      actorId: String(actor.id || ""),
+      actorBaseId: getSocketActorBaseId(actor),
+      itemId: String(item.id || ""),
+      itemUuid: String(item.uuid || ""),
+      itemType: String(item.type || ""),
+      itemName: String(item.name || "")
+    });
+  } catch (error) {
+    console.error("[bloodman] item:delete socket emit failed", error);
+    return false;
+  }
+  return true;
+}
+
+async function updateActorWithFallback(actor, updateData, options = {}) {
+  if (!actor || !hasActorUpdatePayload(updateData)) return null;
+  const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
+  const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
+  if (actor.isOwner || game.user?.isGM) {
+    return actor.update(updateData, {
+      bloodmanAllowCharacteristicBase: allowCharacteristicBase,
+      bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate
+    });
+  }
+  const sent = requestActorSheetUpdate(actor, updateData, {
+    allowCharacteristicBase,
+    allowVitalResourceUpdate
+  });
+  if (!sent) {
+    safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ actif."));
+  }
+  return null;
+}
+
+async function deleteItemWithFallback(item, actor = null) {
+  if (!item) return false;
+  const parentActor = actor || item.actor || null;
+  if (item.isOwner || parentActor?.isOwner || game.user?.isGM) {
+    try {
+      await item.delete();
+    } catch (error) {
+      console.warn("[bloodman] item:delete direct failed, fallback to socket", error);
+    }
+    const itemId = String(item.id || "");
+    if (itemId && !parentActor?.items?.has(itemId)) return true;
+  }
+  const sent = requestDeleteActorItem(parentActor, item);
+  if (!sent) {
+    safeWarn(tl("BLOODMAN.Notifications.ItemDeleteRequiresGM", "Suppression impossible: aucun MJ actif."));
+  }
+  return sent;
+}
+
 function toNonNegativeInt(value, fallback = 0) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -454,7 +545,11 @@ export async function applyDamageToActor(targetActor, damage, options = {}) {
   const nextValue = Math.max(0, current - finalDamage);
   const displayName = resolveCombatTargetName(options?.targetName, targetActor?.name, targetActor?.name || "Cible");
 
-  await targetActor.update({ "system.resources.pv.current": nextValue });
+  await updateActorWithFallback(
+    targetActor,
+    { "system.resources.pv.current": nextValue },
+    { allowVitalResourceUpdate: true }
+  );
 
   ChatMessage.create({
     speaker: { alias: displayName },
@@ -726,7 +821,7 @@ export async function doDamageRoll(actor, item) {
   if (consumesAmmo) {
     const currentAmmo = Number(actor.system.ammo?.value);
     const nextValue = Math.max(0, currentAmmo - 1);
-    await actor.update({ "system.ammo.value": nextValue });
+    await updateActorWithFallback(actor, { "system.ammo.value": nextValue });
   }
 
   roll.toMessage({
@@ -768,16 +863,18 @@ export async function doHealRoll(actor, item) {
   const max = Number(actor.system.resources?.pv?.max || 0);
   const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
 
-  await actor.update({ "system.resources.pv.current": nextValue });
+  await updateActorWithFallback(
+    actor,
+    { "system.resources.pv.current": nextValue },
+    { allowVitalResourceUpdate: true }
+  );
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
     flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: actor.name, amount: roll.total })
   });
 
-  if (item?.isOwner) {
-    await item.delete();
-  }
+  await deleteItemWithFallback(item, actor);
   return roll;
 }
 
@@ -854,10 +951,14 @@ export async function doGrowthRoll(actor, key) {
   const xpPath = `system.characteristics.${key}.xp`;
   const basePath = `system.characteristics.${key}.base`;
 
-  await actor.update({
-    [basePath]: base + (success ? 1 : 0),
-    [xpPath]: [false, false, false]
-  });
+  await updateActorWithFallback(
+    actor,
+    {
+      [basePath]: base + (success ? 1 : 0),
+      [xpPath]: [false, false, false]
+    },
+    { allowCharacteristicBase: true }
+  );
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),

@@ -1088,6 +1088,67 @@
   font-weight: 700;
 }
 
+.bloodman-sheet .char-base input[readonly] {
+  background: #ececec;
+  color: #444444;
+  cursor: not-allowed;
+}
+
+.bloodman-sheet .char-edit-row {
+  display: grid;
+  grid-template-columns: 24px 64px 1fr 92px 100px;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.bloodman-sheet .char-edit-toggle {
+  grid-column: 1;
+  width: 48px;
+  height: 20px;
+  border: 2px solid #000000;
+  border-radius: 2px;
+  background: #ffffff;
+  color: #000000;
+  font-family: "Oswald", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  text-transform: uppercase;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  appearance: none;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.bloodman-sheet .char-edit-toggle.is-active {
+  background: #ececec;
+}
+
+.bloodman-sheet .char-edit-toggle:hover,
+.bloodman-sheet .char-edit-toggle:active {
+  border-color: #000000;
+  background: #ececec;
+  color: #000000;
+}
+
+.bloodman-sheet .char-edit-toggle:focus,
+.bloodman-sheet .char-edit-toggle:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #000000 !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bloodman-sheet .char-edit-toggle::-moz-focus-inner {
+  border: 0;
+}
+
 .bloodman-sheet .char-score {
   display: flex;
   align-items: center;

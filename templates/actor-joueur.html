@@ -30,16 +30,16 @@
         <div class="state-inputs">
           <div class="state-field">
             <span>{{localize "BLOODMAN.StateBar.All"}}</span>
-            <input type="number" name="system.modifiers.all" value="{{modifiers.all}}" />
+            <input type="number" name="system.modifiers.all" value="{{modifiers.all}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
           </div>
           {{#each characteristics}}
             <div class="state-field">
               <span>{{this.key}}</span>
-              <input type="number" name="system.modifiers.{{this.key}}" value="{{lookup ../modifiers this.key}}" />
+              <input type="number" name="system.modifiers.{{this.key}}" value="{{lookup ../modifiers this.key}}" {{#unless ../canEditRestrictedFields}}readonly{{/unless}} />
             </div>
           {{/each}}
         </div>
-        <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="{{localize 'BLOODMAN.StateBar.StateNamePlaceholder'}}" />
+        <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="{{localize 'BLOODMAN.StateBar.StateNamePlaceholder'}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
       </div>
 
       <div class="tab-grid">
@@ -52,17 +52,17 @@
         <div class="resource-badges">
           <div class="resource-circle pv">
             <div class="value">
-              <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" max="{{resources.pv.max}}" />
+              <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" max="{{resources.pv.max}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
               <span>/</span>
-              <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" />
+              <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
             </div>
             <div class="label">{{localize "BLOODMAN.Resources.PV"}}</div>
           </div>
           <div class="resource-circle pp">
             <div class="value">
-              <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" max="{{resources.pp.max}}" />
+              <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" max="{{resources.pp.max}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
               <span>/</span>
-              <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" />
+              <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
             </div>
             <div class="label">{{localize "BLOODMAN.Resources.PP"}}</div>
           </div>
@@ -86,7 +86,7 @@
                 <div class="char-row {{#if this.showMoveValue}}move-row{{/if}}" data-key="{{this.key}}">
                   <div class="char-icon"><i class="fa-solid {{this.icon}}"></i></div>
                   <div class="char-base">
-                    <input type="number" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" min="0" max="100" />
+                    <input type="number" class="char-base-input {{#unless ../characteristicsEditEnabled}}is-locked{{/unless}}" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" min="0" max="100" {{#unless ../characteristicsEditEnabled}}readonly{{/unless}} />
                     <span class="char-max">/100</span>
                   </div>
                   <div class="char-name">
@@ -114,7 +114,7 @@
                   <div class="char-xp">
                     {{#each this.xp}}
                       <label class="xp-check">
-                        <input type="checkbox" name="system.characteristics.{{../key}}.xp.{{@index}}" data-index="{{@index}}" data-dtype="Boolean" {{checked this}} />
+                        <input type="checkbox" name="system.characteristics.{{../key}}.xp.{{@index}}" data-index="{{@index}}" data-dtype="Boolean" {{checked this}} {{#unless ../../canEditXpChecks}}disabled{{/unless}} />
                       </label>
                     {{/each}}
                     <span class="xp-text">{{localize "BLOODMAN.Characteristics.XP"}}</span>
@@ -126,6 +126,13 @@
                   </div>
                 </div>
               {{/each}}
+              {{#if canToggleCharacteristicsEdit}}
+                <div class="char-edit-row">
+                  <button type="button" class="char-edit-toggle {{#if characteristicsEditEnabled}}is-active{{/if}}">
+                    Edit
+                  </button>
+                </div>
+              {{/if}}
             </div>
           </section>
         </section>
@@ -190,9 +197,9 @@
           <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
           <ol class="item-list weapon-list">
             {{#each weapons}}
-              <li class="item weapon-item" data-item-id="{{this._id}}">
+              <li class="item weapon-item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 <span class="item-meta">{{#if this.displayWeaponType}}{{this.displayWeaponType}}{{else}}{{localize "BLOODMAN.Equipment.WeaponType.Distance"}}{{/if}}</span>
                 <span class="weapon-roll">1{{this.system.damageDie}}</span>
                 {{#if this.showItemReroll}}
@@ -220,9 +227,9 @@
           <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> {{localize "BLOODMAN.Equipment.Protections"}}</div>
           <ol class="item-list">
             {{#each protections}}
-              <li class="item" data-item-id="{{this._id}}">
+              <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 <span class="item-meta">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
@@ -235,9 +242,9 @@
           <div class="equip-title"><i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}</div>
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each objects}}
-              <li class="item" data-item-id="{{this._id}}">
+              <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 {{#if this.system.mark}}<span class="item-mark">{{this.system.mark}}</span>{{/if}}
                 {{#if this.system.noteSmall}}<span class="item-meta">{{this.system.noteSmall}}</span>{{/if}}
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
@@ -248,9 +255,9 @@
 
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each soins}}
-              <li class="item" data-item-id="{{this._id}}">
+              <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 <span class="item-use">{{#if this.system.healDie}}1{{this.system.healDie}}{{else}}1d4{{/if}}</span>
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
@@ -260,9 +267,9 @@
 
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each rations}}
-              <li class="item" data-item-id="{{this._id}}">
+              <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 <span class="item-use">{{localize "BLOODMAN.Common.Eat"}}</span>
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
@@ -300,9 +307,9 @@
         </div>
         <ol class="item-list {{#if aptitudesTwoColumns}}item-list-two-columns{{/if}}">
           {{#each aptitudes}}
-              <li class="item" data-item-id="{{this._id}}">
+              <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
                 {{#if this.showItemReroll}}
                   <button type="button" class="item-reroll">
@@ -329,9 +336,9 @@
         </div>
         <ol class="item-list {{#if pouvoirsTwoColumns}}item-list-two-columns{{/if}}">
           {{#each pouvoirs}}
-              <li class="item" data-item-id="{{this._id}}">
+              <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <img class="item-icon" src="{{this.img}}" />
-                <span class="item-name item-edit">{{this.name}}</span>
+                <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
                 {{#if this.showItemReroll}}
                   <button type="button" class="item-reroll">
