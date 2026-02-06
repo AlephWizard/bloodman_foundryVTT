@@ -594,6 +594,25 @@
   cursor: pointer;
 }
 
+.item-reroll-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--bm-line);
+  border-radius: 4px;
+  background: var(--bm-white);
+  color: var(--bm-black);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
 .ammo-row {
   display: grid;
   grid-template-columns: 1fr 56px;

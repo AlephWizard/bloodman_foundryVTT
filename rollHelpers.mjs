@@ -318,14 +318,17 @@ function buildDamageRequestPayload(token, damage, options = {}) {
   const rollId = String(options.rollId || "").trim();
   const itemId = String(options.itemId || "").trim();
   const itemName = String(options.itemName || "").trim();
+  const itemType = String(options.itemType || "").trim();
   const totalDamage = Number(options.totalDamage);
 
   return {
     requestId,
     type: "applyDamage",
+    kind: "item-damage",
     rollId,
     itemId,
     itemName,
+    itemType,
     totalDamage,
     tokenUuid,
     tokenId,
@@ -573,8 +576,8 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
           targetActorLink: Boolean(tokenDoc?.actorLink),
           targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, targetActor?.name, "Cible"),
           share,
-          hpBefore: Number.NaN,
-          hpAfter: Number.NaN,
+          hpBefore: null,
+          hpAfter: null,
           pending: true
         });
       }
@@ -711,14 +714,17 @@ export async function doDamageRoll(actor, item) {
     inputPayload: backendInput,
     rollId,
     itemId: item?.id || "",
+    itemType: item?.type || "",
     itemName: sourceName,
     totalDamage
   });
   return {
     roll,
     context: {
+      kind: "item-damage",
       rollId,
       itemId: item?.id || "",
+      itemType: item?.type || "",
       itemName: sourceName,
       attackerId: actor?.id || "",
       attackerUserId: game.user?.id || "",
@@ -807,14 +813,17 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
     inputPayload: backendInput,
     rollId,
     itemId: String(options?.itemId || ""),
+    itemType: String(options?.itemType || ""),
     itemName: resolvedSource,
     totalDamage
   });
   return {
     roll,
     context: {
+      kind: "item-damage",
       rollId,
       itemId: String(options?.itemId || ""),
+      itemType: String(options?.itemType || ""),
       itemName: resolvedSource,
       attackerId: actor?.id || "",
       attackerUserId: game.user?.id || "",
