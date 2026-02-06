@@ -927,13 +927,6 @@
   font-weight: 800;
 }
 
-.resource-circle.pv input,
-.resource-circle.pp input,
-.resource-circle.pv .value span,
-.resource-circle.pp .value span {
-  color: #ffffff;
-}
-
 .resource-circle .label {
   margin-top: 4px;
   font-size: 11px;

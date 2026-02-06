@@ -37,6 +37,31 @@ function normalizeStatusValue(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function getStatusEffectIds(effectDef, { normalized = false } = {}) {
+  if (!effectDef) return [];
+  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  const output = [];
+  const seen = new Set();
+  for (const id of ids) {
+    const key = normalized ? normalizeStatusValue(id) : id;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    output.push(normalized ? key : id);
+  }
+  return output;
+}
+
+function getConfiguredStatusIdSet() {
+  const configured = new Set();
+  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
+  for (const effect of effects) {
+    for (const id of getStatusEffectIds(effect, { normalized: true })) configured.add(id);
+  }
+  return configured;
+}
+
 function getLocalizedStatusLabel(effect) {
   if (!effect) return "";
   const raw = effect.name ?? effect.label ?? "";
@@ -50,9 +75,7 @@ function findStatusEffect(candidates, labelKeywords = []) {
   const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
   const wanted = new Set(candidates.map(normalizeStatusValue).filter(Boolean));
   for (const effect of effects) {
-    const ids = [effect.id, ...(Array.isArray(effect.statuses) ? effect.statuses : [])]
-      .map(normalizeStatusValue)
-      .filter(Boolean);
+    const ids = getStatusEffectIds(effect, { normalized: true });
     if (ids.some(id => wanted.has(id))) return effect;
   }
   if (!labelKeywords.length) return null;
@@ -65,123 +88,264 @@ function findStatusEffect(candidates, labelKeywords = []) {
   return null;
 }
 
+function ensureStatusEffectDefinition(effectDef) {
+  if (!effectDef) return null;
+  if (!Array.isArray(CONFIG.statusEffects)) return effectDef;
+  const targetIds = new Set(getStatusEffectIds(effectDef, { normalized: true }));
+  if (!targetIds.size) return effectDef;
+  for (const effect of CONFIG.statusEffects) {
+    const existingIds = getStatusEffectIds(effect, { normalized: true });
+    if (existingIds.some(id => targetIds.has(id))) return effect;
+  }
+  try {
+    CONFIG.statusEffects.push(effectDef);
+  } catch (_error) {
+    // keep non-fatal if the status list is immutable
+  }
+  return effectDef;
+}
+
+function resolvePrimaryStatusId(effectDef) {
+  const ids = getStatusEffectIds(effectDef);
+  if (!ids.length) return "";
+  const configured = getConfiguredStatusIdSet();
+  return ids.find(id => configured.has(normalizeStatusValue(id))) || ids[0];
+}
+
+function buildBleedingFallbackStatusEffect() {
+  return {
+    id: "bleeding",
+    statuses: ["bleeding"],
+    name: "Bleeding",
+    img: "icons/svg/blood.svg"
+  };
+}
+
+function buildDeadFallbackStatusEffect() {
+  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
+  const id = defeatedRaw || "dead";
+  const normalized = normalizeStatusValue(id);
+  const statuses = normalized && normalized !== id ? [id, normalized] : [id];
+  return {
+    id,
+    statuses,
+    name: "Dead",
+    img: "icons/svg/skull.svg"
+  };
+}
+
 function getBleedingStatusEffect() {
   return findStatusEffect(PLAYER_ZERO_PV_STATUS_CANDIDATES, ["bleed", "saign"])
-    || { id: "bleeding", statuses: ["bleeding"], img: "icons/svg/blood.svg" };
+    || ensureStatusEffectDefinition(buildBleedingFallbackStatusEffect());
 }
 
 function getDeadStatusEffect() {
-  const defeated = normalizeStatusValue(CONFIG.specialStatusEffects?.DEFEATED);
+  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
+  const defeated = normalizeStatusValue(defeatedRaw);
   const candidates = defeated ? [defeated, ...NPC_ZERO_PV_STATUS_CANDIDATES] : NPC_ZERO_PV_STATUS_CANDIDATES;
   return findStatusEffect(candidates, ["dead", "mort", "defeat"])
-    || {
-      id: defeated || "dead",
-      statuses: [defeated || "dead"],
-      img: "icons/svg/skull.svg"
-    };
+    || ensureStatusEffectDefinition(buildDeadFallbackStatusEffect());
 }
 
-function getTokenStatusesList(tokenDoc) {
+function getTokenStatusesList(tokenDoc, { normalized = true } = {}) {
   const statuses = tokenDoc?.statuses;
-  if (Array.isArray(statuses)) return [...statuses].map(normalizeStatusValue).filter(Boolean);
-  if (statuses instanceof Set) return [...statuses].map(normalizeStatusValue).filter(Boolean);
+  const list = Array.isArray(statuses)
+    ? [...statuses]
+    : statuses instanceof Set
+      ? [...statuses]
+      : [];
+  const cleaned = list
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  if (!normalized) return cleaned;
+  return cleaned.map(normalizeStatusValue).filter(Boolean);
+}
+
+async function removeTokenStatusOverrides(tokenDoc, familyIds = []) {
+  const family = new Set(normalizeStatusIdList(familyIds));
+  if (!tokenDoc || !family.size) return false;
+  const currentStatuses = getTokenStatusesList(tokenDoc, { normalized: false });
+  if (!currentStatuses.length) return false;
+  const nextStatuses = currentStatuses.filter(id => !family.has(normalizeStatusValue(id)));
+  if (nextStatuses.length === currentStatuses.length) return false;
+  await tokenDoc.update({ statuses: nextStatuses }).catch(() => null);
+  return true;
+}
+
+function getActiveEffectStatusIds(effectDoc, { normalized = true } = {}) {
+  const statuses = effectDoc?.statuses;
+  const list = Array.isArray(statuses)
+    ? [...statuses]
+    : statuses instanceof Set
+      ? [...statuses]
+      : [];
+  const legacyStatusId = String(foundry.utils.getProperty(effectDoc, "flags.core.statusId") || "").trim();
+  if (legacyStatusId) list.push(legacyStatusId);
+  const cleaned = list
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  if (!normalized) return cleaned;
+  return cleaned.map(normalizeStatusValue).filter(Boolean);
+}
+
+function getActorEffectDocuments(actor) {
+  const effects = actor?.effects;
+  if (!effects) return [];
+  if (Array.isArray(effects)) return effects;
+  if (Array.isArray(effects.contents)) return effects.contents;
+  if (typeof effects.values === "function") return [...effects.values()];
   return [];
 }
 
-function tokenHasStatusEffect(tokenDoc, effectDef) {
-  if (!tokenDoc || !effectDef) return false;
-  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
-    .map(normalizeStatusValue)
-    .filter(Boolean);
-  const actor = tokenDoc.actor || null;
-  if (actor && typeof actor.hasStatusEffect === "function") {
-    for (const id of ids) {
+function normalizeStatusIdList(ids = []) {
+  return [...new Set(
+    (Array.isArray(ids) ? ids : [])
+      .map(normalizeStatusValue)
+      .filter(Boolean)
+  )];
+}
+
+function buildStatusFamilyIds(effectDef, extraIds = []) {
+  return normalizeStatusIdList([
+    ...(Array.isArray(extraIds) ? extraIds : []),
+    ...getStatusEffectIds(effectDef)
+  ]);
+}
+
+function getActorStatusEffectDocumentsByFamily(actor, familyIds = []) {
+  const family = new Set(normalizeStatusIdList(familyIds));
+  if (!actor || !family.size) return [];
+  const docs = [];
+  for (const effectDoc of getActorEffectDocuments(actor)) {
+    const ids = getActiveEffectStatusIds(effectDoc);
+    if (ids.some(id => family.has(id))) docs.push(effectDoc);
+  }
+  return docs;
+}
+
+async function deleteStatusEffectDocuments(effectDocs = []) {
+  if (!Array.isArray(effectDocs) || !effectDocs.length) return false;
+  let changed = false;
+  for (const effectDoc of effectDocs) {
+    if (!effectDoc) continue;
+    try {
+      await effectDoc.delete();
+      changed = true;
+    } catch (_error) {
+      // continue best-effort cleanup
+    }
+  }
+  return changed;
+}
+
+function actorHasStatusInFamily(actor, familyIds = []) {
+  const family = normalizeStatusIdList(familyIds);
+  if (!actor || !family.length) return false;
+  if (typeof actor.hasStatusEffect === "function") {
+    for (const id of family) {
       try {
         if (actor.hasStatusEffect(id)) return true;
       } catch (_error) {
-        // continue with other checks
+        // continue checks
       }
     }
   }
-  if (ids.length) {
-    const tokenStatuses = new Set(getTokenStatusesList(tokenDoc));
-    if (ids.some(id => tokenStatuses.has(id))) return true;
-  }
+  return getActorStatusEffectDocumentsByFamily(actor, family).length > 0;
+}
+
+function tokenHasStatusInFamily(tokenDoc, familyIds = []) {
+  const family = normalizeStatusIdList(familyIds);
+  if (!tokenDoc || !family.length) return false;
+  const actor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+  if (actorHasStatusInFamily(actor, family)) return true;
+  const tokenStatuses = new Set(getTokenStatusesList(tokenDoc));
+  if (family.some(id => tokenStatuses.has(id))) return true;
+
   if (typeof tokenDoc.hasStatusEffect === "function") {
-    for (const id of ids) {
+    for (const id of family) {
       try {
         if (tokenDoc.hasStatusEffect(id)) return true;
       } catch (_error) {
-        // continue with other checks
+        // continue checks
       }
     }
   }
   return false;
 }
 
-async function setTokenStatusEffect(tokenDoc, effectDef, active) {
-  if (!tokenDoc || !effectDef) return false;
-  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
-    .map(normalizeStatusValue)
-    .filter(Boolean);
-  const primaryId = ids[0];
-  if (!primaryId) return false;
-  const actor = tokenDoc.actor || null;
-
-  const preferActor = tokenDoc.actorLink !== false && actor && typeof actor.toggleStatusEffect === "function";
-  if (preferActor) {
-    const currentStatuses = getTokenStatusesList(tokenDoc);
-    if (currentStatuses.some(id => ids.includes(id))) {
-      const nextStatuses = currentStatuses.filter(id => !ids.includes(id));
-      await tokenDoc.update({ statuses: nextStatuses }).catch(() => null);
-    }
-    const has = typeof actor.hasStatusEffect === "function"
-      ? actor.hasStatusEffect(primaryId)
-      : false;
-    if (typeof has === "boolean" && has === active) return true;
-    try {
-      await actor.toggleStatusEffect(primaryId, { active, overlay: false });
-      if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
-    } catch (_error) {
-      // fallback on token/document data below
-    }
-    return tokenHasStatusEffect(tokenDoc, effectDef) === active;
-  }
-
-  // Avoid deprecated token toggle APIs; rely on status sets below for unlinked tokens.
-
-  const tokenActor = tokenDoc.actor || null;
-  const worldActor = tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null;
-  const actorForFallback = tokenActor || (tokenDoc.actorLink ? worldActor : null);
-  const sameActorTokensCount = actorForFallback?.id ? getTokenDocumentsForActor(actorForFallback).length : 0;
-  const actorFallbackAllowed = tokenDoc.actorLink ? sameActorTokensCount <= 1 : false;
-  if (actorFallbackAllowed && actorForFallback && typeof actorForFallback.toggleStatusEffect === "function") {
-    try {
-      await actorForFallback.toggleStatusEffect(primaryId, { active, overlay: false });
-      if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
-    } catch (_error) {
-      // fallback on document data below
-    }
-  }
-
-  if (ids.length) {
-    const nextStatuses = new Set(getTokenStatusesList(tokenDoc));
-    let changed = false;
-    const has = nextStatuses.has(primaryId);
-    if (active && !has) {
-      nextStatuses.add(primaryId);
-      changed = true;
-    }
-    if (!active && has) {
-      nextStatuses.delete(primaryId);
-      changed = true;
-    }
-    if (changed) await tokenDoc.update({ statuses: [...nextStatuses] }).catch(() => null);
-    if (tokenHasStatusEffect(tokenDoc, effectDef) === active) return true;
-  }
-  return tokenHasStatusEffect(tokenDoc, effectDef) === active;
+async function clearActorStatusFamily(actor, familyIds = []) {
+  const family = normalizeStatusIdList(familyIds);
+  if (!actor || !family.length) return false;
+  const docs = getActorStatusEffectDocumentsByFamily(actor, family);
+  if (docs.length) await deleteStatusEffectDocuments(docs);
+  return !actorHasStatusInFamily(actor, family);
 }
 
+function tokenHasStatusEffect(tokenDoc, effectDef, familyIds = []) {
+  return tokenHasStatusInFamily(tokenDoc, buildStatusFamilyIds(effectDef, familyIds));
+}
+
+async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = []) {
+  if (!tokenDoc || !effectDef) return false;
+  const primaryId = resolvePrimaryStatusId(effectDef) || getStatusEffectIds(effectDef)[0] || "";
+  const family = buildStatusFamilyIds(effectDef, familyIds);
+  if (!primaryId || !family.length) return false;
+  const actor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+  const currentStatuses = getTokenStatusesList(tokenDoc, { normalized: false });
+  const familySet = new Set(family);
+  const hasTokenOverrides = currentStatuses.some(id => familySet.has(normalizeStatusValue(id)));
+
+  if (actor && !hasTokenOverrides) {
+    const actorDocs = getActorStatusEffectDocumentsByFamily(actor, family);
+    const actorHas = actorHasStatusInFamily(actor, family);
+    if (actorHas === active && actorDocs.length <= 1) return true;
+  }
+
+  if (hasTokenOverrides) await removeTokenStatusOverrides(tokenDoc, family);
+
+  if (actor && typeof actor.toggleStatusEffect === "function") {
+    await clearActorStatusFamily(actor, family);
+    if (active) {
+      try {
+        await actor.toggleStatusEffect(primaryId, { active: true, overlay: false });
+      } catch (_error) {
+        // fallback on token statuses below
+      }
+      const actorDocs = getActorStatusEffectDocumentsByFamily(actor, family);
+      if (actorDocs.length > 1) await deleteStatusEffectDocuments(actorDocs.slice(1));
+      if (!actorHasStatusInFamily(actor, family)) {
+        const normalizedPrimary = normalizeStatusValue(primaryId);
+        if (normalizedPrimary && normalizedPrimary !== primaryId) {
+          try {
+            await actor.toggleStatusEffect(normalizedPrimary, { active: true, overlay: false });
+          } catch (_error) {
+            // fallback on token statuses below
+          }
+        }
+      }
+    }
+    const actorMatches = actorHasStatusInFamily(actor, family) === active;
+    if (actorMatches) return true;
+  }
+
+  const nextStatuses = currentStatuses.filter(id => !familySet.has(normalizeStatusValue(id)));
+  if (active) nextStatuses.push(primaryId);
+
+  const deduped = [];
+  const seen = new Set();
+  for (const id of nextStatuses) {
+    const normalized = normalizeStatusValue(id);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    deduped.push(id);
+  }
+
+  const hasChanged = deduped.length !== currentStatuses.length
+    || deduped.some((id, index) => id !== currentStatuses[index]);
+  if (hasChanged) await tokenDoc.update({ statuses: deduped }).catch(() => null);
+
+  return tokenHasStatusInFamily(tokenDoc, family) === active;
+}
 function getTokenActorType(tokenDoc) {
   const actorType = tokenDoc?.actor?.type;
   if (actorType) return actorType;
@@ -244,31 +408,39 @@ function getTokenPvFromUpdate(tokenDoc, changes) {
 async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
   if (!tokenDoc) return;
   if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
+
   const isZeroOrLess = Number(pvCurrent) <= 0;
   const bleeding = getBleedingStatusEffect();
   const dead = getDeadStatusEffect();
+  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
+
+  const bleedingFamily = buildStatusFamilyIds(bleeding, PLAYER_ZERO_PV_STATUS_CANDIDATES);
+  const deadCandidates = defeatedRaw
+    ? [defeatedRaw, ...NPC_ZERO_PV_STATUS_CANDIDATES]
+    : [...NPC_ZERO_PV_STATUS_CANDIDATES];
+  const deadFamily = buildStatusFamilyIds(dead, deadCandidates);
+
+  if (tokenDoc.actorLink === true) {
+    await removeTokenStatusOverrides(tokenDoc, [...bleedingFamily, ...deadFamily]);
+  }
 
   if (actorType === "personnage") {
-    const hasBleed = bleeding ? tokenHasStatusEffect(tokenDoc, bleeding) : false;
-    if (bleeding && hasBleed !== isZeroOrLess) {
-      const bleedApplied = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess);
-      if (!bleedApplied) console.warn("[bloodman] status:bleeding not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
+    if (bleeding) {
+      const okBleed = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess, bleedingFamily);
+      if (!okBleed) console.warn("[bloodman] status:bleeding sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
     if (dead) {
-      const hasDead = tokenHasStatusEffect(tokenDoc, dead);
-      if (hasDead) await setTokenStatusEffect(tokenDoc, dead, false);
+      const okDeadClear = await setTokenStatusEffect(tokenDoc, dead, false, deadFamily);
+      if (!okDeadClear) console.warn("[bloodman] status:dead clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
   } else {
     if (dead) {
-      const hasDead = tokenHasStatusEffect(tokenDoc, dead);
-      if (hasDead !== isZeroOrLess) {
-        const deadApplied = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess);
-        if (!deadApplied) console.warn("[bloodman] status:dead not applied", { tokenId: tokenDoc.id, pvCurrent, actorType });
-      }
+      const okDead = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess, deadFamily);
+      if (!okDead) console.warn("[bloodman] status:dead sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
     if (bleeding) {
-      const hasBleed = tokenHasStatusEffect(tokenDoc, bleeding);
-      if (hasBleed) await setTokenStatusEffect(tokenDoc, bleeding, false);
+      const okBleedClear = await setTokenStatusEffect(tokenDoc, bleeding, false, bleedingFamily);
+      if (!okBleedClear) console.warn("[bloodman] status:bleeding clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
   }
 
@@ -276,7 +448,6 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
     tokenDoc.object.drawEffects();
   }
 }
-
 if (!globalThis.__bmSyncZeroPvStatusForToken) {
   globalThis.__bmSyncZeroPvStatusForToken = syncZeroPvStatusForToken;
 }
@@ -291,6 +462,85 @@ function getTokenDocumentsForActor(actor) {
     }
   }
   return docs;
+}
+
+function getActorInstancesById(actorId) {
+  const id = String(actorId || "");
+  if (!id) return [];
+  const instances = [];
+  const seen = new Set();
+  const addInstance = actorDoc => {
+    if (!actorDoc) return;
+    const key = String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+    if (seen.has(key)) return;
+    seen.add(key);
+    instances.push(actorDoc);
+  };
+
+  addInstance(game.actors?.get(id));
+  for (const scene of game.scenes || []) {
+    for (const tokenDoc of scene.tokens || []) {
+      if (String(tokenDoc.actorId || "") !== id) continue;
+      addInstance(tokenDoc.actor || null);
+    }
+  }
+  return instances;
+}
+
+function getOwnedCharacterActorInstances() {
+  const instances = [];
+  const seen = new Set();
+  const addInstance = actorDoc => {
+    if (!actorDoc || !actorDoc.isOwner) return;
+    const type = String(actorDoc.type || "");
+    if (type !== "personnage" && type !== "personnage-non-joueur") return;
+    const key = String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+    if (seen.has(key)) return;
+    seen.add(key);
+    instances.push(actorDoc);
+  };
+
+  for (const actor of game.actors || []) addInstance(actor);
+  for (const scene of game.scenes || []) {
+    for (const tokenDoc of scene.tokens || []) addInstance(tokenDoc.actor || null);
+  }
+  return instances;
+}
+
+function getOpenSheetActorInstances() {
+  const instances = [];
+  const seen = new Set();
+  for (const app of Object.values(ui.windows || {})) {
+    const actorDoc = app?.actor || null;
+    if (!actorDoc) continue;
+    const type = String(actorDoc.type || "");
+    if (type !== "personnage" && type !== "personnage-non-joueur") continue;
+    const key = String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    instances.push(actorDoc);
+  }
+  return instances;
+}
+
+function resolveAttackerActorInstancesForDamageApplied(data) {
+  const attackerId = String(data?.attackerId || data?.attaquant_id || "");
+  let instances = getActorInstancesById(attackerId);
+  if (instances.length) return instances;
+
+  const itemId = String(data?.itemId || "");
+  const candidates = [...getOwnedCharacterActorInstances(), ...getOpenSheetActorInstances()];
+  const deduped = [];
+  const seen = new Set();
+  for (const actor of candidates) {
+    const key = String(actor.uuid || `${actor.id}:${actor.parent?.uuid || actor.parent?.id || "world"}`);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(actor);
+  }
+  if (!itemId) return deduped;
+  const withItem = deduped.filter(actor => actor.items?.get(itemId));
+  return withItem.length ? withItem : deduped;
 }
 
 async function syncZeroPvStatusForActor(actor) {
@@ -324,6 +574,7 @@ const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
+const CHAOS_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-chaos-request</span>";
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
 const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
 
@@ -416,6 +667,7 @@ function getDerivedPvMax(actor, phyEffective, roleOverride) {
 }
 
 const PROCESSED_DAMAGE_REQUESTS = new Map();
+const PROCESSED_CHAOS_REQUESTS = new Map();
 
 function rememberDamageRequest(requestId) {
   if (!requestId) return;
@@ -429,6 +681,20 @@ function rememberDamageRequest(requestId) {
 function wasDamageRequestProcessed(requestId) {
   if (!requestId) return false;
   return PROCESSED_DAMAGE_REQUESTS.has(requestId);
+}
+
+function rememberChaosRequest(requestId) {
+  if (!requestId) return;
+  const now = Date.now();
+  PROCESSED_CHAOS_REQUESTS.set(requestId, now);
+  for (const [key, value] of PROCESSED_CHAOS_REQUESTS.entries()) {
+    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_CHAOS_REQUESTS.delete(key);
+  }
+}
+
+function wasChaosRequestProcessed(requestId) {
+  if (!requestId) return false;
+  return PROCESSED_CHAOS_REQUESTS.has(requestId);
 }
 
 async function resolveDamageTokenDocument(data) {
@@ -481,6 +747,22 @@ function getRerollTargetKey(target) {
   return target.tokenUuid || target.tokenId || target.actorId || "";
 }
 
+function isSameRerollTarget(a, b) {
+  if (!a || !b) return false;
+  const keyA = getRerollTargetKey(a);
+  const keyB = getRerollTargetKey(b);
+  if (keyA && keyB) return keyA === keyB;
+  const actorA = String(a.actorId || "");
+  const actorB = String(b.actorId || "");
+  if (actorA && actorB) return actorA === actorB;
+  const tokenA = String(a.tokenId || "");
+  const tokenB = String(b.tokenId || "");
+  if (tokenA && tokenB) return tokenA === tokenB;
+  const uuidA = String(a.tokenUuid || "");
+  const uuidB = String(b.tokenUuid || "");
+  return Boolean(uuidA && uuidB && uuidA === uuidB);
+}
+
 function isDamageRerollContextReady(context) {
   if (!context || !Array.isArray(context.targets) || context.targets.length === 0) return false;
   if (context.used) return false;
@@ -527,7 +809,17 @@ function getRollValuesFromRoll(roll) {
 
 function emitDamageAppliedMessage(data, result, tokenDoc, share) {
   const attackerUserId = String(data.attackerUserId || "");
-  if (!attackerUserId || !game.socket || !result || !tokenDoc) return;
+  if (!game.socket || !result) return;
+  const tokenId = tokenDoc?.id || String(data.tokenId || "");
+  const tokenUuid = tokenDoc?.uuid || String(data.tokenUuid || "");
+  const sceneId = tokenDoc?.parent?.id || tokenDoc?.scene?.id || String(data.sceneId || "");
+  const actorId = tokenDoc?.actorId || String(data.actorId || "");
+  const targetActorLink = tokenDoc ? Boolean(tokenDoc.actorLink) : data.targetActorLink === true;
+  const targetName = resolveCombatTargetName(
+    tokenDoc?.name || data.targetName,
+    tokenDoc?.actor?.name,
+    data.targetName || tokenDoc?.name || ""
+  );
   game.socket.emit(SYSTEM_SOCKET, {
     type: "damageApplied",
     rerollUsed: Boolean(data.rerollUsed),
@@ -542,12 +834,12 @@ function emitDamageAppliedMessage(data, result, tokenDoc, share) {
     penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration ?? data.penetration_plus, 0))),
     totalDamage: Number(data.totalDamage),
     target: {
-      tokenId: tokenDoc.id,
-      tokenUuid: tokenDoc.uuid,
-      sceneId: tokenDoc.parent?.id || tokenDoc.scene?.id || "",
-      actorId: tokenDoc.actorId || "",
-      targetActorLink: Boolean(tokenDoc.actorLink),
-      targetName: resolveCombatTargetName(tokenDoc.name, tokenDoc.actor?.name, tokenDoc.name || ""),
+      tokenId,
+      tokenUuid,
+      sceneId,
+      actorId,
+      targetActorLink,
+      targetName,
       share: Math.max(0, Math.floor(Number(share) || 0)),
       hpBefore: Number(result.hpBefore),
       hpAfter: Number(result.hpAfter),
@@ -557,21 +849,25 @@ function emitDamageAppliedMessage(data, result, tokenDoc, share) {
 }
 
 async function handleDamageAppliedMessage(data) {
-  if (!data || data.attackerUserId !== game.user?.id) return;
-  const actor = data.attackerId ? game.actors?.get(data.attackerId) : null;
-  if (!actor) return;
+  if (!data) return;
+  const attackerUserId = String(data.attackerUserId || "");
+  const localUserId = String(game.user?.id || "");
+  if (attackerUserId && attackerUserId !== localUserId) return;
+  const attackers = resolveAttackerActorInstancesForDamageApplied(data);
+  if (!attackers.length) return;
+  if (!attackerUserId && !attackers.some(actor => actor.isOwner)) return;
   const rollId = String(data.rollId || "");
   const itemId = String(data.itemId || "");
   const target = data.target || {};
   const key = getRerollTargetKey(target);
 
-  let context = actor._lastDamageReroll;
+  let context = attackers[0]?._lastDamageReroll;
   if (!context || context.rollId !== rollId) {
     context = {
       rollId,
       itemId,
       itemName: String(data.itemName || ""),
-      attackerId: actor.id,
+      attackerId: String(data.attackerId || data.attaquant_id || attackers[0]?.id || ""),
       attackerUserId: String(data.attackerUserId || ""),
       formula: String(data.damageFormula || "1d4"),
       degats: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
@@ -596,20 +892,42 @@ async function handleDamageAppliedMessage(data) {
     context.totalDamage = Number(data.totalDamage);
   }
 
-  if (key) {
-    const existing = context.targets.find(entry => getRerollTargetKey(entry) === key);
-    if (existing) Object.assign(existing, target);
-    else context.targets.push(target);
+  const existing = context.targets.find(entry => isSameRerollTarget(entry, target));
+  if (existing) {
+    Object.assign(existing, target);
+  } else if (key || target.actorId || target.tokenId || target.tokenUuid) {
+    context.targets.push(target);
   }
 
-  actor._lastDamageReroll = context;
-  actor._lastItemReroll = {
+  const itemRerollState = {
     itemId: context.itemId,
     rollId: context.rollId,
     at: Date.now(),
     damage: context
   };
-  if (actor.sheet?.rendered) actor.sheet.render(false);
+  const actorInstances = [];
+  const seen = new Set();
+  for (const actor of attackers) {
+    for (const instance of getActorInstancesById(actor.id)) {
+      const keyRef = String(instance.uuid || `${instance.id}:${instance.parent?.uuid || instance.parent?.id || "world"}`);
+      if (seen.has(keyRef)) continue;
+      seen.add(keyRef);
+      actorInstances.push(instance);
+    }
+  }
+  if (!actorInstances.length) {
+    for (const actor of attackers) {
+      const keyRef = String(actor.uuid || `${actor.id}:${actor.parent?.uuid || actor.parent?.id || "world"}`);
+      if (seen.has(keyRef)) continue;
+      seen.add(keyRef);
+      actorInstances.push(actor);
+    }
+  }
+  for (const actorInstance of actorInstances) {
+    actorInstance._lastDamageReroll = context;
+    actorInstance._lastItemReroll = itemRerollState;
+    if (actorInstance.sheet?.rendered) actorInstance.sheet.render(false);
+  }
 }
 
 async function handleDamageRerollRequest(data) {
@@ -620,9 +938,25 @@ async function handleDamageRerollRequest(data) {
   const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
 
   for (const target of targets) {
+    const share = Math.max(0, Math.floor(Number(target.share || 0)));
+    if (!share) continue;
     const tokenDoc = await resolveDamageTokenDocument(target);
     const targetActor = tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null);
-    const hpBefore = Number(target.hpBefore);
+    let hpBefore = Number(target.hpBefore);
+    if (!Number.isFinite(hpBefore)) {
+      if (targetActor) {
+        const currentHp = Number(targetActor.system?.resources?.pv?.current);
+        if (Number.isFinite(currentHp)) {
+          const paInitial = getProtectionPA(targetActor);
+          const paEffective = Math.max(0, paInitial - penetration);
+          const estimatedFinalDamage = Math.max(0, share - paEffective);
+          hpBefore = currentHp + estimatedFinalDamage;
+        }
+      } else if (tokenDoc) {
+        const currentHp = Number(getTokenCurrentPv(tokenDoc));
+        if (Number.isFinite(currentHp)) hpBefore = currentHp + share;
+      }
+    }
     if (Number.isFinite(hpBefore)) {
       if (targetActor) {
         await targetActor.update({ "system.resources.pv.current": hpBefore });
@@ -635,8 +969,6 @@ async function handleDamageRerollRequest(data) {
       }
     }
 
-    const share = Math.max(0, Math.floor(Number(target.share || 0)));
-    if (!share) continue;
     const targetName = resolveCombatTargetName(
       target.targetName || tokenDoc?.name,
       targetActor?.name,
@@ -655,12 +987,14 @@ async function handleDamageRerollRequest(data) {
       result = { hpBefore, hpAfter: nextValue, finalDamage: share };
     }
 
-    if (result && tokenDoc) {
-      const actorType = getTokenActorType(tokenDoc);
-      if (actorType && Number.isFinite(result.hpAfter)) {
-        await syncZeroPvStatusForToken(tokenDoc, actorType, result.hpAfter);
+    if (result) {
+      if (tokenDoc) {
+        const actorType = getTokenActorType(tokenDoc);
+        if (actorType && Number.isFinite(result.hpAfter)) {
+          await syncZeroPvStatusForToken(tokenDoc, actorType, result.hpAfter);
+        }
       }
-      emitDamageAppliedMessage(data, result, tokenDoc, share);
+      emitDamageAppliedMessage({ ...data, ...target }, result, tokenDoc, share);
     }
   }
 }
@@ -733,7 +1067,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     console.debug("[bloodman] damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
     const result = await applyDamageToActor(tokenActor, share, { targetName: fallbackName, penetration });
     if (result) {
-      if (tokenDoc) emitDamageAppliedMessage(data, result, tokenDoc, share);
+      emitDamageAppliedMessage(data, result, tokenDoc, share);
       console.debug("[bloodman] damage:output", {
         degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
         jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
@@ -752,12 +1086,14 @@ async function handleIncomingDamageRequest(data, source = "socket") {
   }
   if (uuidActor) {
     console.debug("[bloodman] damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
-    await applyDamageToActor(uuidActor, share, { targetName: fallbackName, penetration });
+    const result = await applyDamageToActor(uuidActor, share, { targetName: fallbackName, penetration });
+    if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
     return;
   }
   if (worldActor) {
     console.debug("[bloodman] damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
-    await applyDamageToActor(worldActor, share, { targetName: fallbackName, penetration });
+    const result = await applyDamageToActor(worldActor, share, { targetName: fallbackName, penetration });
+    if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
     return;
   }
   if (Number.isFinite(fallbackCurrent)) {
@@ -775,8 +1111,16 @@ async function handleIncomingDamageRequest(data, source = "socket") {
 
 
 function registerDamageSocketHandlers() {
-  if (globalThis.__bmDamageSocketReady || !game.socket) return;
-  game.socket.on(SYSTEM_SOCKET, async data => {
+  if (!game.socket) return;
+  const previousHandler = globalThis.__bmDamageSocketHandler;
+  if (previousHandler && typeof game.socket.off === "function") {
+    try {
+      game.socket.off(SYSTEM_SOCKET, previousHandler);
+    } catch (_error) {
+      // non-fatal: continue with fresh registration
+    }
+  }
+  const handler = async data => {
     if (!data) return;
     if (data.type === "damageApplied") {
       await handleDamageAppliedMessage(data);
@@ -790,14 +1134,20 @@ function registerDamageSocketHandlers() {
     if (data.type === "adjustChaosDice") {
       const delta = Number(data.delta);
       if (!Number.isFinite(delta) || delta === 0) return;
+      const requestId = String(data.requestId || "");
+      if (requestId && wasChaosRequestProcessed(requestId)) return;
+      if (requestId) rememberChaosRequest(requestId);
       await setChaosValue(getChaosValue() + delta);
       return;
     }
     if (data.type !== "applyDamage") return;
     await handleIncomingDamageRequest(data, "socket");
-  });
+  };
+  game.socket.on(SYSTEM_SOCKET, handler);
+  globalThis.__bmDamageSocketHandler = handler;
   globalThis.__bmDamageSocketReady = true;
 }
+if (globalThis.game?.ready) registerDamageSocketHandlers();
 
 function getCombatantActor(combatant) {
   return combatant?.token?.actor || combatant?.actor || null;
@@ -1041,8 +1391,17 @@ async function requestChaosDelta(delta) {
     await setChaosValue(getChaosValue() + numeric);
     return;
   }
-  if (!game.socket) return;
-  game.socket.emit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric });
+  const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+  if (game.socket) {
+    game.socket.emit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric, requestId });
+  }
+  const gmIds = game.users?.filter(user => user.active && user.isGM).map(user => user.id) || [];
+  if (!gmIds.length) return;
+  await ChatMessage.create({
+    content: CHAOS_REQUEST_CHAT_MARKUP,
+    whisper: gmIds,
+    flags: { bloodman: { chaosDeltaRequest: { requestId, delta: numeric } } }
+  }).catch(() => null);
 }
 
 function updateChaosDiceUI(value) {
@@ -1150,6 +1509,19 @@ Hooks.on("createItem", (item) => {
 
 Hooks.on("createChatMessage", async (message) => {
   if (!game.user.isGM) return;
+  const chaosPayload = foundry.utils.getProperty(message, "flags.bloodman.chaosDeltaRequest");
+  if (chaosPayload) {
+    const delta = Number(chaosPayload.delta);
+    const requestId = String(chaosPayload.requestId || "");
+    if (Number.isFinite(delta) && delta !== 0) {
+      if (!requestId || !wasChaosRequestProcessed(requestId)) {
+        if (requestId) rememberChaosRequest(requestId);
+        await setChaosValue(getChaosValue() + delta);
+      }
+    }
+    if (message.isOwner) await message.delete().catch(() => null);
+    return;
+  }
   const payload = foundry.utils.getProperty(message, "flags.bloodman.damageRequest");
   if (!payload) return;
   await handleIncomingDamageRequest(payload, "chat");
@@ -1463,7 +1835,7 @@ Hooks.on("updateActor", async (actor, changes) => {
 
 Hooks.on("updateActor", async (actor, changes) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  if (!game.user.isGM && !actor.isOwner) return;
+  if (!game.user.isGM) return;
   const hasPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
   if (!hasPvChange) return;
   if (actor.isToken) {
@@ -1478,7 +1850,7 @@ Hooks.on("updateActor", async (actor, changes) => {
 });
 
 Hooks.on("updateToken", async (tokenDoc, changes) => {
-  if (!game.user.isGM && !tokenDoc?.isOwner) return;
+  if (!game.user.isGM) return;
   if (foundry.utils.getProperty(changes, "name") != null) {
     await syncCombatantNameForToken(tokenDoc);
   }
@@ -1510,8 +1882,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     const rerollKey = this._lastCharacteristicRollKey || "";
     const characteristicRerollActive = this.isRerollWindowActive(this._lastCharacteristicRollAt);
     const itemRerollState = this.getItemRerollState();
-    const itemRerollReady = this.isDamageRerollReady(itemRerollState?.damage);
-    const itemRerollActive = itemRerollReady && this.isRerollWindowActive(itemRerollState?.at);
+    const itemRerollWindowActive = this.isRerollWindowActive(itemRerollState?.at);
+    const itemRerollUnused = !itemRerollState?.damage?.used;
+    const itemRerollActive = Boolean(itemRerollState?.itemId) && itemRerollWindowActive && itemRerollUnused;
     const activeRerollKey = characteristicRerollActive ? rerollKey : "";
     const lastItemRerollId = itemRerollActive ? (itemRerollState?.itemId || "") : "";
     const isPlayerActor = data.actor.type === "personnage";
@@ -1923,7 +2296,37 @@ class BloodmanActorSheet extends BaseActorSheet {
     const context = state?.damage;
     if (!context || state?.itemId !== itemId) return;
     if (!this.isRerollWindowActive(state?.at)) return;
-    if (!this.isDamageRerollReady(context)) return;
+    let targets = Array.isArray(context.targets) ? context.targets.filter(Boolean) : [];
+    if (!targets.length) {
+      const selected = Array.from(game.user.targets || []);
+      if (selected.length) {
+        const requestedTotal = Math.max(0, Math.floor(Number(context.totalDamage || 0)));
+        const baseShare = selected.length > 0 ? Math.floor(requestedTotal / selected.length) : 0;
+        let remainder = Math.max(0, requestedTotal - baseShare * selected.length);
+        targets = selected.map(token => {
+          const tokenDoc = token?.document || token;
+          const bonus = remainder > 0 ? 1 : 0;
+          if (remainder > 0) remainder -= 1;
+          return {
+            tokenId: tokenDoc?.id || token?.id || "",
+            tokenUuid: tokenDoc?.uuid || "",
+            sceneId: tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || "",
+            actorId: tokenDoc?.actorId || token?.actor?.id || "",
+            targetActorLink: Boolean(tokenDoc?.actorLink),
+            targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, token?.actor?.name, "Cible"),
+            share: Math.max(0, baseShare + bonus),
+            hpBefore: Number(getTokenCurrentPv(tokenDoc)),
+            hpAfter: Number.NaN,
+            pending: true
+          };
+        }).filter(target => Number(target.share) > 0);
+        context.targets = targets;
+      }
+    }
+    if (!targets.length) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.NoTargetSelected"));
+      return;
+    }
 
     const isPlayerActor = this.actor.type === "personnage";
     const isNpcActor = this.actor.type === "personnage-non-joueur";
@@ -1936,6 +2339,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         return;
       }
       await this.actor.update({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) });
+      await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
     } else {
       if (!game.user.isGM) return;
       const currentChaos = getChaosValue();

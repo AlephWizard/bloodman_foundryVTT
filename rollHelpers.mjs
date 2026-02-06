@@ -397,7 +397,7 @@ async function requestDamageFromGM(token, damage, options = {}) {
       });
     } catch (error) {
       console.error("[bloodman] damage:fallback chat failed", error);
-      return false;
+      // Socket delivery already succeeded; keep reroll context available to players.
     }
   }
   return true;
