@@ -862,6 +862,73 @@ function getDamagePayloadField(data, keys = []) {
   return undefined;
 }
 
+function toBooleanFlag(value) {
+  if (value === true) return true;
+  if (typeof value === "string") return value.trim().toLowerCase() === "true";
+  return false;
+}
+
+function normalizeRerollTarget(target, { includeAliases = false } = {}) {
+  const source = target && typeof target === "object" ? target : {};
+  const tokenId = String(getDamagePayloadField(source, ["tokenId", "tokenid", "token_id"]) || "");
+  const tokenUuid = String(getDamagePayloadField(source, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
+  const sceneId = String(getDamagePayloadField(source, ["sceneId", "sceneid", "scene_id"]) || "");
+  const actorId = String(getDamagePayloadField(source, ["actorId", "actorid", "actor_id"]) || "");
+  const targetActorLink = toBooleanFlag(
+    getDamagePayloadField(source, ["targetActorLink", "targetactorlink", "target_actor_link"])
+  );
+
+  const normalized = {
+    ...source,
+    tokenId,
+    tokenUuid,
+    sceneId,
+    actorId,
+    targetActorLink
+  };
+
+  if (includeAliases) {
+    normalized.tokenid = tokenId;
+    normalized.tokenuuid = tokenUuid;
+    normalized.sceneid = sceneId;
+    normalized.actorid = actorId;
+    normalized.targetactorlink = targetActorLink;
+  }
+
+  return normalized;
+}
+
+function normalizeRerollTargets(targets, { includeAliases = false } = {}) {
+  if (!Array.isArray(targets)) return [];
+  return targets.map(target => normalizeRerollTarget(target, { includeAliases }));
+}
+
+function buildFallbackRerollTargets(selectedTargets, requestedTotal) {
+  const selected = Array.isArray(selectedTargets) ? selectedTargets : [];
+  if (!selected.length) return [];
+  const baseShare = selected.length > 0 ? Math.floor(requestedTotal / selected.length) : 0;
+  let remainder = Math.max(0, requestedTotal - baseShare * selected.length);
+
+  return selected.map(token => {
+    const tokenDoc = token?.document || token;
+    const bonus = remainder > 0 ? 1 : 0;
+    if (remainder > 0) remainder -= 1;
+    return normalizeRerollTarget({
+      tokenId: tokenDoc?.id || token?.id || "",
+      tokenUuid: tokenDoc?.uuid || "",
+      sceneId: tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || "",
+      actorId: tokenDoc?.actorId || token?.actor?.id || "",
+      targetActorLink: Boolean(tokenDoc?.actorLink),
+      targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, token?.actor?.name, "Cible"),
+      share: Math.max(0, baseShare + bonus),
+      baseShare: Math.max(0, baseShare + bonus),
+      hpBefore: Number(getTokenCurrentPv(tokenDoc)),
+      hpAfter: Number.NaN,
+      pending: true
+    });
+  }).filter(target => Number(target.share) > 0);
+}
+
 async function resolveDamageTokenDocument(data) {
   if (!data) return null;
   const tokenUuid = String(getDamagePayloadField(data, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
@@ -1059,7 +1126,7 @@ async function handleDamageAppliedMessage(data) {
   if (!attackerUserId && !attackers.some(actor => actor.isOwner)) return;
   const rollId = String(data.rollId || "");
   const itemId = String(data.itemId || "");
-  const target = data.target || {};
+  const target = normalizeRerollTarget(data.target || {});
   const key = getRerollTargetKey(target);
 
   let context = attackers[0]?._lastDamageReroll;
@@ -1171,7 +1238,7 @@ async function handleDamageRerollRequest(data) {
     });
     return;
   }
-  const targets = Array.isArray(data.targets) ? data.targets : [];
+  const targets = normalizeRerollTargets(data.targets);
   if (!targets.length) return;
   const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
   console.debug("[bloodman] reroll:recv", {
@@ -1193,7 +1260,7 @@ async function handleDamageRerollRequest(data) {
         target
       });
     }
-    const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : target.targetActorLink === true;
+    const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : toBooleanFlag(target.targetActorLink);
     const targetActor = tokenIsLinked
       ? (tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null))
       : null;
@@ -2683,31 +2750,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     context.itemType = String(context.itemType || item.type || "").toLowerCase();
     if (context.kind !== "item-damage" || !isDamageRerollItemType(context.itemType)) return;
     if (this.actor.type !== "personnage" && !this.isRerollWindowActive(state?.at)) return;
-    let targets = Array.isArray(context.targets) ? context.targets.filter(Boolean) : [];
+    let targets = normalizeRerollTargets(context.targets).filter(Boolean);
     if (!targets.length) {
       const selected = Array.from(game.user.targets || []);
       if (selected.length) {
         const requestedTotal = Math.max(0, Math.floor(Number(context.totalDamage || 0)));
-        const baseShare = selected.length > 0 ? Math.floor(requestedTotal / selected.length) : 0;
-        let remainder = Math.max(0, requestedTotal - baseShare * selected.length);
-        targets = selected.map(token => {
-          const tokenDoc = token?.document || token;
-          const bonus = remainder > 0 ? 1 : 0;
-          if (remainder > 0) remainder -= 1;
-          return {
-            tokenId: tokenDoc?.id || token?.id || "",
-            tokenUuid: tokenDoc?.uuid || "",
-            sceneId: tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || "",
-            actorId: tokenDoc?.actorId || token?.actor?.id || "",
-            targetActorLink: Boolean(tokenDoc?.actorLink),
-            targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, token?.actor?.name, "Cible"),
-            share: Math.max(0, baseShare + bonus),
-            baseShare: Math.max(0, baseShare + bonus),
-            hpBefore: Number(getTokenCurrentPv(tokenDoc)),
-            hpAfter: Number.NaN,
-            pending: true
-          };
-        }).filter(target => Number(target.share) > 0);
+        targets = buildFallbackRerollTargets(selected, requestedTotal);
         context.targets = targets;
       }
     }
@@ -2773,6 +2821,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const rollResults = getRollValuesFromRoll(roll);
     const totalDamage = Math.max(0, Number(roll.total || 0) + Math.max(0, Number(context.bonusBrut || 0)));
     const allocations = buildRerollAllocations(context, totalDamage);
+    const penetrationValue = Math.max(0, Number(context.penetration || 0));
     const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
 
     const damageLabel = context.degats || context.formula || "";
@@ -2787,27 +2836,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     if (!game.user.isGM && hasActiveGM) {
       const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-      const socketTargets = allocations.map(target => {
-        const tokenId = String(getDamagePayloadField(target, ["tokenId", "tokenid", "token_id"]) || "");
-        const tokenUuid = String(getDamagePayloadField(target, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
-        const sceneId = String(getDamagePayloadField(target, ["sceneId", "sceneid", "scene_id"]) || "");
-        const actorId = String(getDamagePayloadField(target, ["actorId", "actorid", "actor_id"]) || "");
-        const targetActorLinkRaw = getDamagePayloadField(target, ["targetActorLink", "targetactorlink", "target_actor_link"]);
-        const targetActorLink = targetActorLinkRaw === true || String(targetActorLinkRaw).toLowerCase() === "true";
-        return {
-          ...target,
-          tokenId,
-          tokenUuid,
-          sceneId,
-          actorId,
-          targetActorLink,
-          tokenid: tokenId,
-          tokenuuid: tokenUuid,
-          sceneid: sceneId,
-          actorid: actorId,
-          targetactorlink: targetActorLink
-        };
-      });
+      const socketTargets = normalizeRerollTargets(allocations, { includeAliases: true });
       const rerollPayload = {
         type: "rerollDamage",
         requestId,
@@ -2852,9 +2881,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       return;
     }
 
-    for (const target of allocations) {
+    for (const rawTarget of allocations) {
+      const target = normalizeRerollTarget(rawTarget);
       const tokenDoc = await resolveDamageTokenDocument(target);
-      const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : target.targetActorLink === true;
+      const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : toBooleanFlag(target.targetActorLink);
       const targetActor = tokenIsLinked
         ? (tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null))
         : null;
@@ -2863,13 +2893,12 @@ class BloodmanActorSheet extends BaseActorSheet {
         ? Number.NaN
         : Number(rawHpBefore);
       if (!Number.isFinite(hpBefore)) {
-        const penetration = Math.max(0, Number(context.penetration || 0));
         const referenceShare = Math.max(0, Math.floor(Number(target.baseShare ?? target.share ?? 0)));
         if (tokenIsLinked && targetActor) {
           const currentHp = Number(targetActor.system?.resources?.pv?.current);
           if (Number.isFinite(currentHp)) {
             const paInitial = getProtectionPA(targetActor);
-            const paEffective = Math.max(0, paInitial - penetration);
+            const paEffective = Math.max(0, paInitial - penetrationValue);
             const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
             hpBefore = currentHp + estimatedFinalDamage;
           }
@@ -2877,7 +2906,7 @@ class BloodmanActorSheet extends BaseActorSheet {
           const currentHp = Number(getTokenCurrentPv(tokenDoc));
           if (Number.isFinite(currentHp)) {
             const paInitial = getProtectionPA(tokenDoc.actor || null);
-            const paEffective = Math.max(0, paInitial - penetration);
+            const paEffective = Math.max(0, paInitial - penetrationValue);
             const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
             hpBefore = currentHp + estimatedFinalDamage;
           }
@@ -2921,11 +2950,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       );
       let result = null;
       if (tokenIsLinked && targetActor) {
-        result = await applyDamageToActor(targetActor, share, { targetName, penetration: Math.max(0, Number(context.penetration || 0)) });
+        result = await applyDamageToActor(targetActor, share, { targetName, penetration: penetrationValue });
       } else if (tokenDoc && Number.isFinite(hpBefore)) {
-        const penetration = Math.max(0, Number(context.penetration || 0));
         const paInitial = getProtectionPA(tokenDoc.actor || null);
-        const paEffective = Math.max(0, paInitial - penetration);
+        const paEffective = Math.max(0, paInitial - penetrationValue);
         const finalDamage = Math.max(0, share - paEffective);
         const nextValue = Math.max(0, hpBefore - finalDamage);
         await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
@@ -2937,7 +2965,7 @@ class BloodmanActorSheet extends BaseActorSheet {
           hpBefore,
           hpAfter: nextValue,
           finalDamage,
-          penetration,
+          penetration: penetrationValue,
           paInitial,
           paEffective,
           pa: paEffective

@@ -355,6 +355,42 @@ function buildDamageRequestPayload(token, damage, options = {}) {
   };
 }
 
+function buildDamageBackendInput(actor, config) {
+  const targetIds = Array.from(game.user.targets || []).map(token => token?.id).filter(Boolean);
+  return {
+    degats: config.degats,
+    bonus_brut: config.bonusBrut,
+    penetration: config.penetration,
+    cible_id: targetIds[0] || "",
+    attaquant_id: actor?.id || ""
+  };
+}
+
+function buildDamageContext(actor, config, {
+  rollId = "",
+  itemId = "",
+  itemType = "",
+  itemName = "",
+  totalDamage = 0,
+  targets = []
+} = {}) {
+  return {
+    kind: "item-damage",
+    rollId,
+    itemId: String(itemId || ""),
+    itemType: String(itemType || ""),
+    itemName: String(itemName || ""),
+    attackerId: actor?.id || "",
+    attackerUserId: game.user?.id || "",
+    formula: config.formula,
+    degats: config.degats,
+    bonusBrut: config.bonusBrut,
+    penetration: config.penetration,
+    totalDamage,
+    targets: Array.isArray(targets) ? targets : []
+  };
+}
+
 export async function doCharacteristicRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
 
@@ -678,14 +714,7 @@ export async function doDamageRoll(actor, item) {
   });
   if (!config) return null;
 
-  const targetIds = Array.from(game.user.targets || []).map(token => token?.id).filter(Boolean);
-  const backendInput = {
-    degats: config.degats,
-    bonus_brut: config.bonusBrut,
-    penetration: config.penetration,
-    cible_id: targetIds[0] || "",
-    attaquant_id: actor?.id || ""
-  };
+  const backendInput = buildDamageBackendInput(actor, config);
   console.debug("[bloodman] damage:input", backendInput);
 
   const rollId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
@@ -720,21 +749,14 @@ export async function doDamageRoll(actor, item) {
   });
   return {
     roll,
-    context: {
-      kind: "item-damage",
+    context: buildDamageContext(actor, config, {
       rollId,
       itemId: item?.id || "",
       itemType: item?.type || "",
       itemName: sourceName,
-      attackerId: actor?.id || "",
-      attackerUserId: game.user?.id || "",
-      formula: config.formula,
-      degats: config.degats,
-      bonusBrut: config.bonusBrut,
-      penetration: config.penetration,
       totalDamage,
       targets: applyResult?.contextTargets || []
-    }
+    })
   };
 }
 
@@ -783,14 +805,7 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
     if (!allowed) return null;
   }
 
-  const targetIds = Array.from(game.user.targets || []).map(token => token?.id).filter(Boolean);
-  const backendInput = {
-    degats: config.degats,
-    bonus_brut: config.bonusBrut,
-    penetration: config.penetration,
-    cible_id: targetIds[0] || "",
-    attaquant_id: actor?.id || ""
-  };
+  const backendInput = buildDamageBackendInput(actor, config);
   console.debug("[bloodman] damage:input", backendInput);
 
   const rollId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
@@ -819,21 +834,14 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
   });
   return {
     roll,
-    context: {
-      kind: "item-damage",
+    context: buildDamageContext(actor, config, {
       rollId,
       itemId: String(options?.itemId || ""),
       itemType: String(options?.itemType || ""),
       itemName: resolvedSource,
-      attackerId: actor?.id || "",
-      attackerUserId: game.user?.id || "",
-      formula: config.formula,
-      degats: config.degats,
-      bonusBrut: config.bonusBrut,
-      penetration: config.penetration,
       totalDamage,
       targets: applyResult?.contextTargets || []
-    }
+    })
   };
 }
 
