@@ -256,7 +256,9 @@ function actorHasStatusInFamily(actor, familyIds = []) {
 function tokenHasStatusInFamily(tokenDoc, familyIds = []) {
   const family = normalizeStatusIdList(familyIds);
   if (!tokenDoc || !family.length) return false;
-  const actor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+  const actor = tokenDoc.actorLink === true
+    ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
+    : tokenDoc.actor || null;
   if (actorHasStatusInFamily(actor, family)) return true;
   const tokenStatuses = new Set(getTokenStatusesList(tokenDoc));
   if (family.some(id => tokenStatuses.has(id))) return true;
@@ -290,7 +292,9 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = [])
   const primaryId = resolvePrimaryStatusId(effectDef) || getStatusEffectIds(effectDef)[0] || "";
   const family = buildStatusFamilyIds(effectDef, familyIds);
   if (!primaryId || !family.length) return false;
-  const actor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+  const actor = tokenDoc.actorLink === true
+    ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
+    : tokenDoc.actor || null;
   const currentStatuses = getTokenStatusesList(tokenDoc, { normalized: false });
   const familySet = new Set(family);
   const hasTokenOverrides = currentStatuses.some(id => familySet.has(normalizeStatusValue(id)));
@@ -575,6 +579,7 @@ const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
 const CHAOS_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-chaos-request</span>";
+const INITIATIVE_GROUP_BUFFER_MS = 180;
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
 const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
 
@@ -668,6 +673,7 @@ function getDerivedPvMax(actor, phyEffective, roleOverride) {
 
 const PROCESSED_DAMAGE_REQUESTS = new Map();
 const PROCESSED_CHAOS_REQUESTS = new Map();
+const INITIATIVE_GROUP_BUFFER = new Map();
 
 function rememberDamageRequest(requestId) {
   if (!requestId) return;
@@ -695,6 +701,82 @@ function rememberChaosRequest(requestId) {
 function wasChaosRequestProcessed(requestId) {
   if (!requestId) return false;
   return PROCESSED_CHAOS_REQUESTS.has(requestId);
+}
+
+function isInitiativeRollMessage(message) {
+  if (!message) return false;
+  if (foundry.utils.getProperty(message, "flags.bloodman.initiativeGroupSummary")) return false;
+  const coreFlag = foundry.utils.getProperty(message, "flags.core.initiativeRoll");
+  if (coreFlag != null) return Boolean(coreFlag);
+  if (!message.speaker?.combatant) return false;
+  if (!Array.isArray(message.rolls) || message.rolls.length === 0) return false;
+  const flavor = String(message.flavor || "").toLowerCase();
+  return flavor.includes("initiative");
+}
+
+function getInitiativeRollTotalFromMessage(message, combat) {
+  const roll = Array.isArray(message?.rolls) && message.rolls.length ? message.rolls[0] : null;
+  const total = Number(roll?.total);
+  if (Number.isFinite(total)) return total;
+  const combatantId = message?.speaker?.combatant;
+  const combatant = combatantId ? combat?.combatants?.get(combatantId) : null;
+  const initiative = Number(combatant?.initiative);
+  return Number.isFinite(initiative) ? initiative : 0;
+}
+
+function getInitiativeNameFromMessage(message, combat) {
+  const combatantId = message?.speaker?.combatant;
+  const combatant = combatantId ? combat?.combatants?.get(combatantId) : null;
+  if (combatant) return getCombatantDisplayName(combatant) || combatant.name || message?.speaker?.alias || "Combattant";
+  return message?.speaker?.alias || message?.alias || "Combattant";
+}
+
+async function flushInitiativeGroupBuffer(key) {
+  const entry = INITIATIVE_GROUP_BUFFER.get(key);
+  if (!entry) return;
+  INITIATIVE_GROUP_BUFFER.delete(key);
+  const messages = entry.messages.filter(message => message && !message.deleted);
+  if (messages.length <= 1) return;
+
+  const combat = game.combats?.get(entry.combatId) || game.combat || null;
+  const rows = messages.map(message => ({
+    name: getInitiativeNameFromMessage(message, combat),
+    total: getInitiativeRollTotalFromMessage(message, combat)
+  }));
+  rows.sort((a, b) => Number(b.total) - Number(a.total));
+
+  const contentRows = rows
+    .map(row => `<li><b>${row.name}</b> : ${row.total}</li>`)
+    .join("");
+  await ChatMessage.create({
+    speaker: { alias: combat?.name || "Initiative" },
+    content: `<div class="bm-initiative-group"><p><b>Initiatives (Lancer pour tous)</b></p><ul>${contentRows}</ul></div>`,
+    flags: { bloodman: { initiativeGroupSummary: true } }
+  }).catch(() => null);
+
+  for (const message of messages) {
+    if (!message?.id || !message.isOwner) continue;
+    await message.delete().catch(() => null);
+  }
+}
+
+function queueInitiativeRollMessage(message) {
+  const combatId = String(message?.speaker?.combat || game.combat?.id || "");
+  if (!combatId) return;
+  const key = `${combatId}:${game.user?.id || ""}`;
+  const existing = INITIATIVE_GROUP_BUFFER.get(key);
+  if (existing) {
+    existing.messages.push(message);
+    if (existing.timer) clearTimeout(existing.timer);
+    existing.timer = setTimeout(() => {
+      flushInitiativeGroupBuffer(key);
+    }, INITIATIVE_GROUP_BUFFER_MS);
+    return;
+  }
+  const timer = setTimeout(() => {
+    flushInitiativeGroupBuffer(key);
+  }, INITIATIVE_GROUP_BUFFER_MS);
+  INITIATIVE_GROUP_BUFFER.set(key, { combatId, messages: [message], timer });
 }
 
 async function resolveDamageTokenDocument(data) {
@@ -765,7 +847,6 @@ function isSameRerollTarget(a, b) {
 
 function isDamageRerollContextReady(context) {
   if (!context || !Array.isArray(context.targets) || context.targets.length === 0) return false;
-  if (context.used) return false;
   return context.targets.every(target => Number.isFinite(Number(target.hpBefore)));
 }
 
@@ -773,7 +854,8 @@ function buildRerollAllocations(context, totalDamage) {
   const targets = Array.isArray(context?.targets) ? context.targets : [];
   if (targets.length === 0) return [];
   if (targets.length === 1) {
-    return [{ ...targets[0], share: Math.max(0, Math.floor(totalDamage)) }];
+    const baseShare = Math.max(0, Math.floor(Number(targets[0]?.baseShare ?? targets[0]?.share ?? 0)));
+    return [{ ...targets[0], baseShare, share: Math.max(0, Math.floor(totalDamage)) }];
   }
   const originalTotal = Number(context.totalDamage || 0);
   let remaining = Math.max(0, Math.floor(totalDamage));
@@ -791,7 +873,8 @@ function buildRerollAllocations(context, totalDamage) {
       share = index === targets.length - 1 ? remaining : 0;
       remaining = Math.max(0, remaining - share);
     }
-    return { ...target, share };
+    const baseShare = Math.max(0, Math.floor(Number(target?.baseShare ?? target?.share ?? 0)));
+    return { ...target, baseShare, share };
   });
   return allocations;
 }
@@ -877,7 +960,6 @@ async function handleDamageAppliedMessage(data) {
       targets: []
     };
   }
-  if (data.rerollUsed) context.used = true;
   if (!context.itemId) context.itemId = itemId;
   if (!context.itemName && data.itemName) context.itemName = String(data.itemName);
   if (!context.formula && data.damageFormula) context.formula = String(data.damageFormula);
@@ -895,8 +977,14 @@ async function handleDamageAppliedMessage(data) {
   const existing = context.targets.find(entry => isSameRerollTarget(entry, target));
   if (existing) {
     Object.assign(existing, target);
+    if (!Number.isFinite(Number(existing.baseShare))) {
+      existing.baseShare = Math.max(0, Math.floor(Number(existing.share || 0)));
+    }
   } else if (key || target.actorId || target.tokenId || target.tokenUuid) {
-    context.targets.push(target);
+    context.targets.push({
+      ...target,
+      baseShare: Math.max(0, Math.floor(Number(target.share || 0)))
+    });
   }
 
   const itemRerollState = {
@@ -932,7 +1020,6 @@ async function handleDamageAppliedMessage(data) {
 
 async function handleDamageRerollRequest(data) {
   if (!data || !game.user.isGM) return;
-  data.rerollUsed = true;
   const targets = Array.isArray(data.targets) ? data.targets : [];
   if (!targets.length) return;
   const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
@@ -944,17 +1031,18 @@ async function handleDamageRerollRequest(data) {
     const targetActor = tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null);
     let hpBefore = Number(target.hpBefore);
     if (!Number.isFinite(hpBefore)) {
+      const referenceShare = Math.max(0, Math.floor(Number(target.baseShare ?? target.share ?? 0)));
       if (targetActor) {
         const currentHp = Number(targetActor.system?.resources?.pv?.current);
         if (Number.isFinite(currentHp)) {
           const paInitial = getProtectionPA(targetActor);
           const paEffective = Math.max(0, paInitial - penetration);
-          const estimatedFinalDamage = Math.max(0, share - paEffective);
+          const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
           hpBefore = currentHp + estimatedFinalDamage;
         }
       } else if (tokenDoc) {
         const currentHp = Number(getTokenCurrentPv(tokenDoc));
-        if (Number.isFinite(currentHp)) hpBefore = currentHp + share;
+        if (Number.isFinite(currentHp)) hpBefore = currentHp + referenceShare;
       }
     }
     if (Number.isFinite(hpBefore)) {
@@ -1509,6 +1597,10 @@ Hooks.on("createItem", (item) => {
 
 Hooks.on("createChatMessage", async (message) => {
   if (!game.user.isGM) return;
+  if (isInitiativeRollMessage(message)) {
+    queueInitiativeRollMessage(message);
+    return;
+  }
   const chaosPayload = foundry.utils.getProperty(message, "flags.bloodman.chaosDeltaRequest");
   if (chaosPayload) {
     const delta = Number(chaosPayload.delta);
@@ -1879,16 +1971,19 @@ class BloodmanActorSheet extends BaseActorSheet {
   getData() {
     const data = super.getData();
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
-    const rerollKey = this._lastCharacteristicRollKey || "";
-    const characteristicRerollActive = this.isRerollWindowActive(this._lastCharacteristicRollAt);
-    const itemRerollState = this.getItemRerollState();
-    const itemRerollWindowActive = this.isRerollWindowActive(itemRerollState?.at);
-    const itemRerollUnused = !itemRerollState?.damage?.used;
-    const itemRerollActive = Boolean(itemRerollState?.itemId) && itemRerollWindowActive && itemRerollUnused;
-    const activeRerollKey = characteristicRerollActive ? rerollKey : "";
-    const lastItemRerollId = itemRerollActive ? (itemRerollState?.itemId || "") : "";
     const isPlayerActor = data.actor.type === "personnage";
     const isNpcActor = data.actor.type === "personnage-non-joueur";
+    const rerollKey = this._lastCharacteristicRollKey || "";
+    const characteristicRerollActive = isPlayerActor
+      ? Boolean(rerollKey)
+      : this.isRerollWindowActive(this._lastCharacteristicRollAt);
+    const itemRerollState = this.getItemRerollState();
+    const itemRerollWindowActive = isPlayerActor
+      ? Boolean(itemRerollState?.itemId)
+      : this.isRerollWindowActive(itemRerollState?.at);
+    const itemRerollActive = Boolean(itemRerollState?.itemId) && itemRerollWindowActive;
+    const activeRerollKey = characteristicRerollActive ? rerollKey : "";
+    const lastItemRerollId = itemRerollActive ? (itemRerollState?.itemId || "") : "";
     const chaosValue = getChaosValue();
     const hasChaosForReroll = isNpcActor && game.user.isGM && chaosValue > 0;
     const canUseCharacteristicReroll = (isPlayerActor || hasChaosForReroll) && characteristicRerollActive;
@@ -2213,7 +2308,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!key) return;
 
     if (this.actor.type === "personnage") {
-      if (this._lastCharacteristicRollKey !== key || !this.isRerollWindowActive(this._lastCharacteristicRollAt)) return;
+      if (this._lastCharacteristicRollKey !== key) return;
       const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
       if (!Number.isFinite(currentPP) || currentPP < CHARACTERISTIC_REROLL_PP_COST) {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
@@ -2295,7 +2390,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const state = this.getItemRerollState();
     const context = state?.damage;
     if (!context || state?.itemId !== itemId) return;
-    if (!this.isRerollWindowActive(state?.at)) return;
+    if (this.actor.type !== "personnage" && !this.isRerollWindowActive(state?.at)) return;
     let targets = Array.isArray(context.targets) ? context.targets.filter(Boolean) : [];
     if (!targets.length) {
       const selected = Array.from(game.user.targets || []);
@@ -2315,6 +2410,7 @@ class BloodmanActorSheet extends BaseActorSheet {
             targetActorLink: Boolean(tokenDoc?.actorLink),
             targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, token?.actor?.name, "Cible"),
             share: Math.max(0, baseShare + bonus),
+            baseShare: Math.max(0, baseShare + bonus),
             hpBefore: Number(getTokenCurrentPv(tokenDoc)),
             hpAfter: Number.NaN,
             pending: true
@@ -2368,10 +2464,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
 
     if (!game.user.isGM && hasActiveGM) {
-      context.used = true;
       game.socket.emit(SYSTEM_SOCKET, {
         type: "rerollDamage",
-        rerollUsed: true,
+        rerollUsed: false,
         attackerUserId: game.user?.id || "",
         attackerId: context.attackerId || this.actor.id,
         rollId: context.rollId,
@@ -2385,7 +2480,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         rollResults,
         targets: allocations
       });
-      this.clearItemRerollState();
+      this.markItemReroll(itemId, context);
       this.render(false);
       return;
     }
@@ -2434,7 +2529,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
     }
 
-    this.clearItemRerollState();
+    this.markItemReroll(itemId, context);
     this.render(false);
   }
 
@@ -2470,6 +2565,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   scheduleRerollExpiry(kind) {
+    if (this.actor?.type === "personnage") return;
     const timerKey = kind === "item" ? "_itemRerollTimer" : "_charRerollTimer";
     if (this[timerKey]) {
       clearTimeout(this[timerKey]);
