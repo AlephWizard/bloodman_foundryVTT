@@ -415,6 +415,107 @@
   color: #ffffff !important;
 }
 
+.bm-doc-type-label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bm-doc-type-icon {
+  width: 1.1em;
+  text-align: center;
+  opacity: 0.95;
+}
+
+.bm-doc-type-select-native {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.bm-doc-type-picker {
+  position: relative;
+}
+
+.bm-doc-type-picker-toggle,
+.bm-doc-type-picker-option {
+  width: 100%;
+  border: 1px solid #4d4d6a;
+  border-radius: 6px;
+  background: #23212b;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: "Oswald", sans-serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.1;
+  text-transform: none;
+}
+
+.bm-doc-type-picker-toggle {
+  min-height: 40px;
+  padding: 6px 10px;
+}
+
+.bm-doc-type-picker-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bm-doc-type-picker-value i,
+.bm-doc-type-picker-option i {
+  width: 1.1em;
+  text-align: center;
+}
+
+.bm-doc-type-picker-caret {
+  font-size: 0.7em;
+  opacity: 0.85;
+}
+
+.bm-doc-type-picker-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: none;
+  background: #23212b;
+  border: 1px solid #4d4d6a;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.bm-doc-type-picker.open .bm-doc-type-picker-menu {
+  display: block;
+}
+
+.bm-doc-type-picker-option {
+  justify-content: flex-start;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+}
+
+.bm-doc-type-picker-option.active,
+.bm-doc-type-picker-option:hover {
+  background: #3f5f90;
+}
+
 @media (max-width: 720px) {
   .bm-damage-config .bm-damage-config-top {
     grid-template-columns: 1fr;

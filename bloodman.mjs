@@ -18,6 +18,255 @@ function safeWarn(message) {
   }
 }
 
+const ACTOR_CREATE_TYPE_ICONS = {
+  "personnage": "fa-masks-theater",
+  "personnage-non-joueur": "fa-mask"
+};
+
+const ITEM_CREATE_TYPE_ICONS = {
+  "arme": "fa-gun",
+  "objet": "fa-box-open",
+  "ration": "fa-utensils",
+  "soin": "fa-kit-medical",
+  "protection": "fa-shield-halved",
+  "aptitude": "fa-hand-fist",
+  "pouvoir": "fa-bolt"
+};
+const CREATE_TYPE_PICKER_ROOT_CLASS = "bm-doc-type-picker";
+const CREATE_TYPE_EMOJI_BY_ICON = {
+  "fa-masks-theater": "\u{1F3AD}",
+  "fa-mask": "\u{1F479}",
+  "fa-gun": "\u{1F52B}",
+  "fa-box-open": "\u{1F4E6}",
+  "fa-utensils": "\u{1F37D}\u{FE0F}",
+  "fa-kit-medical": "\u{1F489}",
+  "fa-shield-halved": "\u{1F6E1}\u{FE0F}",
+  "fa-hand-fist": "\u{270A}",
+  "fa-bolt": "\u{26A1}"
+};
+
+function normalizeCreateTypeLabel(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getCreateTypeIconByTypeKey(typeKey) {
+  const key = String(typeKey || "").trim().toLowerCase();
+  return ACTOR_CREATE_TYPE_ICONS[key] || ITEM_CREATE_TYPE_ICONS[key] || "";
+}
+
+function getCreateTypeIconByLabelText(labelText) {
+  const normalized = normalizeCreateTypeLabel(labelText);
+  if (!normalized) return "";
+  if (normalized.includes("non joueur")) return "fa-mask";
+  if (normalized.includes("joueur")) return "fa-masks-theater";
+  if (normalized.includes("arme")) return "fa-gun";
+  if (normalized.includes("protection")) return "fa-shield-halved";
+  if (normalized.includes("aptitude")) return "fa-hand-fist";
+  if (normalized.includes("pouvoir")) return "fa-bolt";
+  if (normalized.includes("ration")) return "fa-utensils";
+  if (normalized.includes("soin")) return "fa-kit-medical";
+  if (normalized.includes("objet")) return "fa-box-open";
+  return "";
+}
+
+function cleanCreateTypeLabelText(labelText) {
+  return String(labelText || "")
+    .replace(/^[\s\u25A1\u25A0\u2610\u2611\u2612\uF000-\uF8FF]+/g, "")
+    .trim();
+}
+
+function getCreateTypeEmoji(iconClass) {
+  return CREATE_TYPE_EMOJI_BY_ICON[String(iconClass || "").trim()] || "";
+}
+
+function isDocumentTypeSelect(selectEl) {
+  if (!(selectEl instanceof HTMLSelectElement)) return false;
+  if ((selectEl.name || "").toLowerCase() === "type") return true;
+  const keywords = ["joueur", "non joueur", "arme", "aptitude", "objet", "pouvoir", "protection", "ration", "soin"];
+  const options = Array.from(selectEl.options || []);
+  return options.some(option => {
+    const label = normalizeCreateTypeLabel(option?.dataset?.bmTypeLabel || option?.textContent || "");
+    return keywords.some(keyword => label.includes(keyword));
+  });
+}
+
+function findCreateTypeLabelHost(optionRow, input) {
+  const direct = optionRow?.querySelector(".label, .name, .title, .option-name, .document-name");
+  if (direct) return direct;
+  const textCandidates = optionRow?.querySelectorAll("span, div, p, strong, h4") || [];
+  for (const candidate of textCandidates) {
+    if (!candidate) continue;
+    if (candidate.classList?.contains("bm-doc-type-label-with-icon")) return candidate;
+    const text = String(candidate.textContent || "").trim();
+    if (text) return candidate;
+  }
+  if (input?.parentElement && input.parentElement !== optionRow) return input.parentElement;
+  return optionRow;
+}
+
+function appendCreateTypeIcon(optionRow, input, iconClass) {
+  if (!optionRow || !iconClass) return;
+  if (optionRow.querySelector(".bm-doc-type-icon")) return;
+  const host = findCreateTypeLabelHost(optionRow, input);
+  if (!host) return;
+  host.classList?.add("bm-doc-type-label-with-icon");
+  const icon = document.createElement("i");
+  icon.className = `bm-doc-type-icon fa-solid ${iconClass}`;
+  if (host.firstChild) host.insertBefore(icon, host.firstChild);
+  else host.appendChild(icon);
+}
+
+function buildCreateTypeEntries(selectEl) {
+  const entries = [];
+  for (const option of Array.from(selectEl?.options || [])) {
+    const rawLabel = option.dataset?.bmTypeLabel || String(option.textContent || "");
+    const label = cleanCreateTypeLabelText(rawLabel);
+    if (!label) continue;
+    if (!option.dataset.bmTypeLabel) option.dataset.bmTypeLabel = label;
+    const iconClass = getCreateTypeIconByTypeKey(option.value) || getCreateTypeIconByLabelText(label) || "fa-circle-dot";
+    entries.push({ value: option.value, label, iconClass });
+  }
+  return entries;
+}
+
+function resolveSelectedCreateTypeEntry(entries, currentValue) {
+  if (!Array.isArray(entries) || !entries.length) return null;
+  return entries.find(entry => entry.value === currentValue) || entries[0];
+}
+
+function setCreateTypeToggleContent(toggle, entry) {
+  if (!toggle || !entry) return;
+  toggle.replaceChildren();
+  const value = document.createElement("span");
+  value.className = "bm-doc-type-picker-value";
+  const icon = document.createElement("i");
+  icon.className = `fa-solid ${entry.iconClass}`;
+  const label = document.createElement("span");
+  label.textContent = entry.label;
+  value.append(icon, label);
+  const caret = document.createElement("i");
+  caret.className = "fa-solid fa-chevron-down bm-doc-type-picker-caret";
+  toggle.append(value, caret);
+}
+
+function syncCreateTypePicker(selectEl, picker, entries) {
+  if (!selectEl || !picker || !Array.isArray(entries) || !entries.length) return;
+  const toggle = picker.querySelector(".bm-doc-type-picker-toggle");
+  const menu = picker.querySelector(".bm-doc-type-picker-menu");
+  if (!toggle || !menu) return;
+  const selected = resolveSelectedCreateTypeEntry(entries, selectEl.value);
+  if (!selected) return;
+  setCreateTypeToggleContent(toggle, selected);
+  for (const button of menu.querySelectorAll(".bm-doc-type-picker-option")) {
+    const isActive = button.dataset.value === selected.value;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  }
+}
+
+function closeAllCreateTypePickers(except = null) {
+  for (const picker of document.querySelectorAll(`.${CREATE_TYPE_PICKER_ROOT_CLASS}.open`)) {
+    if (except && picker === except) continue;
+    picker.classList.remove("open");
+    const toggle = picker.querySelector(".bm-doc-type-picker-toggle");
+    toggle?.setAttribute("aria-expanded", "false");
+  }
+}
+
+function ensureCreateTypePickerGlobalHandlers() {
+  if (window.__bmCreateTypePickerHandlersInstalled) return;
+  document.addEventListener("pointerdown", event => {
+    try {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest(`.${CREATE_TYPE_PICKER_ROOT_CLASS}`)) return;
+      closeAllCreateTypePickers();
+    } catch (_error) {
+      // non-fatal UI helper
+    }
+  });
+  document.addEventListener("keydown", event => {
+    try {
+      if (event.key !== "Escape") return;
+      closeAllCreateTypePickers();
+    } catch (_error) {
+      // non-fatal UI helper
+    }
+  });
+  window.__bmCreateTypePickerHandlersInstalled = true;
+}
+
+function decorateCreateTypeSelect(selectEl) {
+  try {
+    if (!(selectEl instanceof HTMLSelectElement) || !selectEl.options?.length) return;
+    if (!isDocumentTypeSelect(selectEl)) return;
+    selectEl.classList.remove("bm-doc-type-select-native");
+    delete selectEl.dataset.bmTypeEnhanced;
+    const existingPicker = selectEl.parentElement?.querySelector(`.${CREATE_TYPE_PICKER_ROOT_CLASS}`);
+    existingPicker?.remove();
+
+    for (const option of Array.from(selectEl.options || [])) {
+      const rawLabel = option.dataset?.bmTypeLabel || String(option.textContent || "");
+      const baseLabel = cleanCreateTypeLabelText(rawLabel);
+      if (!baseLabel) continue;
+      if (!option.dataset.bmTypeLabel) option.dataset.bmTypeLabel = baseLabel;
+      const iconClass = getCreateTypeIconByTypeKey(option.value) || getCreateTypeIconByLabelText(baseLabel);
+      const emoji = getCreateTypeEmoji(iconClass);
+      option.textContent = emoji ? `${emoji} ${baseLabel}` : baseLabel;
+    }
+  } catch (error) {
+    try {
+      if (selectEl?.classList) selectEl.classList.remove("bm-doc-type-select-native");
+      if (selectEl?.dataset) delete selectEl.dataset.bmTypeEnhanced;
+      const picker = selectEl?.parentElement?.querySelector(`.${CREATE_TYPE_PICKER_ROOT_CLASS}`);
+      picker?.remove();
+    } catch (_cleanupError) {
+      // non-fatal cleanup
+    }
+    console.warn("[bloodman] create type icon picker disabled for this select", error);
+    return;
+  }
+}
+
+function injectDocumentCreateTypeIcons(htmlLike) {
+  try {
+    const root = htmlLike?.[0] || htmlLike;
+    if (root instanceof HTMLElement) {
+      const typeSelects = root.querySelectorAll("select");
+      for (const selectEl of typeSelects) decorateCreateTypeSelect(selectEl);
+
+      const typeInputs = root.querySelectorAll("input[name='type']");
+      for (const input of typeInputs) {
+        const optionRow = input.closest("label, li, .form-group, .option, [data-value]");
+        if (!optionRow) continue;
+        const typeKey = input.value || optionRow.dataset?.value || "";
+        const rowText = String(optionRow.textContent || "");
+        const iconClass = getCreateTypeIconByTypeKey(typeKey) || getCreateTypeIconByLabelText(rowText);
+        appendCreateTypeIcon(optionRow, input, iconClass);
+      }
+      return;
+    }
+
+    const fallbackSelects = document.querySelectorAll(
+      ".window-app select, .application select, dialog select"
+    );
+    for (const selectEl of fallbackSelects) decorateCreateTypeSelect(selectEl);
+  } catch (error) {
+    console.warn("[bloodman] create type icon injection skipped", error);
+  }
+}
+
+function refreshAllCreateTypeIcons() {
+  const selectNodes = document.querySelectorAll(
+    ".window-app select, .application select, dialog select"
+  );
+  for (const selectEl of selectNodes) decorateCreateTypeSelect(selectEl);
+}
+
 function isGenericTokenName(name) {
   if (!name) return false;
   return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
@@ -1588,6 +1837,25 @@ async function syncCombatantNameForToken(tokenDoc) {
   }
 }
 
+Hooks.on("renderDialog", (_app, html) => {
+  injectDocumentCreateTypeIcons(html);
+});
+
+Hooks.on("renderApplication", (_app, html) => {
+  try {
+    const root = html?.[0] || html;
+    if (!(root instanceof HTMLElement)) return;
+    if (!root.querySelector("select, input[name='type']")) return;
+    injectDocumentCreateTypeIcons(root);
+  } catch (error) {
+    console.warn("[bloodman] renderApplication type icon hook skipped", error);
+  }
+});
+
+Hooks.on("renderDocumentCreateDialog", (_app, html) => {
+  injectDocumentCreateTypeIcons(html);
+});
+
 Hooks.once("init", () => {
   game.settings.register("bloodman", "chaosDice", {
     name: t("BLOODMAN.Settings.ChaosDiceName"),
@@ -1649,6 +1917,19 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
+  refreshAllCreateTypeIcons();
+  if (!window.__bmCreateTypeIconObserver) {
+    const observer = new MutationObserver(() => {
+      try {
+        refreshAllCreateTypeIcons();
+      } catch (_error) {
+        // non-fatal UI decoration
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.__bmCreateTypeIconObserver = observer;
+  }
+
   registerDamageSocketHandlers();
   for (const actor of game.actors) {
     if (!actor.isOwner) continue;
