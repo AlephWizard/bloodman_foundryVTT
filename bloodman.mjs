@@ -1372,7 +1372,12 @@ async function refreshBossSoloNpcPvMax() {
 const PROCESSED_DAMAGE_REQUESTS = new Map();
 const PROCESSED_CHAOS_REQUESTS = new Map();
 const PROCESSED_REROLL_REQUESTS = new Map();
+const PROCESSED_VOYANCE_REQUESTS = new Map();
 const INITIATIVE_GROUP_BUFFER = new Map();
+const VOYANCE_OVERLAY_ID = "bm-voyance-overlay";
+const VOYANCE_STYLE_ID = "bm-voyance-style";
+const VOYANCE_AUTO_CLOSE_MS = 6500;
+const VOYANCE_DEFAULT_BACKGROUND_SRC = "systems/bloodman/images/des_destin.png";
 
 function rememberDamageRequest(requestId) {
   if (!requestId) return;
@@ -1415,6 +1420,251 @@ function wasRerollRequestProcessed(requestId) {
   if (!requestId) return false;
   return PROCESSED_REROLL_REQUESTS.has(requestId);
 }
+
+function rememberVoyanceRequest(requestId) {
+  if (!requestId) return;
+  const now = Date.now();
+  PROCESSED_VOYANCE_REQUESTS.set(requestId, now);
+  for (const [key, value] of PROCESSED_VOYANCE_REQUESTS.entries()) {
+    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_VOYANCE_REQUESTS.delete(key);
+  }
+}
+
+function wasVoyanceRequestProcessed(requestId) {
+  if (!requestId) return false;
+  return PROCESSED_VOYANCE_REQUESTS.has(requestId);
+}
+
+function normalizeVoyanceAnswer(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "oui" ? "oui" : "non";
+}
+
+function normalizeDelay(value, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return fallback;
+  return Math.floor(numeric);
+}
+
+async function canDisplayImageSource(src) {
+  const candidate = String(src || "").trim();
+  if (!candidate) return false;
+  return new Promise(resolve => {
+    const img = new Image();
+    const done = ok => {
+      img.onload = null;
+      img.onerror = null;
+      resolve(ok);
+    };
+    img.onload = () => done(true);
+    img.onerror = () => done(false);
+    img.src = candidate;
+  });
+}
+
+function clearVoyanceOverlay() {
+  document.getElementById(VOYANCE_OVERLAY_ID)?.remove();
+}
+
+function ensureVoyanceOverlayStyles() {
+  if (document.getElementById(VOYANCE_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = VOYANCE_STYLE_ID;
+  style.textContent = `
+    #${VOYANCE_OVERLAY_ID} {
+      position: fixed;
+      inset: 0;
+      z-index: 15000;
+      display: grid;
+      place-items: center;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-backdrop {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(10, 8, 12, 0.45), rgba(0, 0, 0, 0.82));
+      backdrop-filter: blur(2px);
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-panel {
+      position: relative;
+      width: min(72vh, 52vw, 640px);
+      max-width: 90vw;
+      animation: bmFadeUp 320ms ease-out;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-bg {
+      width: 100%;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.55));
+      user-select: none;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-crystal {
+      position: absolute;
+      left: 50%;
+      top: 49.1%;
+      width: 17.8%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-answer-holder {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-answer-image {
+      width: 80%;
+      height: auto;
+      object-fit: contain;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-answer-text {
+      position: relative;
+      display: block;
+      --bm-oracle-x: 0px;
+      color: #1a1423;
+      font-family: "Cinzel Decorative", "Georgia", serif;
+      font-size: clamp(28px, 4.1vw, 50px);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      line-height: 0.88;
+      text-align: center;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 6px rgba(255, 255, 255, 0.95),
+        0 0 14px rgba(255, 228, 150, 0.9),
+        0 0 24px rgba(151, 224, 255, 0.6);
+      filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-answer-text.is-oui {
+      --bm-oracle-x: -1px;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-answer-text.is-non {
+      --bm-oracle-x: -5px;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-oracle-text {
+      animation: bmBounceIn 760ms cubic-bezier(.2,.8,.2,1) both, bmOracleFloat 2.5s ease-in-out 820ms infinite;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-voyance-oracle-text::before {
+      content: "";
+      position: absolute;
+      inset: -0.34em -0.48em;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle, rgba(255, 251, 235, 0.92) 0%, rgba(255, 240, 187, 0.64) 42%, rgba(150, 222, 255, 0.12) 78%, rgba(150, 222, 255, 0) 100%);
+      filter: blur(1.6px);
+      z-index: -1;
+      animation: bmOracleGlow 2.1s ease-in-out 880ms infinite;
+    }
+    #${VOYANCE_OVERLAY_ID} .bm-bounce-in {
+      animation: bmBounceIn 760ms cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes bmFadeUp {
+      from { opacity: 0; transform: translateY(12px) scale(0.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes bmBounceIn {
+      0% { transform: translateX(var(--bm-oracle-x, 0px)) scale(0.2); opacity: 0; }
+      45% { transform: translateX(var(--bm-oracle-x, 0px)) scale(1.18); opacity: 1; }
+      72% { transform: translateX(var(--bm-oracle-x, 0px)) scale(0.88); }
+      100% { transform: translateX(var(--bm-oracle-x, 0px)) scale(1); opacity: 1; }
+    }
+    @keyframes bmOracleFloat {
+      0%, 100% { transform: translateX(var(--bm-oracle-x, 0px)) translateY(0) scale(1); }
+      50% { transform: translateX(var(--bm-oracle-x, 0px)) translateY(-2px) scale(1.01); }
+    }
+    @keyframes bmOracleGlow {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+async function showVoyanceOverlay(payload = {}) {
+  const backgroundSrc = VOYANCE_DEFAULT_BACKGROUND_SRC;
+  const hasBackground = await canDisplayImageSource(backgroundSrc);
+  if (!hasBackground) {
+    ui.notifications?.error(`Image de fond introuvable: ${backgroundSrc}`);
+    return false;
+  }
+
+  clearVoyanceOverlay();
+  ensureVoyanceOverlayStyles();
+
+  const answer = normalizeVoyanceAnswer(payload.answer);
+  const answerUpper = answer === "oui" ? "OUI" : "NON";
+
+  const overlay = document.createElement("div");
+  overlay.id = VOYANCE_OVERLAY_ID;
+  overlay.innerHTML = `
+    <div class="bm-voyance-backdrop"></div>
+    <div class="bm-voyance-panel">
+      <img class="bm-voyance-bg" src="${backgroundSrc}" alt="Automate de voyance" />
+      <div class="bm-voyance-crystal" aria-live="polite"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const panelShown = Boolean(document.querySelector(`#${VOYANCE_OVERLAY_ID} .bm-voyance-panel`));
+  if (!panelShown) {
+    ui.notifications?.error("Affichage de l'automate echoue. Macro interrompue.");
+    clearVoyanceOverlay();
+    return false;
+  }
+
+  const answerDelayMs = normalizeDelay(payload.answerDelayMs, 240);
+  await new Promise(resolve => setTimeout(resolve, answerDelayMs));
+  const crystal = overlay.querySelector(".bm-voyance-crystal");
+  if (!crystal) {
+    ui.notifications?.error("Zone de boule de cristal introuvable.");
+    clearVoyanceOverlay();
+    return false;
+  }
+
+  const holder = document.createElement("div");
+  holder.className = "bm-voyance-answer-holder";
+  const text = document.createElement("div");
+  text.className = `bm-voyance-answer-text bm-voyance-oracle-text ${answer === "non" ? "is-non" : "is-oui"}`;
+  text.textContent = answerUpper;
+  holder.appendChild(text);
+  crystal.appendChild(holder);
+
+  const answerShown = crystal.children.length > 0;
+  if (!answerShown) {
+    ui.notifications?.error("Affichage de la reponse echoue.");
+    clearVoyanceOverlay();
+    return false;
+  }
+
+  const close = () => clearVoyanceOverlay();
+  overlay.addEventListener("click", close, { once: true });
+  const autoCloseMs = normalizeDelay(payload.autoCloseMs, VOYANCE_AUTO_CLOSE_MS);
+  setTimeout(close, autoCloseMs);
+  return true;
+}
+
+async function handleVoyanceOverlayRequest(data, source = "socket") {
+  const requestId = String(data?.requestId || "").trim();
+  if (requestId && wasVoyanceRequestProcessed(requestId)) return false;
+  if (requestId) rememberVoyanceRequest(requestId);
+
+  const payload = {
+    answer: data?.answer,
+    backgroundSrc: data?.backgroundSrc,
+    answerSrc: data?.answerSrc,
+    autoCloseMs: data?.autoCloseMs,
+    answerDelayMs: data?.answerDelayMs
+  };
+  const shown = await showVoyanceOverlay(payload);
+  if (!shown) {
+    console.warn("[bloodman] voyance:display failed", { source, requestId, payload });
+  }
+  return shown;
+}
+globalThis.__bmShowVoyanceOverlay = showVoyanceOverlay;
+globalThis.__bmHandleVoyanceOverlayRequest = handleVoyanceOverlayRequest;
 
 function isInitiativeRollMessage(message) {
   if (!message) return false;
@@ -2402,6 +2652,10 @@ function registerDamageSocketHandlers() {
     }
     if (data.type === "deleteActorItem") {
       if (game.user.isGM) await handleDeleteItemRequest(data);
+      return;
+    }
+    if (data.type === "voyanceOverlay") {
+      await handleVoyanceOverlayRequest(data, "socket");
       return;
     }
     if (!game.user.isGM) return;
