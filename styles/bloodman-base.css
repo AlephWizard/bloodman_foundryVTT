@@ -24,7 +24,12 @@
 .bloodman.sheet.item,
 .bloodman.sheet.actor .window-content,
 .bloodman.sheet.item .window-content {
-  background: unset;
+  background: var(--bm-white);
+}
+
+.bloodman.sheet.actor,
+.bloodman.sheet.item {
+  background: #131313;
 }
 
 .bloodman-item.bm-item-sheet {
@@ -96,6 +101,10 @@
   align-items: start;
 }
 
+.bloodman-item.bm-item-sheet .bm-item-row-audio {
+  align-items: center;
+}
+
 .bloodman-item.bm-item-sheet .bm-item-tag {
   display: inline-flex;
   align-items: center;
@@ -129,6 +138,38 @@
   padding: 0 9px;
   font-size: 14px;
   font-weight: 500;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-audio-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  gap: 6px;
+  align-items: center;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-audio-input {
+  min-width: 0;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker {
+  width: 32px;
+  height: 31px;
+  padding: 0;
+  border: 1.5px solid var(--bm-item-line);
+  border-radius: 9px;
+  background: var(--bm-item-panel);
+  color: var(--bm-item-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker:hover,
+.bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker:focus {
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.24);
+  outline: none;
 }
 
 .bloodman-item.bm-item-sheet .bm-item-textarea {

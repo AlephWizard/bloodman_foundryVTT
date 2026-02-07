@@ -102,7 +102,10 @@
       "RawBonusLabel": "BONUS/MALUS BRUTE",
       "UsableLabel": "UTILISABLE :",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
-      "VoyageXPCostLabel": "COUT XP VOYAGE :"
+      "VoyageXPCostLabel": "COUT XP VOYAGE :",
+      "AudioFileLabel": "FICHIER SON :",
+      "AudioFilePlaceholder": "systems/bloodman/sounds/effet.ogg",
+      "AudioBrowse": "Parcourir un fichier audio"
     },
     "Rolls": {
       "Success": "RÉUSSITE",
@@ -156,6 +159,9 @@
       "DamageSplitTotal": "La répartition doit totaliser {total}.",
       "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum.",
       "NotEnoughVoyageXPForAptitude": "XP voyage insuffisante pour {aptitude} (requis: {required}, disponible: {available}).",
+      "ItemAudioMissing": "Aucun fichier audio selectionne pour {item}.",
+      "ItemAudioInvalid": "Le fichier audio de {item} est invalide ou introuvable.",
+      "ItemAudioInvalidSelection": "Fichier audio invalide pour {item}. Le champ a ete vide.",
       "InvalidArchetypeBonusNumber": "Le bonus d'archetype doit etre un nombre valide.",
       "ArchetypeBonusCharacteristicRequired": "Selectionnez une caracteristique pour enregistrer un bonus d'archetype.",
       "InvalidArchetypeBonusCharacteristic": "La caracteristique d'archetype selectionnee est invalide."

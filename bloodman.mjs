@@ -1157,6 +1157,9 @@ const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]);
+const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin"]);
+const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
+const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
 const VITAL_RESOURCE_PATHS = new Set([
   "system.resources.pv.current",
   "system.resources.pv.max",
@@ -1199,6 +1202,93 @@ function toFiniteNumber(value, fallback = 0) {
 
 function normalizeNonNegativeInteger(value, fallback = 0) {
   return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
+}
+
+function waitMs(ms) {
+  const delay = Math.max(0, Math.floor(toFiniteNumber(ms, 0)));
+  if (!delay) return Promise.resolve();
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+function isAudioEnabledItemType(itemType) {
+  const type = String(itemType || "").trim().toLowerCase();
+  return AUDIO_ENABLED_ITEM_TYPES.has(type);
+}
+
+function normalizeItemAudioFile(value) {
+  const path = String(value || "").trim();
+  if (!path) return "";
+  const cleanPath = path.split("#")[0].split("?")[0].trim();
+  if (!cleanPath || !AUDIO_FILE_EXTENSION_PATTERN.test(cleanPath)) return "";
+  return path;
+}
+
+function getItemAudioName(item) {
+  const fallbackType = String(item?.type || "").trim();
+  const fallbackName = fallbackType ? t(`TYPES.Item.${fallbackType}`) : t("BLOODMAN.Common.Name");
+  return String(item?.name || fallbackName || "").trim() || t("BLOODMAN.Common.Name");
+}
+
+function normalizeItemAudioUpdate(item, updateData = null) {
+  if (!item || !isAudioEnabledItemType(item.type)) return { changed: false, invalid: false };
+  const path = "system.audioFile";
+  if (updateData) {
+    const hasUpdateData = Object.prototype.hasOwnProperty.call(updateData, path)
+      || foundry.utils.getProperty(updateData, path) !== undefined;
+    if (!hasUpdateData) return { changed: false, invalid: false };
+    const rawValue = foundry.utils.getProperty(updateData, path);
+    const wasProvided = String(rawValue || "").trim().length > 0;
+    const normalized = normalizeItemAudioFile(rawValue);
+    foundry.utils.setProperty(updateData, path, normalized);
+    const current = String(rawValue || "").trim();
+    return {
+      changed: current !== normalized,
+      invalid: wasProvided && !normalized
+    };
+  }
+
+  const rawValue = item.system?.audioFile;
+  const wasProvided = String(rawValue || "").trim().length > 0;
+  const normalized = normalizeItemAudioFile(rawValue);
+  item.updateSource({ [path]: normalized });
+  const current = String(item.system?.audioFile || "").trim();
+  return {
+    changed: current !== normalized,
+    invalid: wasProvided && !normalized
+  };
+}
+
+async function playItemAudio(item, options = {}) {
+  if (!item || !isAudioEnabledItemType(item.type)) return false;
+  const requestedDelay = Number(options?.delayMs);
+  const delayMs = Number.isFinite(requestedDelay)
+    ? Math.max(0, Math.floor(requestedDelay))
+    : ITEM_AUDIO_POST_ROLL_DELAY_MS;
+  const rawAudioFile = String(item.system?.audioFile || "").trim();
+  if (!rawAudioFile) return false;
+  const audioFile = normalizeItemAudioFile(rawAudioFile);
+  const itemName = getItemAudioName(item);
+
+  if (delayMs > 0) await waitMs(delayMs);
+
+  if (!audioFile) {
+    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
+    return false;
+  }
+
+  if (typeof AudioHelper?.play !== "function") {
+    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
+    return false;
+  }
+
+  try {
+    await AudioHelper.play({ src: audioFile, volume: 0.9, autoplay: true, loop: false }, false);
+    return true;
+  } catch (error) {
+    console.error("[bloodman] audio:play failed", { itemType: item.type, itemId: item.id, audioFile, error });
+    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
+    return false;
+  }
 }
 
 function buildDefaultCharacteristics() {
@@ -3232,6 +3322,11 @@ Hooks.on("createItem", async (item, options, userId) => {
 });
 
 Hooks.on("preCreateItem", (item, createData) => {
+  const normalizedAudio = normalizeItemAudioUpdate(item, createData);
+  if (normalizedAudio.invalid) {
+    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
+  }
+
   if (item?.type !== "aptitude") return;
 
   const rawCost = foundry.utils.getProperty(createData || {}, "system.xpVoyageCost");
@@ -3266,6 +3361,11 @@ Hooks.on("preCreateItem", (item, createData) => {
 });
 
 Hooks.on("preUpdateItem", (item, updateData) => {
+  const normalizedAudio = normalizeItemAudioUpdate(item, updateData);
+  if (normalizedAudio.invalid) {
+    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
+  }
+
   if (item?.type !== "aptitude") return;
   const costPath = "system.xpVoyageCost";
   const rawUpdateCost = foundry.utils.getProperty(updateData, costPath);
@@ -4575,6 +4675,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!item) return;
     const result = await doDamageRoll(this.actor, item);
     if (!result) return;
+    await playItemAudio(item);
     if (result?.context) {
       result.context.kind = "item-damage";
       result.context.itemType = String(item.type || "arme");
@@ -4594,6 +4695,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       itemType: item.type
     });
     if (!result) return;
+    await playItemAudio(item);
     if (result?.context) {
       result.context.kind = "item-damage";
       result.context.itemType = String(item.type || "");
@@ -4605,8 +4707,15 @@ class BloodmanActorSheet extends BaseActorSheet {
   async useItem(item) {
     if (!item) return;
     if (item.type === "soin") {
+      const healAudioRef = {
+        id: item.id,
+        type: item.type,
+        name: item.name,
+        system: { audioFile: item.system?.audioFile }
+      };
       if (this.actor?.isOwner || game.user?.isGM) {
         const result = await doHealRoll(this.actor, item);
+        if (result) await playItemAudio(healAudioRef);
         if (result && this.actor.items.get(item.id)) this.render(false);
       } else {
         const die = item.system?.healDie || "d4";
@@ -4622,6 +4731,7 @@ class BloodmanActorSheet extends BaseActorSheet {
           speaker: ChatMessage.getSpeaker({ actor: this.actor }),
           flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total })
         });
+        await playItemAudio(healAudioRef);
         await this.deleteActorItem(item);
         this.render(false);
       }
@@ -5167,10 +5277,11 @@ class BloodmanItemSheet extends BaseItemSheet {
     const die = (this.item.system.damageDie || "d4").toString();
     const formula = /^\d/.test(die) ? die : `1${die}`;
     const beforeRoll = async () => applyPowerCost(this.item.actor, this.item);
-    await doDirectDamageRoll(this.item.actor, formula, this.item.name, {
+    const result = await doDirectDamageRoll(this.item.actor, formula, this.item.name, {
       beforeRoll,
       itemId: this.item.id,
       itemType: this.item.type
     });
+    if (result) await playItemAudio(this.item);
   }
 }
