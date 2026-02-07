@@ -370,7 +370,45 @@ async function promptDamageConfiguration({
 
 function isGenericTokenName(name) {
   if (!name) return false;
-  return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
+  const raw = String(name).trim();
+  if (/^(acteur|actor)\s*\(\d+\)$/i.test(raw)) return true;
+  const normalized = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return false;
+  const genericNames = new Set([
+    "acteur",
+    "actor",
+    "joueur",
+    "player",
+    "non joueur",
+    "non player",
+    "nonplayer",
+    "pnj",
+    "npc",
+    "personnage",
+    "personnage non joueur"
+  ]);
+  if (genericNames.has(normalized)) return true;
+  const localizedPlayerType = String(game?.i18n?.localize?.("TYPES.Actor.personnage") || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  const localizedNpcType = String(game?.i18n?.localize?.("TYPES.Actor.personnage-non-joueur") || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  return normalized === localizedPlayerType || normalized === localizedNpcType;
 }
 
 function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {

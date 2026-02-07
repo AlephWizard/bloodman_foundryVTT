@@ -349,7 +349,45 @@ function stripUpdatePaths(updateData, paths = []) {
 
 function isGenericTokenName(name) {
   if (!name) return false;
-  return /^(acteur|actor)\s*\(\d+\)$/i.test(String(name).trim());
+  const raw = String(name).trim();
+  if (/^(acteur|actor)\s*\(\d+\)$/i.test(raw)) return true;
+  const normalized = raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return false;
+  const genericNames = new Set([
+    "acteur",
+    "actor",
+    "joueur",
+    "player",
+    "non joueur",
+    "non player",
+    "nonplayer",
+    "pnj",
+    "npc",
+    "personnage",
+    "personnage non joueur"
+  ]);
+  if (genericNames.has(normalized)) return true;
+  const localizedPlayerType = String(game?.i18n?.localize?.("TYPES.Actor.personnage") || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  const localizedNpcType = String(game?.i18n?.localize?.("TYPES.Actor.personnage-non-joueur") || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  return normalized === localizedPlayerType || normalized === localizedNpcType;
 }
 
 function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
@@ -830,12 +868,49 @@ function cleanupOrphanRoundMasks() {
   }
 }
 
+const ROUND_MASK_RETRY_DELAYS_MS = [0, 120, 300];
+const ROUND_MASK_SCHEDULE_TIMERS = new Map();
+
+function getRoundMaskScheduleKey(tokenLike) {
+  const tokenDoc = tokenLike?.document || tokenLike;
+  const tokenId = String(tokenDoc?.id || tokenDoc?._id || "").trim();
+  if (!tokenId) return "";
+  const sceneId = String(
+    tokenDoc?.parent?.id
+    || tokenDoc?.parent?._id
+    || tokenDoc?.scene?.id
+    || canvas?.scene?.id
+    || ""
+  ).trim();
+  return sceneId ? `${sceneId}:${tokenId}` : tokenId;
+}
+
+function clearScheduledRoundTokenMask(tokenLike) {
+  const scheduleKey = getRoundMaskScheduleKey(tokenLike);
+  if (!scheduleKey) return;
+  const timers = ROUND_MASK_SCHEDULE_TIMERS.get(scheduleKey);
+  if (!Array.isArray(timers) || !timers.length) return;
+  for (const timerId of timers) clearTimeout(timerId);
+  ROUND_MASK_SCHEDULE_TIMERS.delete(scheduleKey);
+}
+
 function scheduleRoundTokenMask(tokenLike) {
   const apply = () => applyRoundTokenMask(tokenLike?.object || tokenLike);
+  const scheduleKey = getRoundMaskScheduleKey(tokenLike);
+  if (scheduleKey) clearScheduledRoundTokenMask(tokenLike);
   apply();
-  setTimeout(apply, 0);
-  setTimeout(apply, 120);
-  setTimeout(apply, 300);
+  const timers = [];
+  const lastIndex = ROUND_MASK_RETRY_DELAYS_MS.length - 1;
+  ROUND_MASK_RETRY_DELAYS_MS.forEach((delay, index) => {
+    const timerId = setTimeout(() => {
+      apply();
+      if (scheduleKey && index === lastIndex) {
+        ROUND_MASK_SCHEDULE_TIMERS.delete(scheduleKey);
+      }
+    }, delay);
+    timers.push(timerId);
+  });
+  if (scheduleKey) ROUND_MASK_SCHEDULE_TIMERS.set(scheduleKey, timers);
 }
 
 function getTokenScaleNormalizationUpdates(tokenLike) {
@@ -3029,10 +3104,12 @@ Hooks.on("createToken", async (tokenDoc) => {
 });
 
 Hooks.on("preDeleteToken", (tokenDoc) => {
+  clearScheduledRoundTokenMask(tokenDoc);
   clearRoundTokenMask(tokenDoc?.object || canvas?.tokens?.get(tokenDoc?.id));
 });
 
 Hooks.on("deleteToken", async (tokenDoc) => {
+  clearScheduledRoundTokenMask(tokenDoc);
   clearRoundTokenMask(tokenDoc?.object || canvas?.tokens?.get(tokenDoc?.id));
   cleanupOrphanRoundMasks();
   if (!game.user.isGM) return;
@@ -3731,7 +3808,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!key) return;
     this.markCharacteristicReroll(key);
     await doCharacteristicRoll(this.actor, key);
-    await this.markXpProgress(key);
+    if (this.actor.type === "personnage") {
+      await this.markXpProgress(key);
+    }
     this.render(false);
   }
 
@@ -3778,6 +3857,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async markXpProgress(key) {
+    if (this.actor.type !== "personnage") return;
     const xp = Array.isArray(this.actor.system.characteristics?.[key]?.xp)
       ? [...this.actor.system.characteristics[key].xp]
       : [false, false, false];
@@ -4240,6 +4320,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async rollGrowth(key) {
     if (!key) return;
+    if (this.actor.type !== "personnage") return;
     if (this.actor?.isOwner || game.user?.isGM) {
       await doGrowthRoll(this.actor, key);
       this.clearCharacteristicRerollState();
@@ -4281,6 +4362,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   promptGrowthRoll(key) {
+    if (this.actor.type !== "personnage") return;
     const labelKey = CHARACTERISTICS.find(c => c.key === key)?.labelKey || "";
     const label = labelKey ? t(labelKey) : key;
     new Dialog({
