@@ -3776,6 +3776,23 @@ class BloodmanActorSheet extends BaseActorSheet {
     return false;
   }
 
+  clearRerollDisplayState() {
+    this.clearCharacteristicRerollState();
+    this.clearItemRerollState();
+  }
+
+  render(force, options = {}) {
+    if (Boolean(force) && !options?.bloodmanKeepRerollState) {
+      this.clearRerollDisplayState();
+    }
+    return super.render(force, options);
+  }
+
+  async close(options = {}) {
+    this.clearRerollDisplayState();
+    return super.close(options);
+  }
+
   async applyActorUpdate(updateData, options = {}) {
     if (!hasActorUpdatePayload(updateData)) return null;
     if (this.actor?.isOwner || game.user?.isGM) {
