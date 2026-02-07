@@ -14,6 +14,14 @@
   gap: 6px;
 }
 
+.item-objet.bm-item-sheet .bm-item-row-use {
+  align-items: center;
+}
+
+.item-objet.bm-item-sheet .bm-item-row-use .toggle-group {
+  min-height: 28px;
+}
+
 .item-objet.bm-item-sheet .bm-item-row-note,
 .item-ration.bm-item-sheet .bm-item-row-note {
   align-items: start;

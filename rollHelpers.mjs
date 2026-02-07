@@ -89,12 +89,32 @@ function getRawDamageBonus(actor) {
   return total;
 }
 
+function normalizeCharacteristicKey(value) {
+  const key = String(value || "").trim().toUpperCase();
+  return BONUS_KEYS.has(key) ? key : "";
+}
+
+function normalizeArchetypeBonusValue(value, fallback = 0) {
+  if (value == null || value === "") return Math.trunc(Number(fallback) || 0);
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.trunc(numeric);
+}
+
+function getArchetypeBonus(actor, key) {
+  const profile = actor?.system?.profile || {};
+  const selectedKey = normalizeCharacteristicKey(profile.archetypeBonusCharacteristic);
+  if (!selectedKey || selectedKey !== normalizeCharacteristicKey(key)) return 0;
+  return normalizeArchetypeBonusValue(profile.archetypeBonusValue, 0);
+}
+
 function getEffectiveCharacteristic(actor, key) {
   const base = Number(actor.system.characteristics?.[key]?.base || 0);
   const globalMod = Number(actor.system.modifiers?.all || 0);
   const keyMod = Number(actor.system.modifiers?.[key] || 0);
   const itemBonus = getItemBonus(actor, key);
-  return base + globalMod + keyMod + itemBonus;
+  const archetypeBonus = getArchetypeBonus(actor, key);
+  return base + globalMod + keyMod + itemBonus + archetypeBonus;
 }
 
 function getProtectionPA(actor) {

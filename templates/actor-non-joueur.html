@@ -137,7 +137,28 @@
             </div>
             <div class="field">
               <label>{{localize "BLOODMAN.Identity.Fields.Archetype"}}</label>
-              <input type="text" name="system.profile.archetype" value="{{profile.archetype}}" />
+              <div class="archetype-row">
+                <input type="text" class="archetype-text" name="system.profile.archetype" value="{{profile.archetype}}" />
+                <input
+                  type="number"
+                  class="archetype-bonus-value"
+                  name="system.profile.archetypeBonusValue"
+                  value="{{profile.archetypeBonusValue}}"
+                  step="1"
+                  data-dtype="Number"
+                />
+                <select
+                  class="archetype-bonus-key"
+                  name="system.profile.archetypeBonusCharacteristic"
+                >
+                  <option value=""></option>
+                  {{#select profile.archetypeBonusCharacteristic}}
+                    {{#each archetypeCharacteristicOptions}}
+                      <option value="{{this.key}}">{{this.label}}</option>
+                    {{/each}}
+                  {{/select}}
+                </select>
+              </div>
             </div>
             <div class="field">
               <label>{{localize "BLOODMAN.Identity.Fields.Vice"}}</label>
@@ -232,6 +253,7 @@
                 <span class="item-name item-edit">{{this.name}}</span>
                 {{#if this.system.mark}}<span class="item-mark">{{this.system.mark}}</span>{{/if}}
                 {{#if this.system.noteSmall}}<span class="item-meta">{{this.system.noteSmall}}</span>{{/if}}
+                {{#if this.system.useEnabled}}<span class="item-use">{{localize "BLOODMAN.Common.Use"}}</span>{{/if}}
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>

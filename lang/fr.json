@@ -10,6 +10,7 @@
       "Luck": "Chance",
       "LuckRoll": "Jet de chance",
       "Eat": "Manger",
+      "Use": "Utiliser",
       "Delete": "Supprimer",
       "Total": "Total",
       "Name": "NOM",
@@ -99,6 +100,7 @@
       "HealDieLabel": "DÉ DE SOIN",
       "BonusLabel": "BONUS/MALUS CARACS",
       "RawBonusLabel": "BONUS/MALUS BRUTE",
+      "UsableLabel": "UTILISABLE :",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
       "VoyageXPCostLabel": "COUT XP VOYAGE :"
     },
@@ -153,7 +155,10 @@
       "AbilityNoActor": "Cette aptitude/pouvoir n'est pas lié à un acteur.",
       "DamageSplitTotal": "La répartition doit totaliser {total}.",
       "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum.",
-      "NotEnoughVoyageXPForAptitude": "XP voyage insuffisante pour {aptitude} (requis: {required}, disponible: {available})."
+      "NotEnoughVoyageXPForAptitude": "XP voyage insuffisante pour {aptitude} (requis: {required}, disponible: {available}).",
+      "InvalidArchetypeBonusNumber": "Le bonus d'archetype doit etre un nombre valide.",
+      "ArchetypeBonusCharacteristicRequired": "Selectionnez une caracteristique pour enregistrer un bonus d'archetype.",
+      "InvalidArchetypeBonusCharacteristic": "La caracteristique d'archetype selectionnee est invalide."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos"

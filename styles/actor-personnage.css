@@ -649,6 +649,25 @@
   letter-spacing: 0.5px;
 }
 
+.archetype-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px 150px;
+  gap: 4px;
+  align-items: center;
+}
+
+.archetype-row .archetype-text {
+  min-width: 0;
+}
+
+.archetype-row .archetype-bonus-value {
+  text-align: center;
+}
+
+.archetype-row .archetype-bonus-key {
+  width: 100%;
+}
+
 .notes-card textarea,
 .aptitudes-card textarea,
 .powers-card textarea {
@@ -680,6 +699,10 @@
 
   .field-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .archetype-row {
+    grid-template-columns: minmax(0, 1fr) 72px 130px;
   }
 }
 

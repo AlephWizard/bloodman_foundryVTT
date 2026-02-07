@@ -1142,6 +1142,7 @@ const CHARACTERISTICS = [
   { key: "SOC", labelKey: "BLOODMAN.Characteristics.Keys.SOC", icon: "fa-users" },
   { key: "SAV", labelKey: "BLOODMAN.Characteristics.Keys.SAV", icon: "fa-book-open" }
 ];
+const CHARACTERISTIC_KEYS = new Set(CHARACTERISTICS.map(characteristic => characteristic.key));
 const STATE_MODIFIER_PATHS = [
   "system.modifiers.all",
   "system.modifiers.label",
@@ -1232,6 +1233,8 @@ function buildDefaultAmmo() {
 function buildDefaultProfile() {
   return {
     archetype: "",
+    archetypeBonusValue: 0,
+    archetypeBonusCharacteristic: "",
     vice: "",
     poids: "",
     taille: "",
@@ -1254,6 +1257,31 @@ function buildDefaultEquipment() {
 
 function isMissingTokenImage(src) {
   return !src || src === "icons/svg/mystery-man.svg";
+}
+
+function normalizeCharacteristicKey(value) {
+  const key = String(value || "").trim().toUpperCase();
+  return CHARACTERISTIC_KEYS.has(key) ? key : "";
+}
+
+function normalizeArchetypeBonusValue(value, fallback = 0) {
+  if (value == null || value === "") return Math.trunc(toFiniteNumber(fallback, 0));
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return Number.NaN;
+  return Math.trunc(numeric);
+}
+
+function getArchetypeCharacteristicBonus(profile, characteristicKey) {
+  const key = normalizeCharacteristicKey(characteristicKey);
+  if (!key) return 0;
+  const selectedKey = normalizeCharacteristicKey(profile?.archetypeBonusCharacteristic);
+  if (!selectedKey || selectedKey !== key) return 0;
+  const value = normalizeArchetypeBonusValue(profile?.archetypeBonusValue, 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getActorArchetypeBonus(actor, characteristicKey) {
+  return getArchetypeCharacteristicBonus(actor?.system?.profile || {}, characteristicKey);
 }
 
 const TOKEN_TEXTURE_VALIDITY_CACHE = new Map();
@@ -1364,7 +1392,8 @@ async function refreshBossSoloNpcPvMax() {
     const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
       + toFiniteNumber(actor.system.modifiers?.all, 0)
       + toFiniteNumber(actor.system.modifiers?.PHY, 0)
-      + toFiniteNumber(itemBonuses.PHY, 0);
+      + toFiniteNumber(itemBonuses.PHY, 0)
+      + getActorArchetypeBonus(actor, "PHY");
     const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
     const nextPvMax = Math.max(0, getDerivedPvMax(actor, phyEffective) + storedPvBonus);
     const currentPvMax = toFiniteNumber(actor.system.resources?.pv?.max, nextPvMax);
@@ -2696,7 +2725,7 @@ function getFixedInitiativeScore(actor) {
   const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
   const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
   const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
-  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0);
+  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0) + getActorArchetypeBonus(actor, "MOU");
   return Math.max(0, Math.round(effective));
 }
 
@@ -2910,6 +2939,25 @@ Hooks.once("ready", async () => {
     }
     if (isNpc && actorResources.voyage != null) {
       updates["system.resources.-=voyage"] = null;
+    }
+
+    const mergedProfile = foundry.utils.mergeObject(
+      buildDefaultProfile(),
+      actor.system.profile || {},
+      { inplace: false }
+    );
+    const normalizedArchetypeBonusValue = normalizeArchetypeBonusValue(mergedProfile.archetypeBonusValue, 0);
+    const normalizedArchetypeBonusCharacteristic = normalizeCharacteristicKey(mergedProfile.archetypeBonusCharacteristic);
+    mergedProfile.archetypeBonusValue = Number.isFinite(normalizedArchetypeBonusValue)
+      ? normalizedArchetypeBonusValue
+      : 0;
+    mergedProfile.archetypeBonusCharacteristic = normalizedArchetypeBonusCharacteristic;
+    if (
+      !actor.system.profile
+      || normalizeArchetypeBonusValue(actor.system.profile?.archetypeBonusValue, 0) !== mergedProfile.archetypeBonusValue
+      || normalizeCharacteristicKey(actor.system.profile?.archetypeBonusCharacteristic) !== mergedProfile.archetypeBonusCharacteristic
+    ) {
+      updates["system.profile"] = mergedProfile;
     }
 
     if (!actor.system.ammo) {
@@ -3583,24 +3631,73 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   // submitOnChange interactions remain fluid for players.
 
   const getUpdatedNumber = (path, fallback) => {
+    if (Object.prototype.hasOwnProperty.call(updateData, path)) {
+      return toFiniteNumber(updateData[path], fallback);
+    }
     const value = foundry.utils.getProperty(updateData, path);
     if (value == null) return toFiniteNumber(fallback, 0);
     return toFiniteNumber(value, fallback);
+  };
+  const getUpdatedRawValue = (path, fallback) => {
+    if (Object.prototype.hasOwnProperty.call(updateData, path)) return updateData[path];
+    const value = foundry.utils.getProperty(updateData, path);
+    return value == null ? fallback : value;
   };
   const hasUpdatePath = (path) => {
     return Object.prototype.hasOwnProperty.call(updateData, path)
       || foundry.utils.getProperty(updateData, path) !== undefined;
   };
 
+  const archetypeBonusValuePath = "system.profile.archetypeBonusValue";
+  const archetypeBonusCharacteristicPath = "system.profile.archetypeBonusCharacteristic";
+  const hasArchetypeBonusValueUpdate = hasUpdatePath(archetypeBonusValuePath);
+  const hasArchetypeBonusCharacteristicUpdate = hasUpdatePath(archetypeBonusCharacteristicPath);
+  if (hasArchetypeBonusValueUpdate || hasArchetypeBonusCharacteristicUpdate) {
+    const currentProfile = actor.system?.profile || {};
+    const rawBonusValue = getUpdatedRawValue(archetypeBonusValuePath, currentProfile.archetypeBonusValue ?? 0);
+    const rawBonusCharacteristic = getUpdatedRawValue(
+      archetypeBonusCharacteristicPath,
+      currentProfile.archetypeBonusCharacteristic || ""
+    );
+    const normalizedBonusValue = normalizeArchetypeBonusValue(rawBonusValue, currentProfile.archetypeBonusValue ?? 0);
+    if (!Number.isFinite(normalizedBonusValue)) {
+      ui.notifications?.error(t("BLOODMAN.Notifications.InvalidArchetypeBonusNumber"));
+      return false;
+    }
+    const normalizedBonusCharacteristic = normalizeCharacteristicKey(rawBonusCharacteristic);
+    const normalizedRawCharacteristic = String(rawBonusCharacteristic || "").trim();
+    if (normalizedRawCharacteristic && !normalizedBonusCharacteristic) {
+      ui.notifications?.error(t("BLOODMAN.Notifications.InvalidArchetypeBonusCharacteristic"));
+      return false;
+    }
+    if (normalizedBonusValue !== 0 && !normalizedBonusCharacteristic) {
+      ui.notifications?.error(t("BLOODMAN.Notifications.ArchetypeBonusCharacteristicRequired"));
+      return false;
+    }
+    foundry.utils.setProperty(updateData, archetypeBonusValuePath, normalizedBonusValue);
+    foundry.utils.setProperty(updateData, archetypeBonusCharacteristicPath, normalizedBonusCharacteristic);
+  }
+
   const itemBonuses = getItemBonusTotals(actor);
   const storedPvBonus = getUpdatedNumber("system.resources.pv.itemBonus", actor.system.resources?.pv?.itemBonus || 0);
   const storedPpBonus = getUpdatedNumber("system.resources.pp.itemBonus", actor.system.resources?.pp?.itemBonus || 0);
+  const currentProfile = actor.system?.profile || {};
+  const archetypeBonusValue = normalizeArchetypeBonusValue(
+    getUpdatedRawValue("system.profile.archetypeBonusValue", currentProfile.archetypeBonusValue ?? 0),
+    currentProfile.archetypeBonusValue ?? 0
+  );
+  const archetypeBonusCharacteristic = normalizeCharacteristicKey(
+    getUpdatedRawValue("system.profile.archetypeBonusCharacteristic", currentProfile.archetypeBonusCharacteristic || "")
+  );
   const getEffective = key => {
     const base = getUpdatedNumber(`system.characteristics.${key}.base`, actor.system.characteristics?.[key]?.base || 0);
     const globalMod = getUpdatedNumber("system.modifiers.all", actor.system.modifiers?.all || 0);
     const keyMod = getUpdatedNumber(`system.modifiers.${key}`, actor.system.modifiers?.[key] || 0);
     const itemBonus = Number(itemBonuses?.[key] || 0);
-    return Number(base) + Number(globalMod) + Number(keyMod) + itemBonus;
+    const profileBonus = archetypeBonusCharacteristic === key && Number.isFinite(archetypeBonusValue)
+      ? archetypeBonusValue
+      : 0;
+    return Number(base) + Number(globalMod) + Number(keyMod) + itemBonus + profileBonus;
   };
 
   const phyEffective = getEffective("PHY");
@@ -3686,10 +3783,17 @@ Hooks.on("updateActor", async (actor, changes) => {
   if (!hasCharBaseChange && !hasModChange && !hasNpcRoleChange) return;
 
   const itemBonuses = getItemBonusTotals(actor);
+  const profile = actor.system?.profile || {};
+  const archetypeBonusValue = normalizeArchetypeBonusValue(profile.archetypeBonusValue, 0);
+  const archetypeBonusCharacteristic = normalizeCharacteristicKey(profile.archetypeBonusCharacteristic);
+  const getArchetypeBonus = key => {
+    if (!Number.isFinite(archetypeBonusValue)) return 0;
+    return archetypeBonusCharacteristic === key ? archetypeBonusValue : 0;
+  };
   const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
   const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
   const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
-  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0);
+  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0) + getArchetypeBonus("MOU");
   const moveValue = Math.round(effective / 5);
 
   await actor.update({ "system.resources.move.value": moveValue });
@@ -3697,11 +3801,13 @@ Hooks.on("updateActor", async (actor, changes) => {
   const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
     + toFiniteNumber(actor.system.modifiers?.all, 0)
     + toFiniteNumber(actor.system.modifiers?.PHY, 0)
-    + toFiniteNumber(itemBonuses.PHY, 0);
+    + toFiniteNumber(itemBonuses.PHY, 0)
+    + getArchetypeBonus("PHY");
   const espEffective = toFiniteNumber(actor.system.characteristics?.ESP?.base, 0)
     + toFiniteNumber(actor.system.modifiers?.all, 0)
     + toFiniteNumber(actor.system.modifiers?.ESP, 0)
-    + toFiniteNumber(itemBonuses.ESP, 0);
+    + toFiniteNumber(itemBonuses.ESP, 0)
+    + getArchetypeBonus("ESP");
   const derivedPvMax = getDerivedPvMax(actor, phyEffective);
   const derivedPpMax = Math.round(espEffective / 5);
   const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
@@ -3877,6 +3983,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
     const isPlayerActor = data.actor.type === "personnage";
     const isNpcActor = data.actor.type === "personnage-non-joueur";
+    const profileBonusValue = normalizeArchetypeBonusValue(data.actor.system?.profile?.archetypeBonusValue, 0);
+    const profileBonusCharacteristic = normalizeCharacteristicKey(data.actor.system?.profile?.archetypeBonusCharacteristic);
     const rerollKey = this._lastCharacteristicRollKey || "";
     const characteristicRerollActive = isPlayerActor
       ? Boolean(rerollKey)
@@ -3910,11 +4018,26 @@ class BloodmanActorSheet extends BaseActorSheet {
         : [false, false, false];
       const flat = Number(modifiers.all || 0) + Number(modifiers[c.key] || 0);
       const itemBonus = Number(itemBonuses[c.key] || 0);
-      const effective = base + flat + itemBonus;
+      const profileBonus = profileBonusCharacteristic === c.key && Number.isFinite(profileBonusValue)
+        ? profileBonusValue
+        : 0;
+      const totalBonus = itemBonus + profileBonus;
+      const effective = base + flat + totalBonus;
       const xpReady = xp.every(Boolean);
       const showReroll = canUseCharacteristicReroll && activeRerollKey === c.key;
       const showRerollClear = isPlayerActor && showReroll;
-      return { key: c.key, label, icon: c.icon, base, effective, itemBonus, xp, xpReady, showReroll, showRerollClear };
+      return {
+        key: c.key,
+        label,
+        icon: c.icon,
+        base,
+        effective,
+        itemBonus: totalBonus,
+        xp,
+        xpReady,
+        showReroll,
+        showRerollClear
+      };
     });
     const totalPoints = characteristics.reduce((sum, c) => sum + Number(c.base || 0), 0);
 
@@ -3996,6 +4119,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     const profile = foundry.utils.mergeObject(buildDefaultProfile(), data.actor.system.profile || {}, {
       inplace: false
     });
+    profile.archetypeBonusValue = Number.isFinite(profileBonusValue) ? profileBonusValue : 0;
+    profile.archetypeBonusCharacteristic = profileBonusCharacteristic;
+    const archetypeCharacteristicOptions = CHARACTERISTICS.map(characteristic => ({
+      key: characteristic.key,
+      label: t(characteristic.labelKey) || characteristic.key
+    }));
     const equipment = foundry.utils.mergeObject(buildDefaultEquipment(), data.actor.system.equipment || {}, {
       inplace: false
     });
@@ -4065,6 +4194,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       modifiers,
       resources,
       profile,
+      archetypeCharacteristicOptions,
       npcRole,
       npcRoleSbire: npcRole === "sbire",
       npcRoleSbireFort: npcRole === "sbire-fort",
@@ -4197,10 +4327,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       item?.sheet?.render(true);
     });
 
-    html.find(".item-use").click(ev => {
+    html.find(".item-use").click(async ev => {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
-      this.useItem(item);
+      await this.useItem(item);
     });
 
     html.find(".item-reroll").click(ev => {
@@ -4495,8 +4625,18 @@ class BloodmanActorSheet extends BaseActorSheet {
         await this.deleteActorItem(item);
         this.render(false);
       }
+      return;
     }
-    if (item.type === "ration") await this.deleteActorItem(item);
+    if (item.type === "ration") {
+      await this.deleteActorItem(item);
+      this.render(false);
+      return;
+    }
+    if (item.type === "objet") {
+      if (!toBooleanFlag(item.system?.useEnabled)) return;
+      await this.deleteActorItem(item);
+      this.render(false);
+    }
   }
 
   async rerollItemRoll(itemId) {
@@ -4901,10 +5041,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     const itemBonuses = getItemBonusTotals(this.actor);
     const base = toFiniteNumber(this.actor.system.characteristics?.[key]?.base, 0);
+    const archetypeBonus = getActorArchetypeBonus(this.actor, key);
     const effective = base
       + toFiniteNumber(this.actor.system.modifiers?.all, 0)
       + toFiniteNumber(this.actor.system.modifiers?.[key], 0)
-      + toFiniteNumber(itemBonuses?.[key], 0);
+      + toFiniteNumber(itemBonuses?.[key], 0)
+      + toFiniteNumber(archetypeBonus, 0);
 
     const roll = await new Roll("1d100").evaluate();
     const success = Number(roll.total || 0) > effective;
