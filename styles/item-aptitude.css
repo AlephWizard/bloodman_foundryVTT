@@ -1,80 +1,112 @@
 .item-aptitude.bm-item-sheet {
-  gap: 12px;
+  gap: 8px;
 }
 
 .item-aptitude.bm-item-sheet .bm-ability-damage {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto auto minmax(120px, 170px);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(51, 42, 32, 0.86), rgba(31, 25, 20, 0.86));
 }
 
 .item-aptitude.bm-item-sheet .bm-ability-damage select {
-  width: 160px;
-  max-width: 100%;
+  width: 100%;
+  min-width: 96px;
+  max-width: 170px;
 }
 
 .item-aptitude.bm-item-sheet .ability-row-two {
   display: grid;
-  grid-template-columns: 1fr 4px 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   align-items: start;
 }
 
 .item-aptitude.bm-item-sheet .ability-divider {
-  width: 2px;
-  align-self: stretch;
-  background: #000000;
-  border-radius: 2px;
+  display: none;
 }
 
 .item-aptitude.bm-item-sheet .ability-section {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 10px;
+  background: var(--bm-item-surface-soft);
+}
+
+.item-aptitude.bm-item-sheet .bonus-controls {
+  margin-top: 2px;
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 12px;
-  align-items: center;
+  gap: 6px 8px;
+  align-items: stretch;
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid label {
   display: grid;
-  grid-template-columns: auto 64px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  gap: 6px;
   align-items: center;
   font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 0.4px;
+  font-size: 11px;
+  letter-spacing: 0.35px;
   text-transform: uppercase;
+  padding: 3px 6px;
+  border: 1px dashed var(--bm-item-dash);
+  border-radius: 8px;
+  background: var(--bm-item-chip);
+  color: var(--bm-item-text);
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid span {
-  line-height: 1;
+  line-height: 1.1;
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid input {
-  width: 64px;
-  height: 30px;
+  width: 54px;
+  height: 26px;
+  justify-self: end;
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid-compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 270px;
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid.is-disabled {
   opacity: 0.55;
 }
 
+.item-aptitude.bm-item-sheet .bonus-grid.is-disabled label {
+  background: rgba(58, 48, 37, 0.6);
+}
+
+@media (max-width: 920px) {
+  .item-aptitude.bm-item-sheet .bonus-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 820px) {
-  .item-aptitude.bm-item-sheet .ability-row-two {
+  .item-aptitude.bm-item-sheet .bm-ability-damage {
     grid-template-columns: 1fr;
+    justify-items: start;
   }
 
-  .item-aptitude.bm-item-sheet .ability-divider {
-    display: none;
+  .item-aptitude.bm-item-sheet .bm-ability-damage select {
+    max-width: 100%;
+  }
+
+  .item-aptitude.bm-item-sheet .ability-row-two {
+    grid-template-columns: 1fr;
   }
 }

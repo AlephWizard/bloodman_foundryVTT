@@ -1,17 +1,41 @@
 .item-soin.bm-item-sheet {
-  gap: 12px;
+  gap: 8px;
+}
+
+.item-soin.bm-item-sheet .bm-item-top {
+  grid-template-columns: 78px minmax(0, 1fr);
+}
+
+.item-soin.bm-item-sheet .bm-item-row {
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.item-soin.bm-item-sheet .bm-item-row-note {
+  align-items: start;
+}
+
+.item-soin.bm-item-sheet .bm-item-row-note .bm-item-tag {
+  min-height: 64px;
+  align-items: start;
+  padding-top: 8px;
 }
 
 .item-soin.bm-item-sheet .bm-item-heal {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(110px, 170px);
   align-items: center;
-  gap: 14px;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(51, 42, 32, 0.86), rgba(31, 25, 20, 0.86));
 }
 
 .item-soin.bm-item-sheet .bm-item-heal select {
-  width: 160px;
-  max-width: 100%;
+  width: 100%;
+  min-width: 96px;
+  max-width: 170px;
 }
 
 @media (max-width: 620px) {
@@ -21,5 +45,18 @@
 
   .item-soin.bm-item-sheet .bm-item-img {
     justify-self: center;
+  }
+
+  .item-soin.bm-item-sheet .bm-item-row {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+
+  .item-soin.bm-item-sheet .bm-item-heal {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .item-soin.bm-item-sheet .bm-item-heal select {
+    max-width: 100%;
   }
 }

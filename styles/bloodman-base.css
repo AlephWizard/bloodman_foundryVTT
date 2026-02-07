@@ -28,28 +28,44 @@
 }
 
 .bloodman-item.bm-item-sheet {
+  --bm-item-text: #eee6d6;
+  --bm-item-muted: #bcae93;
+  --bm-item-panel: #1d1915;
+  --bm-item-panel-alt: #14110e;
+  --bm-item-line: #4f4032;
+  --bm-item-border: #6d5a47;
+  --bm-item-accent: #d08b46;
+  --bm-item-surface: rgba(38, 31, 24, 0.88);
+  --bm-item-surface-soft: rgba(29, 24, 19, 0.86);
+  --bm-item-surface-alt: rgba(46, 38, 29, 0.78);
+  --bm-item-chip: rgba(34, 28, 22, 0.9);
+  --bm-item-dash: rgba(208, 139, 70, 0.34);
   font-family: "Oswald", sans-serif;
-  color: #000000;
-  background: #ffffff;
+  color: var(--bm-item-text);
+  background: linear-gradient(165deg, #1a1612 0%, #120f0d 100%);
+  border: 1px solid rgba(139, 114, 88, 0.34);
+  border-radius: 12px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.42);
   padding: 10px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .bloodman-item.bm-item-sheet .bm-item-top {
   display: grid;
-  grid-template-columns: 110px 1fr;
-  gap: 14px;
-  align-items: start;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
 }
 
 .bloodman-item.bm-item-sheet .bm-item-img {
-  width: 90px;
-  height: 90px;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  background: #ffffff;
+  width: 72px;
+  height: 72px;
+  border: 1.5px solid var(--bm-item-border);
+  border-radius: 9px;
+  background: var(--bm-item-panel-alt);
   overflow: hidden;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
 }
 
 .bloodman-item.bm-item-sheet .bm-item-img-el {
@@ -62,13 +78,17 @@
 
 .bloodman-item.bm-item-sheet .bm-item-fields {
   display: grid;
-  gap: 10px;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgba(109, 90, 71, 0.42);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(36, 30, 23, 0.9), rgba(24, 20, 16, 0.9));
 }
 
 .bloodman-item.bm-item-sheet .bm-item-row {
   display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 12px;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 6px;
   align-items: center;
 }
 
@@ -77,105 +97,139 @@
 }
 
 .bloodman-item.bm-item-sheet .bm-item-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--bm-item-border);
+  background: #0f0d0a;
+  color: #f7e6ca;
   font-weight: 700;
-  font-size: 20px;
-  letter-spacing: 0.8px;
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
-  line-height: 1;
+  line-height: 1.05;
 }
 
 .bloodman-item.bm-item-sheet .bm-item-input,
 .bloodman-item.bm-item-sheet .bm-item-textarea {
   width: 100%;
-  border: 3px solid #000000;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #000000;
+  border: 1.5px solid var(--bm-item-line);
+  border-radius: 9px;
+  background: var(--bm-item-panel);
+  color: var(--bm-item-text);
   font-family: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .bloodman-item.bm-item-sheet .bm-item-input {
-  height: 36px;
-  padding: 0 12px;
-  font-size: 16px;
-  font-weight: 400;
+  height: 31px;
+  padding: 0 9px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .bloodman-item.bm-item-sheet .bm-item-textarea {
-  height: 60px;
-  padding: 8px 12px;
-  font-size: 14px;
+  min-height: 64px;
+  padding: 7px 9px;
+  font-size: 13px;
   font-weight: 400;
-  resize: none;
+  resize: vertical;
 }
 
 .bloodman-item.bm-item-sheet select,
 .bloodman-item.bm-item-sheet input[type="number"] {
-  border: 3px solid #000000;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #000000;
+  border: 1.5px solid var(--bm-item-line);
+  border-radius: 9px;
+  background: var(--bm-item-panel);
+  color: var(--bm-item-text);
   font-family: inherit;
 }
 
 .bloodman-item.bm-item-sheet select {
-  height: 36px;
-  padding: 0 12px;
-  font-size: 16px;
+  height: 31px;
+  padding: 0 9px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
 }
 
 .bloodman-item.bm-item-sheet input[type="number"] {
-  height: 30px;
-  padding: 0 8px;
-  font-size: 14px;
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12px;
   font-weight: 600;
   text-align: center;
 }
 
 .bloodman-item.bm-item-sheet .toggle-group {
-  display: flex;
-  gap: 10px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
   align-items: center;
+  min-height: 30px;
 }
 
 .bloodman-item.bm-item-sheet .toggle-option {
   display: inline-flex;
-  gap: 8px;
+  gap: 5px;
   align-items: center;
-  font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.4px;
+  padding: 4px 8px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 999px;
+  background: var(--bm-item-chip);
+  color: var(--bm-item-text);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.45px;
   text-transform: uppercase;
 }
 
 .bloodman-item.bm-item-sheet .toggle-option input {
   appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 3px solid #000000;
-  border-radius: 6px;
-  background: #ffffff;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--bm-item-border);
+  border-radius: 999px;
+  background: var(--bm-item-panel-alt);
   margin: 0;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .bloodman-item.bm-item-sheet .toggle-option input:checked {
-  background: #000000;
+  background: var(--bm-item-accent);
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.2);
 }
 
 .bloodman-item.bm-item-sheet select:disabled,
 .bloodman-item.bm-item-sheet input:disabled,
 .bloodman-item.bm-item-sheet textarea:disabled {
-  opacity: 0.55;
+  opacity: 0.52;
+  filter: grayscale(0.15);
 }
 
 .bloodman-item.bm-item-sheet .inline-label {
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 0.6px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.75px;
   text-transform: uppercase;
-  line-height: 1.1;
+  line-height: 1;
+  color: var(--bm-item-muted);
+}
+
+.bloodman-item.bm-item-sheet .bm-item-input:focus,
+.bloodman-item.bm-item-sheet .bm-item-textarea:focus,
+.bloodman-item.bm-item-sheet input[type="number"]:focus,
+.bloodman-item.bm-item-sheet select:focus {
+  outline: none;
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.24);
 }
 
 #bm-chaos-dice {
