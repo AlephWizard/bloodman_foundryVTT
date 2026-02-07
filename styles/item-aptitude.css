@@ -2,6 +2,15 @@
   gap: 8px;
 }
 
+.item-aptitude.bm-item-sheet .bm-aptitude-cost-row .bm-item-tag {
+  min-width: 0;
+}
+
+.item-aptitude.bm-item-sheet .bm-aptitude-cost-input {
+  max-width: 140px;
+  justify-self: start;
+}
+
 .item-aptitude.bm-item-sheet .bm-ability-damage {
   display: grid;
   grid-template-columns: auto auto minmax(120px, 170px);

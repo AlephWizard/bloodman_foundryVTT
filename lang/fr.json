@@ -99,7 +99,8 @@
       "HealDieLabel": "DÉ DE SOIN",
       "BonusLabel": "BONUS/MALUS CARACS",
       "RawBonusLabel": "BONUS/MALUS BRUTE",
-      "InfiniteAmmoLabel": "MUNITIONS INFINIES :"
+      "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
+      "VoyageXPCostLabel": "COUT XP VOYAGE :"
     },
     "Rolls": {
       "Success": "RÉUSSITE",
@@ -151,7 +152,8 @@
       "DamageTargetResolveFailed": "Le MJ n'a pas pu resoudre la cible pour appliquer les degats.",
       "AbilityNoActor": "Cette aptitude/pouvoir n'est pas lié à un acteur.",
       "DamageSplitTotal": "La répartition doit totaliser {total}.",
-      "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum."
+      "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum.",
+      "NotEnoughVoyageXPForAptitude": "XP voyage insuffisante pour {aptitude} (requis: {required}, disponible: {available})."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos"

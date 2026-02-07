@@ -4,9 +4,9 @@
     <div class="voyage-tools">
       <div class="voyage-banner">
         <i class="fa-solid fa-compass"></i>
-        <input class="voyage-input" type="number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
+        <input class="voyage-input" type="number" min="0" step="1" data-dtype="Number" name="system.resources.voyage.current" value="{{resources.voyage.current}}" />
         <span class="voyage-sep">/</span>
-        <input class="voyage-input" type="number" name="system.resources.voyage.max" value="{{resources.voyage.max}}" />
+        <input class="voyage-input" type="number" min="0" step="1" data-dtype="Number" name="system.resources.voyage.total" value="{{resources.voyage.total}}" />
         <span class="voyage-label">{{localize "BLOODMAN.Resources.VoyageXP"}}</span>
       </div>
       <button type="button" class="luck-roll luck-roll-header" aria-label="{{localize 'BLOODMAN.Common.LuckRoll'}}" title="{{localize 'BLOODMAN.Common.LuckRoll'}}">

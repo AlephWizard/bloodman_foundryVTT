@@ -1196,6 +1196,10 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
 }
 
+function normalizeNonNegativeInteger(value, fallback = 0) {
+  return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
+}
+
 function buildDefaultCharacteristics() {
   const characteristics = {};
   for (const c of CHARACTERISTICS) characteristics[c.key] = { base: 50, xp: [false, false, false] };
@@ -1208,13 +1212,17 @@ function buildDefaultModifiers() {
   return modifiers;
 }
 
-function buildDefaultResources() {
-  return {
+function buildDefaultResources(options = {}) {
+  const includeVoyage = options.includeVoyage !== false;
+  const resources = {
     pv: { current: 0, max: 0, itemBonus: 0 },
     pp: { current: 0, max: 0, itemBonus: 0 },
-    voyage: { current: 0, max: 0 },
     move: { value: 0 }
   };
+  if (includeVoyage) {
+    resources.voyage = { current: 0, total: 0, max: 0 };
+  }
+  return resources;
 }
 
 function buildDefaultAmmo() {
@@ -2852,12 +2860,56 @@ Hooks.once("ready", async () => {
 
     if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
 
-    if (!actor.system.resources || actor.system.resources.voyage == null || actor.system.resources.move == null) {
-      updates["system.resources"] = foundry.utils.mergeObject(
-        buildDefaultResources(),
-        actor.system.resources || {},
+    const actorResources = actor.system.resources || {};
+    const requiresResourceInit = !actor.system.resources
+      || actorResources.move == null
+      || (isCharacter && actorResources.voyage == null);
+    if (requiresResourceInit) {
+      const mergedResources = foundry.utils.mergeObject(
+        buildDefaultResources({ includeVoyage: isCharacter }),
+        actorResources,
         { inplace: false }
       );
+      if (isCharacter) {
+        const rawVoyageCurrent = toFiniteNumber(mergedResources.voyage?.current, 0);
+        const rawVoyageTotal = toFiniteNumber(mergedResources.voyage?.total ?? mergedResources.voyage?.max, 0);
+        const normalizedVoyageTotal = normalizeNonNegativeInteger(rawVoyageTotal, 0);
+        const normalizedVoyageCurrent = Math.min(
+          normalizeNonNegativeInteger(rawVoyageCurrent, 0),
+          normalizedVoyageTotal
+        );
+        mergedResources.voyage = {
+          current: normalizedVoyageCurrent,
+          total: normalizedVoyageTotal,
+          max: normalizedVoyageTotal
+        };
+      } else if (mergedResources.voyage != null) {
+        delete mergedResources.voyage;
+      }
+      updates["system.resources"] = mergedResources;
+    }
+    if (isCharacter) {
+      const rawVoyageCurrent = toFiniteNumber(actorResources.voyage?.current, 0);
+      const rawVoyageTotal = toFiniteNumber(actorResources.voyage?.total ?? actorResources.voyage?.max, 0);
+      const normalizedVoyageTotal = normalizeNonNegativeInteger(rawVoyageTotal, 0);
+      const normalizedVoyageCurrent = Math.min(
+        normalizeNonNegativeInteger(rawVoyageCurrent, 0),
+        normalizedVoyageTotal
+      );
+      if (
+        actorResources.voyage == null
+        || actorResources.voyage.total == null
+        || actorResources.voyage.max == null
+        || rawVoyageCurrent !== normalizedVoyageCurrent
+        || rawVoyageTotal !== normalizedVoyageTotal
+      ) {
+        updates["system.resources.voyage.current"] = normalizedVoyageCurrent;
+        updates["system.resources.voyage.total"] = normalizedVoyageTotal;
+        updates["system.resources.voyage.max"] = normalizedVoyageTotal;
+      }
+    }
+    if (isNpc && actorResources.voyage != null) {
+      updates["system.resources.-=voyage"] = null;
     }
 
     if (!actor.system.ammo) {
@@ -2895,6 +2947,15 @@ Hooks.once("ready", async () => {
     await applyItemResourceBonuses(actor);
 
     for (const item of actor.items) {
+      if (item.type === "aptitude") {
+        const rawCost = item.system?.xpVoyageCost;
+        const numericCost = Number(rawCost);
+        const normalizedCost = normalizeNonNegativeInteger(rawCost, 0);
+        if (rawCost == null || !Number.isFinite(numericCost) || numericCost !== normalizedCost) {
+          await item.update({ "system.xpVoyageCost": normalizedCost });
+        }
+        continue;
+      }
       if (item.type !== "arme") continue;
       const normalized = normalizeWeaponType(item.system?.weaponType);
       if (normalized && normalized !== item.system?.weaponType) {
@@ -3085,10 +3146,86 @@ function ensureChaosDiceUI() {
   }
 }
 
-Hooks.on("createItem", (item) => {
+async function applyAptitudeVoyageCostOnCreate(actor, item) {
+  if (!actor || !item) return;
+  if (actor.type !== "personnage" || item.type !== "aptitude") return;
+
+  const cost = normalizeNonNegativeInteger(item.system?.xpVoyageCost, 0);
+  if (cost <= 0) return;
+
+  const voyageTotal = normalizeNonNegativeInteger(
+    actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
+    0
+  );
+  const voyageCurrent = Math.min(
+    normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0),
+    voyageTotal
+  );
+  const nextVoyageCurrent = Math.max(0, voyageCurrent - cost);
+  if (nextVoyageCurrent === voyageCurrent) return;
+
+  await actor.update({
+    "system.resources.voyage.current": nextVoyageCurrent,
+    "system.resources.voyage.total": voyageTotal,
+    "system.resources.voyage.max": voyageTotal
+  });
+}
+
+Hooks.on("createItem", async (item, options, userId) => {
   if (!item?.actor) return;
+
+  const sourceUserId = String(userId || options?.userId || "");
+  if (sourceUserId && sourceUserId !== game.user?.id) return;
+
+  await applyAptitudeVoyageCostOnCreate(item.actor, item);
+
   if (item.type !== "aptitude" && item.type !== "pouvoir") return;
-  applyItemResourceBonuses(item.actor);
+  await applyItemResourceBonuses(item.actor);
+});
+
+Hooks.on("preCreateItem", (item, createData) => {
+  if (item?.type !== "aptitude") return;
+
+  const rawCost = foundry.utils.getProperty(createData || {}, "system.xpVoyageCost");
+  const normalizedCost = normalizeNonNegativeInteger(
+    rawCost === undefined ? item.system?.xpVoyageCost : rawCost,
+    0
+  );
+  item.updateSource({ "system.xpVoyageCost": normalizedCost });
+
+  const actor = item.actor || item.parent;
+  if (!actor || actor.type !== "personnage") return;
+
+  const availableVoyageXp = normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0);
+  if (availableVoyageXp >= normalizedCost) return;
+
+  const aptitudeName = item.name || t("TYPES.Item.aptitude");
+  console.warn("[bloodman] aptitude acquisition blocked: not enough voyage XP", {
+    actorId: actor.id,
+    actorName: actor.name,
+    aptitude: aptitudeName,
+    required: normalizedCost,
+    available: availableVoyageXp
+  });
+  ui.notifications?.error(
+    t("BLOODMAN.Notifications.NotEnoughVoyageXPForAptitude", {
+      aptitude: aptitudeName,
+      required: normalizedCost,
+      available: availableVoyageXp
+    })
+  );
+  return false;
+});
+
+Hooks.on("preUpdateItem", (item, updateData) => {
+  if (item?.type !== "aptitude") return;
+  const costPath = "system.xpVoyageCost";
+  const rawUpdateCost = foundry.utils.getProperty(updateData, costPath);
+  const hasCostUpdate = Object.prototype.hasOwnProperty.call(updateData, costPath)
+    || rawUpdateCost !== undefined;
+  if (!hasCostUpdate) return;
+  const nextCost = normalizeNonNegativeInteger(rawUpdateCost, item.system?.xpVoyageCost ?? 0);
+  foundry.utils.setProperty(updateData, costPath, nextCost);
 });
 
 Hooks.on("createChatMessage", async (message) => {
@@ -3450,6 +3587,10 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
     if (value == null) return toFiniteNumber(fallback, 0);
     return toFiniteNumber(value, fallback);
   };
+  const hasUpdatePath = (path) => {
+    return Object.prototype.hasOwnProperty.call(updateData, path)
+      || foundry.utils.getProperty(updateData, path) !== undefined;
+  };
 
   const itemBonuses = getItemBonusTotals(actor);
   const storedPvBonus = getUpdatedNumber("system.resources.pv.itemBonus", actor.system.resources?.pv?.itemBonus || 0);
@@ -3487,6 +3628,49 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
     const requested = getUpdatedNumber(ppCurrentPath, 0);
     const nextValue = Math.min(requested, allowedPpMax);
     foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, toFiniteNumber(nextValue, 0)));
+  }
+
+  const voyageCurrentPath = "system.resources.voyage.current";
+  const voyageTotalPath = "system.resources.voyage.total";
+  const voyageMaxPath = "system.resources.voyage.max";
+
+  if (actor.type === "personnage") {
+    const hasVoyageUpdate = hasUpdatePath(voyageCurrentPath)
+      || hasUpdatePath(voyageTotalPath)
+      || hasUpdatePath(voyageMaxPath);
+    if (hasVoyageUpdate) {
+      const actorVoyageCurrent = normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0);
+      const actorVoyageTotal = normalizeNonNegativeInteger(
+        actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
+        0
+      );
+      const requestedCurrent = getUpdatedNumber(voyageCurrentPath, actorVoyageCurrent);
+      const requestedTotal = hasUpdatePath(voyageTotalPath)
+        ? getUpdatedNumber(voyageTotalPath, actorVoyageTotal)
+        : getUpdatedNumber(voyageMaxPath, actorVoyageTotal);
+      const normalizedTotal = normalizeNonNegativeInteger(requestedTotal, actorVoyageTotal);
+      const normalizedCurrent = Math.min(
+        normalizeNonNegativeInteger(requestedCurrent, actorVoyageCurrent),
+        normalizedTotal
+      );
+      foundry.utils.setProperty(updateData, voyageCurrentPath, normalizedCurrent);
+      foundry.utils.setProperty(updateData, voyageTotalPath, normalizedTotal);
+      foundry.utils.setProperty(updateData, voyageMaxPath, normalizedTotal);
+    }
+  } else {
+    const hasVoyagePayload = hasUpdatePath("system.resources.voyage")
+      || hasUpdatePath(voyageCurrentPath)
+      || hasUpdatePath(voyageTotalPath)
+      || hasUpdatePath(voyageMaxPath);
+    if (hasVoyagePayload) {
+      stripUpdatePaths(updateData, [
+        "system.resources.voyage",
+        voyageCurrentPath,
+        voyageTotalPath,
+        voyageMaxPath
+      ]);
+      updateData["system.resources.-=voyage"] = null;
+    }
   }
 });
 
@@ -3723,14 +3907,32 @@ class BloodmanActorSheet extends BaseActorSheet {
     const moveValue = Math.round(mou / 5);
     const pvBase = getDerivedPvMax(this.actor, phy);
 
-    const resources = foundry.utils.mergeObject(buildDefaultResources(), data.actor.system.resources || {}, {
-      inplace: false
-    });
+    const resources = foundry.utils.mergeObject(
+      buildDefaultResources({ includeVoyage: isPlayerActor }),
+      data.actor.system.resources || {},
+      {
+        inplace: false
+      }
+    );
     resources.pv.max = Math.max(0, toFiniteNumber(resources.pv.max, pvBase));
     resources.pp.max = Math.max(0, toFiniteNumber(resources.pp.max, Math.round(esp / 5)));
     resources.pv.current = Math.max(0, Math.min(toFiniteNumber(resources.pv.current, 0), resources.pv.max));
     resources.pp.current = Math.max(0, Math.min(toFiniteNumber(resources.pp.current, 0), resources.pp.max));
     resources.move.value = moveValue;
+    if (isPlayerActor) {
+      const voyageTotal = normalizeNonNegativeInteger(resources.voyage?.total ?? resources.voyage?.max, 0);
+      const voyageCurrent = Math.min(
+        normalizeNonNegativeInteger(resources.voyage?.current, 0),
+        voyageTotal
+      );
+      resources.voyage = {
+        current: voyageCurrent,
+        total: voyageTotal,
+        max: voyageTotal
+      };
+    } else if (resources.voyage != null) {
+      delete resources.voyage;
+    }
     {
       const pvMax = Math.max(0, toFiniteNumber(resources.pv.max, 0));
       const pvCurrent = Math.max(0, toFiniteNumber(resources.pv.current, 0));
@@ -4061,16 +4263,30 @@ class BloodmanActorSheet extends BaseActorSheet {
       const ratio = Math.max(0, Math.min(1, current / max));
       const fill = `${Math.max(0, Math.min(100, ratio * 100)).toFixed(2)}%`;
       const steps = Math.max(1, Math.round(maxRaw || 1));
+      const ratioKey = `data-${kind}-ratio`;
+      const previousRatio = Number(circle.attr(ratioKey));
 
       circle.css(`--${kind}-fill`, fill);
       circle.css(`--${kind}-ratio`, ratio.toFixed(4));
       circle.css(`--${kind}-steps`, String(steps));
+      circle.attr(ratioKey, ratio.toFixed(4));
 
       circle.removeClass("is-empty is-critical is-warning is-healthy");
       if (ratio <= 0) circle.addClass("is-empty");
       else if (ratio <= 0.25) circle.addClass("is-critical");
       else if (ratio <= 0.5) circle.addClass("is-warning");
       else circle.addClass("is-healthy");
+
+      if (Number.isFinite(previousRatio) && Math.abs(previousRatio - ratio) >= 0.001) {
+        const directionClass = ratio > previousRatio ? "is-rising" : "is-falling";
+        const timerKey = kind === "pv" ? "_pvGaugePulseTimer" : "_ppGaugePulseTimer";
+        circle.removeClass("is-rising is-falling");
+        circle.addClass(directionClass);
+        if (this[timerKey]) clearTimeout(this[timerKey]);
+        this[timerKey] = setTimeout(() => {
+          circle.removeClass("is-rising is-falling");
+        }, 380);
+      }
     };
 
     updateGauge("pv", "system.resources.pv.current", "system.resources.pv.max");
@@ -4756,6 +4972,10 @@ class BloodmanItemSheet extends BaseItemSheet {
       data.weaponTypeMelee = weaponType === "corps";
       // Weapons predate the damageEnabled flag; treat missing as enabled for backward compatibility.
       data.weaponDamageEnabled = this.item.system?.damageEnabled !== false;
+    }
+    if (this.item.type === "aptitude") {
+      if (!data.item.system) data.item.system = {};
+      data.item.system.xpVoyageCost = normalizeNonNegativeInteger(this.item.system?.xpVoyageCost, 0);
     }
     return data;
   }
