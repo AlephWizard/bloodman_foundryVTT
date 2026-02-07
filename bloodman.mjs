@@ -1378,6 +1378,7 @@ const VOYANCE_OVERLAY_ID = "bm-voyance-overlay";
 const VOYANCE_STYLE_ID = "bm-voyance-style";
 const VOYANCE_AUTO_CLOSE_MS = 6500;
 const VOYANCE_DEFAULT_BACKGROUND_SRC = "systems/bloodman/images/des_destin.png";
+const VOYANCE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-voyance-request</span>";
 
 function rememberDamageRequest(requestId) {
   if (!requestId) return;
@@ -3091,6 +3092,17 @@ Hooks.on("createItem", (item) => {
 });
 
 Hooks.on("createChatMessage", async (message) => {
+  const voyancePayload = foundry.utils.getProperty(message, "flags.bloodman.voyanceOverlayRequest");
+  if (voyancePayload) {
+    await handleVoyanceOverlayRequest(voyancePayload, "chat");
+    if (message.isOwner) {
+      setTimeout(() => {
+        message.delete().catch(() => null);
+      }, 250);
+    }
+    return;
+  }
+
   if (!game.user.isGM) return;
   if (isInitiativeRollMessage(message)) {
     queueInitiativeRollMessage(message);

@@ -9,6 +9,7 @@
   const AUTO_CLOSE_MS = 6500;
   const ANSWER_DELAY_MS = 240;
   const BACKGROUND_SRC = "systems/bloodman/images/des_destin.png";
+  const VOYANCE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-voyance-request</span>";
 
   const roll = await new Roll("1d20").evaluate({ async: true });
   const total = Number(roll.total || 0);
@@ -41,7 +42,11 @@
 
   if (!game.socket) {
     ui.notifications?.warn("Socket Foundry indisponible: diffusion globale non effectuee.");
-    return;
+  } else {
+    game.socket.emit(SYSTEM_SOCKET, payload);
   }
-  game.socket.emit(SYSTEM_SOCKET, payload);
+  await ChatMessage.create({
+    content: VOYANCE_REQUEST_CHAT_MARKUP,
+    flags: { bloodman: { voyanceOverlayRequest: payload } }
+  }).catch(() => null);
 })();
