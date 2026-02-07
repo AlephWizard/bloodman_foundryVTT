@@ -895,29 +895,140 @@
   border-radius: 16px;
   border: 3px solid #000000;
   box-shadow: none;
+  position: relative;
+  overflow: hidden;
   align-items: center;
   justify-content: flex-end;
-  padding-bottom: 6px;
+  padding: 8px 6px 6px;
+}
+
+.resource-circle.pv::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--pv-fill, 100%);
+  background:
+    linear-gradient(to top, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03)),
+    repeating-linear-gradient(
+      to top,
+      rgba(255, 255, 255, 0.18) 0 6px,
+      rgba(0, 0, 0, 0.07) 6px 7px
+    ),
+    linear-gradient(180deg, #ff9a8f 0%, #f25947 48%, #a7251e 100%);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+  transform-origin: center bottom;
+  transition: height 320ms cubic-bezier(0.22, 1, 0.36, 1), filter 180ms ease;
+  z-index: 0;
+}
+
+.resource-circle.pp::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--pp-fill, 100%);
+  background:
+    linear-gradient(to top, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
+    repeating-linear-gradient(
+      to top,
+      rgba(255, 255, 255, 0.16) 0 6px,
+      rgba(0, 0, 0, 0.08) 6px 7px
+    ),
+    linear-gradient(180deg, #a88df8 0%, #7f54f0 48%, #4b2ab4 100%);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.24);
+  transform-origin: center bottom;
+  transition: height 320ms cubic-bezier(0.22, 1, 0.36, 1), filter 180ms ease;
+  z-index: 0;
+}
+
+.resource-circle.pv::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.00) 24%,
+    rgba(0, 0, 0, 0.10) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.resource-circle.pp::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.00) 24%,
+    rgba(0, 0, 0, 0.12) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.resource-circle.pv.is-warning::before {
+  filter: saturate(0.95) brightness(0.95);
+}
+
+.resource-circle.pv.is-critical::before {
+  animation: bm-pv-critical 0.95s ease-in-out infinite;
+}
+
+.resource-circle.pv.is-empty::before {
+  filter: saturate(0.7) brightness(0.7);
+}
+
+.resource-circle.pp.is-warning::before {
+  filter: saturate(0.95) brightness(0.95);
+}
+
+.resource-circle.pp.is-critical::before {
+  animation: bm-pp-critical 0.95s ease-in-out infinite;
+}
+
+.resource-circle.pp.is-empty::before {
+  filter: saturate(0.7) brightness(0.7);
 }
 
 .resource-circle .value {
+  display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  position: relative;
+  z-index: 2;
   background: transparent;
   border: 0;
   border-radius: 0;
   padding: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.resource-kind-icon {
+  font-size: 11px;
+  opacity: 0.96;
+  line-height: 1;
+  flex: 0 0 auto;
+  margin-right: 1px;
 }
 
 .resource-circle input {
-  width: 32px;
+  width: 30px;
   border: 0;
   border-radius: 0;
   background: transparent;
   font-weight: 800;
   padding: 0;
   text-align: center;
+  line-height: 1;
 }
 
 .resource-circle.pv input,
@@ -930,21 +1041,35 @@
 .resource-circle .value span {
   font-size: 12px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 8px;
 }
 
 .resource-circle .label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 4px;
   font-size: 11px;
   letter-spacing: 0.6px;
   color: #ffffff;
+  position: relative;
+  z-index: 2;
+}
+
+.resource-circle .label i {
+  font-size: 10px;
+  opacity: 0.95;
 }
 
 .resource-circle.pv {
-  background: #b83228;
+  background: linear-gradient(180deg, #3e0f0d 0%, #5a1411 100%);
 }
 
 .resource-circle.pp {
-  background: #5a2aa5;
+  background: linear-gradient(180deg, #22123b 0%, #311a56 100%);
 }
 
 .resource-circle.voyage {
@@ -1169,4 +1294,24 @@
 
 .npc-sheet .char-row.move-row {
   grid-template-columns: 24px 64px 1fr 92px;
+}
+
+@keyframes bm-pv-critical {
+  0%,
+  100% {
+    filter: brightness(0.9) saturate(1);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.12);
+  }
+}
+
+@keyframes bm-pp-critical {
+  0%,
+  100% {
+    filter: brightness(0.9) saturate(1);
+  }
+  50% {
+    filter: brightness(1.18) saturate(1.12);
+  }
 }

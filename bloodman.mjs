@@ -3731,6 +3731,42 @@ class BloodmanActorSheet extends BaseActorSheet {
     resources.pv.current = Math.max(0, Math.min(toFiniteNumber(resources.pv.current, 0), resources.pv.max));
     resources.pp.current = Math.max(0, Math.min(toFiniteNumber(resources.pp.current, 0), resources.pp.max));
     resources.move.value = moveValue;
+    {
+      const pvMax = Math.max(0, toFiniteNumber(resources.pv.max, 0));
+      const pvCurrent = Math.max(0, toFiniteNumber(resources.pv.current, 0));
+      const pvRatio = pvMax > 0 ? Math.max(0, Math.min(1, pvCurrent / pvMax)) : 0;
+      const pvPercent = Math.max(0, Math.min(100, pvRatio * 100));
+      const pvSteps = Math.max(1, Math.round(pvMax || 1));
+      const pvStateClass = pvRatio <= 0
+        ? "is-empty"
+        : pvRatio <= 0.25
+          ? "is-critical"
+          : pvRatio <= 0.5
+            ? "is-warning"
+            : "is-healthy";
+      resources.pv.ratio = pvRatio.toFixed(4);
+      resources.pv.fill = `${pvPercent.toFixed(2)}%`;
+      resources.pv.steps = pvSteps;
+      resources.pv.stateClass = pvStateClass;
+    }
+    {
+      const ppMax = Math.max(0, toFiniteNumber(resources.pp.max, 0));
+      const ppCurrent = Math.max(0, toFiniteNumber(resources.pp.current, 0));
+      const ppRatio = ppMax > 0 ? Math.max(0, Math.min(1, ppCurrent / ppMax)) : 0;
+      const ppPercent = Math.max(0, Math.min(100, ppRatio * 100));
+      const ppSteps = Math.max(1, Math.round(ppMax || 1));
+      const ppStateClass = ppRatio <= 0
+        ? "is-empty"
+        : ppRatio <= 0.25
+          ? "is-critical"
+          : ppRatio <= 0.5
+            ? "is-warning"
+            : "is-healthy";
+      resources.pp.ratio = ppRatio.toFixed(4);
+      resources.pp.fill = `${ppPercent.toFixed(2)}%`;
+      resources.pp.steps = ppSteps;
+      resources.pp.stateClass = ppStateClass;
+    }
 
     const moveChar = characteristics.find(c => c.key === "MOU");
     if (moveChar) {
@@ -3857,6 +3893,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     };
     forceEnableSheetUi();
     setTimeout(forceEnableSheetUi, 0);
+    this.refreshResourceVisuals(html);
+    setTimeout(() => this.refreshResourceVisuals(html), 0);
 
     html.on("click", ".char-edit-toggle", ev => {
       ev.preventDefault();
@@ -3876,6 +3914,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!VITAL_RESOURCE_PATHS.has(path)) return;
       const nextValue = Math.max(0, Math.floor(toFiniteNumber(input?.value, 0)));
       requestVitalResourceUpdate(this.actor, path, nextValue);
+    });
+
+    html.on("input change", "input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']", () => {
+      this.refreshResourceVisuals(html);
     });
 
     html.find(".luck-roll").click(ev => {
@@ -4002,6 +4044,37 @@ class BloodmanActorSheet extends BaseActorSheet {
       const key = ev.currentTarget.dataset.key;
       this.rollGrowth(key);
     });
+  }
+
+  refreshResourceVisuals(html) {
+    const root = html?.find ? html : this.element;
+    if (!root?.length) return;
+    const updateGauge = (kind, currentPath, maxPath) => {
+      const currentInput = root.find(`input[name='${currentPath}']`).first();
+      const maxInput = root.find(`input[name='${maxPath}']`).first();
+      const circle = root.find(`.resource-circle.${kind}`).first();
+      if (!currentInput.length || !maxInput.length || !circle.length) return;
+
+      const current = Math.max(0, toFiniteNumber(currentInput.val(), 0));
+      const maxRaw = Math.max(0, toFiniteNumber(maxInput.val(), 0));
+      const max = maxRaw > 0 ? maxRaw : 1;
+      const ratio = Math.max(0, Math.min(1, current / max));
+      const fill = `${Math.max(0, Math.min(100, ratio * 100)).toFixed(2)}%`;
+      const steps = Math.max(1, Math.round(maxRaw || 1));
+
+      circle.css(`--${kind}-fill`, fill);
+      circle.css(`--${kind}-ratio`, ratio.toFixed(4));
+      circle.css(`--${kind}-steps`, String(steps));
+
+      circle.removeClass("is-empty is-critical is-warning is-healthy");
+      if (ratio <= 0) circle.addClass("is-empty");
+      else if (ratio <= 0.25) circle.addClass("is-critical");
+      else if (ratio <= 0.5) circle.addClass("is-warning");
+      else circle.addClass("is-healthy");
+    };
+
+    updateGauge("pv", "system.resources.pv.current", "system.resources.pv.max");
+    updateGauge("pp", "system.resources.pp.current", "system.resources.pp.max");
   }
 
   async _onDrop(event) {
