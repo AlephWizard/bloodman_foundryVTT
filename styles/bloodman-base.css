@@ -376,190 +376,271 @@
 }
 
 .bm-damage-config {
-  display: grid;
-  gap: 12px;
-  margin: 2px 0 0;
+  margin: 0;
   font-family: "Oswald", sans-serif;
-  background: #0f0e0e;
-  color: #ffffff;
-  padding: 12px;
-  border-radius: 14px;
 }
 
-.bm-damage-config .bm-damage-config-top {
+.window-app.bloodman-damage-dialog,
+.window-app.dialog.bloodman-damage-dialog {
+  --bm-damage-bg: #121015;
+  --bm-damage-bg-soft: #1a1720;
+  --bm-damage-field: #18141d;
+  --bm-damage-fg: #f8f7fb;
+  --bm-damage-muted: #cbc5d7;
+  --bm-damage-border: #494154;
+  --bm-damage-border-strong: #f8f7fb;
+}
+
+body.theme-light .window-app.bloodman-damage-dialog,
+body.theme-light .window-app.dialog.bloodman-damage-dialog {
+  --bm-damage-bg: #f2eff8;
+  --bm-damage-bg-soft: #ebe6f4;
+  --bm-damage-field: #ffffff;
+  --bm-damage-fg: #1b1723;
+  --bm-damage-muted: #5f556f;
+  --bm-damage-border: #a49ab8;
+  --bm-damage-border-strong: #1b1723;
+}
+
+.bm-damage-config .bm-damage-config-shell {
   display: grid;
-  grid-template-columns: 170px 1fr;
-  gap: 12px;
-  align-items: stretch;
+  gap: 10px;
+  background: linear-gradient(170deg, var(--bm-damage-bg-soft), var(--bm-damage-bg));
+  border: 1px solid var(--bm-damage-border);
+  border-radius: 12px;
+  color: var(--bm-damage-fg);
+  padding: 10px;
+}
+
+.bm-damage-config .bm-damage-config-head {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 10px;
+  align-items: center;
 }
 
 .bm-damage-config .bm-damage-config-icon-wrap {
-  border: 0;
-  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 148px;
-  background: #0f0e0e;
-  outline: none;
-  box-shadow: none;
-}
-
-.bm-damage-config .bm-damage-config-icon-wrap,
-.bm-damage-config .bm-damage-config-icon-wrap * {
-  color: #ffffff;
 }
 
 .bm-damage-config .bm-damage-config-icon-ring {
-  width: 122px;
-  height: 122px;
-  border: 0;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  display: flex;
+  border: 1px solid var(--bm-damage-border);
+  background: var(--bm-damage-field);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-}
-
-.bm-damage-config .bm-damage-config-icon-ring::before,
-.bm-damage-config .bm-damage-config-icon-ring::after {
-  content: "";
-  position: absolute;
-  background: transparent;
 }
 
 .bm-damage-config .bm-damage-config-icon-ring i {
-  font-size: 84px;
-  color: #ffffff;
-  z-index: 1;
-  background: transparent;
+  font-size: 18px;
+  color: var(--bm-damage-fg);
 }
 
-.bm-damage-config .bm-damage-config-fields {
+.bm-damage-config .bm-damage-config-head-copy {
+  min-width: 0;
+}
+
+.bm-damage-config .bm-damage-config-eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--bm-damage-fg);
+  line-height: 1;
+}
+
+.bm-damage-config .bm-damage-config-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config .bm-damage-config-grid {
   display: grid;
-  gap: 12px;
-  align-content: start;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .bm-damage-config .bm-damage-config-row {
   display: grid;
-  gap: 8px;
+  gap: 5px;
+}
+
+.bm-damage-config .bm-damage-config-row-wide {
+  grid-column: 1 / -1;
 }
 
 .bm-damage-config .bm-damage-config-inline {
-  grid-template-columns: minmax(0, 1fr) 92px;
+  grid-template-columns: minmax(0, 1fr) 86px;
   align-items: center;
 }
 
 .bm-damage-config label {
-  font-size: 18px;
-  font-weight: 300;
-  line-height: 1;
-  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--bm-damage-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .bm-damage-config .bm-damage-config-inline label {
-  justify-self: end;
   text-align: right;
-  white-space: nowrap !important;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  width: 100%;
-  font-weight: 300;
-  font-size: 16px;
-  opacity: 0.95;
+  white-space: nowrap;
+  color: var(--bm-damage-muted);
 }
 
 .bm-damage-config select,
 .bm-damage-config input {
   width: 100%;
-  height: 48px;
-  border: 4px solid #ffffff;
-  border-radius: 14px;
-  padding: 4px 10px;
+  height: 34px;
+  border: 1px solid var(--bm-damage-border);
+  border-radius: 8px;
+  padding: 0 10px;
   font-family: "Oswald", sans-serif;
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1;
-  color: #ffffff;
-  background: #0f0e0e;
+  color: var(--bm-damage-fg);
+  background: var(--bm-damage-field);
+}
+
+.bm-damage-config select:focus,
+.bm-damage-config input:focus {
+  outline: none;
+  border-color: var(--bm-damage-border-strong);
+  box-shadow: 0 0 0 1px var(--bm-damage-border-strong);
 }
 
 .bm-damage-config select {
   color-scheme: dark;
-  -webkit-appearance: none;
   appearance: none;
+  -webkit-appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, #ffffff 50%),
-    linear-gradient(135deg, #ffffff 50%, transparent 50%),
-    linear-gradient(to right, #0f0e0e, #0f0e0e);
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
-    calc(100% - 18px) 20px,
-    calc(100% - 10px) 20px,
-    100% 0;
-  background-size: 8px 8px, 8px 8px, 3em 3em;
+    calc(100% - 15px) 14px,
+    calc(100% - 10px) 14px;
+  background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
-  padding-right: 36px;
+  padding-right: 30px;
 }
 
 .bm-damage-config input[type="number"] {
   text-align: center;
 }
 
+.bm-damage-config .bm-damage-config-toggle {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--bm-damage-border);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: var(--bm-damage-field);
+  cursor: pointer;
+}
+
+.bm-damage-config .bm-damage-config-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bm-damage-config .bm-damage-config-toggle-indicator {
+  width: 30px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--bm-damage-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bm-damage-muted);
+  background: transparent;
+}
+
+.bm-damage-config .bm-damage-config-toggle-copy {
+  display: grid;
+  gap: 1px;
+}
+
+.bm-damage-config .bm-damage-config-toggle-title {
+  font-size: 13px;
+  line-height: 1.15;
+  color: var(--bm-damage-fg);
+}
+
+.bm-damage-config .bm-damage-config-toggle-hint {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config .bm-damage-config-toggle input[type="checkbox"]:checked + .bm-damage-config-toggle-indicator {
+  border-color: var(--bm-damage-border-strong);
+  color: var(--bm-damage-fg);
+}
+
 .window-app.bloodman-damage-dialog .dialog-buttons,
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons {
-  margin-top: 12px;
-  display: block;
-  background: #0f0e0e !important;
+  margin-top: 8px;
   padding: 0;
   border: 0 !important;
+  background: transparent !important;
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons button,
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button {
   width: 100%;
-  height: 56px;
-  border: 4px solid #ffffff !important;
-  border-radius: 14px;
-  background: #0f0e0e !important;
-  color: #ffffff !important;
+  height: 38px;
+  border: 1px solid var(--bm-damage-border-strong) !important;
+  border-radius: 8px;
+  background: var(--bm-damage-field) !important;
+  color: var(--bm-damage-fg) !important;
   font-family: "Oswald", sans-serif;
-  font-size: 22px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   line-height: 1;
   padding: 0 10px;
   text-transform: uppercase;
   box-shadow: none !important;
-  outline: none !important;
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons button:hover,
 .window-app.bloodman-damage-dialog .dialog-buttons button:focus,
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button:hover,
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button:focus {
-  background: #0f0e0e;
-  color: #ffffff;
+  filter: brightness(1.08);
   box-shadow: none;
 }
 
 .window-app.bloodman-damage-dialog .window-content,
 .window-app.dialog.bloodman-damage-dialog .window-content {
-  background: #0f0e0e !important;
-  padding: 12px;
+  background: var(--bm-damage-bg) !important;
+  padding: 10px;
 }
 
 .window-app.bloodman-damage-dialog select,
 .window-app.dialog.bloodman-damage-dialog select {
-  background-color: #0f0e0e !important;
-  color: #ffffff !important;
+  background-color: var(--bm-damage-field) !important;
+  color: var(--bm-damage-fg) !important;
 }
 
 .window-app.bloodman-damage-dialog select option,
 .window-app.dialog.bloodman-damage-dialog select option {
-  background: #0f0e0e !important;
-  color: #ffffff !important;
+  background: var(--bm-damage-field) !important;
+  color: var(--bm-damage-fg) !important;
 }
 
 .bm-doc-type-label-with-icon {
@@ -664,12 +745,21 @@
 }
 
 @media (max-width: 720px) {
-  .bm-damage-config .bm-damage-config-top {
+  .bm-damage-config .bm-damage-config-grid {
     grid-template-columns: 1fr;
   }
 
-  .bm-damage-config .bm-damage-config-icon-wrap {
-    min-height: 120px;
+  .bm-damage-config .bm-damage-config-inline {
+    grid-template-columns: minmax(0, 1fr) 72px;
+  }
+
+  .bm-damage-config .bm-damage-config-toggle {
+    grid-template-columns: 26px 1fr;
+    padding: 7px;
+  }
+
+  .bm-damage-config .bm-damage-config-toggle-indicator {
+    width: 26px;
   }
 }
 

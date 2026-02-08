@@ -2342,6 +2342,38 @@ function getRollValuesFromRoll(roll) {
   return values;
 }
 
+function buildKeepHighestDamageTag(firstTotal, secondTotal, keptTotal) {
+  if (!Number.isFinite(firstTotal) || !Number.isFinite(secondTotal) || !Number.isFinite(keptTotal)) return "";
+  return `2 jets, garder le plus haut: ${firstTotal} / ${secondTotal} -> ${keptTotal}`;
+}
+
+async function evaluateRerollDamageFormula(formula, rollKeepHighest = false) {
+  const normalizedFormula = normalizeRollDieFormula(formula, "d4");
+  if (!rollKeepHighest) {
+    const roll = await new Roll(normalizedFormula).evaluate();
+    return {
+      roll,
+      rollResults: getRollValuesFromRoll(roll),
+      rawTotal: Number(roll.total) || 0,
+      modeTag: ""
+    };
+  }
+
+  const firstRoll = await new Roll(normalizedFormula).evaluate();
+  const secondRoll = await new Roll(normalizedFormula).evaluate();
+  const firstTotal = Number(firstRoll.total) || 0;
+  const secondTotal = Number(secondRoll.total) || 0;
+  const keepFirst = firstTotal >= secondTotal;
+  const keptRoll = keepFirst ? firstRoll : secondRoll;
+  const keptTotal = keepFirst ? firstTotal : secondTotal;
+  return {
+    roll: keptRoll,
+    rollResults: getRollValuesFromRoll(keptRoll),
+    rawTotal: keptTotal,
+    modeTag: buildKeepHighestDamageTag(firstTotal, secondTotal, keptTotal)
+  };
+}
+
 function emitDamageAppliedMessage(data, result, tokenDoc, share) {
   const attackerUserId = String(data.attackerUserId || "");
   if (!game.socket || !result) return;
@@ -2368,6 +2400,7 @@ function emitDamageAppliedMessage(data, result, tokenDoc, share) {
     damageFormula: String(data.damageFormula || ""),
     damageLabel: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
     bonusBrut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
+    rollKeepHighest: data.rollKeepHighest === true,
     penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration ?? data.penetration_plus, 0))),
     totalDamage: Number(data.totalDamage),
     target: {
@@ -2411,6 +2444,7 @@ async function handleDamageAppliedMessage(data) {
       formula: String(data.damageFormula || "1d4"),
       degats: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
       bonusBrut: Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0))),
+      rollKeepHighest: data.rollKeepHighest === true,
       penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0))),
       totalDamage: Number(data.totalDamage),
       targets: []
@@ -2434,6 +2468,9 @@ async function handleDamageAppliedMessage(data) {
   if (!context.degats && (data.damageLabel || data.degats)) context.degats = String(data.damageLabel || data.degats).trim().toUpperCase();
   if (!Number.isFinite(Number(context.bonusBrut)) && Number.isFinite(Number(data.bonusBrut ?? data.bonus_brut))) {
     context.bonusBrut = Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0)));
+  }
+  if (typeof context.rollKeepHighest !== "boolean") {
+    context.rollKeepHighest = data.rollKeepHighest === true;
   }
   if (!Number.isFinite(Number(context.penetration)) && Number.isFinite(Number(data.penetration))) {
     context.penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
@@ -5435,9 +5472,11 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
     }
 
-    const roll = await new Roll(context.formula || "1d4").evaluate();
-    const rollResults = getRollValuesFromRoll(roll);
-    const totalDamage = Math.max(0, Number(roll.total || 0) + Math.max(0, Number(context.bonusBrut || 0)));
+    const rollEval = await evaluateRerollDamageFormula(context.formula || "1d4", context.rollKeepHighest === true);
+    const roll = rollEval.roll;
+    const rollResults = Array.isArray(rollEval.rollResults) ? rollEval.rollResults : [];
+    const totalDamage = Math.max(0, Number(rollEval.rawTotal || 0) + Math.max(0, Number(context.bonusBrut || 0)));
+    const modeTag = String(rollEval.modeTag || "");
     const allocations = buildRerollAllocations(context, totalDamage);
     const penetrationValue = Math.max(0, Number(context.penetration || 0));
     const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
@@ -5449,7 +5488,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         name: this.actor.name,
         amount: totalDamage,
         source: context.itemName ? ` (${context.itemName})` : ""
-      })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration} | ${t("BLOODMAN.Common.Reroll")}</small>`
+      })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration}${modeTag ? ` | ${modeTag}` : ""} | ${t("BLOODMAN.Common.Reroll")}</small>`
     });
 
     if (!game.user.isGM && hasActiveGM) {
@@ -5469,6 +5508,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         damageFormula: context.formula,
         damageLabel: context.degats,
         bonusBrut: context.bonusBrut,
+        rollKeepHighest: context.rollKeepHighest === true,
         penetration: context.penetration,
         totalDamage,
         rollResults,

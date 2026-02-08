@@ -288,17 +288,64 @@ function getRollValues(roll) {
   return values;
 }
 
+function buildKeepHighestRollTag(firstTotal, secondTotal, keptTotal) {
+  if (!Number.isFinite(firstTotal) || !Number.isFinite(secondTotal) || !Number.isFinite(keptTotal)) return "";
+  const label = tl("BLOODMAN.Dialogs.DamageConfig.RollHighestLabel", "2 jets, garder le plus haut");
+  return `${label}: ${firstTotal} / ${secondTotal} -> ${keptTotal}`;
+}
+
+async function evaluateDamageRoll(config = {}) {
+  const formula = normalizeDamageFormula(config?.formula) || "1d4";
+  const rollKeepHighest = Boolean(config?.rollKeepHighest);
+  if (!rollKeepHighest) {
+    const roll = await new Roll(formula).evaluate();
+    return {
+      roll,
+      rollResults: getRollValues(roll),
+      rawTotal: Number(roll.total) || 0,
+      rollKeepHighest: false,
+      modeTag: ""
+    };
+  }
+
+  const firstRoll = await new Roll(formula).evaluate();
+  const secondRoll = await new Roll(formula).evaluate();
+  const firstTotal = Number(firstRoll.total) || 0;
+  const secondTotal = Number(secondRoll.total) || 0;
+  const keepFirst = firstTotal >= secondTotal;
+  const keptRoll = keepFirst ? firstRoll : secondRoll;
+  const keptTotal = keepFirst ? firstTotal : secondTotal;
+  return {
+    roll: keptRoll,
+    rollResults: getRollValues(keptRoll),
+    rawTotal: keptTotal,
+    rollKeepHighest: true,
+    modeTag: buildKeepHighestRollTag(firstTotal, secondTotal, keptTotal),
+    firstTotal,
+    secondTotal
+  };
+}
+
 async function promptDamageConfiguration({
   actor,
   sourceName = "",
   defaultFormula = "1d4",
   defaultBonus = 0,
-  defaultPenetration = 0
+  defaultPenetration = 0,
+  defaultRollKeepHighest = false
 } = {}) {
   const selectedDefault = getDefaultDamageOption(defaultFormula);
   const initialBonus = toNonNegativeInt(defaultBonus, 0);
   const initialPenetration = toNonNegativeInt(defaultPenetration, 0);
+  const initialRollKeepHighest = Boolean(defaultRollKeepHighest);
   const titleSource = sourceName ? ` (${sourceName})` : "";
+  const damageDieLabel = tl("BLOODMAN.Items.DamageDieLabel", "De de degat");
+  const settingsLabel = tl("BLOODMAN.Dialogs.DamageConfig.SettingsLabel", "Reglages du jet");
+  const rollHighestLabel = tl("BLOODMAN.Dialogs.DamageConfig.RollHighestLabel", "2 jets, garder le plus haut");
+  const rollHighestHint = tl(
+    "BLOODMAN.Dialogs.DamageConfig.RollHighestHint",
+    "Lance la formule deux fois puis conserve le meilleur resultat."
+  );
   // Prevent the trailing "+" from wrapping to a new line in narrow layouts.
   const rawBonusLabel = tl("BLOODMAN.Dialogs.DamageConfig.RawBonusLabel", "Degats bruts +").replace(/\s\+$/, "&nbsp;+");
   const penetrationLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationLabel", "Penetration +").replace(/\s\+$/, "&nbsp;+");
@@ -308,26 +355,41 @@ async function promptDamageConfiguration({
     .join("");
 
   const content = `<form class="bm-damage-config">
-    <div class="bm-damage-config-top">
-      <div class="bm-damage-config-icon-wrap" aria-hidden="true">
-        <div class="bm-damage-config-icon-ring">
-          <i class="fa-solid fa-skull"></i>
+    <div class="bm-damage-config-shell">
+      <div class="bm-damage-config-head">
+        <div class="bm-damage-config-icon-wrap" aria-hidden="true">
+          <div class="bm-damage-config-icon-ring">
+            <i class="fa-solid fa-skull"></i>
+          </div>
+        </div>
+        <div class="bm-damage-config-head-copy">
+          <p class="bm-damage-config-eyebrow">${settingsLabel}</p>
+          <p class="bm-damage-config-hint">${tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats")}</p>
         </div>
       </div>
-        <div class="bm-damage-config-fields">
-          <div class="bm-damage-config-row">
-            <select name="degats">${options}</select>
-          </div>
-          <div class="bm-damage-config-row bm-damage-config-inline">
+      <div class="bm-damage-config-grid">
+        <div class="bm-damage-config-row bm-damage-config-row-wide">
+          <label>${damageDieLabel}</label>
+          <select name="degats">${options}</select>
+        </div>
+        <div class="bm-damage-config-row bm-damage-config-inline">
           <label>${rawBonusLabel}</label>
           <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" />
-          </div>
-          <div class="bm-damage-config-row bm-damage-config-inline">
+        </div>
+        <div class="bm-damage-config-row bm-damage-config-inline">
           <label>${penetrationLabel}</label>
           <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" />
-          </div>
         </div>
       </div>
+      <label class="bm-damage-config-toggle">
+        <input type="checkbox" name="roll_keep_highest" ${initialRollKeepHighest ? "checked" : ""} />
+        <span class="bm-damage-config-toggle-indicator" aria-hidden="true">2x</span>
+        <span class="bm-damage-config-toggle-copy">
+          <span class="bm-damage-config-toggle-title">${rollHighestLabel}</span>
+          <span class="bm-damage-config-toggle-hint">${rollHighestHint}</span>
+        </span>
+      </label>
+    </div>
   </form>`;
 
   return new Promise(resolve => {
@@ -343,46 +405,48 @@ async function promptDamageConfiguration({
         title: `${tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats")}${titleSource}`,
         content,
         buttons: {
-        roll: {
-          label: "LANCER",
-          callback: html => {
-            const selectedFormula = normalizeDamageFormula(html.find("select[name='degats']").val());
-            const option = getDamageOptionByFormula(selectedFormula);
-            if (!option) {
-              safeWarn(tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide."));
-              return false;
-            }
+          roll: {
+            label: tl("BLOODMAN.Common.Roll", "Lancer"),
+            callback: html => {
+              const selectedFormula = normalizeDamageFormula(html.find("select[name='degats']").val());
+              const option = getDamageOptionByFormula(selectedFormula);
+              if (!option) {
+                safeWarn(tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide."));
+                return false;
+              }
 
-            const bonusRaw = html.find("input[name='bonus_brut']").val();
-            const penetrationRaw = html.find("input[name='penetration']").val();
-            const bonus = Number(bonusRaw);
-            const penetration = Number(penetrationRaw);
-            if (!Number.isFinite(bonus) || bonus < 0) {
-              safeWarn(tl("BLOODMAN.Notifications.InvalidRawDamageBonus", "La valeur Degats bruts + doit etre un nombre entier >= 0."));
-              return false;
-            }
-            if (!Number.isFinite(penetration) || penetration < 0) {
-              safeWarn(tl("BLOODMAN.Notifications.InvalidPenetration", "La valeur Penetration + doit etre un nombre entier >= 0."));
-              return false;
-            }
+              const bonusRaw = html.find("input[name='bonus_brut']").val();
+              const penetrationRaw = html.find("input[name='penetration']").val();
+              const rollKeepHighest = Boolean(html.find("input[name='roll_keep_highest']").is(":checked"));
+              const bonus = Number(bonusRaw);
+              const penetration = Number(penetrationRaw);
+              if (!Number.isFinite(bonus) || bonus < 0) {
+                safeWarn(tl("BLOODMAN.Notifications.InvalidRawDamageBonus", "La valeur Degats bruts + doit etre un nombre entier >= 0."));
+                return false;
+              }
+              if (!Number.isFinite(penetration) || penetration < 0) {
+                safeWarn(tl("BLOODMAN.Notifications.InvalidPenetration", "La valeur Penetration + doit etre un nombre entier >= 0."));
+                return false;
+              }
 
-            const config = {
-              degats: option.label,
-              formula: option.formula,
-              bonusBrut: Math.floor(bonus),
-              penetration: Math.floor(penetration),
-              attaquant_id: actor?.id || ""
-            };
-            finish(config);
+              const config = {
+                degats: option.label,
+                formula: option.formula,
+                bonusBrut: Math.floor(bonus),
+                penetration: Math.floor(penetration),
+                rollKeepHighest,
+                attaquant_id: actor?.id || ""
+              };
+              finish(config);
+            }
           }
-        }
         },
         default: "roll",
         close: () => finish(null)
       },
       {
         classes: ["bloodman-damage-dialog"],
-        width: 520
+        width: 500
       }
     ).render(true);
   });
@@ -463,6 +527,7 @@ function buildDamageRequestPayload(token, damage, options = {}) {
   const attackerId = String(options.attaquant_id || options.attackerId || "").trim();
   const attackerName = String(options.attackerName || "").trim();
   const rollResults = Array.isArray(options.rollResults) ? options.rollResults : [];
+  const rollKeepHighest = options.rollKeepHighest === true;
   const attackerUserId = String(options.attackerUserId || game.user?.id || "").trim();
   const rollId = String(options.rollId || "").trim();
   const itemId = String(options.itemId || "").trim();
@@ -497,6 +562,7 @@ function buildDamageRequestPayload(token, damage, options = {}) {
     attackerId,
     attackerName,
     rollResults,
+    rollKeepHighest,
     degats: damageLabel || damageFormula.toUpperCase(),
     bonus_brut: bonusBrut,
     cible_id: tokenId || actorId || "",
@@ -509,6 +575,7 @@ function buildDamageBackendInput(actor, config) {
   return {
     degats: config.degats,
     bonus_brut: config.bonusBrut,
+    roll_keep_highest: Boolean(config.rollKeepHighest),
     penetration: config.penetration,
     cible_id: targetIds[0] || "",
     attaquant_id: actor?.id || ""
@@ -534,6 +601,7 @@ function buildDamageContext(actor, config, {
     formula: config.formula,
     degats: config.degats,
     bonusBrut: config.bonusBrut,
+    rollKeepHighest: Boolean(config.rollKeepHighest),
     penetration: config.penetration,
     totalDamage,
     targets: Array.isArray(targets) ? targets : []
@@ -863,9 +931,11 @@ export async function doDamageRoll(actor, item) {
   console.debug("[bloodman] damage:input", backendInput);
 
   const rollId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  let roll = await new Roll(config.formula).evaluate();
-  let rollResults = getRollValues(roll);
-  let totalDamage = Math.max(0, Number(roll.total || 0) + config.bonusBrut);
+  const rollEval = await evaluateDamageRoll(config);
+  const roll = rollEval.roll;
+  const rollResults = Array.isArray(rollEval.rollResults) ? rollEval.rollResults : [];
+  const totalDamage = Math.max(0, Number(rollEval.rawTotal || 0) + config.bonusBrut);
+  const modeTag = String(rollEval.modeTag || "");
   const sourceName = item?.name || "";
 
   if (consumesAmmo) {
@@ -876,7 +946,7 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName)
+    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, modeTag)
   });
 
   const applyResult = await applyDamageToTargets(actor, totalDamage, {
@@ -957,14 +1027,16 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
   console.debug("[bloodman] damage:input", backendInput);
 
   const rollId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  let roll = await new Roll(config.formula).evaluate();
-  let rollResults = getRollValues(roll);
-  let totalDamage = Math.max(0, Number(roll.total || 0) + config.bonusBrut);
+  const rollEval = await evaluateDamageRoll(config);
+  const roll = rollEval.roll;
+  const rollResults = Array.isArray(rollEval.rollResults) ? rollEval.rollResults : [];
+  const totalDamage = Math.max(0, Number(rollEval.rawTotal || 0) + config.bonusBrut);
+  const modeTag = String(rollEval.modeTag || "");
   const resolvedSource = sourceName || "";
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource)
+    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, modeTag)
   });
 
   const applyResult = await applyDamageToTargets(actor, totalDamage, {
