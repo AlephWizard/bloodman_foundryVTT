@@ -334,6 +334,26 @@
   animation: bm-chaos-bounce 1.35s ease-in-out infinite;
 }
 
+.window-app .window-header .header-button.bloodman-minimize {
+  font-size: 0;
+  min-width: 20px;
+  justify-content: center;
+}
+
+.window-app .window-header .header-button.bloodman-minimize i {
+  font-size: 14px;
+  margin-right: 0;
+}
+
+.window-app.minimized .window-header .header-button.bloodman-minimize {
+  display: inline-flex !important;
+  align-items: center;
+}
+
+.window-app.minimized .window-header .header-button:not(.close):not(.bloodman-minimize) {
+  display: none;
+}
+
 @keyframes bm-chaos-bounce {
   0% {
     transform: scale(1) translateY(0);

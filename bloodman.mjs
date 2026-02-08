@@ -4493,10 +4493,63 @@ class BloodmanActorSheet extends BaseActorSheet {
       template: "systems/bloodman/templates/actor-joueur.html",
       width: 1050,
       height: 820,
+      minimizable: true,
       resizable: true,
       submitOnChange: true,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "carac" }]
     });
+  }
+
+  _getHeaderButtons() {
+    const baseButtons = typeof super._getHeaderButtons === "function"
+      ? super._getHeaderButtons()
+      : [];
+    const buttons = baseButtons.filter(button => {
+      const cls = String(button?.class || "");
+      return !cls.includes("minimize") && !cls.includes("maximize");
+    });
+
+    buttons.unshift({
+      label: "",
+      class: "bloodman-minimize",
+      icon: this._minimized ? "far fa-window-maximize" : "far fa-window-minimize",
+      onclick: event => {
+        event?.preventDefault?.();
+        if (this._minimized && typeof this.maximize === "function") return this.maximize();
+        if (!this._minimized && typeof this.minimize === "function") return this.minimize();
+        return null;
+      }
+    });
+
+    return buttons;
+  }
+
+  _syncMinimizeHeaderButton() {
+    const root = this.element;
+    if (!root?.length) return;
+    const button = root.find(".window-header .header-button.bloodman-minimize");
+    if (!button.length) return;
+    const icon = button.find("i");
+    icon.removeClass("fa-window-minimize fa-window-maximize");
+    icon.addClass(this._minimized ? "fa-window-maximize" : "fa-window-minimize");
+    button.attr(
+      "title",
+      this._minimized
+        ? (game?.i18n?.localize?.("BLOODMAN.Common.Maximize") || "Agrandir")
+        : (game?.i18n?.localize?.("BLOODMAN.Common.Minimize") || "Reduire")
+    );
+  }
+
+  async minimize(...args) {
+    const result = await super.minimize(...args);
+    this._syncMinimizeHeaderButton();
+    return result;
+  }
+
+  async maximize(...args) {
+    const result = await super.maximize(...args);
+    this._syncMinimizeHeaderButton();
+    return result;
   }
 
   get isEditable() {
@@ -4852,6 +4905,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    this._syncMinimizeHeaderButton();
 
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const basicPlayer = isBasicPlayerRole(game.user?.role);
