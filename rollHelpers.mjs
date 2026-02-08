@@ -549,17 +549,9 @@ export async function doCharacteristicRoll(actor, key) {
   const isCritFailure = rollTotal >= 96 && rollTotal <= 100;
   const success = isCritSuccess ? true : isCritFailure ? false : rollTotal <= effective;
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
-  const critLabel = isCritSuccess
-    ? t("BLOODMAN.Rolls.CriticalSuccess")
-    : isCritFailure
-      ? t("BLOODMAN.Rolls.CriticalFailure")
-      : "";
-  const critLine = critLabel
-    ? `<br><span class="bm-crit ${isCritSuccess ? "bm-crit-success" : "bm-crit-failure"}"><b>${critLabel}</b></span>`
-    : "";
   r.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${actor.name}</b> – ${key}<br>${rollTotal} / ${effective} → <b>${outcome}</b>${critLine}`
+    flavor: `<b>${outcome}</b><br>${rollTotal}`
   });
   return { roll: r, success, effective, critical: isCritSuccess ? "success" : isCritFailure ? "failure" : "" };
 }
