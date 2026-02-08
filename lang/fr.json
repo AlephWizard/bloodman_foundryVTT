@@ -154,6 +154,7 @@
       "NotEnoughChaosReroll": "Pas assez de des du chaos pour relancer.",
       "NoActiveGMApplyDamage": "Aucun MJ actif pour appliquer les degats.",
       "NoTargetSelected": "Aucune cible selectionnee.",
+      "MoveLimitExceeded": "Deplacement restant insuffisant : {max} case(s) disponible(s) (tentative: {attempted}).",
       "DamageTargetResolveFailed": "Le MJ n'a pas pu resoudre la cible pour appliquer les degats.",
       "AbilityNoActor": "Cette aptitude/pouvoir n'est pas lié à un acteur.",
       "DamageSplitTotal": "La répartition doit totaliser {total}.",

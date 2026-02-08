@@ -1192,6 +1192,8 @@ const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
 const CHAOS_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-chaos-request</span>";
 const REROLL_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-reroll-request</span>";
 const INITIATIVE_GROUP_BUFFER_MS = 180;
+const TOKEN_MOVE_LIMIT_EPSILON = 0.0001;
+let LAST_COMBAT_MOVE_RESET_KEY = "";
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
 const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
 
@@ -1202,6 +1204,12 @@ function toFiniteNumber(value, fallback = 0) {
 
 function normalizeNonNegativeInteger(value, fallback = 0) {
   return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
+}
+
+function normalizeRollDieFormula(value, fallback = "d4") {
+  const raw = String(value ?? fallback ?? "d4").trim();
+  if (!raw) return "1d4";
+  return /^\d/.test(raw) ? raw : `1${raw}`;
 }
 
 function waitMs(ms) {
@@ -1308,7 +1316,7 @@ function buildDefaultResources(options = {}) {
   const resources = {
     pv: { current: 0, max: 0, itemBonus: 0 },
     pp: { current: 0, max: 0, itemBonus: 0 },
-    move: { value: 0 }
+    move: { value: 0, max: 0 }
   };
   if (includeVoyage) {
     resources.voyage = { current: 0, total: 0, max: 0 };
@@ -2809,14 +2817,175 @@ function getCombatantActor(combatant) {
   return combatant?.token?.actor || combatant?.actor || null;
 }
 
-function getFixedInitiativeScore(actor) {
+function getActorEffectiveMovementScore(actor, { itemBonuses = null } = {}) {
   if (!actor) return 0;
-  const itemBonuses = getItemBonusTotals(actor);
+  const bonuses = itemBonuses || getItemBonusTotals(actor);
   const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
   const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
   const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
-  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0) + getActorArchetypeBonus(actor, "MOU");
+  return base + globalMod + keyMod + toFiniteNumber(bonuses?.MOU, 0) + getActorArchetypeBonus(actor, "MOU");
+}
+
+function getActorMoveSlots(actor, options = {}) {
+  const effective = getActorEffectiveMovementScore(actor, options);
+  return Math.max(0, Math.round(effective / 5));
+}
+
+function normalizeActorMoveGauge(actor, { itemBonuses = null, initializeWhenMissing = false } = {}) {
+  const max = normalizeNonNegativeInteger(getActorMoveSlots(actor, { itemBonuses }), 0);
+  const hasStoredMax = foundry.utils.getProperty(actor, "system.resources.move.max") != null;
+  const storedValue = Number(foundry.utils.getProperty(actor, "system.resources.move.value"));
+  const hasPositiveStoredValue = Number.isFinite(storedValue) && storedValue > 0;
+
+  let value = storedValue;
+  if (!hasStoredMax && initializeWhenMissing && !hasPositiveStoredValue) value = max;
+  else if (!Number.isFinite(value)) value = max;
+  value = Math.max(0, Math.min(toFiniteNumber(value, max), max));
+  value = normalizeNonNegativeInteger(value, max);
+
+  return { max, value, hasStoredMax };
+}
+
+async function setActorMoveGauge(actor, nextValue, maxValue) {
+  if (!actor) return;
+  const max = normalizeNonNegativeInteger(maxValue, 0);
+  const value = normalizeNonNegativeInteger(Math.max(0, Math.min(toFiniteNumber(nextValue, max), max)), max);
+  const currentValue = Number(foundry.utils.getProperty(actor, "system.resources.move.value"));
+  const currentMax = Number(foundry.utils.getProperty(actor, "system.resources.move.max"));
+  const hasCurrentMax = foundry.utils.getProperty(actor, "system.resources.move.max") != null;
+  if (validateNumericEquality(currentValue, value) && hasCurrentMax && validateNumericEquality(currentMax, max)) return;
+
+  const updateData = {
+    "system.resources.move.value": value,
+    "system.resources.move.max": max
+  };
+  if (actor.isOwner || game.user?.isGM) {
+    await actor.update(updateData);
+    return;
+  }
+  const sent = requestActorSheetUpdate(actor, updateData);
+  if (!sent) safeWarn("Mise a jour impossible: aucun GM actif.");
+}
+
+function getTokenMoveDistanceInCells(tokenDoc, changes) {
+  if (!tokenDoc || !changes) return Number.NaN;
+  const hasX = foundry.utils.getProperty(changes, "x") != null;
+  const hasY = foundry.utils.getProperty(changes, "y") != null;
+  if (!hasX && !hasY) return 0;
+
+  const currentX = Number(tokenDoc.x);
+  const currentY = Number(tokenDoc.y);
+  if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) return Number.NaN;
+
+  const nextRawX = foundry.utils.getProperty(changes, "x");
+  const nextRawY = foundry.utils.getProperty(changes, "y");
+  const nextX = nextRawX == null ? currentX : Number(nextRawX);
+  const nextY = nextRawY == null ? currentY : Number(nextRawY);
+  if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) return Number.NaN;
+  if (validateNumericEquality(currentX, nextX) && validateNumericEquality(currentY, nextY)) return 0;
+
+  const scene = tokenDoc.parent || tokenDoc.scene || canvas?.scene || null;
+  const gridSize = toFiniteNumber(scene?.grid?.size, toFiniteNumber(canvas?.grid?.size, 0));
+  if (!(gridSize > 0)) return Number.NaN;
+
+  const tokenWidth = Math.max(1, toFiniteNumber(tokenDoc.width, 1));
+  const tokenHeight = Math.max(1, toFiniteNumber(tokenDoc.height, 1));
+  const offsetX = (tokenWidth * gridSize) / 2;
+  const offsetY = (tokenHeight * gridSize) / 2;
+  const origin = { x: currentX + offsetX, y: currentY + offsetY };
+  const destination = { x: nextX + offsetX, y: nextY + offsetY };
+
+  const sceneId = String(scene?.id || "");
+  const activeSceneId = String(canvas?.scene?.id || "");
+  const canMeasureOnCanvas = sceneId && activeSceneId && sceneId === activeSceneId;
+  const gridDistance = toFiniteNumber(scene?.grid?.distance, 1);
+  if (canMeasureOnCanvas && gridDistance > 0 && typeof canvas?.grid?.measurePath === "function") {
+    try {
+      const measurement = canvas.grid.measurePath([origin, destination]);
+      const measuredCost = Number(measurement?.cost);
+      if (Number.isFinite(measuredCost)) return Math.max(0, measuredCost);
+      const measuredDistance = Number(measurement?.distance);
+      if (Number.isFinite(measuredDistance)) return Math.max(0, measuredDistance / gridDistance);
+    } catch (_error) {
+      // Fallback to deterministic grid-cell delta below.
+    }
+  }
+
+  const dxCells = Math.abs(destination.x - origin.x) / gridSize;
+  const dyCells = Math.abs(destination.y - origin.y) / gridSize;
+  return Math.max(dxCells, dyCells);
+}
+
+function getFixedInitiativeScore(actor) {
+  if (!actor) return 0;
+  const effective = getActorEffectiveMovementScore(actor);
   return Math.max(0, Math.round(effective));
+}
+
+function getActiveCombatant(combat) {
+  if (!combat) return null;
+  if (combat.combatant) return combat.combatant;
+  const turn = Number(combat.turn ?? -1);
+  if (!Number.isInteger(turn) || turn < 0) return null;
+  if (Array.isArray(combat.turns) && combat.turns[turn]) return combat.turns[turn];
+  if (Array.isArray(combat.combatants?.contents) && combat.combatants.contents[turn]) return combat.combatants.contents[turn];
+  return null;
+}
+
+function getCombatMoveResetKey(combat) {
+  if (!combat?.active) return "";
+  const combatId = String(combat?.id || "");
+  const activeCombatant = getActiveCombatant(combat);
+  const combatantId = String(activeCombatant?.id || "");
+  const round = Number(combat?.round ?? 0);
+  const turn = Number(combat?.turn ?? -1);
+  if (!combatId || !combatantId || round <= 0 || turn < 0) return "";
+  return `${combatId}:${round}:${turn}:${combatantId}`;
+}
+
+function getStartedActiveCombat() {
+  const combat = game.combat || null;
+  if (!combat?.active) return null;
+  const round = Number(combat?.round ?? 0);
+  return round > 0 ? combat : null;
+}
+
+function getCombatantForToken(combat, tokenDoc) {
+  if (!combat || !tokenDoc) return null;
+  const tokenId = String(tokenDoc.id || tokenDoc._id || "");
+  if (!tokenId) return null;
+  return combat.combatants?.find(combatant => String(combatant?.tokenId || "") === tokenId) || null;
+}
+
+function isActorInStartedActiveCombat(actor, combat = null) {
+  if (!actor) return false;
+  const startedCombat = combat || getStartedActiveCombat();
+  if (!startedCombat) return false;
+  const actorBaseId = getSocketActorBaseId(actor);
+  if (!actorBaseId) return false;
+  return Boolean(startedCombat.combatants?.some(combatant => {
+    const combatantActor = getCombatantActor(combatant);
+    return getSocketActorBaseId(combatantActor) === actorBaseId;
+  }));
+}
+
+async function resetActiveCombatantMoveGauge(combat) {
+  if (!game.user?.isGM) return;
+  if (!combat?.active) return;
+  const round = Number(combat?.round ?? 0);
+  if (round <= 0) return;
+  const resetKey = getCombatMoveResetKey(combat);
+  if (!resetKey || resetKey === LAST_COMBAT_MOVE_RESET_KEY) return;
+  const activeCombatant = getActiveCombatant(combat);
+  if (!activeCombatant) return;
+
+  const actor = getCombatantActor(activeCombatant);
+  if (!actor) return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+
+  const gauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
+  await setActorMoveGauge(actor, gauge.max, gauge.max);
+  LAST_COMBAT_MOVE_RESET_KEY = resetKey;
 }
 
 function getInitiativeFormulaForActor(actor) {
@@ -2983,6 +3152,7 @@ Hooks.once("ready", async () => {
     const requiresResourceInit = !actor.system.resources
       || actorResources.move == null
       || (isCharacter && actorResources.voyage == null);
+    const moveGauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
     if (requiresResourceInit) {
       const mergedResources = foundry.utils.mergeObject(
         buildDefaultResources({ includeVoyage: isCharacter }),
@@ -3005,7 +3175,18 @@ Hooks.once("ready", async () => {
       } else if (mergedResources.voyage != null) {
         delete mergedResources.voyage;
       }
+      mergedResources.move = mergedResources.move || {};
+      mergedResources.move.value = moveGauge.value;
+      mergedResources.move.max = moveGauge.max;
       updates["system.resources"] = mergedResources;
+    } else {
+      const storedMoveValue = Number(actorResources.move?.value);
+      const storedMoveMax = Number(actorResources.move?.max);
+      const hasStoredMoveMax = actorResources.move?.max != null;
+      if (!hasStoredMoveMax || !validateNumericEquality(storedMoveValue, moveGauge.value) || !validateNumericEquality(storedMoveMax, moveGauge.max)) {
+        updates["system.resources.move.value"] = moveGauge.value;
+        updates["system.resources.move.max"] = moveGauge.max;
+      }
     }
     if (isCharacter) {
       const rawVoyageCurrent = toFiniteNumber(actorResources.voyage?.current, 0);
@@ -3572,7 +3753,7 @@ function buildItemDisplayData(item) {
 
   if (item.system?.damageEnabled && item.system?.damageDie) {
     const rawDie = item.system.damageDie.toString();
-    data.displayDamageDie = /^\d/.test(rawDie) ? rawDie : `1${rawDie}`;
+    data.displayDamageDie = normalizeRollDieFormula(rawDie, "d4");
   }
 
   data.displayBonuses = displayBonuses;
@@ -3699,15 +3880,24 @@ Hooks.on("updateCombat", (combat, changes) => {
   if (!changes) return;
   if (changes.round != null || changes.turn != null || changes.active != null) {
     focusActiveCombatantToken(combat);
+    resetActiveCombatantMoveGauge(combat).catch(error => {
+      console.warn("[bloodman] move:gauge reset failed", error);
+    });
   }
 });
 
 Hooks.on("combatTurnChange", (combat) => {
   focusActiveCombatantToken(combat);
+  resetActiveCombatantMoveGauge(combat).catch(error => {
+    console.warn("[bloodman] move:gauge reset failed", error);
+  });
 });
 
 Hooks.on("combatStart", (combat) => {
   focusActiveCombatantToken(combat);
+  resetActiveCombatantMoveGauge(combat).catch(error => {
+    console.warn("[bloodman] move:gauge reset failed", error);
+  });
 });
 
 Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
@@ -3890,13 +4080,8 @@ Hooks.on("updateActor", async (actor, changes) => {
     if (!Number.isFinite(archetypeBonusValue)) return 0;
     return archetypeBonusCharacteristic === key ? archetypeBonusValue : 0;
   };
-  const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
-  const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
-  const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
-  const effective = base + globalMod + keyMod + toFiniteNumber(itemBonuses.MOU, 0) + getArchetypeBonus("MOU");
-  const moveValue = Math.round(effective / 5);
-
-  await actor.update({ "system.resources.move.value": moveValue });
+  const moveGauge = normalizeActorMoveGauge(actor, { itemBonuses, initializeWhenMissing: true });
+  await setActorMoveGauge(actor, moveGauge.value, moveGauge.max);
 
   const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
     + toFiniteNumber(actor.system.modifiers?.all, 0)
@@ -3948,8 +4133,63 @@ Hooks.on("updateActor", async (actor, changes) => {
   await syncZeroPvStatusForActor(actor);
 });
 
-Hooks.on("updateToken", async (tokenDoc, changes) => {
+Hooks.on("preUpdateToken", (tokenDoc, changes, options, userId) => {
+  if (options?.bloodmanIgnoreMoveLimit) return;
+  const hasX = foundry.utils.getProperty(changes, "x") != null;
+  const hasY = foundry.utils.getProperty(changes, "y") != null;
+  if (!hasX && !hasY) return;
+
+  const combat = getStartedActiveCombat();
+  if (!combat) return;
+  const combatant = getCombatantForToken(combat, tokenDoc);
+  if (!combatant) return;
+
+  const sourceUserId = String(userId || "");
+  const currentUserId = String(game.user?.id || "");
+  if (sourceUserId && currentUserId && sourceUserId !== currentUserId) return;
+
+  const actorType = getTokenActorType(tokenDoc);
+  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
+  const actor = tokenDoc?.actor || (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+  if (!actor) return;
+
+  const gauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
+  const remaining = gauge.value;
+  const movedCells = getTokenMoveDistanceInCells(tokenDoc, changes);
+  if (!Number.isFinite(movedCells)) return;
+  const moveCost = Math.max(0, Math.ceil(Math.max(0, movedCells) - TOKEN_MOVE_LIMIT_EPSILON));
+  if (moveCost <= TOKEN_MOVE_LIMIT_EPSILON) return;
+  if (moveCost > remaining + TOKEN_MOVE_LIMIT_EPSILON) {
+    safeWarn(t("BLOODMAN.Notifications.MoveLimitExceeded", { max: remaining, attempted: moveCost }));
+    return false;
+  }
+
+  options.bloodmanMoveCost = moveCost;
+  options.bloodmanMoveCombatId = String(combat.id || "");
+});
+
+Hooks.on("updateToken", async (tokenDoc, changes, options, userId) => {
   scheduleRoundTokenMask(tokenDoc);
+  const moveCost = Number(options?.bloodmanMoveCost);
+  const startedCombat = getStartedActiveCombat();
+  const isCombatMove = startedCombat
+    && String(options?.bloodmanMoveCombatId || "") === String(startedCombat.id || "")
+    && Boolean(getCombatantForToken(startedCombat, tokenDoc));
+  const sourceUserId = String(userId || "");
+  const currentUserId = String(game.user?.id || "");
+  const isSourceUser = sourceUserId ? sourceUserId === currentUserId : Boolean(game.user?.isGM);
+  if (isCombatMove && Number.isFinite(moveCost) && moveCost > TOKEN_MOVE_LIMIT_EPSILON && isSourceUser) {
+    const actorType = getTokenActorType(tokenDoc);
+    if (actorType === "personnage" || actorType === "personnage-non-joueur") {
+      const actor = tokenDoc?.actor || (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+      if (actor) {
+        const gauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
+        const nextValue = Math.max(0, gauge.value - moveCost);
+        await setActorMoveGauge(actor, nextValue, gauge.max);
+      }
+    }
+  }
+
   if (!game.user.isGM) return;
   if (foundry.utils.getProperty(changes, "name") != null) {
     await syncCombatantNameForToken(tokenDoc);
@@ -4143,8 +4383,11 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const phy = characteristics.find(c => c.key === "PHY")?.effective ?? 0;
     const esp = characteristics.find(c => c.key === "ESP")?.effective ?? 0;
-    const mou = characteristics.find(c => c.key === "MOU")?.effective ?? 0;
-    const moveValue = Math.round(mou / 5);
+    const startedCombat = getStartedActiveCombat();
+    const moveGaugeActive = isActorInStartedActiveCombat(this.actor, startedCombat);
+    const moveGauge = normalizeActorMoveGauge(this.actor, { itemBonuses, initializeWhenMissing: true });
+    const moveValue = moveGaugeActive ? moveGauge.value : moveGauge.max;
+    const moveMax = moveGauge.max;
     const pvBase = getDerivedPvMax(this.actor, phy);
 
     const resources = foundry.utils.mergeObject(
@@ -4158,6 +4401,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     resources.pp.max = Math.max(0, toFiniteNumber(resources.pp.max, Math.round(esp / 5)));
     resources.pv.current = Math.max(0, Math.min(toFiniteNumber(resources.pv.current, 0), resources.pv.max));
     resources.pp.current = Math.max(0, Math.min(toFiniteNumber(resources.pp.current, 0), resources.pp.max));
+    resources.move.max = moveMax;
     resources.move.value = moveValue;
     if (isPlayerActor) {
       const voyageTotal = normalizeNonNegativeInteger(resources.voyage?.total ?? resources.voyage?.max, 0);
@@ -4213,6 +4457,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const moveChar = characteristics.find(c => c.key === "MOU");
     if (moveChar) {
       moveChar.moveValue = moveValue;
+      moveChar.moveMax = moveMax;
       moveChar.showMoveValue = true;
     }
 
@@ -4686,8 +4931,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async rollAbilityDamage(item) {
     if (!item) return;
-    const die = (item.system.damageDie || "d4").toString();
-    const formula = /^\d/.test(die) ? die : `1${die}`;
+    const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
     const beforeRoll = async () => applyPowerCost(this.actor, item);
     const result = await doDirectDamageRoll(this.actor, formula, item.name, {
       beforeRoll,
@@ -4718,8 +4962,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         if (result) await playItemAudio(healAudioRef);
         if (result && this.actor.items.get(item.id)) this.render(false);
       } else {
-        const die = item.system?.healDie || "d4";
-        const formula = /^\d/.test(String(die)) ? String(die) : `1${die}`;
+        const formula = normalizeRollDieFormula(item.system?.healDie, "d4");
         const roll = await new Roll(formula).evaluate();
         const current = toFiniteNumber(this.actor.system?.resources?.pv?.current, 0);
         const max = toFiniteNumber(this.actor.system?.resources?.pv?.max, current);
@@ -5106,23 +5349,20 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!item) return false;
 
     if (item.type === "arme") {
-      const die = (item.system?.damageDie || "d4").toString();
-      const formula = /^\d/.test(die) ? die : `1${die}`;
+      const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
       const result = await doDirectDamageRoll(this.actor, formula, item.name, { itemId: item.id, itemType: item.type });
       return Boolean(result);
     }
 
     if (item.type === "aptitude" || item.type === "pouvoir") {
       if (!item.system?.damageEnabled || !item.system?.damageDie) return false;
-      const die = item.system.damageDie.toString();
-      const formula = /^\d/.test(die) ? die : `1${die}`;
+      const formula = normalizeRollDieFormula(item.system.damageDie, "d4");
       const result = await doDirectDamageRoll(this.actor, formula, item.name, { itemId: item.id, itemType: item.type });
       return Boolean(result);
     }
 
     if (item.type === "soin") {
-      const die = (item.system?.healDie || "d4").toString();
-      const formula = /^\d/.test(die) ? die : `1${die}`;
+      const formula = normalizeRollDieFormula(item.system?.healDie, "d4");
       const roll = await new Roll(formula).evaluate();
       const current = toFiniteNumber(this.actor.system.resources?.pv?.current, 0);
       const max = toFiniteNumber(this.actor.system.resources?.pv?.max, current);
@@ -5274,8 +5514,7 @@ class BloodmanItemSheet extends BaseItemSheet {
       ui.notifications?.warn(t("BLOODMAN.Notifications.AbilityNoActor"));
       return;
     }
-    const die = (this.item.system.damageDie || "d4").toString();
-    const formula = /^\d/.test(die) ? die : `1${die}`;
+    const formula = normalizeRollDieFormula(this.item.system?.damageDie, "d4");
     const beforeRoll = async () => applyPowerCost(this.item.actor, this.item);
     const result = await doDirectDamageRoll(this.item.actor, formula, this.item.name, {
       beforeRoll,

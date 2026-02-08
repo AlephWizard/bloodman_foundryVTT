@@ -856,7 +856,7 @@ export async function doDamageRoll(actor, item) {
   }
 
   const rawDie = die.toString();
-  const defaultFormula = normalizeDamageFormula(/^\d/.test(rawDie) ? rawDie : `1${rawDie}`) || "1d4";
+  const defaultFormula = normalizeDamageFormula(rawDie) || "1d4";
   const defaultBonus = getRawDamageBonus(actor);
   const config = await promptDamageConfiguration({
     actor,
@@ -915,7 +915,8 @@ export async function doDamageRoll(actor, item) {
 
 export async function doHealRoll(actor, item) {
   const die = item.system.healDie || "d4";
-  const roll = await new Roll(`1${die}`).evaluate();
+  const formula = normalizeDamageFormula(die) || "1d4";
+  const roll = await new Roll(formula).evaluate();
 
   const current = Number(actor.system.resources?.pv?.current || 0);
   const max = Number(actor.system.resources?.pv?.max || 0);
