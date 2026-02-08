@@ -3633,32 +3633,51 @@ function getVisibleRect(element) {
 function positionChaosDiceUI() {
   const root = document.getElementById("bm-chaos-dice");
   if (!root) return;
-  const chatRect = getVisibleRect(document.getElementById("chat-form"));
+  // Keep the widget at document level so fixed coordinates stay viewport-based.
+  if (root.parentElement !== document.body) {
+    document.body.appendChild(root);
+  }
   const hotbarRect = getVisibleRect(document.getElementById("hotbar"));
-  const gap = 10;
+  const macroStripRect = getVisibleRect(
+    document.querySelector("#hotbar #macro-list")
+    || document.querySelector("#hotbar ol#macro-list")
+    || document.querySelector("#hotbar #action-bar")
+    || document.querySelector("#hotbar ol#action-bar")
+  );
+  const sidebarRect = getVisibleRect(document.getElementById("sidebar"))
+    || getVisibleRect(document.getElementById("ui-right"));
+  const anchorRect = hotbarRect || macroStripRect || null;
+  const rootRect = root.getBoundingClientRect();
+  const halfWidth = Math.max(18, (rootRect.width || 60) / 2);
+  const viewportMargin = 8;
+  const rightGap = 14;
+  const bottomOffset = 30;
 
-  if (chatRect) {
-    const rootRect = root.getBoundingClientRect();
-    const width = rootRect.width || 46;
-    const left = Math.max(12, Math.round(chatRect.left - width - gap));
-    const bottom = 12;
-    root.style.left = `${left}px`;
-    root.style.right = "auto";
-    root.style.bottom = `${bottom}px`;
-    return;
+  let centerX = Math.round(window.innerWidth / 2);
+  if (anchorRect) {
+    centerX = Math.round(anchorRect.right + rightGap + halfWidth);
+  } else if (sidebarRect) {
+    centerX = Math.round(sidebarRect.left - halfWidth - rightGap);
   }
 
-  const anchorTop = hotbarRect?.top;
-  if (typeof anchorTop === "number") {
-    const bottomOffset = Math.max(12, Math.round(window.innerHeight - anchorTop + 6));
-    root.style.bottom = `${bottomOffset}px`;
-  }
+  const rightBoundary = sidebarRect
+    ? (sidebarRect.left - viewportMargin - halfWidth)
+    : (window.innerWidth - viewportMargin - halfWidth);
+  const leftBoundary = viewportMargin + halfWidth;
+  const maxCenter = Math.max(leftBoundary, rightBoundary);
+  const clampedX = Math.max(leftBoundary, Math.min(maxCenter, centerX));
+
+  root.style.left = `${clampedX}px`;
+  root.style.right = "auto";
+  root.style.bottom = `${bottomOffset}px`;
+  root.style.top = "auto";
+  root.style.transform = "translateX(-50%)";
 }
 
 function ensureChaosDiceUI() {
   if (!game.user.isGM) return;
   if (document.getElementById("bm-chaos-dice")) return;
-  const target = document.getElementById("ui-bottom") || document.body;
+  const target = document.body;
   if (!target) return;
 
   const container = document.createElement("div");
@@ -3866,6 +3885,10 @@ Hooks.on("renderChatMessage", (message, html) => {
   } catch (error) {
     console.warn("[bloodman] chat:roll decorate skipped", error);
   }
+});
+
+Hooks.on("renderHotbar", () => {
+  positionChaosDiceUI();
 });
 
 Hooks.on("updateItem", (item) => {
