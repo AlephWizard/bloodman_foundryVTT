@@ -1954,6 +1954,125 @@ function getInitiativeNameFromMessage(message, combat) {
   return message?.speaker?.alias || message?.alias || "Combattant";
 }
 
+function escapeChatMarkup(value) {
+  const raw = String(value ?? "");
+  if (typeof foundry?.utils?.escapeHTML === "function") return foundry.utils.escapeHTML(raw);
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getChatSpeakerTokenDocument(message) {
+  if (!message) return null;
+  const tokenId = String(message?.speaker?.token || "");
+  if (!tokenId) return null;
+  const sceneId = String(message?.speaker?.scene || canvas?.scene?.id || "");
+  const scene = sceneId ? game.scenes?.get(sceneId) : canvas?.scene;
+  if (!scene) return null;
+  return scene.tokens?.get(tokenId) || scene.tokens?.contents?.find(token => token.id === tokenId) || null;
+}
+
+function getChatSpeakerActor(message) {
+  const actorId = String(message?.speaker?.actor || "");
+  if (actorId) {
+    const actor = game.actors?.get(actorId) || null;
+    if (actor) return actor;
+  }
+  const tokenDoc = getChatSpeakerTokenDocument(message);
+  return tokenDoc?.actor || (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null) || null;
+}
+
+function resolveChatTokenImage(actor, tokenDoc) {
+  const tokenSrc = String(foundry.utils.getProperty(tokenDoc, "texture.src") || "").trim();
+  if (tokenSrc) return tokenSrc;
+  const prototypeSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
+  if (prototypeSrc) return prototypeSrc;
+  const actorImage = String(actor?.img || "").trim();
+  if (actorImage) return actorImage;
+  return "icons/svg/mystery-man.svg";
+}
+
+function resolveChatAccentColor(message) {
+  const userId = String(message?.user?.id || message?.user || "");
+  const author = (userId ? game.users?.get(userId) : null) || message?.author || null;
+  const raw = author?.color;
+  if (typeof raw === "string" && raw.trim()) return normalizeChatCssColor(raw.trim());
+  const cssValue = typeof raw?.css === "string"
+    ? raw.css
+    : (typeof raw?.css === "function" ? raw.css() : "");
+  if (cssValue) return normalizeChatCssColor(cssValue);
+  const fallback = String(raw || "").trim();
+  if (fallback && fallback !== "[object Object]") return normalizeChatCssColor(fallback);
+  return "#2f66d9";
+}
+
+function normalizeChatCssColor(value, fallback = "#2f66d9") {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+  const supportsApi = Boolean(globalThis.CSS && typeof globalThis.CSS.supports === "function");
+  if (!supportsApi) return raw;
+  return globalThis.CSS.supports("color", raw) ? raw : fallback;
+}
+
+function resolveChatPseudoName(actor, message) {
+  const candidates = [
+    foundry.utils.getProperty(actor, "system.profile.pseudonyme"),
+    foundry.utils.getProperty(actor, "system.profile.pseudo"),
+    actor?.name,
+    message?.speaker?.alias,
+    message?.alias
+  ];
+  for (const candidate of candidates) {
+    const label = String(candidate || "").trim();
+    if (label) return label;
+  }
+  return t("BLOODMAN.Common.Name");
+}
+
+function shouldDecorateChatRollMessage(message, actor) {
+  if (!message) return false;
+  const hasRoll = Array.isArray(message?.rolls) && message.rolls.length > 0;
+  const hasLuckFlag = Boolean(foundry.utils.getProperty(message, "flags.bloodman.luckRoll"));
+  if (!hasRoll && !hasLuckFlag) return false;
+  const actorType = String(actor?.type || "");
+  return actorType === "personnage" || actorType === "personnage-non-joueur" || hasLuckFlag;
+}
+
+function decorateBloodmanChatRollMessage(message, html) {
+  const root = html?.[0] || html;
+  if (!(root instanceof HTMLElement)) return;
+  if (root.classList.contains("bm-chat-roll")) return;
+
+  const actor = getChatSpeakerActor(message);
+  if (!shouldDecorateChatRollMessage(message, actor)) return;
+  const contentEl = root.querySelector(".message-content");
+  if (!contentEl) return;
+  if (contentEl.querySelector(".bm-chat-roll-frame")) return;
+
+  const tokenDoc = getChatSpeakerTokenDocument(message);
+  const tokenImage = resolveChatTokenImage(actor, tokenDoc);
+  const pseudo = resolveChatPseudoName(actor, message);
+  const accent = resolveChatAccentColor(message);
+
+  const escapedPseudo = escapeChatMarkup(pseudo);
+  const escapedImage = escapeChatMarkup(tokenImage);
+  const escapedAccent = escapeChatMarkup(accent);
+  const originalContent = contentEl.innerHTML;
+
+  contentEl.innerHTML = `<div class="bm-chat-roll-frame" style="--bm-chat-roll-accent:${escapedAccent};">
+    <div class="bm-chat-roll-head">
+      <span class="bm-chat-roll-accent-band" aria-hidden="true"></span>
+      <div class="bm-chat-roll-token"><img src="${escapedImage}" alt="${escapedPseudo}" /></div>
+      <div class="bm-chat-roll-pseudo">${escapedPseudo}</div>
+    </div>
+    <div class="bm-chat-roll-inner bm-chat-roll-native">${originalContent}</div>
+  </div>`;
+  root.classList.add("bm-chat-roll");
+}
+
 async function flushInitiativeGroupBuffer(key) {
   const entry = INITIATIVE_GROUP_BUFFER.get(key);
   if (!entry) return;
@@ -3741,6 +3860,14 @@ Hooks.on("createChatMessage", async (message) => {
   }
 });
 
+Hooks.on("renderChatMessage", (message, html) => {
+  try {
+    decorateBloodmanChatRollMessage(message, html);
+  } catch (error) {
+    console.warn("[bloodman] chat:roll decorate skipped", error);
+  }
+});
+
 Hooks.on("updateItem", (item) => {
   if (!item?.actor) return;
   if (item.type !== "aptitude" && item.type !== "pouvoir") return;
@@ -4996,6 +5123,15 @@ class BloodmanActorSheet extends BaseActorSheet {
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content,
+      flags: {
+        bloodman: {
+          luckRoll: {
+            chance: chanceValue,
+            roll: luckValue,
+            outcome
+          }
+        }
+      },
       ...(usedDice3d || !diceSound ? {} : { sound: diceSound })
     });
   }
