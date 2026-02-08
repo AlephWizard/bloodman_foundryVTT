@@ -281,6 +281,130 @@ function isBasicPlayerRole(role) {
   return Number(role ?? 0) <= playerRole;
 }
 
+const CHARACTERISTIC_BASE_MIN = 30;
+const CHARACTERISTIC_BASE_MAX = 95;
+
+function isCharacteristicBaseRangeRestrictedRole(role) {
+  const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
+  return Number(role ?? 0) < assistantRole;
+}
+
+function clampCharacteristicBaseForRole(role, value, fallback = CHARACTERISTIC_BASE_MIN) {
+  const numeric = toFiniteNumber(value, fallback);
+  if (!isCharacteristicBaseRangeRestrictedRole(role)) return numeric;
+  return Math.max(CHARACTERISTIC_BASE_MIN, Math.min(CHARACTERISTIC_BASE_MAX, numeric));
+}
+
+function normalizeCharacteristicBaseUpdatesForRole(updateData, role, actor = null) {
+  if (!updateData || typeof updateData !== "object") return false;
+  let changed = false;
+
+  const normalizeForCharacteristic = (characteristicKey, rawValue) => {
+    const fallback = toFiniteNumber(actor?.system?.characteristics?.[characteristicKey]?.base, CHARACTERISTIC_BASE_MIN);
+    return clampCharacteristicBaseForRole(role, rawValue, fallback);
+  };
+
+  for (const path of Object.keys(updateData)) {
+    const match = path.match(/^system\.characteristics\.([^\.]+)\.base$/);
+    if (!match) continue;
+    const characteristicKey = match[1];
+    const normalized = normalizeForCharacteristic(characteristicKey, updateData[path]);
+    if (!validateNumericEquality(Number(updateData[path]), normalized)) {
+      updateData[path] = normalized;
+      changed = true;
+    }
+  }
+
+  const nestedCharacteristics = foundry.utils.getProperty(updateData, "system.characteristics");
+  if (!nestedCharacteristics || typeof nestedCharacteristics !== "object") return changed;
+  for (const characteristicKey of Object.keys(nestedCharacteristics)) {
+    const characteristicUpdate = nestedCharacteristics[characteristicKey];
+    if (!characteristicUpdate || typeof characteristicUpdate !== "object") continue;
+    if (!Object.prototype.hasOwnProperty.call(characteristicUpdate, "base")) continue;
+    const normalized = normalizeForCharacteristic(characteristicKey, characteristicUpdate.base);
+    if (!validateNumericEquality(Number(characteristicUpdate.base), normalized)) {
+      characteristicUpdate.base = normalized;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function toCheckboxBoolean(value, fallback = false) {
+  if (value === true || value === false) return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "off" || normalized === "no" || normalized === "") return false;
+  }
+  return Boolean(fallback);
+}
+
+function normalizeCharacteristicXpUpdates(updateData, actor = null) {
+  if (!updateData || typeof updateData !== "object") return false;
+  let changed = false;
+
+  for (const characteristic of CHARACTERISTICS) {
+    const key = String(characteristic?.key || "");
+    if (!key) continue;
+    const xpPath = `system.characteristics.${key}.xp`;
+    const xpIndexPrefix = `${xpPath}.`;
+    const actorCurrent = Array.isArray(actor?.system?.characteristics?.[key]?.xp)
+      ? actor.system.characteristics[key].xp
+      : [false, false, false];
+    const nextXp = [
+      toCheckboxBoolean(actorCurrent[0], false),
+      toCheckboxBoolean(actorCurrent[1], false),
+      toCheckboxBoolean(actorCurrent[2], false)
+    ];
+    let touched = false;
+
+    let xpPayload;
+    if (Object.prototype.hasOwnProperty.call(updateData, xpPath)) {
+      xpPayload = updateData[xpPath];
+      touched = true;
+    } else {
+      const nestedPayload = foundry.utils.getProperty(updateData, xpPath);
+      if (nestedPayload !== undefined) {
+        xpPayload = nestedPayload;
+        touched = true;
+      }
+    }
+
+    if (xpPayload !== undefined) {
+      if (Array.isArray(xpPayload)) {
+        for (let i = 0; i < 3; i += 1) {
+          if (xpPayload[i] === undefined) continue;
+          nextXp[i] = toCheckboxBoolean(xpPayload[i], nextXp[i]);
+        }
+      } else if (xpPayload && typeof xpPayload === "object") {
+        for (const [rawIndex, rawValue] of Object.entries(xpPayload)) {
+          const index = Number(rawIndex);
+          if (!Number.isInteger(index) || index < 0 || index > 2) continue;
+          nextXp[index] = toCheckboxBoolean(rawValue, nextXp[index]);
+        }
+      }
+    }
+
+    for (const path of Object.keys(updateData)) {
+      if (!path.startsWith(xpIndexPrefix)) continue;
+      const index = Number(path.slice(xpIndexPrefix.length));
+      if (!Number.isInteger(index) || index < 0 || index > 2) continue;
+      nextXp[index] = toCheckboxBoolean(updateData[path], nextXp[index]);
+      delete updateData[path];
+      touched = true;
+      changed = true;
+    }
+
+    if (!touched) continue;
+    foundry.utils.setProperty(updateData, xpPath, nextXp);
+    changed = true;
+  }
+
+  return changed;
+}
+
 function stripUnauthorizedCharacteristicBaseUpdates(updateData) {
   if (!updateData || typeof updateData !== "object") return false;
   let blocked = false;
@@ -2562,6 +2686,7 @@ function sanitizeActorUpdateForRole(updateData, role, options = {}) {
   const basicPlayer = isBasicPlayerRole(role);
   const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
+  const enforceCharacteristicBaseRange = options.enforceCharacteristicBaseRange !== false;
   if (basicPlayer && !allowCharacteristicBase) {
     stripUnauthorizedCharacteristicBaseUpdates(sanitized);
   }
@@ -2571,6 +2696,8 @@ function sanitizeActorUpdateForRole(updateData, role, options = {}) {
   if (basicPlayer) {
     stripUpdatePaths(sanitized, STATE_MODIFIER_PATHS);
   }
+  normalizeCharacteristicXpUpdates(sanitized, options.actor || null);
+  if (enforceCharacteristicBaseRange) normalizeCharacteristicBaseUpdatesForRole(sanitized, role);
   return sanitized;
 }
 
@@ -2623,8 +2750,10 @@ async function handleActorSheetUpdateRequest(data) {
   const allowCharacteristicBase = Boolean(data?.options?.allowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(data?.options?.allowVitalResourceUpdate);
   const sanitized = sanitizeActorUpdateForRole(data.updateData || {}, requesterRole, {
+    actor,
     allowCharacteristicBase,
-    allowVitalResourceUpdate
+    allowVitalResourceUpdate,
+    enforceCharacteristicBaseRange: actor.type === "personnage"
   });
   if (!hasActorUpdatePayload(sanitized)) return;
   await actor.update(sanitized, {
@@ -3902,6 +4031,7 @@ Hooks.on("combatStart", (combat) => {
 
 Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  normalizeCharacteristicXpUpdates(updateData, actor);
   const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
   let blockedRestrictedFields = false;
   const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
@@ -3915,6 +4045,9 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
       blockedRestrictedFields = stripUpdatePaths(updateData, Array.from(VITAL_RESOURCE_PATHS)) || blockedRestrictedFields;
     }
     blockedRestrictedFields = stripUpdatePaths(updateData, STATE_MODIFIER_PATHS) || blockedRestrictedFields;
+  }
+  if (actor.type === "personnage") {
+    normalizeCharacteristicBaseUpdatesForRole(updateData, updaterRole, actor);
   }
 
   // Keep the update silent when restricted fields are stripped so normal
@@ -4306,7 +4439,9 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
     const sanitized = sanitizeActorUpdateForRole(formData, game.user?.role, {
-      allowCharacteristicBase
+      actor: this.actor,
+      allowCharacteristicBase,
+      enforceCharacteristicBaseRange: this.actor?.type === "personnage"
     });
     if (!hasActorUpdatePayload(sanitized)) return;
     await this.applyActorUpdate(sanitized, { bloodmanAllowCharacteristicBase: allowCharacteristicBase });
@@ -4315,6 +4450,8 @@ class BloodmanActorSheet extends BaseActorSheet {
   getData() {
     const data = super.getData();
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
+    const characteristicBaseHasBounds = data.actor.type === "personnage"
+      && isCharacteristicBaseRangeRestrictedRole(game.user?.role);
     const canEditRestrictedFields = canToggleCharacteristicsEdit;
     const canEditXpChecks = canToggleCharacteristicsEdit;
     const canOpenItemSheets = canToggleCharacteristicsEdit;
@@ -4530,6 +4667,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     return {
       ...data,
       canToggleCharacteristicsEdit,
+      characteristicBaseHasBounds,
+      characteristicBaseMin: CHARACTERISTIC_BASE_MIN,
+      characteristicBaseMax: CHARACTERISTIC_BASE_MAX,
       canEditRestrictedFields,
       canEditXpChecks,
       canOpenItemSheets,
@@ -4834,20 +4974,29 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (this.actor.type !== "personnage") return;
 
     const roll = await new Roll("2d100").evaluate();
-    const results = roll?.dice?.[0]?.results || [];
-    const chanceValue = Number(results[0]?.result || 0);
-    const luckValue = Number(results[1]?.result || 0);
+    const results = getRollValuesFromRoll(roll);
+    const chanceValue = Number(results[0] || 0);
+    const luckValue = Number(results[1] || 0);
     const success = luckValue <= chanceValue;
     const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
+    const luckLabel = t("BLOODMAN.Common.LuckRoll");
+    const actorName = String(this.actor.name || "").trim() || t("BLOODMAN.Common.Name");
+    const content = `<p><strong>${actorName}</strong> - ${luckLabel} : <strong>${outcome}</strong></p><p><small>D1: <strong>${chanceValue}</strong> | D2: <strong>${luckValue}</strong></small></p>`;
+    let usedDice3d = false;
+    try {
+      if (game?.dice3d && typeof game.dice3d.showForRoll === "function") {
+        await game.dice3d.showForRoll(roll, game.user, true);
+        usedDice3d = true;
+      }
+    } catch (error) {
+      console.warn("[bloodman] luck:dice3d feedback failed", error);
+    }
+    const diceSound = String(CONFIG?.sounds?.dice || "").trim();
 
-    roll.toMessage({
+    await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: t("BLOODMAN.Rolls.Luck.Chat", {
-        name: this.actor.name,
-        chance: chanceValue,
-        roll: luckValue,
-        result: outcome
-      })
+      content,
+      ...(usedDice3d || !diceSound ? {} : { sound: diceSound })
     });
   }
 

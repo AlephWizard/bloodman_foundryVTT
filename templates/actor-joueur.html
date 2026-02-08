@@ -86,7 +86,7 @@
                 <div class="char-row {{#if this.showMoveValue}}move-row{{/if}}" data-key="{{this.key}}">
                   <div class="char-icon"><i class="fa-solid {{this.icon}}"></i></div>
                   <div class="char-base">
-                    <input type="number" class="char-base-input {{#unless ../characteristicsEditEnabled}}is-locked{{/unless}}" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" min="0" max="100" {{#unless ../characteristicsEditEnabled}}readonly{{/unless}} />
+                    <input type="number" class="char-base-input {{#unless ../characteristicsEditEnabled}}is-locked{{/unless}}" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" {{#if ../characteristicBaseHasBounds}}min="{{../characteristicBaseMin}}" max="{{../characteristicBaseMax}}"{{/if}} {{#unless ../characteristicsEditEnabled}}readonly{{/unless}} />
                     <span class="char-max">/100</span>
                   </div>
                   <div class="char-name">
