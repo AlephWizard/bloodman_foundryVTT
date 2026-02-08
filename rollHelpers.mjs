@@ -3,6 +3,7 @@ const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SO
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
+const DAMAGE_DIALOG_CONFIG_USER_FLAG = "damageDialogConfig";
 const DAMAGE_CONFIG_OPTIONS = [
   { label: "1D4", formula: "1d4" },
   { label: "1D6", formula: "1d6" },
@@ -277,6 +278,35 @@ function getDefaultDamageOption(formula) {
   return getDamageOptionByFormula(formula) || DAMAGE_CONFIG_OPTIONS[0];
 }
 
+function getRememberedDamageDialogConfig() {
+  const raw = game.user?.getFlag?.("bloodman", DAMAGE_DIALOG_CONFIG_USER_FLAG);
+  if (!raw || typeof raw !== "object") return null;
+  const option = getDamageOptionByFormula(raw.formula);
+  return {
+    formula: option?.formula || "",
+    bonusBrut: toNonNegativeInt(raw.bonusBrut, 0),
+    penetration: toNonNegativeInt(raw.penetration, 0),
+    rollKeepHighest: raw.rollKeepHighest === true
+  };
+}
+
+async function rememberDamageDialogConfig(config = {}) {
+  if (!game.user?.setFlag) return;
+  const option = getDamageOptionByFormula(config.formula);
+  const payload = {
+    formula: option?.formula || "",
+    bonusBrut: toNonNegativeInt(config.bonusBrut, 0),
+    penetration: toNonNegativeInt(config.penetration, 0),
+    rollKeepHighest: config.rollKeepHighest === true,
+    updatedAt: Date.now()
+  };
+  try {
+    await game.user.setFlag("bloodman", DAMAGE_DIALOG_CONFIG_USER_FLAG, payload);
+  } catch (error) {
+    console.warn("[bloodman] damage:remember config failed", error);
+  }
+}
+
 function getRollValues(roll) {
   const values = [];
   for (const die of roll?.dice || []) {
@@ -334,10 +364,17 @@ async function promptDamageConfiguration({
   defaultPenetration = 0,
   defaultRollKeepHighest = false
 } = {}) {
-  const selectedDefault = getDefaultDamageOption(defaultFormula);
-  const initialBonus = toNonNegativeInt(defaultBonus, 0);
-  const initialPenetration = toNonNegativeInt(defaultPenetration, 0);
-  const initialRollKeepHighest = Boolean(defaultRollKeepHighest);
+  const rememberedConfig = getRememberedDamageDialogConfig();
+  const selectedDefault = getDamageOptionByFormula(rememberedConfig?.formula) || getDefaultDamageOption(defaultFormula);
+  const initialBonus = rememberedConfig
+    ? toNonNegativeInt(rememberedConfig.bonusBrut, toNonNegativeInt(defaultBonus, 0))
+    : toNonNegativeInt(defaultBonus, 0);
+  const initialPenetration = rememberedConfig
+    ? toNonNegativeInt(rememberedConfig.penetration, toNonNegativeInt(defaultPenetration, 0))
+    : toNonNegativeInt(defaultPenetration, 0);
+  const initialRollKeepHighest = rememberedConfig
+    ? rememberedConfig.rollKeepHighest === true
+    : Boolean(defaultRollKeepHighest);
   const titleSource = sourceName ? ` (${sourceName})` : "";
   const damageDieLabel = tl("BLOODMAN.Items.DamageDieLabel", "De de degat");
   const settingsLabel = tl("BLOODMAN.Dialogs.DamageConfig.SettingsLabel", "Reglages du jet");
@@ -437,6 +474,7 @@ async function promptDamageConfiguration({
                 rollKeepHighest,
                 attaquant_id: actor?.id || ""
               };
+              void rememberDamageDialogConfig(config);
               finish(config);
             }
           }
