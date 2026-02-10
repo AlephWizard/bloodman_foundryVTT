@@ -1292,7 +1292,7 @@ const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]);
-const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin"]);
+const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin", "objet"]);
 const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
 const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
 const VITAL_RESOURCE_PATHS = new Set([
@@ -5879,6 +5879,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     if (item.type === "objet") {
       if (!toBooleanFlag(item.system?.useEnabled)) return;
+      await playItemAudio(item, { delayMs: 0 });
       await this.deleteActorItem(item);
       this.render(false);
     }
