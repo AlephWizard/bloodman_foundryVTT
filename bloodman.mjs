@@ -1274,7 +1274,9 @@ const STATE_MODIFIER_PATHS = [
 ];
 
 const SYSTEM_SOCKET = "system.bloodman";
-const CARRIED_ITEM_LIMIT = 10;
+const CARRIED_ITEM_LIMIT_BASE = 10;
+const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
+const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
@@ -1294,6 +1296,19 @@ const VITAL_RESOURCE_PATHS = new Set([
 function isDamageRerollItemType(itemType) {
   const type = String(itemType || "").trim().toLowerCase();
   return DAMAGE_REROLL_ALLOWED_ITEM_TYPES.has(type);
+}
+
+function isCarriedItemLimitedActorType(actorType) {
+  const type = String(actorType || "").trim().toLowerCase();
+  return CARRIED_ITEM_LIMIT_ACTOR_TYPES.has(type);
+}
+
+function isBagSlotsEnabled(actor) {
+  return Boolean(actor?.system?.equipment?.bagSlotsEnabled);
+}
+
+function getActorCarriedItemsLimit(actor) {
+  return isBagSlotsEnabled(actor) ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
 }
 
 function validateNumericEquality(a, b) {
@@ -1473,7 +1488,8 @@ function buildDefaultEquipment() {
   return {
     monnaies: "",
     transports: "",
-    transportNpcs: []
+    transportNpcs: [],
+    bagSlotsEnabled: false
   };
 }
 
@@ -4850,6 +4866,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const equipment = foundry.utils.mergeObject(buildDefaultEquipment(), data.actor.system.equipment || {}, {
       inplace: false
     });
+    const bagSlotsEnabled = Boolean(equipment.bagSlotsEnabled);
+    const carriedItemsLimit = bagSlotsEnabled ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
     const ammo = foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false });
     const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
@@ -4925,6 +4943,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       npcRoleSbireFort: npcRole === "sbire-fort",
       npcRoleBossSeul: npcRole === "boss-seul",
       equipment,
+      showBagSlotsToggle: isCarriedItemLimitedActorType(this.actor?.type),
+      bagSlotsEnabled,
+      bagSlotsDisabled: !bagSlotsEnabled,
+      carriedItemsLimit,
       weapons,
       objects: itemBuckets.objet,
       rations: itemBuckets.ration,
@@ -5093,6 +5115,31 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.applyActorUpdate({ "system.equipment.transportNpcs": nextRefs });
     });
 
+    html.find(".bag-slots-toggle").change(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const input = ev.currentTarget;
+      const choice = String(input?.dataset?.bagSlots || "").toLowerCase();
+      if (choice !== "yes" && choice !== "no") return;
+
+      const yesInput = html.find(".bag-slots-toggle[data-bag-slots='yes']");
+      const noInput = html.find(".bag-slots-toggle[data-bag-slots='no']");
+      const checked = Boolean(input.checked);
+
+      let bagSlotsEnabled = false;
+      if (choice === "yes") {
+        bagSlotsEnabled = checked;
+        yesInput.prop("checked", checked);
+        noInput.prop("checked", !checked);
+      } else {
+        bagSlotsEnabled = !checked;
+        yesInput.prop("checked", !checked);
+        noInput.prop("checked", checked);
+      }
+
+      await this.applyActorUpdate({ "system.equipment.bagSlotsEnabled": bagSlotsEnabled });
+    });
+
     html.find(".xp-check input").change(async ev => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -5182,7 +5229,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async _reachedCarriedItemsLimit(data) {
-    if (this.actor.type !== "personnage") return false;
+    if (!isCarriedItemLimitedActorType(this.actor?.type)) return false;
     const droppedItem = await Item.implementation.fromDropData(data).catch(() => null);
     if (!droppedItem || !CARRIED_ITEM_TYPES.has(droppedItem.type)) return false;
 
@@ -5190,9 +5237,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (sourceActor?.id === this.actor.id) return false;
 
     const carriedCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
-    if (carriedCount < CARRIED_ITEM_LIMIT) return false;
+    const carriedItemsLimit = getActorCarriedItemsLimit(this.actor);
+    if (carriedCount < carriedItemsLimit) return false;
 
-    ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: CARRIED_ITEM_LIMIT }));
+    ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: carriedItemsLimit }));
     return true;
   }
 

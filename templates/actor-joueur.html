@@ -260,7 +260,22 @@
         </div>
 
         <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}</div>
+          <div class="equip-title equip-title-row">
+            <span class="equip-title-label"><i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}</span>
+            {{#if showBagSlotsToggle}}
+              <span class="carry-bag-toggle">
+                <i class="fa-solid fa-bag-shopping"></i>
+                <label class="carry-choice">
+                  <input type="checkbox" class="bag-slots-toggle" data-bag-slots="yes" {{#if bagSlotsEnabled}}checked{{/if}} />
+                  <span>{{localize "BLOODMAN.Common.Yes"}}</span>
+                </label>
+                <label class="carry-choice">
+                  <input type="checkbox" class="bag-slots-toggle" data-bag-slots="no" {{#if bagSlotsDisabled}}checked{{/if}} />
+                  <span>{{localize "BLOODMAN.Common.No"}}</span>
+                </label>
+              </span>
+            {{/if}}
+          </div>
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each objects}}
               <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">

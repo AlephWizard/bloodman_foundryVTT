@@ -469,6 +469,42 @@
   margin-right: 6px;
 }
 
+.equip-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.equip-title-label {
+  display: inline-flex;
+  align-items: center;
+}
+
+.carry-bag-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.carry-bag-toggle i {
+  margin-right: 0;
+}
+
+.carry-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.carry-choice input {
+  margin: 0;
+}
+
 .equip-subtitle {
   margin-top: 6px;
   font-weight: 700;
