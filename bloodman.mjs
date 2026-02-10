@@ -5267,8 +5267,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     for (const key of [...powerUseState]) {
       if (!activePowerIds.has(key)) powerUseState.delete(key);
     }
-    const aptitudesTwoColumns = aptitudes.length >= 2;
-    const pouvoirsTwoColumns = pouvoirs.length >= 2;
+    const aptitudesThreeColumns = aptitudes.length >= 2;
+    const pouvoirsThreeColumns = pouvoirs.length >= 2;
 
     const npcRole = data.actor.system.npcRole || "";
 
@@ -5331,14 +5331,32 @@ class BloodmanActorSheet extends BaseActorSheet {
       ammo,
       transportNpcs,
       equipmentThreeColumns,
-      aptitudesTwoColumns,
-      pouvoirsTwoColumns
+      aptitudesThreeColumns,
+      pouvoirsThreeColumns
     };
+  }
+
+  autoResizeToContent() {
+    if (this._minimized) return;
+    const root = this.element;
+    if (!root?.length) return;
+    const app = root.closest(".window-app");
+    if (!app?.length) return;
+    const headerHeight = Math.ceil(Number(app.find(".window-header").outerHeight(true)) || 0);
+    const content = app.find(".window-content").get(0);
+    if (!content) return;
+    const configuredMinHeight = Number(this.options?.height);
+    const minHeight = Number.isFinite(configuredMinHeight) ? Math.max(420, configuredMinHeight) : 820;
+    const targetHeight = Math.max(minHeight, Math.ceil(content.scrollHeight + headerHeight + 8));
+    const currentHeight = Math.ceil(Number(this.position?.height) || 0);
+    if (Math.abs(targetHeight - currentHeight) < 2) return;
+    this.setPosition({ height: targetHeight });
   }
 
   activateListeners(html) {
     super.activateListeners(html);
     this._syncMinimizeHeaderButton();
+    const scheduleAutoResize = () => setTimeout(() => this.autoResizeToContent(), 0);
 
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const basicPlayer = isBasicPlayerRole(game.user?.role);
@@ -5366,6 +5384,11 @@ class BloodmanActorSheet extends BaseActorSheet {
     setTimeout(forceEnableSheetUi, 0);
     this.refreshResourceVisuals(html);
     setTimeout(() => this.refreshResourceVisuals(html), 0);
+    scheduleAutoResize();
+
+    html.find(".sheet-tabs .item").on("click", () => {
+      scheduleAutoResize();
+    });
 
     html.on("click", ".char-edit-toggle", ev => {
       ev.preventDefault();
@@ -5547,6 +5570,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     html.find(".xp-roll").click(ev => {
       const key = ev.currentTarget.dataset.key;
       this.rollGrowth(key);
+    });
+
+    html.find(".item-icon").on("load", () => {
+      scheduleAutoResize();
     });
   }
 

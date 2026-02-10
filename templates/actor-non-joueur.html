@@ -327,7 +327,7 @@
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-hand-fist"></i> {{localize "BLOODMAN.Abilities.Title"}}</span>
         </div>
-        <ol class="item-list {{#if aptitudesTwoColumns}}item-list-two-columns{{/if}}">
+        <ol class="item-list {{#if aptitudesThreeColumns}}item-list-three-columns{{/if}}">
           {{#each aptitudes}}
               <li class="item" data-item-id="{{this._id}}">
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
@@ -350,7 +350,7 @@
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-bolt"></i> {{localize "BLOODMAN.Powers.Title"}}</span>
         </div>
-        <ol class="item-list {{#if pouvoirsTwoColumns}}item-list-two-columns{{/if}}">
+        <ol class="item-list {{#if pouvoirsThreeColumns}}item-list-three-columns{{/if}}">
           {{#each pouvoirs}}
               <li class="item" data-item-id="{{this._id}}">
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>

@@ -737,6 +737,12 @@
   min-height: 70px;
 }
 
+.aptitudes-card .item-list,
+.powers-card .item-list {
+  max-height: none;
+  overflow: visible;
+}
+
 @media (max-width: 980px) {
   .tab-grid {
     grid-template-columns: 1fr;
