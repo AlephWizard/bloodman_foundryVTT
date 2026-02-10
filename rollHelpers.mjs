@@ -3,7 +3,9 @@ const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SO
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
+const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
 const DAMAGE_DIALOG_CONFIG_USER_FLAG = "damageDialogConfig";
+const DAMAGE_CONFIG_POPUP_SOCKET_TYPE = "damageConfigPopup";
 const DAMAGE_CONFIG_OPTIONS = [
   { label: "1D4", formula: "1d4" },
   { label: "1D6", formula: "1d6" },
@@ -153,6 +155,72 @@ function getTokenCurrentPv(tokenLike) {
 
 function getActiveGMIds() {
   return game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
+}
+
+function isAssistantOrHigherRole(role) {
+  const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
+  return Number(role ?? 0) >= assistantRole;
+}
+
+function getDamageConfigPopupViewerIds(requesterUserId = "") {
+  const ids = new Set();
+  const requesterId = String(requesterUserId || "").trim();
+  if (requesterId) ids.add(requesterId);
+  for (const user of game.users || []) {
+    if (!user?.active) continue;
+    const userId = String(user.id || "").trim();
+    if (!userId) continue;
+    if (user.isGM || isAssistantOrHigherRole(user.role)) ids.add(userId);
+  }
+  return [...ids];
+}
+
+function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
+  if (!game.socket) return false;
+  const requesterUserId = String(game.user?.id || "").trim();
+  const viewerIds = getDamageConfigPopupViewerIds(requesterUserId);
+  if (!viewerIds.length) return false;
+  if (viewerIds.length === 1 && viewerIds[0] === requesterUserId) return false;
+
+  const randomId = () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2));
+  const requestId = String(options.requestId || randomId()).trim() || randomId();
+  const eventId = randomId();
+  const action = String(options.action || "open").trim().toLowerCase() || "open";
+  const useChatFallback = options.useChatFallback === true;
+  const payload = {
+    type: DAMAGE_CONFIG_POPUP_SOCKET_TYPE,
+    eventId,
+    requestId,
+    action,
+    requesterUserId,
+    viewerIds,
+    actorId: String(actor?.id || ""),
+    actorName: String(actor?.name || "").trim(),
+    sourceName: String(sourceName || "").trim(),
+    config: {
+      degats: String(config?.degats || "").trim().toUpperCase(),
+      formula: normalizeDamageFormula(config?.formula),
+      bonusBrut: toNonNegativeInt(config?.bonusBrut, 0),
+      penetration: toNonNegativeInt(config?.penetration, 0),
+      rollKeepHighest: config?.rollKeepHighest === true
+    }
+  };
+  try {
+    game.socket.emit(SYSTEM_SOCKET, payload);
+  } catch (error) {
+    console.error("[bloodman] damage:config popup socket emit failed", error);
+  }
+  const observerIds = viewerIds.filter(id => id && id !== requesterUserId);
+  if (useChatFallback && observerIds.length && typeof ChatMessage?.create === "function") {
+    void ChatMessage.create({
+      content: DAMAGE_CONFIG_POPUP_CHAT_MARKUP,
+      whisper: observerIds,
+      flags: { bloodman: { damageConfigPopup: payload } }
+    }).catch(error => {
+      console.error("[bloodman] damage:config popup chat fallback failed", error);
+    });
+  }
+  return true;
 }
 
 function hasActorUpdatePayload(updateData) {
@@ -429,11 +497,67 @@ async function promptDamageConfiguration({
     </div>
   </form>`;
 
+  const popupRequestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+  const initialPopupConfig = {
+    degats: selectedDefault.label,
+    formula: selectedDefault.formula,
+    bonusBrut: initialBonus,
+    penetration: initialPenetration,
+    rollKeepHighest: initialRollKeepHighest
+  };
+  let lastPopupConfig = { ...initialPopupConfig };
+  let popupUpdateTimer = null;
+  let popupUpdatePendingConfig = null;
+  const emitPopupState = (nextConfig, action = "update", { useChatFallback = false } = {}) => {
+    const payloadConfig = {
+      degats: String(nextConfig?.degats || initialPopupConfig.degats || "").trim().toUpperCase(),
+      formula: normalizeDamageFormula(nextConfig?.formula || initialPopupConfig.formula || "1d4"),
+      bonusBrut: toNonNegativeInt(nextConfig?.bonusBrut, initialPopupConfig.bonusBrut),
+      penetration: toNonNegativeInt(nextConfig?.penetration, initialPopupConfig.penetration),
+      rollKeepHighest: nextConfig?.rollKeepHighest === true
+    };
+    lastPopupConfig = payloadConfig;
+    emitDamageConfigPopup(actor, sourceName, payloadConfig, {
+      requestId: popupRequestId,
+      action,
+      useChatFallback
+    });
+  };
+  const flushPopupUpdate = ({ useChatFallback = true } = {}) => {
+    if (!popupUpdatePendingConfig) return;
+    const pending = popupUpdatePendingConfig;
+    popupUpdatePendingConfig = null;
+    if (popupUpdateTimer) {
+      clearTimeout(popupUpdateTimer);
+      popupUpdateTimer = null;
+    }
+    emitPopupState(pending, "update", { useChatFallback });
+  };
+  const schedulePopupUpdate = nextConfig => {
+    popupUpdatePendingConfig = nextConfig;
+    if (popupUpdateTimer) return;
+    popupUpdateTimer = setTimeout(() => {
+      popupUpdateTimer = null;
+      if (!popupUpdatePendingConfig) return;
+      const pending = popupUpdatePendingConfig;
+      popupUpdatePendingConfig = null;
+      emitPopupState(pending, "update", { useChatFallback: true });
+    }, 120);
+  };
+
+  // Mirror the opened configuration dialog to GM/assistant observers.
+  emitPopupState(initialPopupConfig, "open", { useChatFallback: true });
+
   return new Promise(resolve => {
     let settled = false;
     const finish = value => {
       if (settled) return;
       settled = true;
+      if (popupUpdateTimer) {
+        clearTimeout(popupUpdateTimer);
+        popupUpdateTimer = null;
+      }
+      popupUpdatePendingConfig = null;
       resolve(value);
     };
 
@@ -441,6 +565,22 @@ async function promptDamageConfiguration({
       {
         title: `${tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats")}${titleSource}`,
         content,
+        render: html => {
+          const readCurrentConfig = () => {
+            const selectedFormula = normalizeDamageFormula(html.find("select[name='degats']").val());
+            const option = getDamageOptionByFormula(selectedFormula) || getDefaultDamageOption(selectedFormula);
+            return {
+              degats: option?.label || selectedFormula.toUpperCase(),
+              formula: option?.formula || selectedFormula,
+              bonusBrut: toNonNegativeInt(html.find("input[name='bonus_brut']").val(), initialBonus),
+              penetration: toNonNegativeInt(html.find("input[name='penetration']").val(), initialPenetration),
+              rollKeepHighest: Boolean(html.find("input[name='roll_keep_highest']").is(":checked"))
+            };
+          };
+          html.on("input change", "select[name='degats'], input[name='bonus_brut'], input[name='penetration'], input[name='roll_keep_highest']", () => {
+            schedulePopupUpdate(readCurrentConfig());
+          });
+        },
         buttons: {
           roll: {
             label: tl("BLOODMAN.Common.Roll", "Lancer"),
@@ -475,12 +615,18 @@ async function promptDamageConfiguration({
                 attaquant_id: actor?.id || ""
               };
               void rememberDamageDialogConfig(config);
+              flushPopupUpdate({ useChatFallback: true });
+              emitPopupState(config, "update", { useChatFallback: true });
               finish(config);
             }
           }
         },
         default: "roll",
-        close: () => finish(null)
+        close: () => {
+          flushPopupUpdate({ useChatFallback: true });
+          emitPopupState(lastPopupConfig, "close", { useChatFallback: true });
+          finish(null);
+        }
       },
       {
         classes: ["bloodman-damage-dialog"],

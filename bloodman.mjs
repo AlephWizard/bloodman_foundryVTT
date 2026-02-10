@@ -284,9 +284,13 @@ function isBasicPlayerRole(role) {
 const CHARACTERISTIC_BASE_MIN = 30;
 const CHARACTERISTIC_BASE_MAX = 95;
 
-function isCharacteristicBaseRangeRestrictedRole(role) {
+function isAssistantOrHigherRole(role) {
   const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
-  return Number(role ?? 0) < assistantRole;
+  return Number(role ?? 0) >= assistantRole;
+}
+
+function isCharacteristicBaseRangeRestrictedRole(role) {
+  return !isAssistantOrHigherRole(role);
 }
 
 function clampCharacteristicBaseForRole(role, value, fallback = CHARACTERISTIC_BASE_MIN) {
@@ -1645,10 +1649,12 @@ async function refreshBossSoloNpcPvMax() {
 }
 
 const PROCESSED_DAMAGE_REQUESTS = new Map();
+const PROCESSED_DAMAGE_CONFIG_POPUPS = new Map();
 const PROCESSED_CHAOS_REQUESTS = new Map();
 const PROCESSED_REROLL_REQUESTS = new Map();
 const PROCESSED_VOYANCE_REQUESTS = new Map();
 const INITIATIVE_GROUP_BUFFER = new Map();
+const ACTIVE_DAMAGE_CONFIG_POPUPS = new Map();
 const VOYANCE_OVERLAY_ID = "bm-voyance-overlay";
 const VOYANCE_STYLE_ID = "bm-voyance-style";
 const VOYANCE_AUTO_CLOSE_MS = 6500;
@@ -1667,6 +1673,114 @@ function rememberDamageRequest(requestId) {
 function wasDamageRequestProcessed(requestId) {
   if (!requestId) return false;
   return PROCESSED_DAMAGE_REQUESTS.has(requestId);
+}
+
+function rememberDamageConfigPopupRequest(requestId) {
+  if (!requestId) return;
+  const now = Date.now();
+  PROCESSED_DAMAGE_CONFIG_POPUPS.set(requestId, now);
+  for (const [key, value] of PROCESSED_DAMAGE_CONFIG_POPUPS.entries()) {
+    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_DAMAGE_CONFIG_POPUPS.delete(key);
+  }
+}
+
+function wasDamageConfigPopupRequestProcessed(requestId) {
+  if (!requestId) return false;
+  return PROCESSED_DAMAGE_CONFIG_POPUPS.has(requestId);
+}
+
+function buildDamageConfigObserverState(data) {
+  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const actorName = String(data?.actorName || "").trim();
+  const sourceName = String(data?.sourceName || "").trim();
+  const requesterName = String(game.users?.get(String(data?.requesterUserId || ""))?.name || "").trim();
+  const config = data?.config && typeof data.config === "object" ? data.config : {};
+  const formula = String(config.formula || "1d4").trim() || "1d4";
+  const damageLabel = String(config.degats || "").trim().toUpperCase() || formula.toUpperCase();
+  const bonusBrut = Math.max(0, Math.floor(toFiniteNumber(config.bonusBrut, 0)));
+  const penetration = Math.max(0, Math.floor(toFiniteNumber(config.penetration, 0)));
+  const keepHighest = config.rollKeepHighest === true;
+  const yesLabel = t("BLOODMAN.Common.Yes");
+  const noLabel = t("BLOODMAN.Common.No");
+  const actorDisplay = actorName || requesterName || "Attaquant";
+  const sourceDisplay = sourceName || "-";
+  const keepHighestText = `2 jets, garder le plus haut: ${keepHighest ? yesLabel : noLabel}`;
+  return {
+    escapeHtml,
+    formula,
+    damageLabel,
+    bonusBrut,
+    penetration,
+    keepHighest,
+    actorDisplay,
+    sourceDisplay,
+    keepHighestText,
+    title: `Jet de degats - ${actorDisplay}`
+  };
+}
+
+function getDamageConfigObserverContent(state) {
+  const safe = state.escapeHtml;
+  return `<form class="bm-damage-config">
+    <div class="bm-damage-config-shell">
+      <div class="bm-damage-config-head">
+        <div class="bm-damage-config-icon-wrap" aria-hidden="true">
+          <div class="bm-damage-config-icon-ring"><i class="fa-solid fa-skull"></i></div>
+        </div>
+        <div class="bm-damage-config-head-copy">
+          <p class="bm-damage-config-eyebrow">Suivi MJ</p>
+          <p class="bm-damage-config-hint" data-bm-popup-field="hint">${safe(state.actorDisplay)} - ${safe(state.sourceDisplay)}</p>
+        </div>
+      </div>
+      <div class="bm-damage-config-grid">
+        <div class="bm-damage-config-row bm-damage-config-row-wide">
+          <label>Degats</label>
+          <input type="text" data-bm-popup-field="damage" value="${safe(state.damageLabel)} (${safe(state.formula)})" disabled />
+        </div>
+        <div class="bm-damage-config-row bm-damage-config-inline">
+          <label>Degats bruts +</label>
+          <input type="number" data-bm-popup-field="bonus" value="${state.bonusBrut}" disabled />
+        </div>
+        <div class="bm-damage-config-row bm-damage-config-inline">
+          <label>Penetration +</label>
+          <input type="number" data-bm-popup-field="penetration" value="${state.penetration}" disabled />
+        </div>
+      </div>
+      <label class="bm-damage-config-toggle">
+        <input type="checkbox" data-bm-popup-field="roll-keep-highest" disabled ${state.keepHighest ? "checked" : ""} />
+        <span class="bm-damage-config-toggle-indicator" aria-hidden="true">2x</span>
+        <span class="bm-damage-config-toggle-copy">
+          <span class="bm-damage-config-toggle-title" data-bm-popup-field="keep-highest-text">${safe(state.keepHighestText)}</span>
+        </span>
+      </label>
+    </div>
+  </form>`;
+}
+
+function updateDamageConfigObserverDialog(dialog, state) {
+  const root = dialog?.element;
+  if (!root?.length) return false;
+  root.find("[data-bm-popup-field='hint']").text(`${state.actorDisplay} - ${state.sourceDisplay}`);
+  root.find("[data-bm-popup-field='damage']").val(`${state.damageLabel} (${state.formula})`);
+  root.find("[data-bm-popup-field='bonus']").val(String(state.bonusBrut));
+  root.find("[data-bm-popup-field='penetration']").val(String(state.penetration));
+  root.find("[data-bm-popup-field='roll-keep-highest']").prop("checked", state.keepHighest);
+  root.find("[data-bm-popup-field='keep-highest-text']").text(state.keepHighestText);
+  return true;
+}
+
+function closeDamageConfigObserverDialog(requestId) {
+  const key = String(requestId || "").trim();
+  if (!key) return false;
+  const dialog = ACTIVE_DAMAGE_CONFIG_POPUPS.get(key);
+  if (!dialog) return false;
+  ACTIVE_DAMAGE_CONFIG_POPUPS.delete(key);
+  try {
+    dialog.close();
+  } catch (_error) {
+    // ignore
+  }
+  return true;
 }
 
 function rememberChaosRequest(requestId) {
@@ -2434,6 +2548,70 @@ function emitDamageAppliedMessage(data, result, tokenDoc, share) {
   });
 }
 
+function canCurrentUserReceiveDamageConfigPopup(data) {
+  const localUserId = String(game.user?.id || "").trim();
+  if (!localUserId) return false;
+  const requesterUserId = String(data?.requesterUserId || "").trim();
+  if (requesterUserId && requesterUserId === localUserId) return false;
+
+  const viewerIds = Array.isArray(data?.viewerIds)
+    ? data.viewerIds.map(id => String(id || "").trim()).filter(Boolean)
+    : [];
+  if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
+
+  if (game.user?.isGM) return true;
+  return isAssistantOrHigherRole(game.user?.role);
+}
+
+function showDamageConfigObserverPopup(data) {
+  if (!data || typeof Dialog !== "function") return false;
+  const requestId = String(data.requestId || "").trim();
+  const action = String(data.action || "open").trim().toLowerCase() || "open";
+  if (action === "close") return closeDamageConfigObserverDialog(requestId);
+
+  const state = buildDamageConfigObserverState(data);
+  const existing = requestId ? ACTIVE_DAMAGE_CONFIG_POPUPS.get(requestId) : null;
+  if (existing?.element?.length) {
+    return updateDamageConfigObserverDialog(existing, state);
+  }
+  if (existing) ACTIVE_DAMAGE_CONFIG_POPUPS.delete(requestId);
+
+  const content = getDamageConfigObserverContent(state);
+  const dialog = new Dialog(
+    {
+      title: state.title,
+      content,
+      buttons: {
+        ok: { label: "OK" }
+      },
+      default: "ok",
+      close: () => {
+        if (!requestId) return;
+        const current = ACTIVE_DAMAGE_CONFIG_POPUPS.get(requestId);
+        if (current === dialog) ACTIVE_DAMAGE_CONFIG_POPUPS.delete(requestId);
+      }
+    },
+    {
+      classes: ["bloodman-damage-dialog"],
+      width: 500
+    }
+  );
+  dialog.render(true);
+  if (requestId) ACTIVE_DAMAGE_CONFIG_POPUPS.set(requestId, dialog);
+  return true;
+}
+
+async function handleDamageConfigPopupMessage(data, source = "socket") {
+  if (!data) return false;
+  const eventId = String(data.eventId || "").trim();
+  if (eventId && wasDamageConfigPopupRequestProcessed(eventId)) return false;
+  if (eventId) rememberDamageConfigPopupRequest(eventId);
+  if (!canCurrentUserReceiveDamageConfigPopup(data)) return false;
+  const shown = showDamageConfigObserverPopup(data);
+  if (!shown) console.warn("[bloodman] damage:config popup display failed", { source, eventId, payload: data });
+  return shown;
+}
+
 async function handleDamageAppliedMessage(data) {
   if (!data) return;
   const attackerUserId = String(data.attackerUserId || "");
@@ -3071,6 +3249,10 @@ function registerDamageSocketHandlers() {
   }
   const handler = async data => {
     if (!data) return;
+    if (data.type === "damageConfigPopup") {
+      await handleDamageConfigPopupMessage(data, "socket");
+      return;
+    }
     if (data.type === "damageApplied") {
       await handleDamageAppliedMessage(data);
       return;
@@ -3877,15 +4059,38 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   foundry.utils.setProperty(updateData, costPath, nextCost);
 });
 
+function isCurrentUserChatMessageAuthor(message) {
+  const localUserId = String(game.user?.id || "").trim();
+  const messageUserId = String(message?.user?.id || message?.user || message?.author?.id || "").trim();
+  if (localUserId && messageUserId) return localUserId === messageUserId;
+  return Boolean(message?.isAuthor);
+}
+
+function scheduleTransientChatMessageDeletion(message, delayMs = 250) {
+  const messageId = String(message?.id || "").trim();
+  if (!messageId) return;
+  if (!isCurrentUserChatMessageAuthor(message)) return;
+  const timeout = Math.max(0, Math.floor(toFiniteNumber(delayMs, 250)));
+  setTimeout(() => {
+    const existing = game.messages?.get(messageId);
+    if (!existing) return;
+    if (!isCurrentUserChatMessageAuthor(existing)) return;
+    existing.delete().catch(() => null);
+  }, timeout);
+}
+
 Hooks.on("createChatMessage", async (message) => {
   const voyancePayload = foundry.utils.getProperty(message, "flags.bloodman.voyanceOverlayRequest");
   if (voyancePayload) {
     await handleVoyanceOverlayRequest(voyancePayload, "chat");
-    if (message.isOwner) {
-      setTimeout(() => {
-        message.delete().catch(() => null);
-      }, 250);
-    }
+    scheduleTransientChatMessageDeletion(message, 250);
+    return;
+  }
+
+  const damageConfigPopupPayload = foundry.utils.getProperty(message, "flags.bloodman.damageConfigPopup");
+  if (damageConfigPopupPayload) {
+    await handleDamageConfigPopupMessage(damageConfigPopupPayload, "chat");
+    scheduleTransientChatMessageDeletion(message, 250);
     return;
   }
 
@@ -3904,32 +4109,20 @@ Hooks.on("createChatMessage", async (message) => {
         await setChaosValue(getChaosValue() + delta);
       }
     }
-    if (message.isOwner) {
-      setTimeout(() => {
-        message.delete().catch(() => null);
-      }, 250);
-    }
+    scheduleTransientChatMessageDeletion(message, 250);
     return;
   }
   const payload = foundry.utils.getProperty(message, "flags.bloodman.damageRequest");
   if (payload) {
     await handleIncomingDamageRequest(payload, "chat");
-    if (message.isOwner) {
-      setTimeout(() => {
-        message.delete().catch(() => null);
-      }, 250);
-    }
+    scheduleTransientChatMessageDeletion(message, 250);
     return;
   }
 
   const rerollPayload = foundry.utils.getProperty(message, "flags.bloodman.rerollDamageRequest");
   if (!rerollPayload) return;
   await handleDamageRerollRequest(rerollPayload);
-  if (message.isOwner) {
-    setTimeout(() => {
-      message.delete().catch(() => null);
-    }, 250);
-  }
+  scheduleTransientChatMessageDeletion(message, 250);
 });
 
 Hooks.on("renderChatMessage", (message, html) => {
