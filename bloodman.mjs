@@ -859,14 +859,14 @@ function getTokenActorType(tokenDoc) {
   return worldActorType || "";
 }
 
+const ROUND_TOKEN_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
+const ROUND_MASK_RETRY_DELAYS_MS = [0, 90, 260];
+const ROUND_MASK_SCHEDULE_TIMERS = new Map();
+
 function shouldUseRoundTokenMask(tokenLike) {
   const tokenDoc = tokenLike?.document || tokenLike;
   const actorType = getTokenActorType(tokenDoc);
-  return actorType === "personnage" || actorType === "personnage-non-joueur";
-}
-
-function shouldNormalizeTokenVisual(tokenLike) {
-  return shouldUseRoundTokenMask(tokenLike);
+  return ROUND_TOKEN_ACTOR_TYPES.has(actorType);
 }
 
 function shouldResetTokenScale(scaleValue) {
@@ -885,20 +885,47 @@ function shouldResetTokenFit(fitValue) {
   return String(fitValue || "").trim().toLowerCase() !== "cover";
 }
 
-function getTokenSpriteForRoundMask(token) {
-  if (!token) return null;
-  const mesh = token.mesh;
-  if (!mesh || typeof mesh !== "object") return null;
+function resolveTokenObject(tokenLike) {
+  if (!tokenLike) return null;
+  if (tokenLike.mesh) return tokenLike;
+  if (tokenLike.object?.mesh) return tokenLike.object;
+  const tokenId = String(tokenLike.id || tokenLike._id || "").trim();
+  if (tokenId && canvas?.tokens?.get) {
+    const byCanvas = canvas.tokens.get(tokenId);
+    if (byCanvas?.mesh) return byCanvas;
+  }
+  return null;
+}
+
+function getTokenSpriteForRoundMask(tokenObject) {
+  const mesh = tokenObject?.mesh;
+  if (!mesh || mesh.destroyed) return null;
   if (!mesh.texture) return null;
   return mesh;
 }
 
-function clearRoundTokenMask(token) {
-  if (!token) return;
-  const sprite = getTokenSpriteForRoundMask(token);
-  const mask = token._bmRoundMask || null;
+function computeRoundMaskGeometry(sprite) {
+  const bounds = sprite?.getLocalBounds?.();
+  const x = Number(bounds?.x);
+  const y = Number(bounds?.y);
+  const width = Number(bounds?.width);
+  const height = Number(bounds?.height);
+  if (!(Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0)) return null;
+  const centerX = x + (width / 2);
+  const centerY = y + (height / 2);
+  const radius = (Math.min(width, height) / 2) * 0.995;
+  if (!(Number.isFinite(centerX) && Number.isFinite(centerY) && Number.isFinite(radius) && radius > 0)) return null;
+  const signature = `${centerX.toFixed(2)}|${centerY.toFixed(2)}|${radius.toFixed(2)}`;
+  return { centerX, centerY, radius, signature };
+}
+
+function clearRoundTokenMask(tokenLike) {
+  const tokenObject = resolveTokenObject(tokenLike);
+  if (!tokenObject) return false;
+  const sprite = getTokenSpriteForRoundMask(tokenObject);
+  const mask = tokenObject._bmRoundMask || null;
   if (sprite?.mask === mask) sprite.mask = null;
-  if (mask) {
+  if (mask && !mask.destroyed) {
     if (mask.parent) {
       try {
         mask.parent.removeChild(mask);
@@ -906,105 +933,80 @@ function clearRoundTokenMask(token) {
         // non-fatal detach
       }
     }
-    mask.visible = false;
-    mask.renderable = false;
     try {
       mask.destroy({ children: true });
     } catch (_error) {
       // non-fatal cleanup
     }
   }
-  token._bmRoundMask = null;
+  tokenObject._bmRoundMask = null;
+  tokenObject._bmRoundMaskSignature = "";
+  return true;
 }
 
 function applyRoundTokenMask(tokenLike) {
-  const token = tokenLike?.object || tokenLike;
-  if (!token) return;
-  const sprite = getTokenSpriteForRoundMask(token);
-  if (!sprite) {
-    clearRoundTokenMask(token);
-    return;
+  const source = tokenLike?.document || tokenLike;
+  const tokenObject = resolveTokenObject(tokenLike);
+  if (!source || !tokenObject) return false;
+  if (!shouldUseRoundTokenMask(source)) {
+    clearRoundTokenMask(tokenObject);
+    return false;
   }
-  const shouldRound = shouldUseRoundTokenMask(tokenLike);
-  if (!shouldRound) {
-    clearRoundTokenMask(token);
-    return;
+
+  const sprite = getTokenSpriteForRoundMask(tokenObject);
+  if (!sprite) {
+    clearRoundTokenMask(tokenObject);
+    return false;
+  }
+
+  const geometry = computeRoundMaskGeometry(sprite);
+  if (!geometry) {
+    clearRoundTokenMask(tokenObject);
+    return false;
   }
 
   const PIXI_NS = globalThis.PIXI;
-  if (!PIXI_NS?.Graphics) return;
-
-  const localBounds = sprite.getLocalBounds?.();
-  const boundsX = Number(localBounds?.x);
-  const boundsY = Number(localBounds?.y);
-  const boundsW = Number(localBounds?.width);
-  const boundsH = Number(localBounds?.height);
-  if (!(Number.isFinite(boundsW) && Number.isFinite(boundsH) && boundsW > 0 && boundsH > 0)) {
-    clearRoundTokenMask(token);
-    return;
-  }
-
-  const centerX = boundsX + (boundsW / 2);
-  const centerY = boundsY + (boundsH / 2);
-  const radius = (Math.min(boundsW, boundsH) / 2) * 0.995;
-  if (!(Number.isFinite(centerX) && Number.isFinite(centerY) && radius > 0)) {
-    clearRoundTokenMask(token);
-    return;
-  }
-
-  let mask = token._bmRoundMask || null;
+  if (!PIXI_NS?.Graphics) return false;
+  let mask = tokenObject._bmRoundMask || null;
   if (!mask || mask.destroyed) {
     mask = new PIXI_NS.Graphics();
     mask._bmRoundMaskGraphic = true;
-    mask._bmOwnerToken = token;
-    token._bmRoundMask = mask;
+    tokenObject._bmRoundMask = mask;
+    tokenObject._bmRoundMaskSignature = "";
   }
 
-  mask.clear();
-  mask.beginFill(0xffffff, 1);
-  mask.drawCircle(centerX, centerY, radius);
-  mask.endFill();
+  const previousSignature = String(tokenObject._bmRoundMaskSignature || "");
+  if (previousSignature !== geometry.signature) {
+    mask.clear();
+    mask.beginFill(0xffffff, 1);
+    mask.drawCircle(geometry.centerX, geometry.centerY, geometry.radius);
+    mask.endFill();
+    tokenObject._bmRoundMaskSignature = geometry.signature;
+  }
 
   if (mask.parent !== sprite) sprite.addChild(mask);
-  sprite.mask = mask;
-
-  // Safety net: never keep a mask that would effectively hide the token.
-  const hasValidRenderArea = Number.isFinite(Number(sprite.width))
-    && Number.isFinite(Number(sprite.height))
-    && Number(sprite.width) > 1
-    && Number(sprite.height) > 1;
-  if (!hasValidRenderArea || sprite.worldAlpha <= 0) {
-    clearRoundTokenMask(token);
-  }
+  if (sprite.mask !== mask) sprite.mask = mask;
+  return true;
 }
 
 function cleanupOrphanRoundMasks() {
   const root = canvas?.stage;
   if (!root?.children) return;
-
   const stack = [...root.children];
   while (stack.length) {
     const node = stack.pop();
     if (!node) continue;
-    if (Array.isArray(node.children) && node.children.length) {
-      stack.push(...node.children);
-    }
+    if (Array.isArray(node.children) && node.children.length) stack.push(...node.children);
     if (!node._bmRoundMaskGraphic) continue;
-    const owner = node._bmOwnerToken;
-    const ownerAlive = owner && !owner.destroyed;
-    if (ownerAlive) continue;
+    const hasLivingParent = Boolean(node.parent && !node.parent.destroyed);
+    if (hasLivingParent) continue;
     try {
-      node.visible = false;
-      node.renderable = false;
       node.destroy({ children: true });
     } catch (_error) {
       // non-fatal cleanup
     }
   }
 }
-
-const ROUND_MASK_RETRY_DELAYS_MS = [0, 120, 300];
-const ROUND_MASK_SCHEDULE_TIMERS = new Map();
 
 function getRoundMaskScheduleKey(tokenLike) {
   const tokenDoc = tokenLike?.document || tokenLike;
@@ -1030,39 +1032,27 @@ function clearScheduledRoundTokenMask(tokenLike) {
 }
 
 function scheduleRoundTokenMask(tokenLike) {
-  const apply = () => applyRoundTokenMask(tokenLike?.object || tokenLike);
-  const scheduleKey = getRoundMaskScheduleKey(tokenLike);
-  if (scheduleKey) clearScheduledRoundTokenMask(tokenLike);
-  apply();
+  const source = tokenLike?.document || tokenLike;
+  if (!source) return;
+  const scheduleKey = getRoundMaskScheduleKey(source);
+  if (scheduleKey) clearScheduledRoundTokenMask(source);
+  if (!shouldUseRoundTokenMask(source)) {
+    clearRoundTokenMask(source);
+    return;
+  }
+  applyRoundTokenMask(source);
+
   const timers = [];
-  const lastIndex = ROUND_MASK_RETRY_DELAYS_MS.length - 1;
-  ROUND_MASK_RETRY_DELAYS_MS.forEach((delay, index) => {
+  const delays = ROUND_MASK_RETRY_DELAYS_MS.filter(delay => Number(delay) > 0);
+  const lastIndex = delays.length - 1;
+  delays.forEach((delay, index) => {
     const timerId = setTimeout(() => {
-      apply();
-      if (scheduleKey && index === lastIndex) {
-        ROUND_MASK_SCHEDULE_TIMERS.delete(scheduleKey);
-      }
+      applyRoundTokenMask(source);
+      if (scheduleKey && index === lastIndex) ROUND_MASK_SCHEDULE_TIMERS.delete(scheduleKey);
     }, delay);
     timers.push(timerId);
   });
-  if (scheduleKey) ROUND_MASK_SCHEDULE_TIMERS.set(scheduleKey, timers);
-}
-
-function getTokenScaleNormalizationUpdates(tokenLike) {
-  if (!shouldNormalizeTokenVisual(tokenLike)) return {};
-  const updates = {};
-  const source = tokenLike?.document || tokenLike;
-  const scaleX = foundry.utils.getProperty(source, "texture.scaleX");
-  const scaleY = foundry.utils.getProperty(source, "texture.scaleY");
-  const offsetX = foundry.utils.getProperty(source, "texture.offsetX");
-  const offsetY = foundry.utils.getProperty(source, "texture.offsetY");
-  const fit = foundry.utils.getProperty(source, "texture.fit");
-  if (shouldResetTokenScale(scaleX)) updates["texture.scaleX"] = 1;
-  if (shouldResetTokenScale(scaleY)) updates["texture.scaleY"] = 1;
-  if (shouldResetTokenOffset(offsetX)) updates["texture.offsetX"] = 0;
-  if (shouldResetTokenOffset(offsetY)) updates["texture.offsetY"] = 0;
-  if (shouldResetTokenFit(fit)) updates["texture.fit"] = "cover";
-  return updates;
+  if (scheduleKey && timers.length) ROUND_MASK_SCHEDULE_TIMERS.set(scheduleKey, timers);
 }
 
 function isPvBarAttribute(attribute) {
@@ -3960,7 +3950,6 @@ Hooks.once("ready", async () => {
         if (actorType === "personnage" && !token.actorLink) tokenUpdates.actorLink = true;
         if (actorType === "personnage-non-joueur" && token.actorLink) tokenUpdates.actorLink = false;
         if (actorType === "personnage" || actorType === "personnage-non-joueur") {
-          foundry.utils.mergeObject(tokenUpdates, getTokenScaleNormalizationUpdates(token), { inplace: true });
           const tokenActor = token.actor || game.actors?.get(token.actorId) || null;
           const tokenSrc = foundry.utils.getProperty(token, "texture.src");
           if (await needsTokenImageRepair(tokenSrc)) {
@@ -4456,7 +4445,6 @@ Hooks.on("preCreateToken", (doc) => {
   const actorType = getTokenActorType(doc);
   if (actorType === "personnage") sourceUpdates.actorLink = true;
   if (actorType === "personnage-non-joueur") sourceUpdates.actorLink = false;
-  foundry.utils.mergeObject(sourceUpdates, getTokenScaleNormalizationUpdates(doc), { inplace: true });
   const tokenSrc = foundry.utils.getProperty(doc, "texture.src");
   if (isMissingTokenImage(tokenSrc)) {
     const fallbackSrc = getSafeTokenTextureFallback(doc);
@@ -4473,16 +4461,11 @@ Hooks.on("drawToken", token => {
 });
 
 Hooks.on("refreshToken", token => {
+  void repairTokenTextureSource(token);
   scheduleRoundTokenMask(token);
 });
 
 Hooks.on("createToken", async (tokenDoc) => {
-  if (game.user.isGM) {
-    const normalizationUpdates = getTokenScaleNormalizationUpdates(tokenDoc);
-    if (Object.keys(normalizationUpdates).length) {
-      await tokenDoc.update(normalizationUpdates);
-    }
-  }
   await repairTokenTextureSource(tokenDoc);
   scheduleRoundTokenMask(tokenDoc);
   if (!game.user.isGM) return;
@@ -4492,12 +4475,12 @@ Hooks.on("createToken", async (tokenDoc) => {
 
 Hooks.on("preDeleteToken", (tokenDoc) => {
   clearScheduledRoundTokenMask(tokenDoc);
-  clearRoundTokenMask(tokenDoc?.object || canvas?.tokens?.get(tokenDoc?.id));
+  clearRoundTokenMask(tokenDoc);
 });
 
 Hooks.on("deleteToken", async (tokenDoc) => {
   clearScheduledRoundTokenMask(tokenDoc);
-  clearRoundTokenMask(tokenDoc?.object || canvas?.tokens?.get(tokenDoc?.id));
+  clearRoundTokenMask(tokenDoc);
   cleanupOrphanRoundMasks();
   if (!game.user.isGM) return;
   if (getTokenActorType(tokenDoc) !== "personnage") return;
@@ -4512,15 +4495,8 @@ Hooks.on("canvasReady", async () => {
 Hooks.on("canvasReady", async () => {
   cleanupOrphanRoundMasks();
   for (const token of canvas?.tokens?.placeables || []) {
-    if (game.user.isGM) {
-      const tokenDoc = token?.document || token;
-      const normalizationUpdates = getTokenScaleNormalizationUpdates(tokenDoc);
-      if (Object.keys(normalizationUpdates).length) {
-        await tokenDoc.update(normalizationUpdates);
-      }
-    }
     await repairTokenTextureSource(token);
-    applyRoundTokenMask(token);
+    scheduleRoundTokenMask(token);
   }
 });
 
@@ -4930,12 +4906,14 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async minimize(...args) {
     this.clearPowerUseState();
+    this._lastAutoResizeKey = "";
     const result = await super.minimize(...args);
     this._syncMinimizeHeaderButton();
     return result;
   }
 
   async maximize(...args) {
+    this._lastAutoResizeKey = "";
     const result = await super.maximize(...args);
     this._syncMinimizeHeaderButton();
     this.render(false);
@@ -4986,6 +4964,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   async close(options = {}) {
     this.clearRerollDisplayState();
     this.clearPowerUseState();
+    this._lastAutoResizeKey = "";
     return super.close(options);
   }
 
@@ -5336,27 +5315,65 @@ class BloodmanActorSheet extends BaseActorSheet {
     };
   }
 
-  autoResizeToContent() {
+  getAutoResizeKey() {
+    const root = this.element;
+    const activeTab = String(
+      root?.find?.(".sheet-body .tab.active")?.first?.()?.data?.("tab")
+      || root?.find?.(".sheet-tabs .item.active")?.first?.()?.data?.("tab")
+      || ""
+    ).trim();
+    const actorItems = this.actor?.items;
+    const totalItems = Number(actorItems?.size || 0);
+    const aptitudesCount = Number(actorItems?.filter?.(item => item.type === "aptitude")?.length || 0);
+    const pouvoirsCount = Number(actorItems?.filter?.(item => item.type === "pouvoir")?.length || 0);
+    const carriedCount = Number(actorItems?.filter?.(item => CARRIED_ITEM_TYPES.has(item.type))?.length || 0);
+    const transportCount = Number(getTransportNpcRefs(this.actor).length || 0);
+    return `${activeTab}|${totalItems}|${aptitudesCount}|${pouvoirsCount}|${carriedCount}|${transportCount}`;
+  }
+
+  autoResizeToContent(force = false) {
     if (this._minimized) return;
     const root = this.element;
     if (!root?.length) return;
     const app = root.closest(".window-app");
     if (!app?.length) return;
-    const headerHeight = Math.ceil(Number(app.find(".window-header").outerHeight(true)) || 0);
-    const content = app.find(".window-content").get(0);
-    if (!content) return;
+    const resizeKey = this.getAutoResizeKey();
+    if (!force && resizeKey && resizeKey === this._lastAutoResizeKey) return;
+    const formEl = root.get(0);
+    if (!formEl) return;
+    const headerEl = app.find(".window-header").get(0);
     const configuredMinHeight = Number(this.options?.height);
     const minHeight = Number.isFinite(configuredMinHeight) ? Math.max(420, configuredMinHeight) : 820;
-    const targetHeight = Math.max(minHeight, Math.ceil(content.scrollHeight + headerHeight + 8));
-    const currentHeight = Math.ceil(Number(this.position?.height) || 0);
-    if (Math.abs(targetHeight - currentHeight) < 2) return;
+    const previousInlineHeight = formEl.style.height;
+    formEl.style.height = "auto";
+    const formNaturalHeight = Math.ceil(
+      Math.max(
+        Number(formEl.scrollHeight) || 0,
+        Number(formEl.offsetHeight) || 0,
+        Number(formEl.getBoundingClientRect?.().height) || 0
+      )
+    );
+    formEl.style.height = previousInlineHeight;
+    if (formNaturalHeight <= 0) return;
+    const headerHeight = Math.ceil(
+      Number(headerEl?.getBoundingClientRect?.().height)
+      || Number(app.find(".window-header").outerHeight(true))
+      || 0
+    );
+    const targetHeight = Math.max(minHeight, headerHeight + formNaturalHeight + 4);
+    const currentHeight = Math.ceil(Number(this.position?.height) || Number(app.outerHeight()) || 0);
+    if (Math.abs(targetHeight - currentHeight) < 2) {
+      if (resizeKey) this._lastAutoResizeKey = resizeKey;
+      return;
+    }
     this.setPosition({ height: targetHeight });
+    if (resizeKey) this._lastAutoResizeKey = resizeKey;
   }
 
   activateListeners(html) {
     super.activateListeners(html);
     this._syncMinimizeHeaderButton();
-    const scheduleAutoResize = () => setTimeout(() => this.autoResizeToContent(), 0);
+    const scheduleAutoResize = (force = false) => setTimeout(() => this.autoResizeToContent(force), 0);
 
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const basicPlayer = isBasicPlayerRole(game.user?.role);
@@ -5384,7 +5401,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     setTimeout(forceEnableSheetUi, 0);
     this.refreshResourceVisuals(html);
     setTimeout(() => this.refreshResourceVisuals(html), 0);
-    scheduleAutoResize();
+    scheduleAutoResize(true);
 
     html.find(".sheet-tabs .item").on("click", () => {
       scheduleAutoResize();
@@ -6374,8 +6391,8 @@ class BloodmanItemSheet extends BaseItemSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "item"],
-      width: 700,
-      height: 460,
+      width: 860,
+      height: 500,
       resizable: true,
       submitOnChange: true
     });

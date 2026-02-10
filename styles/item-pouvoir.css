@@ -1,26 +1,26 @@
 .item-pouvoir.bm-item-sheet {
-  gap: 8px;
+  gap: 10px;
 }
 
 .item-pouvoir.bm-item-sheet .power-cost-row {
   display: grid;
-  grid-template-columns: auto 72px auto;
+  grid-template-columns: minmax(0, 1fr) 86px auto;
   align-items: center;
-  gap: 8px;
-  padding: 8px 9px;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid var(--bm-item-line);
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(51, 42, 32, 0.86), rgba(31, 25, 20, 0.86));
 }
 
 .item-pouvoir.bm-item-sheet .power-cost-input {
-  width: 72px;
+  width: 86px;
 }
 
 .item-pouvoir.bm-item-sheet .ability-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
 }
 
@@ -32,7 +32,7 @@
   display: grid;
   gap: 6px;
   min-width: 0;
-  padding: 8px 9px;
+  padding: 10px;
   border: 1px solid var(--bm-item-line);
   border-radius: 10px;
   background: var(--bm-item-surface-soft);
@@ -40,8 +40,27 @@
 
 .item-pouvoir.bm-item-sheet .ability-section select {
   width: 100%;
-  min-width: 96px;
-  max-width: 170px;
+  min-width: 120px;
+  max-width: none;
+}
+
+.item-pouvoir.bm-item-sheet .power-usable-damage-section {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.item-pouvoir.bm-item-sheet .power-usable-damage-section > .inline-label {
+  grid-column: 1;
+}
+
+.item-pouvoir.bm-item-sheet .power-usable-damage-section > .toggle-group {
+  grid-column: 2;
+  justify-self: end;
+}
+
+.item-pouvoir.bm-item-sheet .power-usable-damage-section > .damage-die-select {
+  grid-column: 1 / -1;
 }
 
 .item-pouvoir.bm-item-sheet .power-usable-damage-section .damage-die-select {
@@ -93,7 +112,7 @@
 
 .item-pouvoir.bm-item-sheet .bonus-grid-compact {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-width: 270px;
+  max-width: none;
 }
 
 .item-pouvoir.bm-item-sheet .bonus-grid.is-disabled {
@@ -107,7 +126,11 @@
   }
 
   .item-pouvoir.bm-item-sheet .ability-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+  }
+
+  .item-pouvoir.bm-item-sheet .power-usable-damage-section > .toggle-group {
+    justify-self: start;
   }
 }
 

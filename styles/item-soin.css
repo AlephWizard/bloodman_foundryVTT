@@ -1,32 +1,22 @@
 .item-soin.bm-item-sheet {
-  gap: 8px;
+  gap: 10px;
 }
 
 .item-soin.bm-item-sheet .bm-item-top {
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: 88px minmax(0, 1fr);
 }
 
 .item-soin.bm-item-sheet .bm-item-row {
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 82px minmax(0, 1fr);
   gap: 6px;
-}
-
-.item-soin.bm-item-sheet .bm-item-row-note {
-  align-items: start;
-}
-
-.item-soin.bm-item-sheet .bm-item-row-note .bm-item-tag {
-  min-height: 64px;
-  align-items: start;
-  padding-top: 8px;
 }
 
 .item-soin.bm-item-sheet .bm-item-heal {
   display: grid;
-  grid-template-columns: auto minmax(110px, 170px);
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 210px);
   align-items: center;
-  gap: 8px;
-  padding: 8px 9px;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid var(--bm-item-line);
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(51, 42, 32, 0.86), rgba(31, 25, 20, 0.86));
@@ -35,10 +25,11 @@
 .item-soin.bm-item-sheet .bm-item-heal select {
   width: 100%;
   min-width: 96px;
-  max-width: 170px;
+  max-width: 210px;
+  justify-self: end;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 860px) {
   .item-soin.bm-item-sheet .bm-item-top {
     grid-template-columns: 1fr;
   }
@@ -48,7 +39,7 @@
   }
 
   .item-soin.bm-item-sheet .bm-item-row {
-    grid-template-columns: 68px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr);
   }
 
   .item-soin.bm-item-sheet .bm-item-heal {
@@ -58,5 +49,6 @@
 
   .item-soin.bm-item-sheet .bm-item-heal select {
     max-width: 100%;
+    justify-self: stretch;
   }
 }
