@@ -49,7 +49,7 @@
       <div class="tab-grid">
         <aside class="sidebar">
           <div class="portrait-frame">
-            <img src="{{actor.img}}" data-edit="img" class="portrait" />
+            <img src="{{actor.img}}" {{#if canEditTokenImage}}data-edit="img"{{/if}} class="portrait" />
           </div>
         </aside>
 
@@ -204,6 +204,7 @@
           <ol class="item-list weapon-list">
             {{#each weapons}}
               <li class="item weapon-item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-meta">{{#if this.displayWeaponType}}{{this.displayWeaponType}}{{else}}{{localize "BLOODMAN.Equipment.WeaponType.Distance"}}{{/if}}</span>
@@ -214,7 +215,6 @@
                   </button>
                   <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                 {{/if}}
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -234,10 +234,10 @@
           <ol class="item-list">
             {{#each protections}}
               <li class="item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-meta">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -264,12 +264,12 @@
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each objects}}
               <li class="item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 {{#if this.system.mark}}<span class="item-mark">{{this.system.mark}}</span>{{/if}}
                 {{#if this.system.noteSmall}}<span class="item-meta">{{this.system.noteSmall}}</span>{{/if}}
                 {{#if this.system.useEnabled}}<span class="item-use">{{localize "BLOODMAN.Common.Use"}}</span>{{/if}}
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -278,10 +278,10 @@
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each soins}}
               <li class="item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-use">{{#if this.system.healDie}}1{{this.system.healDie}}{{else}}1d4{{/if}}</span>
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -290,10 +290,10 @@
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each rations}}
               <li class="item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 <span class="item-use">{{localize "BLOODMAN.Common.Eat"}}</span>
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
               </li>
             {{/each}}
@@ -311,10 +311,10 @@
           <ol class="item-list weapon-list">
             {{#each transportNpcs}}
               <li class="item weapon-item" data-transport-npc-ref="{{this.ref}}">
+                <a class="transport-npc-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon transport-npc-open" src="{{this.img}}" />
                 <span class="item-name transport-npc-open">{{this.name}}</span>
                 <span class="item-meta">PNJ</span>
-                <a class="transport-npc-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
               </li>
             {{/each}}
           </ol>
@@ -330,6 +330,7 @@
         <ol class="item-list {{#if aptitudesTwoColumns}}item-list-two-columns{{/if}}">
           {{#each aptitudes}}
               <li class="item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
                 {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
@@ -339,14 +340,7 @@
                   </button>
                   <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                 {{/if}}
-                {{#if this.displayBonuses.length}}
-                  {{#each this.displayBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
-                {{/if}}
-                {{#if this.displayResourceBonuses.length}}
-                  {{#each this.displayResourceBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
-                {{/if}}
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
               </li>
             {{/each}}
           </ol>
@@ -359,23 +353,18 @@
         <ol class="item-list {{#if pouvoirsTwoColumns}}item-list-two-columns{{/if}}">
           {{#each pouvoirs}}
               <li class="item" data-item-id="{{this._id}}">
+                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name item-edit">{{this.name}}</span>
-                {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
+                {{#if this.showPowerUseButton}}<button type="button" class="power-use">Utiliser</button>{{/if}}
+                {{#if this.showPowerDamage}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
                 {{#if this.showItemReroll}}
                   <button type="button" class="item-reroll">
                     <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
                   </button>
                   <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                 {{/if}}
-                {{#if this.displayBonuses.length}}
-                  {{#each this.displayBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
-                {{/if}}
-                {{#if this.displayResourceBonuses.length}}
-                  {{#each this.displayResourceBonuses}}<span class="item-meta">{{this.key}} {{this.value}}</span>{{/each}}
-                {{/if}}
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
               </li>
             {{/each}}
           </ol>

@@ -18,6 +18,13 @@ function safeWarn(message) {
   }
 }
 
+function formatMultilineTextToHtml(value) {
+  const raw = String(value || "");
+  if (!raw.trim()) return "";
+  const escaped = foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(raw) : raw;
+  return escaped.replace(/\r\n|\r|\n/g, "<br>");
+}
+
 const ACTOR_CREATE_TYPE_ICONS = {
   "personnage": "fa-masks-theater",
   "personnage-non-joueur": "fa-mask"
@@ -1276,6 +1283,14 @@ const STATE_MODIFIER_PATHS = [
   "system.modifiers.label",
   ...CHARACTERISTICS.map(char => `system.modifiers.${char.key}`)
 ];
+const ACTOR_TOKEN_IMAGE_UPDATE_PATHS = [
+  "prototypeToken.texture.src",
+  "token.img"
+];
+const TOKEN_IMAGE_UPDATE_PATHS = [
+  "texture.src",
+  "img"
+];
 
 const SYSTEM_SOCKET = "system.bloodman";
 const CARRIED_ITEM_LIMIT_BASE = 10;
@@ -1650,6 +1665,7 @@ async function refreshBossSoloNpcPvMax() {
 
 const PROCESSED_DAMAGE_REQUESTS = new Map();
 const PROCESSED_DAMAGE_CONFIG_POPUPS = new Map();
+const PROCESSED_POWER_USE_POPUPS = new Map();
 const PROCESSED_CHAOS_REQUESTS = new Map();
 const PROCESSED_REROLL_REQUESTS = new Map();
 const PROCESSED_VOYANCE_REQUESTS = new Map();
@@ -1660,6 +1676,7 @@ const VOYANCE_STYLE_ID = "bm-voyance-style";
 const VOYANCE_AUTO_CLOSE_MS = 6500;
 const VOYANCE_DEFAULT_BACKGROUND_SRC = "systems/bloodman/images/des_destin.png";
 const VOYANCE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-voyance-request</span>";
+const POWER_USE_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-power-use-popup</span>";
 
 function rememberDamageRequest(requestId) {
   if (!requestId) return;
@@ -1687,6 +1704,20 @@ function rememberDamageConfigPopupRequest(requestId) {
 function wasDamageConfigPopupRequestProcessed(requestId) {
   if (!requestId) return false;
   return PROCESSED_DAMAGE_CONFIG_POPUPS.has(requestId);
+}
+
+function rememberPowerUsePopupRequest(requestId) {
+  if (!requestId) return;
+  const now = Date.now();
+  PROCESSED_POWER_USE_POPUPS.set(requestId, now);
+  for (const [key, value] of PROCESSED_POWER_USE_POPUPS.entries()) {
+    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_POWER_USE_POPUPS.delete(key);
+  }
+}
+
+function wasPowerUsePopupRequestProcessed(requestId) {
+  if (!requestId) return false;
+  return PROCESSED_POWER_USE_POPUPS.has(requestId);
 }
 
 function buildDamageConfigObserverState(data) {
@@ -2267,6 +2298,11 @@ function toBooleanFlag(value) {
   return false;
 }
 
+function isPowerUsableEnabled(value) {
+  if (value == null || value === "") return true;
+  return toBooleanFlag(value);
+}
+
 function normalizeRerollTarget(target, { includeAliases = false } = {}) {
   const source = target && typeof target === "object" ? target : {};
   const tokenId = String(getDamagePayloadField(source, ["tokenId", "tokenid", "token_id"]) || "");
@@ -2609,6 +2645,135 @@ async function handleDamageConfigPopupMessage(data, source = "socket") {
   if (!canCurrentUserReceiveDamageConfigPopup(data)) return false;
   const shown = showDamageConfigObserverPopup(data);
   if (!shown) console.warn("[bloodman] damage:config popup display failed", { source, eventId, payload: data });
+  return shown;
+}
+
+function getPowerUsePopupViewerIds(requesterUserId = "") {
+  const requesterId = String(requesterUserId || "").trim();
+  const ids = [];
+  for (const user of game.users || []) {
+    if (!user?.active) continue;
+    const userId = String(user.id || "").trim();
+    if (!userId) continue;
+    if (!user.isGM && !isAssistantOrHigherRole(user.role)) continue;
+    if (requesterId && userId === requesterId) continue;
+    ids.push(userId);
+  }
+  return ids;
+}
+
+function emitPowerUsePopup(actor, item, options = {}) {
+  if (!game.socket || !actor || !item || item.type !== "pouvoir") return false;
+  const requesterUserId = String(game.user?.id || "").trim();
+  const viewerIds = getPowerUsePopupViewerIds(requesterUserId);
+  if (!viewerIds.length) return false;
+  const randomId = () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2));
+  const powerDamageFormula = item.system?.damageEnabled ? normalizeRollDieFormula(item.system?.damageDie, "d4") : "";
+  const payload = {
+    type: "powerUsePopup",
+    eventId: randomId(),
+    requestId: String(options.requestId || randomId()),
+    requesterUserId,
+    requesterUserName: String(game.user?.name || "").trim(),
+    viewerIds,
+    actorId: String(actor.id || ""),
+    actorName: String(actor.name || "").trim(),
+    powerId: String(item.id || ""),
+    powerName: String(item.name || "").trim() || "Pouvoir",
+    powerDescription: String(item.system?.note || item.system?.notes || "").trim(),
+    powerCostEnabled: toBooleanFlag(item.system?.powerCostEnabled),
+    powerCost: Math.max(0, Math.floor(toFiniteNumber(item.system?.powerCost, 0))),
+    damageEnabled: toBooleanFlag(item.system?.damageEnabled),
+    damageFormula: String(powerDamageFormula || "").trim(),
+    context: {
+      fromUseButton: options.fromUseButton === true
+    }
+  };
+  try {
+    game.socket.emit(SYSTEM_SOCKET, payload);
+  } catch (error) {
+    console.error("[bloodman] power:popup socket emit failed", error);
+  }
+  if (typeof ChatMessage?.create === "function") {
+    void ChatMessage.create({
+      content: POWER_USE_POPUP_CHAT_MARKUP,
+      whisper: viewerIds,
+      flags: { bloodman: { powerUsePopup: payload } }
+    }).catch(error => {
+      console.error("[bloodman] power:popup chat fallback failed", error);
+    });
+  }
+  return true;
+}
+
+function canCurrentUserReceivePowerUsePopup(data) {
+  const localUserId = String(game.user?.id || "").trim();
+  if (!localUserId) return false;
+  const requesterUserId = String(data?.requesterUserId || "").trim();
+  if (requesterUserId && requesterUserId === localUserId) return false;
+  const viewerIds = Array.isArray(data?.viewerIds)
+    ? data.viewerIds.map(id => String(id || "").trim()).filter(Boolean)
+    : [];
+  if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
+  if (game.user?.isGM) return true;
+  return isAssistantOrHigherRole(game.user?.role);
+}
+
+function showPowerUsePopup(data) {
+  if (!data || typeof Dialog !== "function") return false;
+  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const actorName = String(data.actorName || "").trim();
+  const requesterUserName = String(data.requesterUserName || "").trim();
+  const powerName = String(data.powerName || "").trim() || "Pouvoir";
+  const descriptionHtml = formatMultilineTextToHtml(data.powerDescription);
+  const noDescriptionText = escapeHtml("Aucune description.");
+  const damageEnabled = data.damageEnabled === true;
+  const damageFormula = String(data.damageFormula || "").trim().toUpperCase();
+  const damageText = damageEnabled && damageFormula ? damageFormula : "Aucun";
+  const powerCostEnabled = data.powerCostEnabled === true;
+  const powerCost = Math.max(0, Math.floor(toFiniteNumber(data.powerCost, 0)));
+  const costText = powerCostEnabled ? `${powerCost} PP` : "Aucun";
+  const actorLabel = escapeHtml(actorName || "Joueur");
+  const requesterLabel = escapeHtml(requesterUserName || actorName || "Joueur");
+  const powerLabel = escapeHtml(powerName);
+  const damageLabel = escapeHtml(damageText);
+  const costLabel = escapeHtml(costText);
+  const title = `Pouvoir utilise - ${actorName || requesterUserName || "Joueur"}`;
+  const content = `<div class="bm-power-use-popup">
+    <p><strong>Joueur :</strong> ${requesterLabel}</p>
+    <p><strong>Personnage :</strong> ${actorLabel}</p>
+    <p><strong>Pouvoir :</strong> ${powerLabel}</p>
+    <p><strong>Cout :</strong> ${costLabel}</p>
+    <p><strong>Degats :</strong> ${damageLabel}</p>
+    <p><strong>Description :</strong></p>
+    <p>${descriptionHtml || noDescriptionText}</p>
+  </div>`;
+  const dialog = new Dialog(
+    {
+      title,
+      content,
+      buttons: {
+        ok: { label: "OK" }
+      },
+      default: "ok"
+    },
+    {
+      classes: ["bloodman-damage-dialog", "bloodman-power-use-dialog"],
+      width: 480
+    }
+  );
+  dialog.render(true);
+  return true;
+}
+
+async function handlePowerUsePopupMessage(data, source = "socket") {
+  if (!data) return false;
+  const eventId = String(data.eventId || data.requestId || "").trim();
+  if (eventId && wasPowerUsePopupRequestProcessed(eventId)) return false;
+  if (eventId) rememberPowerUsePopupRequest(eventId);
+  if (!canCurrentUserReceivePowerUsePopup(data)) return false;
+  const shown = showPowerUsePopup(data);
+  if (!shown) console.warn("[bloodman] power:popup display failed", { source, eventId, payload: data });
   return shown;
 }
 
@@ -3046,6 +3211,9 @@ function sanitizeActorUpdateForRole(updateData, role, options = {}) {
   if (basicPlayer) {
     stripUpdatePaths(sanitized, STATE_MODIFIER_PATHS);
   }
+  if (!isAssistantOrHigherRole(role)) {
+    stripUpdatePaths(sanitized, ACTOR_TOKEN_IMAGE_UPDATE_PATHS);
+  }
   normalizeCharacteristicXpUpdates(sanitized, options.actor || null);
   if (enforceCharacteristicBaseRange) normalizeCharacteristicBaseUpdatesForRole(sanitized, role);
   return sanitized;
@@ -3251,6 +3419,10 @@ function registerDamageSocketHandlers() {
     if (!data) return;
     if (data.type === "damageConfigPopup") {
       await handleDamageConfigPopupMessage(data, "socket");
+      return;
+    }
+    if (data.type === "powerUsePopup") {
+      await handlePowerUsePopupMessage(data, "socket");
       return;
     }
     if (data.type === "damageApplied") {
@@ -4094,6 +4266,13 @@ Hooks.on("createChatMessage", async (message) => {
     return;
   }
 
+  const powerUsePopupPayload = foundry.utils.getProperty(message, "flags.bloodman.powerUsePopup");
+  if (powerUsePopupPayload) {
+    await handlePowerUsePopupMessage(powerUsePopupPayload, "chat");
+    scheduleTransientChatMessageDeletion(message, 250);
+    return;
+  }
+
   if (!game.user.isGM) return;
   if (isInitiativeRollMessage(message)) {
     queueInitiativeRollMessage(message);
@@ -4152,21 +4331,6 @@ Hooks.on("deleteItem", (item) => {
 function getItemBonusTotals(actor) {
   const totals = {};
   for (const c of CHARACTERISTICS) totals[c.key] = 0;
-  if (!actor?.items) return totals;
-  for (const item of actor.items) {
-    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
-    if (!item.system?.bonusEnabled) continue;
-    if (item.system?.bonuses) {
-      for (const c of CHARACTERISTICS) {
-        if (!Object.prototype.hasOwnProperty.call(item.system.bonuses, c.key)) continue;
-        const bonus = Number(item.system.bonuses[c.key]);
-        if (Number.isFinite(bonus)) totals[c.key] += bonus;
-      }
-    }
-    const legacyKey = (item.system?.charKey || "").toString().toUpperCase();
-    const legacyBonus = Number(item.system?.charBonus);
-    if (Number.isInteger(legacyBonus) && totals[legacyKey] != null) totals[legacyKey] += legacyBonus;
-  }
   return totals;
 }
 
@@ -4175,12 +4339,6 @@ function getItemResourceBonusTotals(actor) {
   if (!actor?.items) return totals;
   for (const item of actor.items) {
     if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
-    if (item.system?.bonusEnabled) {
-      const pvBonus = Number(item.system?.resourceBonuses?.pv);
-      const ppBonus = Number(item.system?.resourceBonuses?.pp);
-      if (Number.isFinite(pvBonus)) totals.pv += pvBonus;
-      if (Number.isFinite(ppBonus)) totals.pp += ppBonus;
-    }
     if (item.system?.rawBonusEnabled) {
       const pvBonus = Number(item.system?.rawBonuses?.pv);
       const ppBonus = Number(item.system?.rawBonuses?.pp);
@@ -4225,16 +4383,12 @@ async function applyItemResourceBonuses(actor) {
 async function applyPowerCost(actor, item) {
   if (!actor || !item) return true;
   if (item.type !== "pouvoir") return true;
-  if (!item.system?.damageEnabled || !item.system?.powerCostEnabled) return true;
+  if (!item.system?.powerCostEnabled) return true;
   const cost = Number(item.system?.powerCost);
   if (!Number.isFinite(cost) || cost <= 0) return true;
   const current = Number(actor.system.resources?.pp?.current || 0);
   if (current < cost) {
-    ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPP"));
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      content: t("BLOODMAN.Rolls.Damage.Zero", { name: actor.name, item: item.name })
-    });
+    ui.notifications?.error("Points de puissance insuffisants pour utiliser ce pouvoir.");
     return false;
   }
   const nextValue = Math.max(0, current - cost);
@@ -4252,37 +4406,13 @@ async function applyPowerCost(actor, item) {
 function buildItemDisplayData(item) {
   const data = item.toObject();
   data._id = data._id ?? item.id;
-  const bonusEnabled = Boolean(item.system?.bonusEnabled);
-  const displayBonuses = [];
-  const displayResourceBonuses = [];
-
-  if (bonusEnabled) {
-    const bonuses = item.system?.bonuses || {};
-    for (const c of CHARACTERISTICS) {
-      const value = Number(bonuses[c.key]);
-      if (Number.isFinite(value) && value !== 0) displayBonuses.push({ key: c.key, value });
-    }
-
-    const legacyKey = (item.system?.charKey || "").toString().toUpperCase();
-    const legacyValue = Number(item.system?.charBonus);
-    if (legacyKey && Number.isFinite(legacyValue) && legacyValue !== 0) {
-      const exists = displayBonuses.some(bonus => bonus.key === legacyKey);
-      if (!exists) displayBonuses.push({ key: legacyKey, value: legacyValue });
-    }
-
-    const pvBonus = Number(item.system?.resourceBonuses?.pv);
-    const ppBonus = Number(item.system?.resourceBonuses?.pp);
-    if (Number.isFinite(pvBonus) && pvBonus !== 0) displayResourceBonuses.push({ key: "PV", value: pvBonus });
-    if (Number.isFinite(ppBonus) && ppBonus !== 0) displayResourceBonuses.push({ key: "PP", value: ppBonus });
-  }
+  data.usableEnabled = isPowerUsableEnabled(item.system?.usableEnabled);
+  data.displayNoteHtml = formatMultilineTextToHtml(item.system?.note || item.system?.notes || "");
 
   if (item.system?.damageEnabled && item.system?.damageDie) {
     const rawDie = item.system.damageDie.toString();
     data.displayDamageDie = normalizeRollDieFormula(rawDie, "d4");
   }
-
-  data.displayBonuses = displayBonuses;
-  data.displayResourceBonuses = displayResourceBonuses;
   return data;
 }
 
@@ -4441,6 +4571,9 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
       blockedRestrictedFields = stripUpdatePaths(updateData, Array.from(VITAL_RESOURCE_PATHS)) || blockedRestrictedFields;
     }
     blockedRestrictedFields = stripUpdatePaths(updateData, STATE_MODIFIER_PATHS) || blockedRestrictedFields;
+  }
+  if (!isAssistantOrHigherRole(updaterRole)) {
+    blockedRestrictedFields = stripUpdatePaths(updateData, ACTOR_TOKEN_IMAGE_UPDATE_PATHS) || blockedRestrictedFields;
   }
   if (actor.type === "personnage") {
     normalizeCharacteristicBaseUpdatesForRole(updateData, updaterRole, actor);
@@ -4663,6 +4796,15 @@ Hooks.on("updateActor", async (actor, changes) => {
 });
 
 Hooks.on("preUpdateToken", (tokenDoc, changes, options, userId) => {
+  const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
+  if (!isAssistantOrHigherRole(updaterRole)) {
+    const blockedTokenImageUpdate = stripUpdatePaths(changes, TOKEN_IMAGE_UPDATE_PATHS);
+    if (blockedTokenImageUpdate) {
+      const hasRemainingChanges = Object.keys(foundry.utils.flattenObject(changes || {})).length > 0;
+      if (!hasRemainingChanges) return false;
+    }
+  }
+
   if (options?.bloodmanIgnoreMoveLimit) return;
   const hasX = foundry.utils.getProperty(changes, "x") != null;
   const hasY = foundry.utils.getProperty(changes, "y") != null;
@@ -4787,6 +4929,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async minimize(...args) {
+    this.clearPowerUseState();
     const result = await super.minimize(...args);
     this._syncMinimizeHeaderButton();
     return result;
@@ -4795,6 +4938,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   async maximize(...args) {
     const result = await super.maximize(...args);
     this._syncMinimizeHeaderButton();
+    this.render(false);
     return result;
   }
 
@@ -4809,6 +4953,29 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.clearItemRerollState();
   }
 
+  getPowerUseState() {
+    if (!(this._usedPowerItemIds instanceof Set)) this._usedPowerItemIds = new Set();
+    return this._usedPowerItemIds;
+  }
+
+  clearPowerUseState() {
+    this.getPowerUseState().clear();
+  }
+
+  isPowerActivated(itemId) {
+    const key = String(itemId || "").trim();
+    if (!key) return false;
+    return this.getPowerUseState().has(key);
+  }
+
+  markPowerActivated(itemId, active = true) {
+    const key = String(itemId || "").trim();
+    if (!key) return;
+    const state = this.getPowerUseState();
+    if (active) state.add(key);
+    else state.delete(key);
+  }
+
   render(force, options = {}) {
     if (Boolean(force) && !options?.bloodmanKeepRerollState) {
       this.clearRerollDisplayState();
@@ -4818,6 +4985,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async close(options = {}) {
     this.clearRerollDisplayState();
+    this.clearPowerUseState();
     return super.close(options);
   }
 
@@ -4899,6 +5067,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   getData() {
     const data = super.getData();
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
+    const canEditTokenImage = isAssistantOrHigherRole(game.user?.role);
     const characteristicBaseHasBounds = data.actor.type === "personnage"
       && isCharacteristicBaseRangeRestrictedRole(game.user?.role);
     const canEditRestrictedFields = canToggleCharacteristicsEdit;
@@ -5082,11 +5251,22 @@ class BloodmanActorSheet extends BaseActorSheet {
       dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
       return dataItem;
     });
+    const powerUseState = this.getPowerUseState();
     const pouvoirs = itemBuckets.pouvoir.map(item => {
       const dataItem = buildItemDisplayData(item);
-      dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
+      const itemId = String(item.id || dataItem._id || "").trim();
+      const usableEnabled = isPowerUsableEnabled(item.system?.usableEnabled);
+      const isActivated = usableEnabled && itemId ? powerUseState.has(itemId) : false;
+      if (!usableEnabled && itemId) powerUseState.delete(itemId);
+      dataItem.showPowerUseButton = usableEnabled;
+      dataItem.showPowerDamage = Boolean(dataItem.displayDamageDie) && (!usableEnabled || isActivated);
+      dataItem.showItemReroll = dataItem.showPowerDamage && shouldShowItemReroll(item.id);
       return dataItem;
     });
+    const activePowerIds = new Set(itemBuckets.pouvoir.map(item => String(item.id || "").trim()).filter(Boolean));
+    for (const key of [...powerUseState]) {
+      if (!activePowerIds.has(key)) powerUseState.delete(key);
+    }
     const aptitudesTwoColumns = aptitudes.length >= 2;
     const pouvoirsTwoColumns = pouvoirs.length >= 2;
 
@@ -5123,6 +5303,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       characteristicBaseMax: CHARACTERISTIC_BASE_MAX,
       canEditRestrictedFields,
       canEditXpChecks,
+      canEditTokenImage,
       canOpenItemSheets,
       characteristicsEditEnabled,
       characteristics,
@@ -5272,6 +5453,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       await this.useItem(item);
+    });
+
+    html.find(".power-use").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = ev.currentTarget.closest(".item");
+      const item = this.getItemFromListElement(li);
+      await this.usePower(item);
     });
 
     html.find(".item-reroll").click(ev => {
@@ -5571,8 +5760,13 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async rollAbilityDamage(item) {
     if (!item) return;
+    const isUsablePower = item.type === "pouvoir" && isPowerUsableEnabled(item.system?.usableEnabled);
+    if (isUsablePower && !this.isPowerActivated(item.id)) return;
     const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
-    const beforeRoll = async () => applyPowerCost(this.actor, item);
+    const beforeRoll = async () => {
+      if (isUsablePower) return true;
+      return applyPowerCost(this.actor, item);
+    };
     const result = await doDirectDamageRoll(this.actor, formula, item.name, {
       beforeRoll,
       itemId: item.id,
@@ -5588,8 +5782,22 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.render(false);
   }
 
+  async usePower(item) {
+    if (!item || item.type !== "pouvoir") return;
+    if (!isPowerUsableEnabled(item.system?.usableEnabled)) return;
+    const used = await applyPowerCost(this.actor, item);
+    if (!used) return;
+    this.markPowerActivated(item.id, true);
+    emitPowerUsePopup(this.actor, item, { fromUseButton: true });
+    this.render(false);
+  }
+
   async useItem(item) {
     if (!item) return;
+    if (item.type === "pouvoir") {
+      await this.usePower(item);
+      return;
+    }
     if (item.type === "soin") {
       const healAudioRef = {
         id: item.id,
@@ -6128,6 +6336,10 @@ class BloodmanItemSheet extends BaseItemSheet {
     if (this.item.type === "aptitude") {
       if (!data.item.system) data.item.system = {};
       data.item.system.xpVoyageCost = normalizeNonNegativeInteger(this.item.system?.xpVoyageCost, 0);
+    }
+    if (this.item.type === "pouvoir") {
+      if (!data.item.system) data.item.system = {};
+      data.item.system.usableEnabled = isPowerUsableEnabled(this.item.system?.usableEnabled);
     }
     return data;
   }

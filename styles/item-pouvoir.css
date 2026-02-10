@@ -19,7 +19,7 @@
 
 .item-pouvoir.bm-item-sheet .ability-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   align-items: start;
 }
@@ -44,13 +44,23 @@
   max-width: 170px;
 }
 
+.item-pouvoir.bm-item-sheet .power-usable-damage-section .damage-die-select {
+  background: #000000;
+  color: #ffffff;
+}
+
+.item-pouvoir.bm-item-sheet .power-usable-damage-section .damage-die-select option {
+  background: #000000;
+  color: #ffffff;
+}
+
 .item-pouvoir.bm-item-sheet .bonus-controls {
   margin-top: 2px;
 }
 
 .item-pouvoir.bm-item-sheet .bonus-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px 8px;
   align-items: stretch;
 }
@@ -88,12 +98,6 @@
 
 .item-pouvoir.bm-item-sheet .bonus-grid.is-disabled {
   opacity: 0.55;
-}
-
-@media (max-width: 980px) {
-  .item-pouvoir.bm-item-sheet .bonus-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 920px) {

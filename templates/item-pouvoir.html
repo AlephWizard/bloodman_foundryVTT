@@ -42,8 +42,20 @@
     </div>
   </div>
 
-  <div class="ability-row">
-    <div class="ability-section">
+  <div class="ability-row ability-row-two">
+    <div class="ability-section power-usable-damage-section">
+      <label class="inline-label">{{localize "BLOODMAN.Items.UsableLabel"}}</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.usableEnabled" value="true" data-dtype="Boolean" {{#if item.system.usableEnabled}}checked{{/if}} />
+          {{localize "BLOODMAN.Common.Yes"}}
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.usableEnabled" value="false" data-dtype="Boolean" {{#unless item.system.usableEnabled}}checked{{/unless}} />
+          {{localize "BLOODMAN.Common.No"}}
+        </label>
+      </div>
+
       <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
       <div class="toggle-group">
         <label class="toggle-option">
@@ -55,7 +67,7 @@
           {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
-      <select name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
+      <select class="damage-die-select" name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
         {{#select item.system.damageDie}}
           <option value="d4">d4</option>
           <option value="d6">d6</option>
@@ -72,39 +84,6 @@
         {{/select}}
       </select>
     </div>
-
-    <div class="ability-divider"></div>
-
-    <div class="ability-section">
-      <label class="inline-label">{{localize "BLOODMAN.Items.BonusLabel"}}</label>
-      <div class="toggle-group">
-        <label class="toggle-option">
-          <input type="radio" name="system.bonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.bonusEnabled}}checked{{/if}} />
-          {{localize "BLOODMAN.Common.Yes"}}
-        </label>
-        <label class="toggle-option">
-          <input type="radio" name="system.bonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.bonusEnabled}}checked{{/unless}} />
-          {{localize "BLOODMAN.Common.No"}}
-        </label>
-      </div>
-      <div class="bonus-controls">
-        <div class="bonus-grid {{#unless item.system.bonusEnabled}}is-disabled{{/unless}}">
-          <label><span>MEL</span><input type="number" name="system.bonuses.MEL" value="{{item.system.bonuses.MEL}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>VIS</span><input type="number" name="system.bonuses.VIS" value="{{item.system.bonuses.VIS}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>ESP</span><input type="number" name="system.bonuses.ESP" value="{{item.system.bonuses.ESP}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>PHY</span><input type="number" name="system.bonuses.PHY" value="{{item.system.bonuses.PHY}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>MOU</span><input type="number" name="system.bonuses.MOU" value="{{item.system.bonuses.MOU}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>ADR</span><input type="number" name="system.bonuses.ADR" value="{{item.system.bonuses.ADR}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>PER</span><input type="number" name="system.bonuses.PER" value="{{item.system.bonuses.PER}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>SOC</span><input type="number" name="system.bonuses.SOC" value="{{item.system.bonuses.SOC}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>SAV</span><input type="number" name="system.bonuses.SAV" value="{{item.system.bonuses.SAV}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>PV</span><input type="number" name="system.resourceBonuses.pv" value="{{item.system.resourceBonuses.pv}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-          <label><span>PP</span><input type="number" name="system.resourceBonuses.pp" value="{{item.system.resourceBonuses.pp}}" data-dtype="Number" step="1" {{#unless item.system.bonusEnabled}}disabled{{/unless}} /></label>
-        </div>
-      </div>
-    </div>
-
-    <div class="ability-divider"></div>
 
     <div class="ability-section">
       <label class="inline-label">{{localize "BLOODMAN.Items.RawBonusLabel"}}</label>

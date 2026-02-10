@@ -592,11 +592,12 @@
 }
 
 .transport-npc-delete {
-  margin-left: auto;
+  margin-left: 0;
   cursor: pointer;
 }
 
-.item-use {
+.item-use,
+.power-use {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -607,6 +608,23 @@
   border-radius: 6px;
   background: var(--bm-black);
   color: var(--bm-white);
+}
+
+.power-use {
+  padding: 1px 5px;
+  min-height: 18px;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: #111111 !important;
+  color: #ffffff !important;
+  border-color: var(--bm-line) !important;
+  font-family: inherit;
+  font-weight: 700;
 }
 
 .item-reroll {

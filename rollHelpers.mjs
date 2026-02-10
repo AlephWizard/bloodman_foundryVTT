@@ -62,22 +62,9 @@ export function getWeaponCategory(value) {
 }
 
 function getItemBonus(actor, key) {
-  if (!actor?.items) return 0;
-  let total = 0;
-  for (const item of actor.items) {
-    if (!isBonusItem(item)) continue;
-    if (!item.system?.bonusEnabled) continue;
-    if (item.system?.bonuses && Object.prototype.hasOwnProperty.call(item.system.bonuses, key)) {
-      const bonus = Number(item.system.bonuses[key]);
-      if (Number.isFinite(bonus)) total += bonus;
-    }
-    const legacyKey = (item.system?.charKey || "").toString().toUpperCase();
-    if (legacyKey === key && BONUS_KEYS.has(legacyKey)) {
-      const legacyBonus = Number(item.system?.charBonus);
-      if (Number.isInteger(legacyBonus)) total += legacyBonus;
-    }
-  }
-  return total;
+  void actor;
+  void key;
+  return 0;
 }
 
 function getRawDamageBonus(actor) {

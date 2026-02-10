@@ -631,6 +631,20 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   padding: 10px;
 }
 
+.window-app.bloodman-power-use-dialog .window-content,
+.window-app.dialog.bloodman-power-use-dialog .window-content {
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-power-use-dialog .bm-power-use-popup,
+.window-app.dialog.bloodman-power-use-dialog .bm-power-use-popup,
+.window-app.bloodman-power-use-dialog .bm-power-use-popup p,
+.window-app.dialog.bloodman-power-use-dialog .bm-power-use-popup p,
+.window-app.bloodman-power-use-dialog .bm-power-use-popup strong,
+.window-app.dialog.bloodman-power-use-dialog .bm-power-use-popup strong {
+  color: #ffffff !important;
+}
+
 .window-app.bloodman-damage-dialog select,
 .window-app.dialog.bloodman-damage-dialog select {
   background-color: var(--bm-damage-field) !important;

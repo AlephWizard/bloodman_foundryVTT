@@ -28,18 +28,18 @@
   max-width: 170px;
 }
 
-.item-aptitude.bm-item-sheet .ability-row-two {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  align-items: start;
+.item-aptitude.bm-item-sheet .bm-ability-damage .damage-die-select {
+  background: #000000;
+  color: #ffffff;
 }
 
-.item-aptitude.bm-item-sheet .ability-divider {
-  display: none;
+.item-aptitude.bm-item-sheet .bm-ability-damage .damage-die-select option {
+  background: #000000;
+  color: #ffffff;
 }
 
-.item-aptitude.bm-item-sheet .ability-section {
+.item-aptitude.bm-item-sheet .ability-section,
+.item-aptitude.bm-item-sheet .bm-raw-bonus-section {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -55,7 +55,7 @@
 
 .item-aptitude.bm-item-sheet .bonus-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px 8px;
   align-items: stretch;
 }
@@ -99,12 +99,6 @@
   background: rgba(58, 48, 37, 0.6);
 }
 
-@media (max-width: 920px) {
-  .item-aptitude.bm-item-sheet .bonus-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 820px) {
   .item-aptitude.bm-item-sheet .bm-ability-damage {
     grid-template-columns: 1fr;
@@ -113,9 +107,5 @@
 
   .item-aptitude.bm-item-sheet .bm-ability-damage select {
     max-width: 100%;
-  }
-
-  .item-aptitude.bm-item-sheet .ability-row-two {
-    grid-template-columns: 1fr;
   }
 }
