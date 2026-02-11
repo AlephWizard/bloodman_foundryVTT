@@ -1287,6 +1287,7 @@ const CARRIED_ITEM_LIMIT_BASE = 10;
 const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
+const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
@@ -1352,6 +1353,64 @@ function toFiniteNumber(value, fallback = 0) {
 
 function normalizeNonNegativeInteger(value, fallback = 0) {
   return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
+}
+
+function resolveResourceGaugeState(currentValue, maxValue, options = {}) {
+  const useUnitMaxWhenZero = options.useUnitMaxWhenZero === true;
+  const current = Math.max(0, toFiniteNumber(currentValue, 0));
+  const maxRaw = Math.max(0, toFiniteNumber(maxValue, 0));
+  const denominator = maxRaw > 0 ? maxRaw : (useUnitMaxWhenZero ? 1 : 0);
+  const ratio = denominator > 0 ? Math.max(0, Math.min(1, current / denominator)) : 0;
+  const percent = Math.max(0, Math.min(100, ratio * 100));
+  const stateClass = ratio <= 0
+    ? "is-empty"
+    : ratio <= 0.25
+      ? "is-critical"
+      : ratio <= 0.5
+        ? "is-warning"
+        : "is-healthy";
+  return {
+    ratio,
+    fill: `${percent.toFixed(2)}%`,
+    steps: Math.max(1, Math.round(maxRaw || 1)),
+    stateClass
+  };
+}
+
+function applyResourceGaugeState(resource, options = {}) {
+  if (!resource || typeof resource !== "object") return;
+  const gauge = resolveResourceGaugeState(resource.current, resource.max, options);
+  resource.ratio = gauge.ratio.toFixed(4);
+  resource.fill = gauge.fill;
+  resource.steps = gauge.steps;
+  resource.stateClass = gauge.stateClass;
+}
+
+function buildTypedItemBuckets(items = []) {
+  const buckets = Object.fromEntries(ITEM_BUCKET_TYPES.map(type => [type, []]));
+  for (const item of items || []) {
+    const type = String(item?.type || "").trim().toLowerCase();
+    if (Array.isArray(buckets[type])) buckets[type].push(item);
+  }
+  return buckets;
+}
+
+function getActorItemCounts(items = []) {
+  const counts = {
+    total: 0,
+    aptitudes: 0,
+    pouvoirs: 0,
+    carried: 0
+  };
+  for (const item of items || []) {
+    if (!item) continue;
+    counts.total += 1;
+    const type = String(item.type || "").trim().toLowerCase();
+    if (type === "aptitude") counts.aptitudes += 1;
+    if (type === "pouvoir") counts.pouvoirs += 1;
+    if (CARRIED_ITEM_TYPES.has(type)) counts.carried += 1;
+  }
+  return counts;
 }
 
 function normalizeRollDieFormula(value, fallback = "d4") {
@@ -5151,42 +5210,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     } else if (resources.voyage != null) {
       delete resources.voyage;
     }
-    {
-      const pvMax = Math.max(0, toFiniteNumber(resources.pv.max, 0));
-      const pvCurrent = Math.max(0, toFiniteNumber(resources.pv.current, 0));
-      const pvRatio = pvMax > 0 ? Math.max(0, Math.min(1, pvCurrent / pvMax)) : 0;
-      const pvPercent = Math.max(0, Math.min(100, pvRatio * 100));
-      const pvSteps = Math.max(1, Math.round(pvMax || 1));
-      const pvStateClass = pvRatio <= 0
-        ? "is-empty"
-        : pvRatio <= 0.25
-          ? "is-critical"
-          : pvRatio <= 0.5
-            ? "is-warning"
-            : "is-healthy";
-      resources.pv.ratio = pvRatio.toFixed(4);
-      resources.pv.fill = `${pvPercent.toFixed(2)}%`;
-      resources.pv.steps = pvSteps;
-      resources.pv.stateClass = pvStateClass;
-    }
-    {
-      const ppMax = Math.max(0, toFiniteNumber(resources.pp.max, 0));
-      const ppCurrent = Math.max(0, toFiniteNumber(resources.pp.current, 0));
-      const ppRatio = ppMax > 0 ? Math.max(0, Math.min(1, ppCurrent / ppMax)) : 0;
-      const ppPercent = Math.max(0, Math.min(100, ppRatio * 100));
-      const ppSteps = Math.max(1, Math.round(ppMax || 1));
-      const ppStateClass = ppRatio <= 0
-        ? "is-empty"
-        : ppRatio <= 0.25
-          ? "is-critical"
-          : ppRatio <= 0.5
-            ? "is-warning"
-            : "is-healthy";
-      resources.pp.ratio = ppRatio.toFixed(4);
-      resources.pp.fill = `${ppPercent.toFixed(2)}%`;
-      resources.pp.steps = ppSteps;
-      resources.pp.stateClass = ppStateClass;
-    }
+    applyResourceGaugeState(resources.pv);
+    applyResourceGaugeState(resources.pp);
 
     const moveChar = characteristics.find(c => c.key === "MOU");
     if (moveChar) {
@@ -5212,18 +5237,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const ammo = foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false });
     const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
-    const itemBuckets = {
-      arme: [],
-      objet: [],
-      ration: [],
-      soin: [],
-      protection: [],
-      aptitude: [],
-      pouvoir: []
-    };
-    for (const item of this.actor.items) {
-      if (itemBuckets[item.type]) itemBuckets[item.type].push(item);
-    }
+    const itemBuckets = buildTypedItemBuckets(this.actor.items);
 
     const aptitudes = itemBuckets.aptitude.map(item => {
       const dataItem = buildItemDisplayData(item);
@@ -5323,12 +5337,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       || ""
     ).trim();
     const actorItems = this.actor?.items;
-    const totalItems = Number(actorItems?.size || 0);
-    const aptitudesCount = Number(actorItems?.filter?.(item => item.type === "aptitude")?.length || 0);
-    const pouvoirsCount = Number(actorItems?.filter?.(item => item.type === "pouvoir")?.length || 0);
-    const carriedCount = Number(actorItems?.filter?.(item => CARRIED_ITEM_TYPES.has(item.type))?.length || 0);
+    const itemCounts = getActorItemCounts(actorItems);
     const transportCount = Number(getTransportNpcRefs(this.actor).length || 0);
-    return `${activeTab}|${totalItems}|${aptitudesCount}|${pouvoirsCount}|${carriedCount}|${transportCount}`;
+    return `${activeTab}|${itemCounts.total}|${itemCounts.aptitudes}|${itemCounts.pouvoirs}|${itemCounts.carried}|${transportCount}`;
   }
 
   autoResizeToContent(force = false) {
@@ -5603,25 +5614,18 @@ class BloodmanActorSheet extends BaseActorSheet {
       const circle = root.find(`.resource-circle.${kind}`).first();
       if (!currentInput.length || !maxInput.length || !circle.length) return;
 
-      const current = Math.max(0, toFiniteNumber(currentInput.val(), 0));
-      const maxRaw = Math.max(0, toFiniteNumber(maxInput.val(), 0));
-      const max = maxRaw > 0 ? maxRaw : 1;
-      const ratio = Math.max(0, Math.min(1, current / max));
-      const fill = `${Math.max(0, Math.min(100, ratio * 100)).toFixed(2)}%`;
-      const steps = Math.max(1, Math.round(maxRaw || 1));
+      const gauge = resolveResourceGaugeState(currentInput.val(), maxInput.val(), { useUnitMaxWhenZero: true });
       const ratioKey = `data-${kind}-ratio`;
       const previousRatio = Number(circle.attr(ratioKey));
+      const ratio = gauge.ratio;
 
-      circle.css(`--${kind}-fill`, fill);
+      circle.css(`--${kind}-fill`, gauge.fill);
       circle.css(`--${kind}-ratio`, ratio.toFixed(4));
-      circle.css(`--${kind}-steps`, String(steps));
+      circle.css(`--${kind}-steps`, String(gauge.steps));
       circle.attr(ratioKey, ratio.toFixed(4));
 
       circle.removeClass("is-empty is-critical is-warning is-healthy");
-      if (ratio <= 0) circle.addClass("is-empty");
-      else if (ratio <= 0.25) circle.addClass("is-critical");
-      else if (ratio <= 0.5) circle.addClass("is-warning");
-      else circle.addClass("is-healthy");
+      circle.addClass(gauge.stateClass);
 
       if (Number.isFinite(previousRatio) && Math.abs(previousRatio - ratio) >= 0.001) {
         const directionClass = ratio > previousRatio ? "is-rising" : "is-falling";

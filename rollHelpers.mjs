@@ -169,9 +169,8 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
   if (!viewerIds.length) return false;
   if (viewerIds.length === 1 && viewerIds[0] === requesterUserId) return false;
 
-  const randomId = () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2));
-  const requestId = String(options.requestId || randomId()).trim() || randomId();
-  const eventId = randomId();
+  const requestId = String(options.requestId || generateRandomId()).trim() || generateRandomId();
+  const eventId = generateRandomId();
   const action = String(options.action || "open").trim().toLowerCase() || "open";
   const useChatFallback = options.useChatFallback === true;
   const payload = {
@@ -307,6 +306,10 @@ function toNonNegativeInt(value, fallback = 0) {
   return Math.max(0, Math.floor(numeric));
 }
 
+function generateRandomId() {
+  return foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+}
+
 function getChaosValue() {
   return Math.max(0, Math.floor(Number(game.settings.get("bloodman", "chaosDice") || 0)));
 }
@@ -411,6 +414,51 @@ async function evaluateDamageRoll(config = {}) {
   };
 }
 
+async function evaluateConfiguredDamageOutcome(config = {}) {
+  const rollEval = await evaluateDamageRoll(config);
+  const bonus = toNonNegativeInt(config?.bonusBrut, 0);
+  return {
+    roll: rollEval.roll,
+    rollResults: Array.isArray(rollEval.rollResults) ? rollEval.rollResults : [],
+    totalDamage: Math.max(0, Number(rollEval.rawTotal || 0) + bonus),
+    modeTag: String(rollEval.modeTag || "")
+  };
+}
+
+function buildDamageApplyOptions(actor, config, outcome, options = {}) {
+  const sourceName = String(options.sourceName || "");
+  const totalDamage = Number.isFinite(Number(options.totalDamage))
+    ? Number(options.totalDamage)
+    : Number(outcome?.totalDamage || 0);
+  return {
+    ...config,
+    rollResults: Array.isArray(outcome?.rollResults) ? outcome.rollResults : [],
+    attackerId: actor?.id || "",
+    attackerName: actor?.name || "",
+    sourceName,
+    inputPayload: options.inputPayload,
+    rollId: String(options.rollId || ""),
+    itemId: String(options.itemId || ""),
+    itemType: String(options.itemType || ""),
+    itemName: String(options.itemName || sourceName),
+    totalDamage
+  };
+}
+
+function buildDamageRollContextResult(actor, config, outcome, options = {}) {
+  const sourceName = String(options.sourceName || "");
+  return buildDamageContext(actor, config, {
+    rollId: String(options.rollId || ""),
+    itemId: String(options.itemId || ""),
+    itemType: String(options.itemType || ""),
+    itemName: String(options.itemName || sourceName),
+    totalDamage: Number.isFinite(Number(options.totalDamage))
+      ? Number(options.totalDamage)
+      : Number(outcome?.totalDamage || 0),
+    targets: Array.isArray(options.targets) ? options.targets : []
+  });
+}
+
 async function promptDamageConfiguration({
   actor,
   sourceName = "",
@@ -484,7 +532,7 @@ async function promptDamageConfiguration({
     </div>
   </form>`;
 
-  const popupRequestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+  const popupRequestId = generateRandomId();
   const initialPopupConfig = {
     degats: selectedDefault.label,
     formula: selectedDefault.formula,
@@ -679,7 +727,7 @@ function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
 function buildDamageRequestPayload(token, damage, options = {}) {
   const tokenDocument = getTokenDocument(token);
   const targetActor = getTokenActor(token);
-  const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
+  const requestId = generateRandomId();
   const tokenUuid = tokenDocument?.uuid;
   const tokenId = tokenDocument?.id || token?.id;
   const sceneId = tokenDocument?.parent?.id || token?.scene?.id || tokenDocument?.scene?.id || canvas?.scene?.id;
@@ -862,6 +910,29 @@ function buildDamageFlavor(actor, amount, config, sourceName = "", tag = "") {
   return `${t("BLOODMAN.Rolls.Damage.Deal", { name: actor.name, amount, source })}<br><small>${config.degats} + ${config.bonusBrut} | PEN ${config.penetration}${note}</small>`;
 }
 
+function buildDamageContextTargetEntry(token, targetActor, share, options = {}) {
+  const tokenDoc = getTokenDocument(token);
+  const targetName = String(options.targetName || resolveCombatTargetName(
+    tokenDoc?.name || token?.name,
+    targetActor?.name,
+    "Cible"
+  ));
+  const entry = {
+    tokenId: String(tokenDoc?.id || token?.id || ""),
+    tokenUuid: String(tokenDoc?.uuid || ""),
+    sceneId: String(tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || ""),
+    actorId: String(tokenDoc?.actorId || targetActor?.id || ""),
+    targetActorLink: Boolean(tokenDoc?.actorLink),
+    targetName,
+    share: Number.isFinite(Number(share)) ? Number(share) : 0,
+    hpBefore: options.hpBefore ?? null,
+    hpAfter: options.hpAfter ?? null,
+    pending: options.pending === true
+  };
+  if (options.finalDamage != null) entry.finalDamage = options.finalDamage;
+  return entry;
+}
+
 async function applyDamageToTargets(sourceActor, total, options = {}) {
   const targets = Array.from(game.user.targets || []);
   if (!targets.length) {
@@ -986,20 +1057,8 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
       if (!ok) {
         safeWarn(tl("BLOODMAN.Notifications.DamageRequestFailed", "Le message de degats n'a pas pu etre transmis au MJ."));
       } else {
-        const tokenDoc = getTokenDocument(token);
         const targetActor = getTokenActor(token);
-        contextTargets.push({
-          tokenId: tokenDoc?.id || token?.id || "",
-          tokenUuid: tokenDoc?.uuid || "",
-          sceneId: tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || "",
-          actorId: tokenDoc?.actorId || targetActor?.id || "",
-          targetActorLink: Boolean(tokenDoc?.actorLink),
-          targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, targetActor?.name, "Cible"),
-          share,
-          hpBefore: null,
-          hpAfter: null,
-          pending: true
-        });
+        contextTargets.push(buildDamageContextTargetEntry(token, targetActor, share, { pending: true }));
       }
       continue;
     }
@@ -1020,19 +1079,13 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
       continue;
     }
     const tokenDoc = getTokenDocument(token);
-    contextTargets.push({
-      tokenId: tokenDoc?.id || token?.id || "",
-      tokenUuid: tokenDoc?.uuid || "",
-      sceneId: tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || "",
-      actorId: tokenDoc?.actorId || targetActor?.id || "",
-      targetActorLink: Boolean(tokenDoc?.actorLink),
+    contextTargets.push(buildDamageContextTargetEntry(token, targetActor, share, {
       targetName,
-      share,
       hpBefore: result.hpBefore,
       hpAfter: result.hpAfter,
       finalDamage: result.finalDamage,
       pending: false
-    });
+    }));
     if (typeof globalThis.__bmSyncZeroPvStatusForToken === "function") {
       const actorType = targetActor?.type || tokenDoc?.actor?.type || "";
       if (tokenDoc && actorType && Number.isFinite(result.hpAfter)) {
@@ -1101,12 +1154,10 @@ export async function doDamageRoll(actor, item) {
   const backendInput = buildDamageBackendInput(actor, config);
   console.debug("[bloodman] damage:input", backendInput);
 
-  const rollId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  const rollEval = await evaluateDamageRoll(config);
-  const roll = rollEval.roll;
-  const rollResults = Array.isArray(rollEval.rollResults) ? rollEval.rollResults : [];
-  const totalDamage = Math.max(0, Number(rollEval.rawTotal || 0) + config.bonusBrut);
-  const modeTag = String(rollEval.modeTag || "");
+  const rollId = generateRandomId();
+  const damageOutcome = await evaluateConfiguredDamageOutcome(config);
+  const roll = damageOutcome.roll;
+  const totalDamage = damageOutcome.totalDamage;
   const sourceName = item?.name || "";
 
   if (consumesAmmo) {
@@ -1117,29 +1168,30 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, modeTag)
+    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, damageOutcome.modeTag)
   });
 
-  const applyResult = await applyDamageToTargets(actor, totalDamage, {
-    ...config,
-    rollResults,
-    attackerId: actor?.id || "",
-    attackerName: actor?.name || "",
-    sourceName,
-    inputPayload: backendInput,
-    rollId,
-    itemId: item?.id || "",
-    itemType: item?.type || "",
-    itemName: sourceName,
-    totalDamage
-  });
-  return {
-    roll,
-    context: buildDamageContext(actor, config, {
+  const applyResult = await applyDamageToTargets(
+    actor,
+    totalDamage,
+    buildDamageApplyOptions(actor, config, damageOutcome, {
+      sourceName,
+      inputPayload: backendInput,
       rollId,
       itemId: item?.id || "",
       itemType: item?.type || "",
       itemName: sourceName,
+      totalDamage
+    })
+  );
+  return {
+    roll,
+    context: buildDamageRollContextResult(actor, config, damageOutcome, {
+      rollId,
+      itemId: item?.id || "",
+      itemType: item?.type || "",
+      itemName: sourceName,
+      sourceName,
       totalDamage,
       targets: applyResult?.contextTargets || []
     })
@@ -1197,39 +1249,38 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
   const backendInput = buildDamageBackendInput(actor, config);
   console.debug("[bloodman] damage:input", backendInput);
 
-  const rollId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  const rollEval = await evaluateDamageRoll(config);
-  const roll = rollEval.roll;
-  const rollResults = Array.isArray(rollEval.rollResults) ? rollEval.rollResults : [];
-  const totalDamage = Math.max(0, Number(rollEval.rawTotal || 0) + config.bonusBrut);
-  const modeTag = String(rollEval.modeTag || "");
+  const rollId = generateRandomId();
+  const damageOutcome = await evaluateConfiguredDamageOutcome(config);
+  const roll = damageOutcome.roll;
+  const totalDamage = damageOutcome.totalDamage;
   const resolvedSource = sourceName || "";
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, modeTag)
+    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, damageOutcome.modeTag)
   });
 
-  const applyResult = await applyDamageToTargets(actor, totalDamage, {
-    ...config,
-    rollResults,
-    attackerId: actor?.id || "",
-    attackerName: actor?.name || "",
-    sourceName: resolvedSource,
-    inputPayload: backendInput,
-    rollId,
-    itemId: String(options?.itemId || ""),
-    itemType: String(options?.itemType || ""),
-    itemName: resolvedSource,
-    totalDamage
-  });
-  return {
-    roll,
-    context: buildDamageContext(actor, config, {
+  const applyResult = await applyDamageToTargets(
+    actor,
+    totalDamage,
+    buildDamageApplyOptions(actor, config, damageOutcome, {
+      sourceName: resolvedSource,
+      inputPayload: backendInput,
       rollId,
       itemId: String(options?.itemId || ""),
       itemType: String(options?.itemType || ""),
       itemName: resolvedSource,
+      totalDamage
+    })
+  );
+  return {
+    roll,
+    context: buildDamageRollContextResult(actor, config, damageOutcome, {
+      rollId,
+      itemId: String(options?.itemId || ""),
+      itemType: String(options?.itemType || ""),
+      itemName: resolvedSource,
+      sourceName: resolvedSource,
       totalDamage,
       targets: applyResult?.contextTargets || []
     })
