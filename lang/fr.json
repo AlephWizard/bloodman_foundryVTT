@@ -40,7 +40,9 @@
       "Role": "RÔLE",
       "RoleSbire": "Sbire",
       "RoleSbireFort": "Sbire fort",
-      "RoleBossSeul": "Boss seul"
+      "RoleBossSeul": "Boss seul",
+      "QuickNotesLabel": "Notes Rapides",
+      "QuickNotesPlaceholder": "Annotations rapides PNJ..."
     },
     "Resources": {
       "VoyageXP": "XP VOYAGE",

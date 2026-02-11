@@ -2306,6 +2306,7 @@ function buildDefaultProfile() {
     age: "",
     origine: "",
     historique: "",
+    quickNotes: "",
     notes: "",
     aptitudes: "",
     pouvoirs: ""
