@@ -239,8 +239,8 @@
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}</div>
           <div class="ammo-row">
-            <input type="text" name="system.ammo.type" value="{{ammo.type}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}" />
-            <input type="number" name="system.ammo.value" value="{{ammo.value}}" />
+            <input type="text" name="system.ammo.type" value="{{ammo.type}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
+            <input type="number" name="system.ammo.value" value="{{ammo.value}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
           </div>
         </div>
 

@@ -1304,6 +1304,11 @@ const VITAL_RESOURCE_PATHS = new Set([
   "system.resources.pp.current",
   "system.resources.pp.max"
 ]);
+const AMMO_UPDATE_PATHS = [
+  "system.ammo",
+  "system.ammo.type",
+  "system.ammo.value"
+];
 
 function isDamageRerollItemType(itemType) {
   const type = String(itemType || "").trim().toLowerCase();
@@ -3352,6 +3357,7 @@ function sanitizeActorUpdateForRole(updateData, role, options = {}) {
   }
   if (!isAssistantOrHigherRole(role)) {
     stripUpdatePaths(sanitized, ACTOR_TOKEN_IMAGE_UPDATE_PATHS);
+    stripUpdatePaths(sanitized, AMMO_UPDATE_PATHS);
   }
   normalizeCharacteristicXpUpdates(sanitized, options.actor || null);
   if (enforceCharacteristicBaseRange) normalizeCharacteristicBaseUpdatesForRole(sanitized, role);
@@ -4783,6 +4789,7 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   }
   if (!isAssistantOrHigherRole(updaterRole)) {
     blockedRestrictedFields = stripUpdatePaths(updateData, ACTOR_TOKEN_IMAGE_UPDATE_PATHS) || blockedRestrictedFields;
+    blockedRestrictedFields = stripUpdatePaths(updateData, AMMO_UPDATE_PATHS) || blockedRestrictedFields;
   }
   if (actor.type === "personnage") {
     normalizeCharacteristicBaseUpdatesForRole(updateData, updaterRole, actor);
@@ -5280,6 +5287,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const data = super.getData();
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const canEditTokenImage = isAssistantOrHigherRole(game.user?.role);
+    const canEditAmmoFields = isAssistantOrHigherRole(game.user?.role);
     const characteristicBaseHasBounds = data.actor.type === "personnage"
       && isCharacteristicBaseRangeRestrictedRole(game.user?.role);
     const canEditRestrictedFields = canToggleCharacteristicsEdit;
@@ -5471,6 +5479,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       canEditRestrictedFields,
       canEditXpChecks,
       canEditTokenImage,
+      canEditAmmoFields,
       canOpenItemSheets,
       characteristicsEditEnabled,
       characteristics,
