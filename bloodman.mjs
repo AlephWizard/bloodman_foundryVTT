@@ -288,6 +288,15 @@ function canCurrentUserEditCharacteristics() {
   return canUserRoleEditCharacteristics(game.user?.role);
 }
 
+function canUserRoleDropMenuItems(role) {
+  const minRole = Number(CONST?.USER_ROLES?.TRUSTED ?? 2);
+  return Number(role ?? 0) >= minRole;
+}
+
+function canCurrentUserDropMenuItems() {
+  return canUserRoleDropMenuItems(game.user?.role);
+}
+
 function isBasicPlayerRole(role) {
   const playerRole = Number(CONST?.USER_ROLES?.PLAYER ?? 1);
   return Number(role ?? 0) <= playerRole;
@@ -299,6 +308,14 @@ const CHARACTERISTIC_BASE_MAX = 95;
 function isAssistantOrHigherRole(role) {
   const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
   return Number(role ?? 0) >= assistantRole;
+}
+
+function canUserRoleOpenItemSheets(role) {
+  return isAssistantOrHigherRole(role);
+}
+
+function canCurrentUserOpenItemSheets() {
+  return canUserRoleOpenItemSheets(game.user?.role);
 }
 
 function isCharacteristicBaseRangeRestrictedRole(role) {
@@ -2297,6 +2314,9 @@ function buildDefaultProfile() {
 
 function buildDefaultEquipment() {
   return {
+    armes: "",
+    protections: "",
+    objets: "",
     monnaies: "",
     monnaiesActuel: 0,
     transports: "",
@@ -6027,7 +6047,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       && isCharacteristicBaseRangeRestrictedRole(game.user?.role);
     const canEditRestrictedFields = canToggleCharacteristicsEdit;
     const canEditXpChecks = canToggleCharacteristicsEdit;
-    const canOpenItemSheets = canToggleCharacteristicsEdit;
+    const canOpenItemSheets = canCurrentUserOpenItemSheets();
     if (!canToggleCharacteristicsEdit) this._characteristicsEditEnabled = false;
     const characteristicsEditEnabled = canToggleCharacteristicsEdit && Boolean(this._characteristicsEditEnabled);
     const modifiers = foundry.utils.mergeObject(buildDefaultModifiers(), data.actor.system.modifiers || {}, {
@@ -6460,7 +6480,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
 
     html.find(".item-edit").click(ev => {
-      if (!canCurrentUserEditCharacteristics()) return;
+      if (!canCurrentUserOpenItemSheets()) return;
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       item?.sheet?.render(true);
@@ -6657,6 +6677,35 @@ class BloodmanActorSheet extends BaseActorSheet {
     return 1;
   }
 
+  async resolveDropPermissionState(dropData) {
+    if (game.user?.isGM) return { allowed: true };
+    const entries = Array.isArray(dropData?.items) && dropData.items.length
+      ? dropData.items
+      : [dropData];
+    const canDropMenuItems = canCurrentUserDropMenuItems();
+    const limitedLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 1);
+
+    for (const entry of entries) {
+      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
+      if (!droppedItem) continue;
+      const sourceActor = droppedItem.actor;
+      if (sourceActor?.id === this.actor?.id) continue;
+      const isMenuSource = !sourceActor;
+      if (isMenuSource && !canDropMenuItems) return { allowed: false, reason: "role" };
+      // Keep actor-to-actor transfers unchanged.
+      if (sourceActor) continue;
+      // Compendium access rules are handled by Foundry and pack visibility.
+      if (String(droppedItem.pack || "").trim()) continue;
+
+      const hasLimitedAccess = typeof droppedItem.testUserPermission === "function"
+        ? droppedItem.testUserPermission(game.user, limitedLevel, { exact: false })
+        : Number(droppedItem.permission ?? 0) >= limitedLevel;
+      if (!hasLimitedAccess) return { allowed: false, reason: "permission" };
+    }
+
+    return { allowed: true };
+  }
+
   getDroppedItemUnitPrice(item) {
     const rawPrice = String(item?.system?.price ?? "").trim();
     if (!rawPrice) return { ok: true, value: 0 };
@@ -6696,6 +6745,15 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async _onDropItem(event, data) {
+    const permissionState = await this.resolveDropPermissionState(data);
+    if (!permissionState.allowed) {
+      const notificationKey = permissionState.reason === "role"
+        ? "BLOODMAN.Notifications.DropBlockedForPlayerRole"
+        : "BLOODMAN.Notifications.DropRequiresLimitedPermission";
+      ui.notifications?.warn(t(notificationKey));
+      return null;
+    }
+
     const reachedLimit = await this._reachedCarriedItemsLimit(data);
     if (reachedLimit) return null;
 

@@ -186,7 +186,9 @@
       "InvalidStateName": "Etat inconnu : {states}.",
       "InvalidCurrencyCurrent": "La valeur Actuel doit etre un nombre entre 0 et 1000000.",
       "NotEnoughCurrency": "Fonds insuffisants pour cet achat (cout: {cost}, actuel: {current}).",
-      "InvalidPurchasePrice": "Le prix de l'element est invalide; achat refuse."
+      "InvalidPurchasePrice": "Le prix de l'element est invalide; achat refuse.",
+      "DropRequiresLimitedPermission": "Acces insuffisant: seul un droit Limite (ou plus) permet de deplacer un element vers la fiche.",
+      "DropBlockedForPlayerRole": "Le role Joueur ne permet pas de deplacer des elements du menu vers la fiche."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos"

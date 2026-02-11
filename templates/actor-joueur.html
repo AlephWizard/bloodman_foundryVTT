@@ -247,6 +247,7 @@
 
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
+          <input type="text" name="system.equipment.armes" value="{{equipment.armes}}" />
           <ol class="item-list weapon-list">
             {{#each weapons}}
               <li class="item weapon-item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
@@ -280,6 +281,7 @@
 
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> {{localize "BLOODMAN.Equipment.Protections"}}</div>
+          <input type="text" name="system.equipment.protections" value="{{equipment.protections}}" />
           <ol class="item-list">
             {{#each protections}}
               <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
@@ -310,6 +312,7 @@
               </span>
             {{/if}}
           </div>
+          <input type="text" name="system.equipment.objets" value="{{equipment.objets}}" />
           <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
             {{#each objects}}
               <li class="item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
