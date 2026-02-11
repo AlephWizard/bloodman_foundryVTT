@@ -3441,15 +3441,16 @@ async function handleDamageConfigPopupMessage(data, source = "socket") {
   return shown;
 }
 
-function getPowerUsePopupViewerIds(requesterUserId = "") {
+function getPowerUsePopupViewerIds(requesterUserId = "", options = {}) {
   const requesterId = String(requesterUserId || "").trim();
+  const includeRequesterUser = options?.includeRequesterUser === true;
   const ids = [];
   for (const user of game.users || []) {
     if (!user?.active) continue;
     const userId = String(user.id || "").trim();
     if (!userId) continue;
     if (!user.isGM && !isAssistantOrHigherRole(user.role)) continue;
-    if (requesterId && userId === requesterId) continue;
+    if (!includeRequesterUser && requesterId && userId === requesterId) continue;
     ids.push(userId);
   }
   return ids;
@@ -3458,7 +3459,8 @@ function getPowerUsePopupViewerIds(requesterUserId = "") {
 function emitPowerUsePopup(actor, item, options = {}) {
   if (!game.socket || !actor || !item || item.type !== "pouvoir") return false;
   const requesterUserId = String(game.user?.id || "").trim();
-  const viewerIds = getPowerUsePopupViewerIds(requesterUserId);
+  const includeRequesterUser = options?.includeRequesterUser === true;
+  const viewerIds = getPowerUsePopupViewerIds(requesterUserId, { includeRequesterUser });
   if (!viewerIds.length) return false;
   const randomId = () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2));
   const powerDamageFormula = item.system?.damageEnabled ? normalizeRollDieFormula(item.system?.damageDie, "d4") : "";
@@ -3503,10 +3505,12 @@ function canCurrentUserReceivePowerUsePopup(data) {
   const localUserId = String(game.user?.id || "").trim();
   if (!localUserId) return false;
   const requesterUserId = String(data?.requesterUserId || "").trim();
-  if (requesterUserId && requesterUserId === localUserId) return false;
+  const isRequester = requesterUserId && requesterUserId === localUserId;
   const viewerIds = Array.isArray(data?.viewerIds)
     ? data.viewerIds.map(id => String(id || "").trim()).filter(Boolean)
     : [];
+  if (isRequester && viewerIds.length && !viewerIds.includes(localUserId)) return false;
+  if (isRequester && !viewerIds.length) return false;
   if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
   if (game.user?.isGM) return true;
   return isAssistantOrHigherRole(game.user?.role);
@@ -6948,7 +6952,11 @@ class BloodmanActorSheet extends BaseActorSheet {
     const used = await applyPowerCost(this.actor, item);
     if (!used) return;
     this.markPowerActivated(item.id, true);
-    emitPowerUsePopup(this.actor, item, { fromUseButton: true });
+    const includeRequesterUser = game.user?.isGM && this.actor?.type === "personnage-non-joueur";
+    emitPowerUsePopup(this.actor, item, {
+      fromUseButton: true,
+      includeRequesterUser
+    });
     this.render(false);
   }
 
