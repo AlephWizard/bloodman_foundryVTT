@@ -336,7 +336,11 @@
 
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-coins"></i> {{localize "BLOODMAN.Equipment.Currencies"}}</div>
-          <input type="text" name="system.equipment.monnaies" value="{{equipment.monnaies}}" />
+          <div class="currency-row">
+            <input type="text" name="system.equipment.monnaies" value="{{equipment.monnaies}}" />
+            <span class="currency-current-label">{{localize "BLOODMAN.Equipment.CurrencyCurrentLabel"}}</span>
+            <input type="number" name="system.equipment.monnaiesActuel" min="0" max="1000000" step="0.01" value="{{equipment.monnaiesActuel}}" />
+          </div>
         </div>
 
         <div class="equip-block" data-transport-drop>

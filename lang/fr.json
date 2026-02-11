@@ -84,6 +84,7 @@
       "Protections": "PROTECTIONS",
       "Objects": "OBJETS",
       "Currencies": "MONNAIES",
+      "CurrencyCurrentLabel": "Actuel",
       "Transports": "TRANSPORTS",
       "AmmoTypePlaceholder": "Type",
       "AmmoStockLabel": "Stock",
@@ -182,7 +183,10 @@
       "InvalidArchetypeBonusNumber": "Le bonus d'archetype doit etre un nombre valide.",
       "ArchetypeBonusCharacteristicRequired": "Selectionnez une caracteristique pour enregistrer un bonus d'archetype.",
       "InvalidArchetypeBonusCharacteristic": "La caracteristique d'archetype selectionnee est invalide.",
-      "InvalidStateName": "Etat inconnu : {states}."
+      "InvalidStateName": "Etat inconnu : {states}.",
+      "InvalidCurrencyCurrent": "La valeur Actuel doit etre un nombre entre 0 et 1000000.",
+      "NotEnoughCurrency": "Fonds insuffisants pour cet achat (cout: {cost}, actuel: {current}).",
+      "InvalidPurchasePrice": "Le prix de l'element est invalide; achat refuse."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos"

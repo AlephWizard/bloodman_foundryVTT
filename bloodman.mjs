@@ -1661,6 +1661,7 @@ const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]
 const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin", "objet"]);
 const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
 const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
+const CURRENCY_CURRENT_MAX = 1_000_000;
 const VITAL_RESOURCE_PATHS = new Set([
   "system.resources.pv.current",
   "system.resources.pv.max",
@@ -1725,6 +1726,104 @@ function toFiniteNumber(value, fallback = 0) {
 
 function normalizeNonNegativeInteger(value, fallback = 0) {
   return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
+}
+
+function parseLooseNumericInput(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { ok: true, empty: true, value: 0 };
+  const compact = raw.replace(/\s+/g, "").replace(",", ".");
+  const numericPattern = /^[-+]?(?:\d+|\d*\.\d+)$/;
+  if (!numericPattern.test(compact)) return { ok: false, empty: false, value: 0 };
+  const numericValue = Number(compact);
+  if (!Number.isFinite(numericValue)) return { ok: false, empty: false, value: 0 };
+  return { ok: true, empty: false, value: numericValue };
+}
+
+function roundCurrencyValue(value) {
+  const rounded = Math.round((Number(value) || 0) * 100) / 100;
+  const whole = Math.round(rounded);
+  if (Math.abs(rounded - whole) <= 0.000001) return whole;
+  return rounded;
+}
+
+function normalizeCurrencyCurrentValue(value, fallback = 0) {
+  const parsed = parseLooseNumericInput(value);
+  if (!parsed.ok) {
+    return { ok: false, value: roundCurrencyValue(Math.max(0, toFiniteNumber(fallback, 0))) };
+  }
+  const numeric = parsed.empty ? 0 : parsed.value;
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > CURRENCY_CURRENT_MAX) {
+    return { ok: false, value: roundCurrencyValue(Math.max(0, toFiniteNumber(fallback, 0))) };
+  }
+  return { ok: true, value: roundCurrencyValue(numeric) };
+}
+
+function formatCurrencyValue(value) {
+  const normalized = roundCurrencyValue(Math.max(0, toFiniteNumber(value, 0)));
+  if (Number.isInteger(normalized)) return String(normalized);
+  return normalized.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function buildInvalidCurrencyCurrentMessage() {
+  const localized = t("BLOODMAN.Notifications.InvalidCurrencyCurrent");
+  if (localized && localized !== "BLOODMAN.Notifications.InvalidCurrencyCurrent") return localized;
+  return "La valeur Actuel doit etre un nombre entre 0 et 1000000.";
+}
+
+function normalizeActorEquipmentCurrencyUpdateData(actor, updateData) {
+  if (!updateData || typeof updateData !== "object") return { changed: false, invalid: false };
+  const equipmentPath = "system.equipment";
+  const currencyTypePath = "system.equipment.monnaies";
+  const currencyCurrentPath = "system.equipment.monnaiesActuel";
+  const hasEquipmentRootUpdate = hasUpdatePath(updateData, equipmentPath);
+  const hasCurrencyTypeUpdate = hasUpdatePath(updateData, currencyTypePath);
+  const hasCurrencyCurrentUpdate = hasUpdatePath(updateData, currencyCurrentPath);
+  if (!hasEquipmentRootUpdate && !hasCurrencyTypeUpdate && !hasCurrencyCurrentUpdate) {
+    return { changed: false, invalid: false };
+  }
+
+  const currentEquipment = foundry.utils.mergeObject(buildDefaultEquipment(), actor?.system?.equipment || {}, {
+    inplace: false
+  });
+
+  const rootUpdate = hasEquipmentRootUpdate ? getUpdatedPathValue(updateData, equipmentPath, {}) : {};
+  const rootSource = rootUpdate && typeof rootUpdate === "object" ? rootUpdate : {};
+  const nextEquipment = foundry.utils.mergeObject(currentEquipment, rootSource, { inplace: false });
+  if (hasCurrencyTypeUpdate) {
+    nextEquipment.monnaies = getUpdatedPathValue(updateData, currencyTypePath, nextEquipment.monnaies);
+  }
+  if (hasCurrencyCurrentUpdate) {
+    nextEquipment.monnaiesActuel = getUpdatedPathValue(updateData, currencyCurrentPath, nextEquipment.monnaiesActuel);
+  }
+
+  const normalizedType = String(nextEquipment.monnaies ?? "").trim();
+  const normalizedCurrent = normalizeCurrencyCurrentValue(
+    nextEquipment.monnaiesActuel,
+    currentEquipment.monnaiesActuel ?? 0
+  );
+  if (!normalizedCurrent.ok) {
+    return {
+      changed: false,
+      invalid: true,
+      message: buildInvalidCurrencyCurrentMessage()
+    };
+  }
+
+  nextEquipment.monnaies = normalizedType;
+  nextEquipment.monnaiesActuel = normalizedCurrent.value;
+
+  if (hasEquipmentRootUpdate) {
+    foundry.utils.setProperty(updateData, equipmentPath, nextEquipment);
+  } else {
+    foundry.utils.setProperty(updateData, currencyTypePath, nextEquipment.monnaies);
+    foundry.utils.setProperty(updateData, currencyCurrentPath, nextEquipment.monnaiesActuel);
+  }
+
+  return {
+    changed: true,
+    invalid: false,
+    currencyCurrent: nextEquipment.monnaiesActuel
+  };
 }
 
 function resolveResourceGaugeState(currentValue, maxValue, options = {}) {
@@ -2199,6 +2298,7 @@ function buildDefaultProfile() {
 function buildDefaultEquipment() {
   return {
     monnaies: "",
+    monnaiesActuel: 0,
     transports: "",
     transportNpcs: [],
     bagSlotsEnabled: false
@@ -4508,6 +4608,30 @@ Hooks.once("ready", async () => {
     }
 
     if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
+
+    const currentEquipment = foundry.utils.mergeObject(buildDefaultEquipment(), actor.system.equipment || {}, {
+      inplace: false
+    });
+    const normalizedCurrencyCurrent = normalizeCurrencyCurrentValue(currentEquipment.monnaiesActuel, 0);
+    const safeCurrencyCurrent = normalizedCurrencyCurrent.ok ? normalizedCurrencyCurrent.value : 0;
+    const normalizedCurrencyType = String(currentEquipment.monnaies ?? "").trim();
+    if (!actor.system.equipment) {
+      updates["system.equipment"] = {
+        ...currentEquipment,
+        monnaies: normalizedCurrencyType,
+        monnaiesActuel: safeCurrencyCurrent
+      };
+    } else {
+      const storedCurrencyType = String(actor.system.equipment?.monnaies ?? "").trim();
+      const storedCurrencyCurrent = normalizeCurrencyCurrentValue(actor.system.equipment?.monnaiesActuel, 0).value;
+      if (storedCurrencyType !== normalizedCurrencyType) {
+        updates["system.equipment.monnaies"] = normalizedCurrencyType;
+      }
+      if (!validateNumericEquality(storedCurrencyCurrent, safeCurrencyCurrent)) {
+        updates["system.equipment.monnaiesActuel"] = safeCurrencyCurrent;
+      }
+    }
+
     const actorResources = actor.system.resources || {};
     const requiresResourceInit = !actor.system.resources
       || actorResources.move == null
@@ -5376,6 +5500,11 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
     }
   }
   normalizeActorAmmoUpdateData(actor, updateData);
+  const currencyNormalization = normalizeActorEquipmentCurrencyUpdateData(actor, updateData);
+  if (currencyNormalization.invalid) {
+    ui.notifications?.error(currencyNormalization.message || buildInvalidCurrencyCurrentMessage());
+    return false;
+  }
   if (actor.type === "personnage") {
     normalizeCharacteristicBaseUpdatesForRole(updateData, updaterRole, actor);
   }
@@ -6021,6 +6150,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const equipment = foundry.utils.mergeObject(buildDefaultEquipment(), data.actor.system.equipment || {}, {
       inplace: false
     });
+    equipment.monnaies = String(equipment.monnaies ?? "").trim();
+    equipment.monnaiesActuel = normalizeCurrencyCurrentValue(equipment.monnaiesActuel, 0).value;
     const bagSlotsEnabled = Boolean(equipment.bagSlotsEnabled);
     const carriedItemsLimit = bagSlotsEnabled ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
     const ammoCapacityLimit = getActorAmmoCapacityLimit(this.actor);
@@ -6501,10 +6632,103 @@ class BloodmanActorSheet extends BaseActorSheet {
     return super._onDrop(event);
   }
 
+  getActorCurrencyCurrentValue() {
+    return normalizeCurrencyCurrentValue(this.actor?.system?.equipment?.monnaiesActuel, 0).value;
+  }
+
+  getDropItemQuantity(dropData, droppedItem = null) {
+    const candidates = [
+      dropData?.quantity,
+      dropData?.count,
+      dropData?.amount,
+      dropData?.data?.quantity,
+      droppedItem?.system?.quantity
+    ];
+    for (const candidate of candidates) {
+      const quantity = Number(candidate);
+      if (!Number.isFinite(quantity)) continue;
+      if (quantity <= 0) continue;
+      return Math.max(1, Math.floor(quantity));
+    }
+    return 1;
+  }
+
+  getDroppedItemUnitPrice(item) {
+    const rawPrice = String(item?.system?.price ?? "").trim();
+    if (!rawPrice) return { ok: true, value: 0 };
+    const parsed = parseLooseNumericInput(rawPrice);
+    if (!parsed.ok) return { ok: false, value: 0 };
+    const unitPrice = parsed.value;
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) return { ok: false, value: 0 };
+    return { ok: true, value: roundCurrencyValue(unitPrice) };
+  }
+
+  async resolveDropPurchaseSummary(dropData) {
+    const entries = Array.isArray(dropData?.items) && dropData.items.length
+      ? dropData.items
+      : [dropData];
+    let totalCost = 0;
+    let hasInvalidPrice = false;
+
+    for (const entry of entries) {
+      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
+      if (!droppedItem) continue;
+      const sourceActor = droppedItem.actor;
+      if (sourceActor?.id === this.actor?.id) continue;
+      const priceState = this.getDroppedItemUnitPrice(droppedItem);
+      if (!priceState.ok) {
+        hasInvalidPrice = true;
+        continue;
+      }
+      if (!(priceState.value > 0)) continue;
+      const quantity = this.getDropItemQuantity(entry, droppedItem);
+      totalCost += priceState.value * quantity;
+    }
+
+    return {
+      hasInvalidPrice,
+      totalCost: roundCurrencyValue(totalCost)
+    };
+  }
+
   async _onDropItem(event, data) {
     const reachedLimit = await this._reachedCarriedItemsLimit(data);
     if (reachedLimit) return null;
-    return super._onDropItem(event, data);
+
+    const purchase = await this.resolveDropPurchaseSummary(data);
+    if (purchase.hasInvalidPrice) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.InvalidPurchasePrice"));
+      return null;
+    }
+
+    let previousCurrency = null;
+    let deductedBeforeDrop = false;
+    if (purchase.totalCost > 0) {
+      previousCurrency = this.getActorCurrencyCurrentValue();
+      if (previousCurrency + 0.000001 < purchase.totalCost) {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughCurrency", {
+          cost: formatCurrencyValue(purchase.totalCost),
+          current: formatCurrencyValue(previousCurrency)
+        }));
+        return null;
+      }
+      const nextCurrency = roundCurrencyValue(previousCurrency - purchase.totalCost);
+      await this.applyActorUpdate({ "system.equipment.monnaiesActuel": nextCurrency });
+      deductedBeforeDrop = true;
+    }
+
+    try {
+      const dropped = await super._onDropItem(event, data);
+      if (!dropped && deductedBeforeDrop && previousCurrency != null) {
+        await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
+      }
+      return dropped;
+    } catch (error) {
+      if (deductedBeforeDrop && previousCurrency != null) {
+        await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
+      }
+      throw error;
+    }
   }
 
   async _reachedCarriedItemsLimit(data) {

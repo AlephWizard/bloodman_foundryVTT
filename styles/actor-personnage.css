@@ -637,6 +637,25 @@
   color: var(--bm-black);
 }
 
+.currency-row {
+  display: grid;
+  grid-template-columns: 1fr auto 110px;
+  gap: 6px;
+  margin-top: 4px;
+  align-items: center;
+}
+
+.currency-current-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.currency-row input[type="number"] {
+  text-align: right;
+}
+
 .item-list {
   list-style: none;
   margin: 4px 0 0;
