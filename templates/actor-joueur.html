@@ -39,7 +39,36 @@
             </div>
           {{/each}}
         </div>
-        <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="{{localize 'BLOODMAN.StateBar.StateNamePlaceholder'}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
+        <div class="state-name-row">
+          <input type="text" name="system.modifiers.label" value="{{modifiers.label}}" class="state-name" placeholder="{{localize 'BLOODMAN.StateBar.StateNamePlaceholder'}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
+          {{#if canEditStatePresets}}
+            <details class="state-preset-menu">
+              <summary class="state-preset-toggle" title="{{localize 'BLOODMAN.StateBar.PresetMenuTitle'}}" aria-label="{{localize 'BLOODMAN.StateBar.PresetMenuTitle'}}">
+                <i class="fa-solid fa-list" aria-hidden="true"></i>
+              </summary>
+              <div class="state-preset-panel">
+                <div class="state-preset-group">
+                  <div class="state-preset-group-title">{{localize "BLOODMAN.StateBar.PsychicStates"}}</div>
+                  {{#each statePresetPsychic}}
+                    <button type="button" class="state-preset-item {{#if this.selected}}is-selected{{/if}}" data-state-id="{{this.id}}" title="{{this.tooltip}}">
+                      <span class="state-preset-name">{{this.name}}</span>
+                      <span class="state-preset-meta">{{this.modifierLabel}}{{#if this.duration}} | {{this.duration}}{{/if}}</span>
+                    </button>
+                  {{/each}}
+                </div>
+                <div class="state-preset-group">
+                  <div class="state-preset-group-title">{{localize "BLOODMAN.StateBar.BodyStates"}}</div>
+                  {{#each statePresetBody}}
+                    <button type="button" class="state-preset-item {{#if this.selected}}is-selected{{/if}}" data-state-id="{{this.id}}" title="{{this.tooltip}}">
+                      <span class="state-preset-name">{{this.name}}</span>
+                      <span class="state-preset-meta">{{this.modifierLabel}}{{#if this.duration}} | {{this.duration}}{{/if}}</span>
+                    </button>
+                  {{/each}}
+                </div>
+              </div>
+            </details>
+          {{/if}}
+        </div>
       </div>
 
       <div class="tab-grid">
@@ -106,8 +135,10 @@
                     {{/if}}
                   </div>
                   <div class="char-score">
-                    {{#if this.itemBonus}}
-                      <span class="char-bonus">{{#if (gt this.itemBonus 0)}}+{{/if}}{{this.itemBonus}}</span>
+                    {{#if this.modifierTotal}}
+                      <span class="char-modifier {{#if (lt this.modifierTotal 0)}}negative{{else}}positive{{/if}}">
+                        {{#if (gt this.modifierTotal 0)}}+{{/if}}{{this.modifierTotal}}
+                      </span>
                     {{/if}}
                     <span class="char-effective">{{this.effective}}</span>
                   </div>
@@ -224,6 +255,8 @@
                 <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                 <span class="item-meta">{{#if this.displayWeaponType}}{{this.displayWeaponType}}{{else}}{{localize "BLOODMAN.Equipment.WeaponType.Distance"}}{{/if}}</span>
                 <span class="weapon-roll">1{{this.system.damageDie}}</span>
+                {{#if this.showAmmoState}}<span class="weapon-ammo">{{this.ammoMagazine}} / {{this.ammoCapacityDisplay}}</span>{{/if}}
+                {{#if this.showReloadButton}}<button type="button" class="weapon-reload {{#if this.reloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                 {{#if this.showItemReroll}}
                   <button type="button" class="item-reroll">
                     <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
@@ -240,7 +273,8 @@
           <div class="equip-title"><i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}</div>
           <div class="ammo-row">
             <input type="text" name="system.ammo.type" value="{{ammo.type}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
-            <input type="number" name="system.ammo.value" value="{{ammo.value}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
+            <span class="ammo-inline-label">{{localize "BLOODMAN.Equipment.AmmoStockLabel"}}</span>
+            <input type="number" name="system.ammo.stock" min="0" step="1" value="{{ammo.stock}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoStockPlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
           </div>
         </div>
 

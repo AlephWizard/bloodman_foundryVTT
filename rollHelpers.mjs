@@ -294,7 +294,8 @@ function requestActorSheetUpdate(actor, updateData, options = {}) {
       updateData,
       options: {
         allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
-        allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate)
+        allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate),
+        allowAmmoUpdate: Boolean(options.allowAmmoUpdate)
       }
     });
   } catch (error) {
@@ -333,15 +334,18 @@ async function updateActorWithFallback(actor, updateData, options = {}) {
   if (!actor || !hasActorUpdatePayload(updateData)) return null;
   const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
+  const allowAmmoUpdate = Boolean(options.allowAmmoUpdate);
   if (actor.isOwner || game.user?.isGM) {
     return actor.update(updateData, {
       bloodmanAllowCharacteristicBase: allowCharacteristicBase,
-      bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate
+      bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate,
+      bloodmanAllowAmmoUpdate: allowAmmoUpdate
     });
   }
   const sent = requestActorSheetUpdate(actor, updateData, {
     allowCharacteristicBase,
-    allowVitalResourceUpdate
+    allowVitalResourceUpdate,
+    allowAmmoUpdate
   });
   if (!sent) {
     safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ actif."));
@@ -372,6 +376,40 @@ function toNonNegativeInt(value, fallback = 0) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(0, Math.floor(numeric));
+}
+
+function buildDefaultAmmoState() {
+  return { type: "", stock: 0, magazine: 0, value: 0 };
+}
+
+function normalizeAmmoType(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizeAmmoState(rawAmmo = null, options = {}) {
+  const fallbackBase = options.fallback ?? buildDefaultAmmoState();
+  const fallback = foundry.utils.mergeObject(buildDefaultAmmoState(), fallbackBase || {}, { inplace: false });
+  const source = foundry.utils.mergeObject(fallback, rawAmmo || {}, { inplace: false });
+  const type = normalizeAmmoType(source.type);
+
+  const fallbackStock = toNonNegativeInt(fallback.stock ?? fallback.value, 0);
+  const fallbackMagazine = toNonNegativeInt(fallback.magazine ?? fallback.value, 0);
+  const stock = toNonNegativeInt(source.stock ?? source.value, fallbackStock);
+  let magazine = toNonNegativeInt(source.magazine ?? source.value, fallbackMagazine);
+
+  const capacity = toNonNegativeInt(options.capacity, 0);
+  if (capacity > 0) magazine = Math.min(magazine, capacity);
+
+  return {
+    type,
+    stock,
+    magazine,
+    value: stock
+  };
+}
+
+function getWeaponMagazineCapacity(item) {
+  return toNonNegativeInt(item?.system?.magazineCapacity, 0);
 }
 
 function generateRandomId() {
@@ -1201,8 +1239,16 @@ export async function doDamageRoll(actor, item) {
   const weaponType = getWeaponCategory(item.system?.weaponType);
   const infiniteAmmo = Boolean(item.system.infiniteAmmo);
   const consumesAmmo = weaponType === "distance" && !infiniteAmmo;
+  const magazineCapacity = getWeaponMagazineCapacity(item);
+  const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
+  const ammoState = normalizeAmmoState(actor?.system?.ammo, {
+    fallback: buildDefaultAmmoState(),
+    capacity: magazineCapacity
+  });
   if (consumesAmmo) {
-    const currentAmmo = Number(actor.system.ammo?.value);
+    const currentAmmo = usesDirectStock
+      ? Number(ammoState.stock)
+      : Number(ammoState.magazine);
     if (!Number.isFinite(currentAmmo) || currentAmmo <= 0) {
       ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
       return null;
@@ -1231,9 +1277,22 @@ export async function doDamageRoll(actor, item) {
   const sourceName = item?.name || "";
 
   if (consumesAmmo) {
-    const currentAmmo = Number(actor.system.ammo?.value);
-    const nextValue = Math.max(0, currentAmmo - 1);
-    await updateActorWithFallback(actor, { "system.ammo.value": nextValue });
+    if (usesDirectStock) {
+      const currentStock = toNonNegativeInt(ammoState.stock, 0);
+      const nextStock = Math.max(0, currentStock - 1);
+      await updateActorWithFallback(
+        actor,
+        {
+          "system.ammo.stock": nextStock,
+          "system.ammo.value": nextStock
+        },
+        { allowAmmoUpdate: true }
+      );
+    } else {
+      const currentMagazine = toNonNegativeInt(ammoState.magazine, 0);
+      const nextMagazine = Math.max(0, currentMagazine - 1);
+      await updateActorWithFallback(actor, { "system.ammo.magazine": nextMagazine }, { allowAmmoUpdate: true });
+    }
   }
 
   roll.toMessage({

@@ -11,6 +11,7 @@
       "LuckRoll": "Jet de chance",
       "Eat": "Manger",
       "Use": "Utiliser",
+      "Reload": "Recharger",
       "Delete": "Supprimer",
       "Total": "Total",
       "Name": "NOM",
@@ -27,7 +28,13 @@
     "StateBar": {
       "States": "ÉTATS",
       "All": "ALL",
-      "StateNamePlaceholder": "Nom de l'état"
+      "StateNamePlaceholder": "Nom de l'état",
+      "PresetMenuTitle": "Menu des etats",
+      "PsychicStates": "Etats psychiques",
+      "BodyStates": "Etats corporels",
+      "DurationLabel": "Duree",
+      "DescriptionLabel": "Description",
+      "NoModifier": "Aucun modificateur"
     },
     "Npc": {
       "Role": "RÔLE",
@@ -79,6 +86,10 @@
       "Currencies": "MONNAIES",
       "Transports": "TRANSPORTS",
       "AmmoTypePlaceholder": "Type",
+      "AmmoStockLabel": "Stock",
+      "AmmoMagazineLabel": "Mag.",
+      "AmmoStockPlaceholder": "Stock",
+      "AmmoMagazinePlaceholder": "Magasin",
       "WeaponType": {
         "Label": "TYPE D'ARME :",
         "Distance": "Distance",
@@ -102,6 +113,7 @@
       "RawBonusLabel": "BONUS/MALUS BRUTE",
       "UsableLabel": "UTILISABLE :",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
+      "MagazineCapacityLabel": "CAPACITE MAGASIN :",
       "VoyageXPCostLabel": "COUT XP VOYAGE :",
       "AudioFileLabel": "FICHIER SON :",
       "AudioFilePlaceholder": "systems/bloodman/sounds/effet.ogg",
@@ -169,7 +181,8 @@
       "ItemAudioInvalidSelection": "Fichier audio invalide pour {item}. Le champ a ete vide.",
       "InvalidArchetypeBonusNumber": "Le bonus d'archetype doit etre un nombre valide.",
       "ArchetypeBonusCharacteristicRequired": "Selectionnez une caracteristique pour enregistrer un bonus d'archetype.",
-      "InvalidArchetypeBonusCharacteristic": "La caracteristique d'archetype selectionnee est invalide."
+      "InvalidArchetypeBonusCharacteristic": "La caracteristique d'archetype selectionnee est invalide.",
+      "InvalidStateName": "Etat inconnu : {states}."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos"

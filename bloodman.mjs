@@ -10,6 +10,11 @@ function t(key, data = null) {
   return data ? game.i18n.format(key, data) : game.i18n.localize(key);
 }
 
+function tl(key, fallback, data = null) {
+  const localized = t(key, data);
+  return localized && localized !== key ? localized : fallback;
+}
+
 function safeWarn(message) {
   try {
     ui.notifications?.warn(message);
@@ -1273,6 +1278,364 @@ const STATE_MODIFIER_PATHS = [
   "system.modifiers.label",
   ...CHARACTERISTICS.map(char => `system.modifiers.${char.key}`)
 ];
+const STATE_PRESETS = [
+  {
+    id: "psychic-1",
+    category: "psychic",
+    name: "NIV 1 : INQUIETUDE (24h)",
+    shortName: "INQUIETUDE",
+    duration: "24h",
+    description: "",
+    modifierAll: -2,
+    modifierByKey: {}
+  },
+  {
+    id: "psychic-2",
+    category: "psychic",
+    name: "NIV 2 : ANGOISSE (72h)",
+    shortName: "ANGOISSE",
+    duration: "72h",
+    description: "",
+    modifierAll: -4,
+    modifierByKey: {}
+  },
+  {
+    id: "psychic-3",
+    category: "psychic",
+    name: "NIV 3 : EFFROI (168h)",
+    shortName: "EFFROI",
+    duration: "168h",
+    description: "",
+    modifierAll: -6,
+    modifierByKey: {}
+  },
+  {
+    id: "psychic-4",
+    category: "psychic",
+    name: "NIV 4 : PANIQUE (730h)",
+    shortName: "PANIQUE",
+    duration: "730h",
+    description: "",
+    modifierAll: -8,
+    modifierByKey: {}
+  },
+  {
+    id: "psychic-5",
+    category: "psychic",
+    name: "NIV 5 : DELIRES (8760h)",
+    shortName: "DELIRES",
+    duration: "8760h",
+    description: "",
+    modifierAll: -10,
+    modifierByKey: {}
+  },
+  {
+    id: "psychic-6",
+    category: "psychic",
+    name: "NIV 6 : ALIENATION (87600h)",
+    shortName: "ALIENATION",
+    duration: "87600h",
+    description: "",
+    modifierAll: -12,
+    modifierByKey: {}
+  },
+  {
+    id: "psychic-7",
+    category: "psychic",
+    name: "NIV 7 : FOLIE",
+    shortName: "FOLIE",
+    duration: "",
+    description: "Vous devenez fou.",
+    modifierAll: 0,
+    modifierByKey: {}
+  },
+  {
+    id: "body-injured",
+    category: "body",
+    name: "BLESSE",
+    shortName: "BLESSE",
+    duration: "",
+    description: "",
+    modifierAll: -30,
+    modifierByKey: {}
+  },
+  {
+    id: "body-hunger",
+    category: "body",
+    name: "FAIM",
+    shortName: "FAIM",
+    duration: "",
+    description: "",
+    modifierAll: 0,
+    modifierByKey: { MOU: -10, PHY: -10, ADR: -10, SOC: -10 }
+  },
+  {
+    id: "body-thirst",
+    category: "body",
+    name: "SOIF",
+    shortName: "SOIF",
+    duration: "",
+    description: "",
+    modifierAll: 0,
+    modifierByKey: { MOU: -20, PHY: -20, ADR: -20, SOC: -20 }
+  },
+  {
+    id: "body-drowsy",
+    category: "body",
+    name: "SOMNOLENT",
+    shortName: "SOMNOLENT",
+    duration: "",
+    description: "",
+    modifierAll: 0,
+    modifierByKey: { MOU: -40, PHY: -40, ADR: -40 }
+  },
+  {
+    id: "body-sick",
+    category: "body",
+    name: "MALADE",
+    shortName: "MALADE",
+    duration: "",
+    description: "",
+    modifierAll: -10,
+    modifierByKey: {}
+  },
+  {
+    id: "body-hypothermia",
+    category: "body",
+    name: "HYPOTHERMIE",
+    shortName: "HYPOTHERMIE",
+    duration: "",
+    description: "",
+    modifierAll: 0,
+    modifierByKey: { MEL: -30, MOU: -30, PHY: -30, ADR: -30 }
+  },
+  {
+    id: "body-hyperthermia",
+    category: "body",
+    name: "HYPERTHERMIE",
+    shortName: "HYPERTHERMIE",
+    duration: "",
+    description: "",
+    modifierAll: 0,
+    modifierByKey: { MEL: -30, MOU: -30, PHY: -30, ADR: -30 }
+  }
+];
+const STATE_PRESET_BY_ID = new Map(STATE_PRESETS.map(preset => [preset.id, preset]));
+const STATE_PRESET_ORDER = STATE_PRESETS.map(preset => preset.id);
+
+function normalizeStatePresetToken(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim();
+}
+
+function splitStatePresetLabel(rawValue) {
+  const raw = String(rawValue ?? "");
+  if (!raw.trim()) return [];
+  return raw
+    .split(/[\n\r,;|]+/)
+    .map(token => String(token || "").trim())
+    .filter(Boolean);
+}
+
+function buildStatePresetAliasMap() {
+  const aliasMap = new Map();
+  const registerAlias = (token, stateId) => {
+    const normalized = normalizeStatePresetToken(token);
+    if (!normalized || aliasMap.has(normalized)) return;
+    aliasMap.set(normalized, stateId);
+  };
+
+  for (const preset of STATE_PRESETS) {
+    registerAlias(preset.id, preset.id);
+    registerAlias(preset.name, preset.id);
+    registerAlias(preset.shortName, preset.id);
+    const levelMatch = String(preset.name || "").match(/^NIV\s*(\d+)/i);
+    if (levelMatch?.[1]) registerAlias(`NIV ${levelMatch[1]}`, preset.id);
+  }
+
+  return aliasMap;
+}
+
+const STATE_PRESET_ALIAS_MAP = buildStatePresetAliasMap();
+
+function resolveStatePresetIdFromToken(token) {
+  const normalized = normalizeStatePresetToken(token);
+  if (!normalized) return "";
+  const direct = STATE_PRESET_ALIAS_MAP.get(normalized);
+  if (direct) return direct;
+  for (const preset of STATE_PRESETS) {
+    const shortToken = normalizeStatePresetToken(preset.shortName);
+    if (!shortToken) continue;
+    if (normalized.includes(shortToken)) return preset.id;
+  }
+  return "";
+}
+
+function buildStatePresetLabelFromIds(stateIds = []) {
+  if (!Array.isArray(stateIds) || !stateIds.length) return "";
+  const selected = new Set(stateIds.map(id => String(id || "").trim()).filter(Boolean));
+  const names = [];
+  for (const presetId of STATE_PRESET_ORDER) {
+    if (!selected.has(presetId)) continue;
+    const preset = STATE_PRESET_BY_ID.get(presetId);
+    if (!preset) continue;
+    names.push(preset.name);
+  }
+  return names.join(" ; ");
+}
+
+function resolveStatePresetSelection(rawLabel) {
+  const tokens = splitStatePresetLabel(rawLabel);
+  const selectedIds = [];
+  const seen = new Set();
+  const invalidTokens = [];
+
+  for (const token of tokens) {
+    const stateId = resolveStatePresetIdFromToken(token);
+    if (!stateId) {
+      invalidTokens.push(token);
+      continue;
+    }
+    if (seen.has(stateId)) continue;
+    seen.add(stateId);
+    selectedIds.push(stateId);
+  }
+
+  const orderedIds = STATE_PRESET_ORDER.filter(stateId => seen.has(stateId));
+  return {
+    ids: orderedIds,
+    invalidTokens,
+    label: buildStatePresetLabelFromIds(orderedIds)
+  };
+}
+
+function buildStatePresetModifierTotals(stateIds = []) {
+  const totals = { all: 0 };
+  for (const characteristic of CHARACTERISTICS) totals[characteristic.key] = 0;
+
+  for (const stateId of stateIds) {
+    const preset = STATE_PRESET_BY_ID.get(String(stateId || "").trim());
+    if (!preset) continue;
+    totals.all += toFiniteNumber(preset.modifierAll, 0);
+    const modifierByKey = preset.modifierByKey || {};
+    for (const characteristic of CHARACTERISTICS) {
+      totals[characteristic.key] += toFiniteNumber(modifierByKey[characteristic.key], 0);
+    }
+  }
+
+  return totals;
+}
+
+function buildStateModifierUpdateFromLabel(rawLabel) {
+  const selection = resolveStatePresetSelection(rawLabel);
+  if (selection.invalidTokens.length) {
+    return {
+      ok: false,
+      invalidTokens: selection.invalidTokens,
+      ids: selection.ids,
+      label: selection.label,
+      totals: buildStatePresetModifierTotals(selection.ids)
+    };
+  }
+  return {
+    ok: true,
+    invalidTokens: [],
+    ids: selection.ids,
+    label: selection.label,
+    totals: buildStatePresetModifierTotals(selection.ids)
+  };
+}
+
+function applyStateModifierUpdateToData(updateData, label, totals) {
+  if (!updateData || typeof updateData !== "object") return;
+  foundry.utils.setProperty(updateData, "system.modifiers.label", String(label || "").trim());
+  foundry.utils.setProperty(updateData, "system.modifiers.all", toFiniteNumber(totals?.all, 0));
+  for (const characteristic of CHARACTERISTICS) {
+    const key = characteristic.key;
+    foundry.utils.setProperty(updateData, `system.modifiers.${key}`, toFiniteNumber(totals?.[key], 0));
+  }
+}
+
+function buildStatePresetModifierLabel(preset) {
+  if (!preset) return tl("BLOODMAN.StateBar.NoModifier", "Aucun modificateur");
+  const parts = [];
+  const allValue = toFiniteNumber(preset.modifierAll, 0);
+  if (allValue !== 0) {
+    parts.push(`${allValue > 0 ? "+" : ""}${allValue}% ALL CARACS`);
+  }
+  const grouped = new Map();
+  for (const characteristic of CHARACTERISTICS) {
+    const value = toFiniteNumber(preset.modifierByKey?.[characteristic.key], 0);
+    if (value === 0) continue;
+    const group = grouped.get(value) || [];
+    group.push(characteristic.key);
+    grouped.set(value, group);
+  }
+  for (const [value, keys] of grouped.entries()) {
+    parts.push(`${value > 0 ? "+" : ""}${value}% ${keys.join(" / ")}`);
+  }
+  if (!parts.length) return tl("BLOODMAN.StateBar.NoModifier", "Aucun modificateur");
+  return parts.join(" ; ");
+}
+
+function buildStatePresetTooltip(preset) {
+  if (!preset) return "";
+  const categoryLabel = preset.category === "psychic"
+    ? tl("BLOODMAN.StateBar.PsychicStates", "Etats psychiques")
+    : tl("BLOODMAN.StateBar.BodyStates", "Etats corporels");
+  const durationLabel = preset.duration
+    ? `${tl("BLOODMAN.StateBar.DurationLabel", "Duree")} : ${preset.duration}`
+    : "";
+  const descriptionLabel = preset.description
+    ? `${tl("BLOODMAN.StateBar.DescriptionLabel", "Description")} : ${preset.description}`
+    : "";
+  return [preset.name, categoryLabel, buildStatePresetModifierLabel(preset), durationLabel, descriptionLabel]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildStatePresetDisplayData(rawLabel) {
+  const selection = resolveStatePresetSelection(rawLabel);
+  const selected = new Set(selection.ids);
+  const psychic = [];
+  const body = [];
+  for (const preset of STATE_PRESETS) {
+    const entry = {
+      id: preset.id,
+      name: preset.name,
+      category: preset.category,
+      duration: preset.duration || "",
+      description: preset.description || "",
+      modifierLabel: buildStatePresetModifierLabel(preset),
+      tooltip: buildStatePresetTooltip(preset),
+      selected: selected.has(preset.id)
+    };
+    if (preset.category === "psychic") psychic.push(entry);
+    else body.push(entry);
+  }
+  return {
+    ids: selection.ids,
+    invalidTokens: selection.invalidTokens,
+    psychic,
+    body
+  };
+}
+
+function buildInvalidStatePresetMessage(invalidTokens = []) {
+  const states = invalidTokens
+    .map(token => String(token || "").trim())
+    .filter(Boolean)
+    .join(", ");
+  const localized = t("BLOODMAN.Notifications.InvalidStateName", { states: states || "?" });
+  if (localized && localized !== "BLOODMAN.Notifications.InvalidStateName") return localized;
+  return `Etat inconnu: ${states || "?"}.`;
+}
 const ACTOR_TOKEN_IMAGE_UPDATE_PATHS = [
   "prototypeToken.texture.src",
   "token.img"
@@ -1288,7 +1651,7 @@ const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection"]);
-const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet"]);
+const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
@@ -1307,6 +1670,8 @@ const VITAL_RESOURCE_PATHS = new Set([
 const AMMO_UPDATE_PATHS = [
   "system.ammo",
   "system.ammo.type",
+  "system.ammo.stock",
+  "system.ammo.magazine",
   "system.ammo.value"
 ];
 
@@ -1502,19 +1867,82 @@ function resolveItemPricePreviewState(rawValue) {
   return { salePrice: String(salePrice), errorMessage: "" };
 }
 
+function resolveItemSalePriceState(rawPriceValue, rawSalePriceValue) {
+  const pricePreview = resolveItemPricePreviewState(rawPriceValue);
+  const salePriceRaw = String(rawSalePriceValue ?? "").trim();
+  if (salePriceRaw) {
+    return {
+      salePrice: salePriceRaw,
+      errorMessage: pricePreview.errorMessage
+    };
+  }
+  return {
+    salePrice: pricePreview.errorMessage ? "" : pricePreview.salePrice,
+    errorMessage: pricePreview.errorMessage
+  };
+}
+
+function isItemSalePriceManual(rawPriceValue, rawSalePriceValue) {
+  const salePriceRaw = String(rawSalePriceValue ?? "").trim();
+  if (!salePriceRaw) return false;
+  const pricePreview = resolveItemPricePreviewState(rawPriceValue);
+  if (pricePreview.errorMessage) return true;
+  return salePriceRaw !== String(pricePreview.salePrice ?? "").trim();
+}
+
 function normalizeItemPriceUpdate(item, updateData = null) {
   if (!isPriceManagedItemType(item?.type)) return false;
-  const path = "system.price";
+  const pricePath = "system.price";
+  const salePricePath = "system.salePrice";
   if (updateData) {
-    const hasPriceUpdate = Object.prototype.hasOwnProperty.call(updateData, path)
-      || foundry.utils.getProperty(updateData, path) !== undefined;
-    if (!hasPriceUpdate) return false;
-    const nextPrice = String(foundry.utils.getProperty(updateData, path) ?? "").trim();
-    foundry.utils.setProperty(updateData, path, nextPrice);
+    const hasPriceUpdate = Object.prototype.hasOwnProperty.call(updateData, pricePath)
+      || foundry.utils.getProperty(updateData, pricePath) !== undefined;
+    const hasSalePriceUpdate = Object.prototype.hasOwnProperty.call(updateData, salePricePath)
+      || foundry.utils.getProperty(updateData, salePricePath) !== undefined;
+    if (!hasPriceUpdate && !hasSalePriceUpdate) return false;
+
+    const nextPrice = hasPriceUpdate
+      ? String(foundry.utils.getProperty(updateData, pricePath) ?? "").trim()
+      : String(item?.system?.price ?? "").trim();
+    const currentPrice = String(item?.system?.price ?? "").trim();
+    const currentSalePrice = String(item?.system?.salePrice ?? "").trim();
+    const saleWasManual = isItemSalePriceManual(currentPrice, currentSalePrice);
+    const nextSalePrice = hasSalePriceUpdate
+      ? String(foundry.utils.getProperty(updateData, salePricePath) ?? "").trim()
+      : (saleWasManual ? currentSalePrice : "");
+    const nextState = resolveItemSalePriceState(nextPrice, nextSalePrice);
+
+    foundry.utils.setProperty(updateData, pricePath, nextPrice);
+    foundry.utils.setProperty(updateData, salePricePath, nextState.salePrice);
     return true;
   }
   const sourcePrice = String(item?.system?.price ?? "").trim();
-  item.updateSource({ [path]: sourcePrice });
+  const sourceSalePrice = String(item?.system?.salePrice ?? "").trim();
+  const sourceState = resolveItemSalePriceState(sourcePrice, sourceSalePrice);
+  item.updateSource({
+    [pricePath]: sourcePrice,
+    [salePricePath]: sourceState.salePrice
+  });
+  return true;
+}
+
+function normalizeWeaponMagazineCapacityUpdate(item, updateData = null) {
+  const type = String(item?.type || "").trim().toLowerCase();
+  if (type !== "arme") return false;
+  const path = "system.magazineCapacity";
+  if (updateData) {
+    const hasCapacityUpdate = Object.prototype.hasOwnProperty.call(updateData, path)
+      || foundry.utils.getProperty(updateData, path) !== undefined;
+    if (!hasCapacityUpdate) return false;
+    const nextCapacity = normalizeNonNegativeInteger(
+      foundry.utils.getProperty(updateData, path),
+      item?.system?.magazineCapacity ?? 0
+    );
+    foundry.utils.setProperty(updateData, path, nextCapacity);
+    return true;
+  }
+  const sourceCapacity = normalizeNonNegativeInteger(item?.system?.magazineCapacity, 0);
+  item.updateSource({ [path]: sourceCapacity });
   return true;
 }
 
@@ -1621,7 +2049,134 @@ function buildDefaultResources(options = {}) {
 }
 
 function buildDefaultAmmo() {
-  return { type: "", value: 0 };
+  return { type: "", stock: 0, magazine: 0, value: 0 };
+}
+
+function normalizeAmmoType(value) {
+  return String(value ?? "").trim();
+}
+
+function getActorAmmoCapacityLimit(actor) {
+  if (!actor?.items) return 0;
+  let maxCapacity = 0;
+  for (const item of actor.items) {
+    if (String(item?.type || "").trim().toLowerCase() !== "arme") continue;
+    const weaponType = getWeaponCategory(item.system?.weaponType);
+    if (weaponType !== "distance") continue;
+    if (toCheckboxBoolean(item.system?.infiniteAmmo, false)) continue;
+    const capacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
+    if (capacity > maxCapacity) maxCapacity = capacity;
+  }
+  return maxCapacity;
+}
+
+function normalizeAmmoState(rawAmmo = null, options = {}) {
+  const fallbackBase = options.fallback ?? buildDefaultAmmo();
+  const fallback = foundry.utils.mergeObject(buildDefaultAmmo(), fallbackBase || {}, { inplace: false });
+  const source = foundry.utils.mergeObject(fallback, rawAmmo || {}, { inplace: false });
+  const type = normalizeAmmoType(source.type);
+
+  const fallbackStock = normalizeNonNegativeInteger(fallback.stock ?? fallback.value, 0);
+  const fallbackMagazine = normalizeNonNegativeInteger(fallback.magazine ?? fallback.value, 0);
+
+  const stockRaw = source.stock ?? source.value ?? fallbackStock;
+  const magazineRaw = source.magazine ?? source.value ?? fallbackMagazine;
+
+  let stock = normalizeNonNegativeInteger(stockRaw, fallbackStock);
+  let magazine = normalizeNonNegativeInteger(magazineRaw, fallbackMagazine);
+
+  const capacity = normalizeNonNegativeInteger(options.capacity, 0);
+  if (capacity > 0) magazine = Math.min(magazine, capacity);
+
+  stock = Math.max(0, stock);
+  magazine = Math.max(0, magazine);
+
+  return {
+    type,
+    stock,
+    magazine,
+    value: stock
+  };
+}
+
+function areAmmoStatesEqual(currentAmmo = null, nextAmmo = null) {
+  const currentType = normalizeAmmoType(currentAmmo?.type);
+  const nextType = normalizeAmmoType(nextAmmo?.type);
+  if (currentType !== nextType) return false;
+  const currentStock = normalizeNonNegativeInteger(currentAmmo?.stock ?? currentAmmo?.value, 0);
+  const nextStock = normalizeNonNegativeInteger(nextAmmo?.stock ?? nextAmmo?.value, 0);
+  if (currentStock !== nextStock) return false;
+  const currentMagazine = normalizeNonNegativeInteger(currentAmmo?.magazine, 0);
+  const nextMagazine = normalizeNonNegativeInteger(nextAmmo?.magazine, 0);
+  return currentMagazine === nextMagazine;
+}
+
+function hasUpdatePath(updateData, path) {
+  if (!updateData || !path) return false;
+  return Object.prototype.hasOwnProperty.call(updateData, path)
+    || foundry.utils.getProperty(updateData, path) !== undefined;
+}
+
+function getUpdatedPathValue(updateData, path, fallback) {
+  if (Object.prototype.hasOwnProperty.call(updateData, path)) return updateData[path];
+  const nested = foundry.utils.getProperty(updateData, path);
+  return nested === undefined ? fallback : nested;
+}
+
+function normalizeActorAmmoUpdateData(actor, updateData) {
+  if (!updateData || typeof updateData !== "object") return false;
+  const ammoPath = "system.ammo";
+  const ammoTypePath = "system.ammo.type";
+  const ammoStockPath = "system.ammo.stock";
+  const ammoMagazinePath = "system.ammo.magazine";
+  const ammoLegacyValuePath = "system.ammo.value";
+
+  const hasAmmoRootUpdate = hasUpdatePath(updateData, ammoPath);
+  const hasAmmoTypeUpdate = hasUpdatePath(updateData, ammoTypePath);
+  const hasAmmoStockUpdate = hasUpdatePath(updateData, ammoStockPath);
+  const hasAmmoMagazineUpdate = hasUpdatePath(updateData, ammoMagazinePath);
+  const hasAmmoLegacyValueUpdate = hasUpdatePath(updateData, ammoLegacyValuePath);
+  const hasAnyAmmoUpdate = hasAmmoRootUpdate
+    || hasAmmoTypeUpdate
+    || hasAmmoStockUpdate
+    || hasAmmoMagazineUpdate
+    || hasAmmoLegacyValueUpdate;
+  if (!hasAnyAmmoUpdate) return false;
+
+  const capacity = getActorAmmoCapacityLimit(actor);
+  const currentAmmo = normalizeAmmoState(actor?.system?.ammo, {
+    fallback: buildDefaultAmmo(),
+    capacity
+  });
+
+  const rootAmmoUpdate = hasAmmoRootUpdate ? getUpdatedPathValue(updateData, ammoPath, {}) : {};
+  const rootAmmoSource = rootAmmoUpdate && typeof rootAmmoUpdate === "object" ? rootAmmoUpdate : {};
+  const nextRawAmmo = foundry.utils.mergeObject(currentAmmo, rootAmmoSource, { inplace: false });
+
+  if (hasAmmoTypeUpdate) {
+    nextRawAmmo.type = getUpdatedPathValue(updateData, ammoTypePath, nextRawAmmo.type);
+  }
+  if (hasAmmoStockUpdate) {
+    nextRawAmmo.stock = getUpdatedPathValue(updateData, ammoStockPath, nextRawAmmo.stock);
+  }
+  if (hasAmmoMagazineUpdate) {
+    nextRawAmmo.magazine = getUpdatedPathValue(updateData, ammoMagazinePath, nextRawAmmo.magazine);
+  }
+  if (hasAmmoLegacyValueUpdate && !hasAmmoStockUpdate) {
+    nextRawAmmo.stock = getUpdatedPathValue(updateData, ammoLegacyValuePath, nextRawAmmo.stock);
+  }
+
+  const normalizedAmmo = normalizeAmmoState(nextRawAmmo, {
+    fallback: currentAmmo,
+    capacity
+  });
+
+  unsetUpdatePath(updateData, ammoPath);
+  foundry.utils.setProperty(updateData, ammoTypePath, normalizedAmmo.type);
+  foundry.utils.setProperty(updateData, ammoStockPath, normalizedAmmo.stock);
+  foundry.utils.setProperty(updateData, ammoMagazinePath, normalizedAmmo.magazine);
+  foundry.utils.setProperty(updateData, ammoLegacyValuePath, normalizedAmmo.value);
+  return true;
 }
 
 function buildDefaultProfile() {
@@ -3345,6 +3900,7 @@ function sanitizeActorUpdateForRole(updateData, role, options = {}) {
   const basicPlayer = isBasicPlayerRole(role);
   const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
+  const allowAmmoUpdate = Boolean(options.allowAmmoUpdate);
   const enforceCharacteristicBaseRange = options.enforceCharacteristicBaseRange !== false;
   if (basicPlayer && !allowCharacteristicBase) {
     stripUnauthorizedCharacteristicBaseUpdates(sanitized);
@@ -3357,8 +3913,9 @@ function sanitizeActorUpdateForRole(updateData, role, options = {}) {
   }
   if (!isAssistantOrHigherRole(role)) {
     stripUpdatePaths(sanitized, ACTOR_TOKEN_IMAGE_UPDATE_PATHS);
-    stripUpdatePaths(sanitized, AMMO_UPDATE_PATHS);
+    if (!allowAmmoUpdate) stripUpdatePaths(sanitized, AMMO_UPDATE_PATHS);
   }
+  normalizeActorAmmoUpdateData(options.actor || null, sanitized);
   normalizeCharacteristicXpUpdates(sanitized, options.actor || null);
   if (enforceCharacteristicBaseRange) normalizeCharacteristicBaseUpdatesForRole(sanitized, role);
   return sanitized;
@@ -3412,16 +3969,19 @@ async function handleActorSheetUpdateRequest(data) {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
   const allowCharacteristicBase = Boolean(data?.options?.allowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(data?.options?.allowVitalResourceUpdate);
+  const allowAmmoUpdate = Boolean(data?.options?.allowAmmoUpdate);
   const sanitized = sanitizeActorUpdateForRole(data.updateData || {}, requesterRole, {
     actor,
     allowCharacteristicBase,
     allowVitalResourceUpdate,
+    allowAmmoUpdate,
     enforceCharacteristicBaseRange: actor.type === "personnage"
   });
   if (!hasActorUpdatePayload(sanitized)) return;
   await actor.update(sanitized, {
     bloodmanAllowCharacteristicBase: allowCharacteristicBase,
-    bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate
+    bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate,
+    bloodmanAllowAmmoUpdate: allowAmmoUpdate
   });
 }
 
@@ -3527,7 +4087,8 @@ function requestActorSheetUpdate(actor, updateData, options = {}) {
     updateData,
     options: {
       allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
-      allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate)
+      allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate),
+      allowAmmoUpdate: Boolean(options.allowAmmoUpdate)
     }
   });
   return true;
@@ -3947,7 +4508,6 @@ Hooks.once("ready", async () => {
     }
 
     if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
-
     const actorResources = actor.system.resources || {};
     const requiresResourceInit = !actor.system.resources
       || actorResources.move == null
@@ -4031,11 +4591,25 @@ Hooks.once("ready", async () => {
       updates["system.profile"] = mergedProfile;
     }
 
-    if (!actor.system.ammo) {
-      const legacy = Array.isArray(actor.system.ammoPool) ? actor.system.ammoPool[0] : null;
-      updates["system.ammo"] = legacy
-        ? { type: legacy.type || "", value: Number(legacy.value) || 0 }
-        : buildDefaultAmmo();
+    const legacyAmmo = Array.isArray(actor.system.ammoPool) ? actor.system.ammoPool[0] : null;
+    const fallbackAmmo = legacyAmmo
+      ? {
+        type: legacyAmmo.type || "",
+        stock: Number(legacyAmmo.value) || 0,
+        magazine: Number(legacyAmmo.value) || 0,
+        value: Number(legacyAmmo.value) || 0
+      }
+      : buildDefaultAmmo();
+    const normalizedAmmo = normalizeAmmoState(actor.system?.ammo, {
+      fallback: fallbackAmmo,
+      capacity: getActorAmmoCapacityLimit(actor)
+    });
+    const hasAmmoShape = actor.system?.ammo
+      && actor.system.ammo.stock != null
+      && actor.system.ammo.magazine != null
+      && actor.system.ammo.value != null;
+    if (!hasAmmoShape || !areAmmoStatesEqual(actor.system?.ammo, normalizedAmmo)) {
+      updates["system.ammo"] = normalizedAmmo;
     }
     if (actor.prototypeToken) {
       if (isCharacter && actor.prototypeToken.actorLink === false) {
@@ -4083,6 +4657,11 @@ Hooks.once("ready", async () => {
       }
       if (!normalized && !item.system?.weaponType) {
         await item.update({ "system.weaponType": "distance" });
+      }
+      const rawMagazineCapacity = Number(item.system?.magazineCapacity);
+      const magazineCapacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
+      if (!Number.isFinite(rawMagazineCapacity) || rawMagazineCapacity < 0 || rawMagazineCapacity !== Math.floor(rawMagazineCapacity)) {
+        await item.update({ "system.magazineCapacity": magazineCapacity });
       }
     }
   }
@@ -4334,6 +4913,7 @@ Hooks.on("preCreateItem", (item, createData) => {
   }
 
   normalizeItemPriceUpdate(item, createData);
+  normalizeWeaponMagazineCapacityUpdate(item, createData);
   normalizeCharacteristicBonusItemUpdate(item, createData);
 
   if (item?.type !== "aptitude") return;
@@ -4376,6 +4956,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   }
 
   normalizeItemPriceUpdate(item, updateData);
+  normalizeWeaponMagazineCapacityUpdate(item, updateData);
   normalizeCharacteristicBonusItemUpdate(item, updateData);
 
   if (item?.type !== "aptitude") return;
@@ -4777,6 +5358,7 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   let blockedRestrictedFields = false;
   const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(options?.bloodmanAllowVitalResourceUpdate);
+  const allowAmmoUpdate = Boolean(options?.bloodmanAllowAmmoUpdate);
 
   if (isBasicPlayerRole(updaterRole)) {
     if (!allowCharacteristicBase) {
@@ -4789,8 +5371,11 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   }
   if (!isAssistantOrHigherRole(updaterRole)) {
     blockedRestrictedFields = stripUpdatePaths(updateData, ACTOR_TOKEN_IMAGE_UPDATE_PATHS) || blockedRestrictedFields;
-    blockedRestrictedFields = stripUpdatePaths(updateData, AMMO_UPDATE_PATHS) || blockedRestrictedFields;
+    if (!allowAmmoUpdate) {
+      blockedRestrictedFields = stripUpdatePaths(updateData, AMMO_UPDATE_PATHS) || blockedRestrictedFields;
+    }
   }
+  normalizeActorAmmoUpdateData(actor, updateData);
   if (actor.type === "personnage") {
     normalizeCharacteristicBaseUpdatesForRole(updateData, updaterRole, actor);
   }
@@ -4815,6 +5400,22 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
     return Object.prototype.hasOwnProperty.call(updateData, path)
       || foundry.utils.getProperty(updateData, path) !== undefined;
   };
+
+  const stateLabelPath = "system.modifiers.label";
+  if (hasUpdatePath(stateLabelPath)) {
+    const rawLabel = getUpdatedRawValue(stateLabelPath, actor.system?.modifiers?.label || "");
+    const currentLabel = String(actor.system?.modifiers?.label || "").trim();
+    const nextLabel = String(rawLabel || "").trim();
+    const labelChanged = nextLabel !== currentLabel;
+    if (labelChanged) {
+      const stateUpdate = buildStateModifierUpdateFromLabel(rawLabel);
+      if (!stateUpdate.ok) {
+        ui.notifications?.error(buildInvalidStatePresetMessage(stateUpdate.invalidTokens));
+        return false;
+      }
+      applyStateModifierUpdateToData(updateData, stateUpdate.label, stateUpdate.totals);
+    }
+  }
 
   const archetypeBonusValuePath = "system.profile.archetypeBonusValue";
   const archetypeBonusCharacteristicPath = "system.profile.archetypeBonusCharacteristic";
@@ -5215,7 +5816,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     const sent = requestActorSheetUpdate(this.actor, updateData, {
       allowCharacteristicBase: Boolean(options?.bloodmanAllowCharacteristicBase),
-      allowVitalResourceUpdate: Boolean(options?.bloodmanAllowVitalResourceUpdate)
+      allowVitalResourceUpdate: Boolean(options?.bloodmanAllowVitalResourceUpdate),
+      allowAmmoUpdate: Boolean(options?.bloodmanAllowAmmoUpdate)
     });
     if (!sent) safeWarn("Mise à jour impossible: aucun GM actif.");
     if (sent) {
@@ -5295,7 +5897,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     const canOpenItemSheets = canToggleCharacteristicsEdit;
     if (!canToggleCharacteristicsEdit) this._characteristicsEditEnabled = false;
     const characteristicsEditEnabled = canToggleCharacteristicsEdit && Boolean(this._characteristicsEditEnabled);
-    const modifiers = data.actor.system.modifiers || buildDefaultModifiers();
+    const modifiers = foundry.utils.mergeObject(buildDefaultModifiers(), data.actor.system.modifiers || {}, {
+      inplace: false
+    });
+    const statePresetData = buildStatePresetDisplayData(modifiers.label);
     const isPlayerActor = data.actor.type === "personnage";
     const isNpcActor = data.actor.type === "personnage-non-joueur";
     const profileBonusValue = normalizeArchetypeBonusValue(data.actor.system?.profile?.archetypeBonusValue, 0);
@@ -5337,6 +5942,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         ? profileBonusValue
         : 0;
       const totalBonus = itemBonus + profileBonus;
+      const modifierTotal = flat + totalBonus;
       const effective = base + flat + totalBonus;
       const xpReady = xp.every(Boolean);
       const showReroll = canUseCharacteristicReroll && activeRerollKey === c.key;
@@ -5348,6 +5954,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         base,
         effective,
         itemBonus: totalBonus,
+        modifierTotal,
         xp,
         xpReady,
         showReroll,
@@ -5416,7 +6023,14 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     const bagSlotsEnabled = Boolean(equipment.bagSlotsEnabled);
     const carriedItemsLimit = bagSlotsEnabled ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
-    const ammo = foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false });
+    const ammoCapacityLimit = getActorAmmoCapacityLimit(this.actor);
+    const ammo = normalizeAmmoState(
+      foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false }),
+      {
+        fallback: buildDefaultAmmo(),
+        capacity: ammoCapacityLimit
+      }
+    );
     const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
     const itemBuckets = buildTypedItemBuckets(this.actor.items);
@@ -5453,10 +6067,24 @@ class BloodmanActorSheet extends BaseActorSheet {
       const weapon = item.toObject();
       weapon._id = weapon._id ?? item.id;
       const normalized = normalizeWeaponType(weapon.system?.weaponType);
+      const weaponCategory = getWeaponCategory(weapon.system?.weaponType);
       if (normalized === "corps") weapon.displayWeaponType = weaponTypeMelee;
       else if (normalized === "distance") weapon.displayWeaponType = weaponTypeDistance;
       else if (weapon.system?.weaponType) weapon.displayWeaponType = weapon.system.weaponType;
       else weapon.displayWeaponType = weaponTypeDistance;
+      const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(weapon.system?.infiniteAmmo, false);
+      const magazineCapacity = normalizeNonNegativeInteger(weapon.system?.magazineCapacity, 0);
+      const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
+      const magazineForWeapon = usesDirectStock
+        ? Math.max(0, ammo.stock)
+        : Math.min(ammo.magazine, magazineCapacity);
+      const magazineMissingAmmo = !usesDirectStock && magazineForWeapon < magazineCapacity;
+      weapon.magazineCapacity = magazineCapacity;
+      weapon.ammoCapacityDisplay = usesDirectStock ? Math.max(0, ammo.stock) : magazineCapacity;
+      weapon.showAmmoState = consumesAmmo;
+      weapon.ammoMagazine = magazineForWeapon;
+      weapon.showReloadButton = consumesAmmo && ammo.stock > 0 && magazineMissingAmmo;
+      weapon.reloadBlocked = !usesDirectStock && ammo.stock <= 0;
       weapon.showItemReroll = shouldShowItemReroll(item.id);
       return weapon;
     });
@@ -5485,6 +6113,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       characteristics,
       totalPoints,
       modifiers,
+      canEditStatePresets: canEditRestrictedFields,
+      statePresetPsychic: statePresetData.psychic,
+      statePresetBody: statePresetData.body,
       resources,
       profile,
       archetypeCharacteristicOptions,
@@ -5609,6 +6240,15 @@ class BloodmanActorSheet extends BaseActorSheet {
       this.render(false);
     });
 
+    html.on("click", ".state-preset-item", async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!canCurrentUserEditCharacteristics()) return;
+      const stateId = String(ev.currentTarget?.dataset?.stateId || "").trim();
+      if (!stateId) return;
+      await this.toggleStatePreset(stateId);
+    });
+
     html.on("change", "input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']", async ev => {
       if (!canCurrentUserEditCharacteristics()) return;
       if (this.actor?.isOwner) return;
@@ -5658,6 +6298,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       this.rollDamage(item);
+    });
+
+    html.find(".weapon-reload").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = ev.currentTarget.closest(".item");
+      const item = this.getItemFromListElement(li);
+      await this.reloadWeapon(item);
     });
 
     html.find(".ability-roll").click(ev => {
@@ -5786,6 +6434,24 @@ class BloodmanActorSheet extends BaseActorSheet {
     html.find(".item-icon").on("load", () => {
       scheduleAutoResize();
     });
+  }
+
+  async toggleStatePreset(stateId) {
+    const preset = STATE_PRESET_BY_ID.get(String(stateId || "").trim());
+    if (!preset) return;
+    const currentLabel = String(this.actor?.system?.modifiers?.label || "");
+    const currentSelection = resolveStatePresetSelection(currentLabel);
+    if (currentSelection.invalidTokens.length) {
+      ui.notifications?.error(buildInvalidStatePresetMessage(currentSelection.invalidTokens));
+      return;
+    }
+    const selected = new Set(currentSelection.ids);
+    if (selected.has(preset.id)) selected.delete(preset.id);
+    else selected.add(preset.id);
+    const nextIds = STATE_PRESET_ORDER.filter(id => selected.has(id));
+    const nextLabel = buildStatePresetLabelFromIds(nextIds);
+    await this.applyActorUpdate({ "system.modifiers.label": nextLabel });
+    this.render(false);
   }
 
   refreshResourceVisuals(html) {
@@ -5986,6 +6652,45 @@ class BloodmanActorSheet extends BaseActorSheet {
       result.context.itemType = String(item.type || "arme");
       this.markItemReroll(item.id, result.context);
     }
+    this.render(false);
+  }
+
+  async reloadWeapon(item) {
+    if (!item || String(item.type || "").trim().toLowerCase() !== "arme") return;
+    const weaponType = getWeaponCategory(item.system?.weaponType);
+    if (weaponType !== "distance") return;
+    if (toCheckboxBoolean(item.system?.infiniteAmmo, false)) return;
+
+    const capacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
+    if (capacity <= 0) return;
+    const ammoState = normalizeAmmoState(this.actor?.system?.ammo, {
+      fallback: buildDefaultAmmo(),
+      capacity: capacity > 0 ? capacity : 0
+    });
+    const currentMagazine = capacity > 0
+      ? Math.min(ammoState.magazine, capacity)
+      : Math.max(0, ammoState.magazine);
+    const targetCapacity = capacity > 0 ? capacity : (currentMagazine + Math.max(0, ammoState.stock));
+    const needed = Math.max(0, targetCapacity - currentMagazine);
+    if (needed <= 0) return;
+    if (ammoState.stock <= 0) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
+      return;
+    }
+
+    const transferred = Math.min(needed, ammoState.stock);
+    const nextStock = Math.max(0, ammoState.stock - transferred);
+    const nextMagazine = capacity > 0
+      ? Math.min(capacity, currentMagazine + transferred)
+      : Math.max(0, currentMagazine + transferred);
+
+    await this.applyActorUpdate({
+      "system.ammo.stock": nextStock,
+      "system.ammo.magazine": nextMagazine,
+      "system.ammo.value": nextStock
+    }, {
+      bloodmanAllowAmmoUpdate: true
+    });
     this.render(false);
   }
 
@@ -6561,11 +7266,14 @@ class BloodmanItemSheet extends BaseItemSheet {
   async getData(options) {
     const data = await super.getData(options);
     if (this.item.type === "arme") {
+      if (!data.item.system) data.item.system = {};
       const weaponType = getWeaponCategory(this.item.system?.weaponType);
       data.weaponTypeDistance = weaponType === "distance";
       data.weaponTypeMelee = weaponType === "corps";
       // Weapons predate the damageEnabled flag; treat missing as enabled for backward compatibility.
       data.weaponDamageEnabled = this.item.system?.damageEnabled !== false;
+      data.item.system.magazineCapacity = normalizeNonNegativeInteger(this.item.system?.magazineCapacity, 0);
+      data.canEditMagazineCapacity = isAssistantOrHigherRole(game.user?.role);
     }
     if (this.item.type === "aptitude") {
       if (!data.item.system) data.item.system = {};
@@ -6592,9 +7300,11 @@ class BloodmanItemSheet extends BaseItemSheet {
     if (isPriceManagedItemType(this.item.type)) {
       if (!data.item.system) data.item.system = {};
       data.item.system.price = String(this.item.system?.price ?? "").trim();
-      const preview = resolveItemPricePreviewState(data.item.system.price);
+      data.item.system.salePrice = String(this.item.system?.salePrice ?? "").trim();
+      const preview = resolveItemSalePriceState(data.item.system.price, data.item.system.salePrice);
       data.itemComputedSellPrice = preview.salePrice;
       data.itemPriceError = preview.errorMessage;
+      data.item.system.salePrice = preview.salePrice;
     }
     return data;
   }
@@ -6625,20 +7335,40 @@ class BloodmanItemSheet extends BaseItemSheet {
     const root = htmlLike?.find ? htmlLike : this.element;
     if (!root?.length) return;
     const priceInput = root.find("input[name='system.price']").first();
-    const saleInput = root.find("input[data-price-sale]").first();
+    const saleInput = root.find("input[name='system.salePrice']").first();
     const errorNode = root.find("[data-price-error]").first();
     if (!priceInput.length || !saleInput.length || !errorNode.length) return;
-    const preview = resolveItemPricePreviewState(priceInput.val());
-    saleInput.val(preview.salePrice);
-    errorNode.text(preview.errorMessage || "");
-    priceInput.toggleClass("is-invalid", Boolean(preview.errorMessage));
-    priceInput.attr("aria-invalid", preview.errorMessage ? "true" : "false");
+    const saleManual = saleInput.attr("data-sale-manual") === "true";
+    const pricePreview = resolveItemPricePreviewState(priceInput.val());
+    if (!saleManual) {
+      saleInput.val(pricePreview.errorMessage ? "" : pricePreview.salePrice);
+    }
+    errorNode.text(pricePreview.errorMessage || "");
+    priceInput.toggleClass("is-invalid", Boolean(pricePreview.errorMessage));
+    priceInput.attr("aria-invalid", pricePreview.errorMessage ? "true" : "false");
   }
 
   activatePricePreviewListeners(html) {
     if (!isPriceManagedItemType(this.item?.type)) return;
+    const setSaleManualState = () => {
+      const root = html?.find ? html : this.element;
+      if (!root?.length) return false;
+      const priceInput = root.find("input[name='system.price']").first();
+      const saleInput = root.find("input[name='system.salePrice']").first();
+      if (!priceInput.length || !saleInput.length) return false;
+      const manual = isItemSalePriceManual(priceInput.val(), saleInput.val());
+      saleInput.attr("data-sale-manual", manual ? "true" : "false");
+      return manual;
+    };
     const refresh = () => this.refreshPricePreview(html);
-    html.on("input change blur", "input[name='system.price']", refresh);
+    html.on("input change blur", "input[name='system.price']", () => {
+      refresh();
+    });
+    html.on("input change blur", "input[name='system.salePrice']", () => {
+      setSaleManualState();
+      refresh();
+    });
+    setSaleManualState();
     refresh();
   }
 
