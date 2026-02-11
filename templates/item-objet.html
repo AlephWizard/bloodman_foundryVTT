@@ -34,6 +34,31 @@
         </div>
       </div>
 
+      <div class="bm-item-bonus-card">
+        <label class="inline-label">{{localize "BLOODMAN.Items.BonusLabel"}}</label>
+        <div class="toggle-group">
+          <label class="toggle-option">
+            <input type="radio" name="system.characteristicBonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.characteristicBonusEnabled}}checked{{/if}} />
+            {{localize "BLOODMAN.Common.Yes"}}
+          </label>
+          <label class="toggle-option">
+            <input type="radio" name="system.characteristicBonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.characteristicBonusEnabled}}checked{{/unless}} />
+            {{localize "BLOODMAN.Common.No"}}
+          </label>
+        </div>
+        <div class="bonus-grid bonus-grid-characteristics {{#unless item.system.characteristicBonusEnabled}}is-disabled{{/unless}}">
+          <label><span>MEL</span><input type="number" name="system.characteristicBonuses.MEL" value="{{item.system.characteristicBonuses.MEL}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>VIS</span><input type="number" name="system.characteristicBonuses.VIS" value="{{item.system.characteristicBonuses.VIS}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>ESP</span><input type="number" name="system.characteristicBonuses.ESP" value="{{item.system.characteristicBonuses.ESP}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>PHY</span><input type="number" name="system.characteristicBonuses.PHY" value="{{item.system.characteristicBonuses.PHY}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>MOU</span><input type="number" name="system.characteristicBonuses.MOU" value="{{item.system.characteristicBonuses.MOU}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>ADR</span><input type="number" name="system.characteristicBonuses.ADR" value="{{item.system.characteristicBonuses.ADR}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>PER</span><input type="number" name="system.characteristicBonuses.PER" value="{{item.system.characteristicBonuses.PER}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>SOC</span><input type="number" name="system.characteristicBonuses.SOC" value="{{item.system.characteristicBonuses.SOC}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+          <label><span>SAV</span><input type="number" name="system.characteristicBonuses.SAV" value="{{item.system.characteristicBonuses.SAV}}" data-dtype="Number" step="1" {{#unless item.system.characteristicBonusEnabled}}disabled{{/unless}} /></label>
+        </div>
+      </div>
+
       <div class="bm-item-row bm-item-row-note">
         <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
         <textarea class="bm-item-textarea" name="system.note">{{item.system.note}}</textarea>

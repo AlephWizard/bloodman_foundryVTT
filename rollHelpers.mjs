@@ -1,6 +1,7 @@
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
+const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
@@ -42,6 +43,17 @@ function safeWarn(message) {
   }
 }
 
+function toCheckboxBoolean(value, fallback = false) {
+  if (value === true || value === false) return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "off" || normalized === "no" || normalized === "") return false;
+  }
+  return Boolean(fallback);
+}
+
 function isBonusItem(item) {
   return BONUS_ITEM_TYPES.has(item?.type);
 }
@@ -62,9 +74,18 @@ export function getWeaponCategory(value) {
 }
 
 function getItemBonus(actor, key) {
-  void actor;
-  void key;
-  return 0;
+  const characteristicKey = normalizeCharacteristicKey(key);
+  if (!characteristicKey || !actor?.items) return 0;
+
+  let total = 0;
+  for (const item of actor.items) {
+    const type = String(item?.type || "").trim().toLowerCase();
+    if (!CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) continue;
+    if (!toCheckboxBoolean(item?.system?.characteristicBonusEnabled, false)) continue;
+    const bonus = Number(item.system?.characteristicBonuses?.[characteristicKey]);
+    if (Number.isFinite(bonus)) total += bonus;
+  }
+  return total;
 }
 
 function getRawDamageBonus(actor) {
@@ -147,6 +168,53 @@ function getActiveGMIds() {
 function isAssistantOrHigherRole(role) {
   const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
   return Number(role ?? 0) >= assistantRole;
+}
+
+function getDamageChatRecipientIds() {
+  const gmAssistantIds = [];
+  const playerIds = [];
+  for (const user of game.users || []) {
+    if (!user?.active) continue;
+    const userId = String(user.id || "").trim();
+    if (!userId) continue;
+    if (user.isGM || isAssistantOrHigherRole(user.role)) gmAssistantIds.push(userId);
+    else playerIds.push(userId);
+  }
+  return { gmAssistantIds, playerIds };
+}
+
+export async function postDamageTakenChatMessage({ name = "Cible", amount = 0, pa = 0, speakerAlias = "" } = {}) {
+  if (typeof ChatMessage?.create !== "function") return;
+  const safeName = String(name || "Cible").trim() || "Cible";
+  const safeAmount = toNonNegativeInt(amount, 0);
+  const safePa = toNonNegativeInt(pa, 0);
+  if (safeAmount <= 0) return;
+  const alias = String(speakerAlias || safeName).trim() || safeName;
+  const speaker = { alias };
+  const { gmAssistantIds, playerIds } = getDamageChatRecipientIds();
+
+  if (safeAmount > 1 && playerIds.length) {
+    try {
+      await ChatMessage.create({
+        speaker,
+        whisper: playerIds,
+        content: t("BLOODMAN.Rolls.Damage.TakePublic", { name: safeName })
+      });
+    } catch (error) {
+      console.error("[bloodman] damage:chat public failed", error);
+    }
+  }
+
+  if (!gmAssistantIds.length) return;
+  try {
+    await ChatMessage.create({
+      speaker,
+      whisper: gmAssistantIds,
+      content: t("BLOODMAN.Rolls.Damage.Take", { name: safeName, amount: safeAmount, pa: safePa })
+    });
+  } catch (error) {
+    console.error("[bloodman] damage:chat armor detail failed", error);
+  }
 }
 
 function getDamageConfigPopupViewerIds(requesterUserId = "") {
@@ -888,9 +956,11 @@ export async function applyDamageToActor(targetActor, damage, options = {}) {
     { allowVitalResourceUpdate: true }
   );
 
-  ChatMessage.create({
-    speaker: { alias: displayName },
-    content: t("BLOODMAN.Rolls.Damage.Take", { name: displayName, amount: finalDamage, pa: paEffective })
+  await postDamageTakenChatMessage({
+    name: displayName,
+    amount: finalDamage,
+    pa: paEffective,
+    speakerAlias: displayName
   });
 
   return {

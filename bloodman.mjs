@@ -1,4 +1,4 @@
-import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType } from "./rollHelpers.mjs";
+import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./rollHelpers.mjs";
 
 const BaseActorSheet = foundry?.appv1?.sheets?.ActorSheet ?? ActorSheet;
 const BaseItemSheet = foundry?.appv1?.sheets?.ItemSheet ?? ItemSheet;
@@ -1287,6 +1287,7 @@ const CARRIED_ITEM_LIMIT_BASE = 10;
 const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
+const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
@@ -1471,6 +1472,50 @@ function normalizeItemAudioUpdate(item, updateData = null) {
     changed: current !== normalized,
     invalid: wasProvided && !normalized
   };
+}
+
+function normalizeCharacteristicBonusItemUpdate(item, updateData = null) {
+  const type = String(item?.type || "").trim().toLowerCase();
+  if (!CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) return false;
+  const defaultUseEnabled = type === "protection";
+  const sourceSystem = updateData
+    ? foundry.utils.mergeObject(
+      foundry.utils.deepClone(item?.system || {}),
+      foundry.utils.getProperty(updateData, "system") || {},
+      { inplace: false }
+    )
+    : (item?.system || {});
+
+  const useEnabled = toCheckboxBoolean(sourceSystem?.useEnabled, defaultUseEnabled);
+  const characteristicBonusEnabled = toCheckboxBoolean(sourceSystem?.characteristicBonusEnabled, false);
+  const characteristicBonuses = {};
+  for (const characteristic of CHARACTERISTICS) {
+    characteristicBonuses[characteristic.key] = toFiniteNumber(
+      sourceSystem?.characteristicBonuses?.[characteristic.key],
+      0
+    );
+  }
+
+  if (updateData) {
+    foundry.utils.setProperty(updateData, "system.useEnabled", useEnabled);
+    foundry.utils.setProperty(updateData, "system.characteristicBonusEnabled", characteristicBonusEnabled);
+    for (const characteristic of CHARACTERISTICS) {
+      const key = characteristic.key;
+      foundry.utils.setProperty(updateData, `system.characteristicBonuses.${key}`, characteristicBonuses[key]);
+    }
+    return true;
+  }
+
+  const sourceUpdate = {
+    "system.useEnabled": useEnabled,
+    "system.characteristicBonusEnabled": characteristicBonusEnabled
+  };
+  for (const characteristic of CHARACTERISTICS) {
+    const key = characteristic.key;
+    sourceUpdate[`system.characteristicBonuses.${key}`] = characteristicBonuses[key];
+  }
+  item.updateSource(sourceUpdate);
+  return true;
 }
 
 async function playItemAudio(item, options = {}) {
@@ -3044,9 +3089,11 @@ async function handleDamageRerollRequest(data) {
       const finalDamage = Math.max(0, share - paEffective);
       const nextValue = Math.max(0, hpBefore - finalDamage);
       await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
-      ChatMessage.create({
-        speaker: { alias: targetName },
-        content: t("BLOODMAN.Rolls.Damage.Take", { name: targetName, amount: finalDamage, pa: paEffective })
+      await postDamageTakenChatMessage({
+        name: targetName,
+        amount: finalDamage,
+        pa: paEffective,
+        speakerAlias: targetName
       });
       result = {
         hpBefore,
@@ -3126,9 +3173,11 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     } catch (error) {
       console.error("[bloodman] damage:update tokenDoc failed", error);
     }
-    ChatMessage.create({
-      speaker: { alias: fallbackName },
-      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa: paEffective })
+    await postDamageTakenChatMessage({
+      name: fallbackName,
+      amount: finalDamage,
+      pa: paEffective,
+      speakerAlias: fallbackName
     });
     const result = {
       finalDamage,
@@ -3192,9 +3241,11 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     const paInitial = Number.isFinite(fallbackPA) ? fallbackPA : 0;
     const paEffective = Math.max(0, paInitial - penetration);
     const finalDamage = Math.max(0, share - paEffective);
-    ChatMessage.create({
-      speaker: { alias: fallbackName },
-      content: t("BLOODMAN.Rolls.Damage.Take", { name: fallbackName, amount: finalDamage, pa: paEffective })
+    await postDamageTakenChatMessage({
+      name: fallbackName,
+      amount: finalDamage,
+      pa: paEffective,
+      speakerAlias: fallbackName
     });
     return;
   }
@@ -3968,6 +4019,7 @@ Hooks.once("ready", async () => {
 
     if (Object.keys(updates).length) await actor.update(updates);
     await applyItemResourceBonuses(actor);
+    await syncActorDerivedCharacteristicsResources(actor);
 
     for (const item of actor.items) {
       if (item.type === "aptitude") {
@@ -4220,8 +4272,14 @@ Hooks.on("createItem", async (item, options, userId) => {
 
   await applyAptitudeVoyageCostOnCreate(item.actor, item);
 
-  if (item.type !== "aptitude" && item.type !== "pouvoir") return;
-  await applyItemResourceBonuses(item.actor);
+  const type = String(item.type || "").trim().toLowerCase();
+  if (type === "aptitude" || type === "pouvoir") {
+    await applyItemResourceBonuses(item.actor);
+    return;
+  }
+  if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
+    await syncActorDerivedCharacteristicsResources(item.actor);
+  }
 });
 
 Hooks.on("preCreateItem", (item, createData) => {
@@ -4229,6 +4287,8 @@ Hooks.on("preCreateItem", (item, createData) => {
   if (normalizedAudio.invalid) {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
   }
+
+  normalizeCharacteristicBonusItemUpdate(item, createData);
 
   if (item?.type !== "aptitude") return;
 
@@ -4268,6 +4328,8 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   if (normalizedAudio.invalid) {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
   }
+
+  normalizeCharacteristicBonusItemUpdate(item, updateData);
 
   if (item?.type !== "aptitude") return;
   const costPath = "system.xpVoyageCost";
@@ -4366,19 +4428,43 @@ Hooks.on("renderHotbar", () => {
 
 Hooks.on("updateItem", (item) => {
   if (!item?.actor) return;
-  if (item.type !== "aptitude" && item.type !== "pouvoir") return;
-  applyItemResourceBonuses(item.actor);
+  const type = String(item.type || "").trim().toLowerCase();
+  if (type === "aptitude" || type === "pouvoir") {
+    applyItemResourceBonuses(item.actor);
+    return;
+  }
+  if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
+    syncActorDerivedCharacteristicsResources(item.actor);
+  }
 });
 
 Hooks.on("deleteItem", (item) => {
   if (!item?.actor) return;
-  if (item.type !== "aptitude" && item.type !== "pouvoir") return;
-  applyItemResourceBonuses(item.actor);
+  const type = String(item.type || "").trim().toLowerCase();
+  if (type === "aptitude" || type === "pouvoir") {
+    applyItemResourceBonuses(item.actor);
+    return;
+  }
+  if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
+    syncActorDerivedCharacteristicsResources(item.actor);
+  }
 });
 
 function getItemBonusTotals(actor) {
   const totals = {};
   for (const c of CHARACTERISTICS) totals[c.key] = 0;
+  if (!actor?.items) return totals;
+
+  for (const item of actor.items) {
+    const type = String(item?.type || "").trim().toLowerCase();
+    if (!CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) continue;
+    if (!toCheckboxBoolean(item.system?.characteristicBonusEnabled, false)) continue;
+    for (const characteristic of CHARACTERISTICS) {
+      const key = characteristic.key;
+      const value = Number(item.system?.characteristicBonuses?.[key]);
+      if (Number.isFinite(value)) totals[key] += value;
+    }
+  }
   return totals;
 }
 
@@ -4426,6 +4512,53 @@ async function applyItemResourceBonuses(actor) {
   if (storedPp !== totals.pp) updates["system.resources.pp.itemBonus"] = totals.pp;
 
   if (Object.keys(updates).length) await actor.update(updates, { bloodmanAllowVitalResourceUpdate: true });
+}
+
+async function syncActorDerivedCharacteristicsResources(actor) {
+  const isCharacter = actor?.type === "personnage";
+  const isNpc = actor?.type === "personnage-non-joueur";
+  if (!actor || (!isCharacter && !isNpc) || !actor.isOwner) return;
+
+  const itemBonuses = getItemBonusTotals(actor);
+  const profile = actor.system?.profile || {};
+  const archetypeBonusValue = normalizeArchetypeBonusValue(profile.archetypeBonusValue, 0);
+  const archetypeBonusCharacteristic = normalizeCharacteristicKey(profile.archetypeBonusCharacteristic);
+  const getArchetypeBonus = key => {
+    if (!Number.isFinite(archetypeBonusValue)) return 0;
+    return archetypeBonusCharacteristic === key ? archetypeBonusValue : 0;
+  };
+  const effective = key => {
+    return toFiniteNumber(actor.system.characteristics?.[key]?.base, 0)
+      + toFiniteNumber(actor.system.modifiers?.all, 0)
+      + toFiniteNumber(actor.system.modifiers?.[key], 0)
+      + toFiniteNumber(itemBonuses?.[key], 0)
+      + getArchetypeBonus(key);
+  };
+
+  const phyEffective = effective("PHY");
+  const espEffective = effective("ESP");
+  const derivedPvMax = getDerivedPvMax(actor, phyEffective);
+  const derivedPpMax = Math.round(espEffective / 5);
+  const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
+  const storedPpBonus = toFiniteNumber(actor.system.resources?.pp?.itemBonus, 0);
+  const nextPvMax = Math.max(0, derivedPvMax + storedPvBonus);
+  const nextPpMax = Math.max(0, derivedPpMax + storedPpBonus);
+  const currentPvMax = toFiniteNumber(actor.system.resources?.pv?.max, nextPvMax);
+  const currentPpMax = toFiniteNumber(actor.system.resources?.pp?.max, nextPpMax);
+  const currentPv = toFiniteNumber(actor.system.resources?.pv?.current, 0);
+  const currentPp = toFiniteNumber(actor.system.resources?.pp?.current, 0);
+
+  const updates = {};
+  if (!validateNumericEquality(currentPvMax, nextPvMax)) updates["system.resources.pv.max"] = nextPvMax;
+  if (!validateNumericEquality(currentPpMax, nextPpMax)) updates["system.resources.pp.max"] = nextPpMax;
+  if (currentPv > nextPvMax) updates["system.resources.pv.current"] = nextPvMax;
+  if (currentPp > nextPpMax) updates["system.resources.pp.current"] = nextPpMax;
+  if (Object.keys(updates).length) {
+    await actor.update(updates, { bloodmanAllowVitalResourceUpdate: true });
+  }
+
+  const gauge = normalizeActorMoveGauge(actor, { itemBonuses, initializeWhenMissing: true });
+  await setActorMoveGauge(actor, gauge.value, gauge.max);
 }
 
 async function applyPowerCost(actor, item) {
@@ -5142,7 +5275,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       return itemId === lastItemRerollId;
     };
 
-    const itemBonuses = getItemBonusTotals(data.actor);
+    const itemBonuses = getItemBonusTotals(this.actor);
     const characteristics = CHARACTERISTICS.map(c => {
       const label = t(c.labelKey) || c.key;
       const base = Number(data.actor.system.characteristics?.[c.key]?.base || 0);
@@ -6113,9 +6246,11 @@ class BloodmanActorSheet extends BaseActorSheet {
         const finalDamage = Math.max(0, share - paEffective);
         const nextValue = Math.max(0, hpBefore - finalDamage);
         await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
-        ChatMessage.create({
-          speaker: { alias: targetName },
-          content: t("BLOODMAN.Rolls.Damage.Take", { name: targetName, amount: finalDamage, pa: paEffective })
+        await postDamageTakenChatMessage({
+          name: targetName,
+          amount: finalDamage,
+          pa: paEffective,
+          speakerAlias: targetName
         });
         result = {
           hpBefore,
@@ -6389,6 +6524,20 @@ class BloodmanItemSheet extends BaseItemSheet {
     if (this.item.type === "pouvoir") {
       if (!data.item.system) data.item.system = {};
       data.item.system.usableEnabled = isPowerUsableEnabled(this.item.system?.usableEnabled);
+    }
+    if (this.item.type === "objet" || this.item.type === "protection") {
+      if (!data.item.system) data.item.system = {};
+      const defaultUseEnabled = this.item.type === "protection";
+      data.item.system.useEnabled = toCheckboxBoolean(this.item.system?.useEnabled, defaultUseEnabled);
+      data.item.system.characteristicBonusEnabled = toCheckboxBoolean(this.item.system?.characteristicBonusEnabled, false);
+      const characteristicBonuses = {};
+      for (const characteristic of CHARACTERISTICS) {
+        characteristicBonuses[characteristic.key] = toFiniteNumber(
+          this.item.system?.characteristicBonuses?.[characteristic.key],
+          0
+        );
+      }
+      data.item.system.characteristicBonuses = characteristicBonuses;
     }
     return data;
   }

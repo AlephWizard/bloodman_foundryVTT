@@ -114,6 +114,7 @@
       "CriticalFailure": "ÉCHEC CRITIQUE",
       "Damage": {
         "Deal": "<strong>{name}</strong> inflige {amount} dégâts{source}",
+        "TakePublic": "<strong>{name}</strong> subit des dégâts",
         "Take": "<strong>{name}</strong> subit {amount} dégâts (PA {pa})",
         "Zero": "<strong>{name}</strong> inflige 0 dégâts ({item})"
       },
