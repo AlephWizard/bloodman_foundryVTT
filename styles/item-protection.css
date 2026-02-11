@@ -11,7 +11,7 @@
   gap: 6px;
 }
 
-.item-protection.bm-item-sheet .bm-item-row:nth-of-type(2) {
+.item-protection.bm-item-sheet .bm-item-row-pa {
   padding: 5px 7px;
   border: 1px dashed var(--bm-item-dash);
   border-radius: 8px;

@@ -1288,6 +1288,7 @@ const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection"]);
+const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
@@ -1472,6 +1473,44 @@ function normalizeItemAudioUpdate(item, updateData = null) {
     changed: current !== normalized,
     invalid: wasProvided && !normalized
   };
+}
+
+function isPriceManagedItemType(itemType) {
+  const type = String(itemType || "").trim().toLowerCase();
+  return PRICE_ITEM_TYPES.has(type);
+}
+
+function resolveItemPricePreviewState(rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) return { salePrice: "", errorMessage: "" };
+  const compact = raw.replace(/\s+/g, "").replace(",", ".");
+  const numericPattern = /^[-+]?(?:\d+|\d*\.\d+)$/;
+  const numericValue = Number(compact);
+  const invalidLabel = t("BLOODMAN.Items.PriceInvalid");
+  const errorMessage = invalidLabel && invalidLabel !== "BLOODMAN.Items.PriceInvalid"
+    ? invalidLabel
+    : "Le prix doit etre un nombre valide.";
+  if (!numericPattern.test(compact) || !Number.isFinite(numericValue) || numericValue < 0) {
+    return { salePrice: "", errorMessage };
+  }
+  const salePrice = Math.ceil(numericValue * 0.2);
+  return { salePrice: String(salePrice), errorMessage: "" };
+}
+
+function normalizeItemPriceUpdate(item, updateData = null) {
+  if (!isPriceManagedItemType(item?.type)) return false;
+  const path = "system.price";
+  if (updateData) {
+    const hasPriceUpdate = Object.prototype.hasOwnProperty.call(updateData, path)
+      || foundry.utils.getProperty(updateData, path) !== undefined;
+    if (!hasPriceUpdate) return false;
+    const nextPrice = String(foundry.utils.getProperty(updateData, path) ?? "").trim();
+    foundry.utils.setProperty(updateData, path, nextPrice);
+    return true;
+  }
+  const sourcePrice = String(item?.system?.price ?? "").trim();
+  item.updateSource({ [path]: sourcePrice });
+  return true;
 }
 
 function normalizeCharacteristicBonusItemUpdate(item, updateData = null) {
@@ -4288,6 +4327,7 @@ Hooks.on("preCreateItem", (item, createData) => {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
   }
 
+  normalizeItemPriceUpdate(item, createData);
   normalizeCharacteristicBonusItemUpdate(item, createData);
 
   if (item?.type !== "aptitude") return;
@@ -4329,6 +4369,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
   }
 
+  normalizeItemPriceUpdate(item, updateData);
   normalizeCharacteristicBonusItemUpdate(item, updateData);
 
   if (item?.type !== "aptitude") return;
@@ -6539,6 +6580,13 @@ class BloodmanItemSheet extends BaseItemSheet {
       }
       data.item.system.characteristicBonuses = characteristicBonuses;
     }
+    if (isPriceManagedItemType(this.item.type)) {
+      if (!data.item.system) data.item.system = {};
+      data.item.system.price = String(this.item.system?.price ?? "").trim();
+      const preview = resolveItemPricePreviewState(data.item.system.price);
+      data.itemComputedSellPrice = preview.salePrice;
+      data.itemPriceError = preview.errorMessage;
+    }
     return data;
   }
 
@@ -6554,12 +6602,35 @@ class BloodmanItemSheet extends BaseItemSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    this.activatePricePreviewListeners(html);
 
     if (this.item.type !== "aptitude" && this.item.type !== "pouvoir") return;
 
     html.find(".damage-roll").click(() => {
       this.rollAbilityDamage();
     });
+  }
+
+  refreshPricePreview(htmlLike = null) {
+    if (!isPriceManagedItemType(this.item?.type)) return;
+    const root = htmlLike?.find ? htmlLike : this.element;
+    if (!root?.length) return;
+    const priceInput = root.find("input[name='system.price']").first();
+    const saleInput = root.find("input[data-price-sale]").first();
+    const errorNode = root.find("[data-price-error]").first();
+    if (!priceInput.length || !saleInput.length || !errorNode.length) return;
+    const preview = resolveItemPricePreviewState(priceInput.val());
+    saleInput.val(preview.salePrice);
+    errorNode.text(preview.errorMessage || "");
+    priceInput.toggleClass("is-invalid", Boolean(preview.errorMessage));
+    priceInput.attr("aria-invalid", preview.errorMessage ? "true" : "false");
+  }
+
+  activatePricePreviewListeners(html) {
+    if (!isPriceManagedItemType(this.item?.type)) return;
+    const refresh = () => this.refreshPricePreview(html);
+    html.on("input change blur", "input[name='system.price']", refresh);
+    refresh();
   }
 
   async rollAbilityDamage() {

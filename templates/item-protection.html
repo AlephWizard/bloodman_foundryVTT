@@ -11,6 +11,18 @@
       </div>
 
       <div class="bm-item-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Items.PriceLabel"}}</div>
+        <input class="bm-item-input" type="text" name="system.price" value="{{item.system.price}}" />
+      </div>
+
+      <div class="bm-item-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Items.SalePriceLabel"}}</div>
+        <input class="bm-item-input bm-item-input-readonly" type="text" value="{{itemComputedSellPrice}}" readonly data-price-sale />
+      </div>
+
+      <p class="bm-price-error" data-price-error>{{itemPriceError}}</p>
+
+      <div class="bm-item-row bm-item-row-pa">
         <div class="bm-item-tag">PA</div>
         <input class="bm-item-input bm-item-input-narrow" type="number" name="system.pa" value="{{item.system.pa}}" />
       </div>
