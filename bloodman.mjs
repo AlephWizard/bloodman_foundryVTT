@@ -1722,7 +1722,11 @@ const TOKEN_IMAGE_UPDATE_PATHS = [
   "img"
 ];
 
-const SYSTEM_SOCKET = "system.bloodman";
+const SYSTEM_ID = "bloodman";
+const SYSTEM_ROOT_PATH = `systems/${SYSTEM_ID}`;
+const SYSTEM_SOCKET = `system.${SYSTEM_ID}`;
+const CHAOS_DICE_ICON_SRC = `${SYSTEM_ROOT_PATH}/images/d20_destin.svg`;
+const CHAOS_DICE_ICON_FALLBACK_SRC = "icons/svg/d20.svg";
 const CARRIED_ITEM_LIMIT_BASE = 10;
 const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
@@ -4774,7 +4778,7 @@ function ensureChaosDiceUI() {
   container.innerHTML = `
     <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="Augmenter les des du chaos">+</button>
     <div class="bm-chaos-icon" aria-hidden="true">
-      <img src="icons/svg/d20.svg" alt="" />
+      <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
       <span class="bm-chaos-value">0</span>
     </div>
     <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="Diminuer les des du chaos">-</button>
@@ -4784,6 +4788,15 @@ function ensureChaosDiceUI() {
 
   const minus = container.querySelector(".bm-chaos-minus");
   const plus = container.querySelector(".bm-chaos-plus");
+  const chaosIconImage = container.querySelector(".bm-chaos-icon img");
+
+  chaosIconImage?.addEventListener("error", () => {
+    if (chaosIconImage.dataset.fallbackApplied === "true") return;
+    const fallbackSrc = String(chaosIconImage.dataset.fallbackSrc || "").trim();
+    if (!fallbackSrc) return;
+    chaosIconImage.dataset.fallbackApplied = "true";
+    chaosIconImage.src = fallbackSrc;
+  });
 
   minus?.addEventListener("click", async () => {
     const current = getChaosValue();

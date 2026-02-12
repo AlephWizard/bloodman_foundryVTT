@@ -1,14 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600;700&display=swap");
 
-@font-face {
-  font-family: "Penumbra";
-  src: url("../Images/Penumbra.woff2") format("woff2"),
-    url("../Images/Penumbra.woff") format("woff");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --bm-green: #1dbb3c;
   --bm-black: #0f0f0f;
