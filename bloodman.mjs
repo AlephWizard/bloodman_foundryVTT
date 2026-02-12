@@ -2477,6 +2477,115 @@ async function repairTokenTextureSource(tokenLike) {
   }
 }
 
+async function syncPrototypeTokenImageFromActorImage(actor) {
+  if (!game.user?.isGM) return false;
+  if (!actor || (actor.type !== "personnage" && actor.type !== "personnage-non-joueur")) return false;
+  if (actor.isToken) return false;
+
+  const actorImg = String(actor.img || "").trim();
+  const currentPrototypeSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
+  const nextPrototypeSrc = actorImg || "icons/svg/mystery-man.svg";
+
+  if (!nextPrototypeSrc || nextPrototypeSrc === currentPrototypeSrc) return false;
+  try {
+    await actor.update(
+      {
+        "prototypeToken.texture.src": nextPrototypeSrc,
+        "prototypeToken.img": nextPrototypeSrc,
+        "token.img": nextPrototypeSrc
+      },
+      { bloodmanSkipPrototypeImageSync: true }
+    );
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function syncSceneTokenImagesFromActorImage(actor, options = {}) {
+  if (!game.user?.isGM) return 0;
+  if (!actor || (actor.type !== "personnage" && actor.type !== "personnage-non-joueur")) return 0;
+  if (actor.isToken) return 0;
+
+  const previousActorImage = String(options.previousActorImage || "").trim();
+  const previousPrototypeImage = String(options.previousPrototypeImage || "").trim();
+  const previousSources = new Set([previousActorImage, previousPrototypeImage].filter(Boolean));
+
+  const actorImg = String(actor.img || "").trim();
+  const nextTokenSrc = actorImg || "icons/svg/mystery-man.svg";
+  if (!nextTokenSrc) return 0;
+
+  let updatedCount = 0;
+  for (const tokenDoc of getTokenDocumentsForActor(actor)) {
+    if (!tokenDoc?.update) continue;
+    const currentTokenSrc = String(
+      foundry.utils.getProperty(tokenDoc, "texture.src")
+      || foundry.utils.getProperty(tokenDoc, "img")
+      || ""
+    ).trim();
+    const isMissing = isMissingTokenImage(currentTokenSrc);
+    const isLinkedToken = tokenDoc.actorLink === true;
+    const matchesPrevious = previousSources.has(currentTokenSrc);
+    if (!isLinkedToken && !isMissing && !matchesPrevious) continue;
+    if (currentTokenSrc === nextTokenSrc) continue;
+    try {
+      await tokenDoc.update(
+        { "texture.src": nextTokenSrc, "img": nextTokenSrc },
+        { bloodmanSkipActorImageSync: true }
+      );
+      updatedCount += 1;
+    } catch (_error) {
+      // non-fatal: keep syncing other token instances
+    }
+  }
+  return updatedCount;
+}
+
+function resolveWorldActorFromTokenDocument(tokenDoc) {
+  if (!tokenDoc) return null;
+  const actorId = String(tokenDoc.actorId || "").trim();
+  if (actorId) return game.actors?.get(actorId) || null;
+  const actor = tokenDoc.actor || null;
+  if (!actor || actor.isToken) return null;
+  return actor;
+}
+
+async function syncActorAndPrototypeImageFromTokenImage(tokenDoc) {
+  if (!game.user?.isGM) return false;
+  const actor = resolveWorldActorFromTokenDocument(tokenDoc);
+  if (!actor) return false;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return false;
+
+  const tokenSrc = String(
+    foundry.utils.getProperty(tokenDoc, "texture.src")
+    || foundry.utils.getProperty(tokenDoc, "img")
+    || ""
+  ).trim();
+  if (!tokenSrc) return false;
+
+  const actorImg = String(actor.img || "").trim();
+  const protoSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
+  const legacyProtoImg = String(foundry.utils.getProperty(actor, "prototypeToken.img") || "").trim();
+  const legacyTokenImg = String(foundry.utils.getProperty(actor, "token.img") || "").trim();
+  const needsUpdate = actorImg !== tokenSrc || protoSrc !== tokenSrc || legacyProtoImg !== tokenSrc || legacyTokenImg !== tokenSrc;
+  if (!needsUpdate) return false;
+
+  try {
+    await actor.update(
+      {
+        img: tokenSrc,
+        "prototypeToken.texture.src": tokenSrc,
+        "prototypeToken.img": tokenSrc,
+        "token.img": tokenSrc
+      },
+      { bloodmanSkipPrototypeImageSync: true, bloodmanSkipSceneTokenImageSync: true }
+    );
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function getActiveNonGMCount() {
   return game.users?.filter(user => user.active && !user.isGM).length || 0;
 }
@@ -5227,11 +5336,28 @@ Hooks.on("preCreateToken", (doc) => {
   const actorType = getTokenActorType(doc);
   if (actorType === "personnage") sourceUpdates.actorLink = true;
   if (actorType === "personnage-non-joueur") sourceUpdates.actorLink = false;
-  const tokenSrc = foundry.utils.getProperty(doc, "texture.src");
-  if (isMissingTokenImage(tokenSrc)) {
+  const tokenSrc = String(
+    foundry.utils.getProperty(doc, "texture.src")
+    || foundry.utils.getProperty(doc, "img")
+    || ""
+  ).trim();
+  const actorImg = String(
+    doc?.actor?.img
+    || (doc?.actorId ? game.actors?.get(doc.actorId)?.img : "")
+    || ""
+  ).trim();
+  const isCharacterTokenType = actorType === "personnage" || actorType === "personnage-non-joueur";
+
+  if (isCharacterTokenType && actorImg) {
+    if (tokenSrc !== actorImg) {
+      sourceUpdates["texture.src"] = actorImg;
+      sourceUpdates.img = actorImg;
+    }
+  } else if (isMissingTokenImage(tokenSrc)) {
     const fallbackSrc = getSafeTokenTextureFallback(doc);
     if (fallbackSrc && fallbackSrc !== tokenSrc) {
       sourceUpdates["texture.src"] = fallbackSrc;
+      sourceUpdates.img = fallbackSrc;
     }
   }
   if (Object.keys(sourceUpdates).length) doc.updateSource(sourceUpdates);
@@ -5315,8 +5441,28 @@ Hooks.on("combatStart", (combat) => {
 
 Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  const trackingOptions = options && typeof options === "object" ? options : null;
+
+  if (foundry.utils.getProperty(updateData, "img") != null) {
+    if (trackingOptions) {
+      trackingOptions.bloodmanPreviousActorImage = String(actor.img || "").trim();
+      trackingOptions.bloodmanPreviousPrototypeImage = String(
+        foundry.utils.getProperty(actor, "prototypeToken.texture.src") || ""
+      ).trim();
+    }
+  }
+
   normalizeCharacteristicXpUpdates(updateData, actor);
   const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
+
+  const nextActorImageRaw = foundry.utils.getProperty(updateData, "img");
+  if (nextActorImageRaw != null && isAssistantOrHigherRole(updaterRole)) {
+    const nextActorImage = String(nextActorImageRaw || "").trim() || "icons/svg/mystery-man.svg";
+    foundry.utils.setProperty(updateData, "prototypeToken.texture.src", nextActorImage);
+    foundry.utils.setProperty(updateData, "prototypeToken.img", nextActorImage);
+    foundry.utils.setProperty(updateData, "token.img", nextActorImage);
+  }
+
   let blockedRestrictedFields = false;
   const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
   const allowVitalResourceUpdate = Boolean(options?.bloodmanAllowVitalResourceUpdate);
@@ -5582,6 +5728,72 @@ Hooks.on("updateActor", async (actor, changes) => {
   await syncZeroPvStatusForActor(actor);
 });
 
+Hooks.on("updateActor", async (actor, changes, options, userId) => {
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  if (!game.user.isGM) return;
+  if (options?.bloodmanSkipPrototypeImageSync) return;
+  if (options?.bloodmanSkipSceneTokenImageSync) return;
+
+  const hasActorImageChange = foundry.utils.getProperty(changes, "img") != null;
+  if (!hasActorImageChange) return;
+
+  if (actor.isToken) {
+    const tokenDoc = actor.token || actor.parent || null;
+    const nextTokenImage = String(actor.img || "").trim() || "icons/svg/mystery-man.svg";
+    const previousTokenImage = String(options?.bloodmanPreviousActorImage || "").trim();
+    const previousTokenPrototypeImage = String(options?.bloodmanPreviousPrototypeImage || "").trim();
+    if (tokenDoc?.update) {
+      await tokenDoc.update(
+        { "texture.src": nextTokenImage, "img": nextTokenImage },
+        { bloodmanSkipActorImageSync: true }
+      ).catch(() => null);
+    }
+
+    const worldActor = resolveWorldActorFromTokenDocument(tokenDoc);
+    if (!worldActor) return;
+    const previousActorImage = previousTokenImage || String(worldActor.img || "").trim();
+    const previousPrototypeImage = previousTokenPrototypeImage
+      || String(foundry.utils.getProperty(worldActor, "prototypeToken.texture.src") || "").trim();
+    await worldActor.update(
+      {
+        img: nextTokenImage,
+        "prototypeToken.texture.src": nextTokenImage,
+        "prototypeToken.img": nextTokenImage,
+        "token.img": nextTokenImage
+      },
+      { bloodmanSkipPrototypeImageSync: true, bloodmanSkipSceneTokenImageSync: true }
+    ).catch(() => null);
+    await syncSceneTokenImagesFromActorImage(worldActor, { previousActorImage, previousPrototypeImage });
+    return;
+  }
+
+  const actorImageSrc = String(actor.img || "").trim();
+  if (actorImageSrc) TOKEN_TEXTURE_VALIDITY_CACHE.delete(actorImageSrc);
+
+  const previousActorImage = String(options?.bloodmanPreviousActorImage || "").trim();
+  const previousPrototypeImage = String(
+    options?.bloodmanPreviousPrototypeImage
+    ?? foundry.utils.getProperty(actor, "prototypeToken.texture.src")
+    ?? ""
+  ).trim();
+  const requestedPrototypeImage = String(
+    foundry.utils.getProperty(changes, "prototypeToken.texture.src")
+    ?? foundry.utils.getProperty(changes, "prototypeToken.img")
+    ?? foundry.utils.getProperty(changes, "token.img")
+    ?? ""
+  ).trim();
+  if (
+    requestedPrototypeImage
+    && requestedPrototypeImage !== actorImageSrc
+    && requestedPrototypeImage !== previousPrototypeImage
+  ) {
+    return;
+  }
+
+  await syncPrototypeTokenImageFromActorImage(actor);
+  await syncSceneTokenImagesFromActorImage(actor, { previousActorImage, previousPrototypeImage });
+});
+
 Hooks.on("preUpdateToken", (tokenDoc, changes, options, userId) => {
   const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
   if (!isAssistantOrHigherRole(updaterRole)) {
@@ -5628,14 +5840,19 @@ Hooks.on("preUpdateToken", (tokenDoc, changes, options, userId) => {
 
 Hooks.on("updateToken", async (tokenDoc, changes, options, userId) => {
   scheduleRoundTokenMask(tokenDoc);
+  const hasTokenImageChange = foundry.utils.getProperty(changes, "texture.src") != null
+    || foundry.utils.getProperty(changes, "img") != null;
+  const sourceUserId = String(userId || "");
+  const currentUserId = String(game.user?.id || "");
+  const isSourceUser = sourceUserId ? sourceUserId === currentUserId : Boolean(game.user?.isGM);
+  if (game.user?.isGM && hasTokenImageChange && !options?.bloodmanSkipActorImageSync) {
+    await syncActorAndPrototypeImageFromTokenImage(tokenDoc);
+  }
   const moveCost = Number(options?.bloodmanMoveCost);
   const startedCombat = getStartedActiveCombat();
   const isCombatMove = startedCombat
     && String(options?.bloodmanMoveCombatId || "") === String(startedCombat.id || "")
     && Boolean(getCombatantForToken(startedCombat, tokenDoc));
-  const sourceUserId = String(userId || "");
-  const currentUserId = String(game.user?.id || "");
-  const isSourceUser = sourceUserId ? sourceUserId === currentUserId : Boolean(game.user?.isGM);
   if (isCombatMove && Number.isFinite(moveCost) && moveCost > TOKEN_MOVE_LIMIT_EPSILON && isSourceUser) {
     const actorType = getTokenActorType(tokenDoc);
     if (actorType === "personnage" || actorType === "personnage-non-joueur") {
