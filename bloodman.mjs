@@ -1134,6 +1134,7 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
   if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
 
   const isZeroOrLess = Number(pvCurrent) <= 0;
+  await syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess);
   const bleeding = getBleedingStatusEffect();
   const dead = getDeadStatusEffect();
   const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
@@ -1579,6 +1580,65 @@ function applyStateModifierUpdateToData(updateData, label, totals) {
   }
 }
 
+async function setActorStatePresetActive(actor, stateId, active) {
+  if (!actor) return false;
+  const presetId = String(stateId || "").trim();
+  if (!presetId || !STATE_PRESET_BY_ID.has(presetId)) return false;
+
+  const currentLabel = String(actor.system?.modifiers?.label || "");
+  const currentSelection = resolveStatePresetSelection(currentLabel);
+  if (currentSelection.invalidTokens.length) {
+    console.warn("[bloodman] state:preset sync skipped (invalid label)", {
+      actorId: actor.id,
+      actorName: actor.name,
+      invalidTokens: currentSelection.invalidTokens
+    });
+    return false;
+  }
+
+  const selected = new Set(currentSelection.ids);
+  const shouldBeActive = Boolean(active);
+  const isActive = selected.has(presetId);
+  if (isActive === shouldBeActive) return true;
+
+  if (shouldBeActive) selected.add(presetId);
+  else selected.delete(presetId);
+
+  const nextIds = STATE_PRESET_ORDER.filter(id => selected.has(id));
+  const nextLabel = buildStatePresetLabelFromIds(nextIds);
+  try {
+    await actor.update({ "system.modifiers.label": nextLabel });
+    return true;
+  } catch (error) {
+    console.warn("[bloodman] state:preset sync failed", {
+      actorId: actor.id,
+      actorName: actor.name,
+      stateId: presetId,
+      active: shouldBeActive,
+      error
+    });
+    return false;
+  }
+}
+
+async function syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess) {
+  if (!tokenDoc) return;
+
+  const actor = tokenDoc.actorLink === true
+    ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
+    : (tokenDoc.actor || null);
+  if (!actor) return;
+
+  await syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess);
+}
+
+async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
+  if (!actor) return;
+  const resolvedActorType = String(actorType || actor.type || "").trim();
+  if (resolvedActorType !== "personnage") return;
+  await setActorStatePresetActive(actor, PLAYER_ZERO_PV_STATE_PRESET_ID, isZeroOrLess);
+}
+
 function buildStatePresetModifierLabel(preset) {
   if (!preset) return tl("BLOODMAN.StateBar.NoModifier", "Aucun modificateur");
   const parts = [];
@@ -1733,6 +1793,7 @@ const REROLL_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-reroll-r
 const INITIATIVE_GROUP_BUFFER_MS = 180;
 const TOKEN_MOVE_LIMIT_EPSILON = 0.0001;
 let LAST_COMBAT_MOVE_RESET_KEY = "";
+const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
 const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
 
@@ -2112,6 +2173,7 @@ async function playItemAudio(item, options = {}) {
   const delayMs = Number.isFinite(requestedDelay)
     ? Math.max(0, Math.floor(requestedDelay))
     : ITEM_AUDIO_POST_ROLL_DELAY_MS;
+  const broadcast = options?.broadcast !== false;
   const rawAudioFile = String(item.system?.audioFile || "").trim();
   if (!rawAudioFile) return false;
   const audioFile = normalizeItemAudioFile(rawAudioFile);
@@ -2130,7 +2192,7 @@ async function playItemAudio(item, options = {}) {
   }
 
   try {
-    await AudioHelper.play({ src: audioFile, volume: 0.9, autoplay: true, loop: false }, false);
+    await AudioHelper.play({ src: audioFile, volume: 0.9, autoplay: true, loop: false }, broadcast);
     return true;
   } catch (error) {
     console.error("[bloodman] audio:play failed", { itemType: item.type, itemId: item.id, audioFile, error });
@@ -5755,9 +5817,12 @@ Hooks.on("updateActor", async (actor, changes) => {
   if (!game.user.isGM) return;
   const hasPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
   if (!hasPvChange) return;
+  const pvCurrent = Number(actor.system?.resources?.pv?.current);
+  if (Number.isFinite(pvCurrent)) {
+    await syncZeroPvBodyStateForActor(actor, actor.type, pvCurrent <= 0);
+  }
   if (actor.isToken) {
     const tokenDoc = actor.token || actor.parent || null;
-    const pvCurrent = Number(actor.system?.resources?.pv?.current);
     if (tokenDoc && Number.isFinite(pvCurrent)) {
       await syncZeroPvStatusForToken(tokenDoc, actor.type, pvCurrent);
     }
