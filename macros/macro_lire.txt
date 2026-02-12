@@ -1,7 +1,0 @@
-Ouvrir éditeur de texte : 
-
-/* Bloodman - Macro automate de voyance (diffusion globale)
- * Usage:
- * 1) Creez une macro de type "Script".
- * 2) Collez ce code et executez-la.
- */
