@@ -1712,6 +1712,106 @@ function installTokenHudDomObserver() {
   return true;
 }
 
+function setTokenEffectBackgroundTransparent(target) {
+  if (!target || target.destroyed) return false;
+  let changed = false;
+  if (typeof target.clear === "function") {
+    try {
+      target.clear();
+      changed = true;
+    } catch (_error) {
+      // no-op
+    }
+  }
+  if ("alpha" in target && target.alpha !== 0) {
+    target.alpha = 0;
+    changed = true;
+  }
+  if ("visible" in target && target.visible !== false) {
+    target.visible = false;
+    changed = true;
+  }
+  if ("renderable" in target && target.renderable !== false) {
+    target.renderable = false;
+    changed = true;
+  }
+  return changed;
+}
+
+function applyTransparentTokenEffectBackground(tokenLike) {
+  const tokenObject = tokenLike?.object || tokenLike || null;
+  if (!tokenObject) return false;
+
+  const roots = [
+    tokenObject.effects,
+    tokenObject.effectContainer,
+    tokenObject.effectsContainer,
+    tokenObject._effects
+  ].filter(root => root && typeof root === "object");
+  if (!roots.length) return false;
+
+  let changed = false;
+  for (const root of roots) {
+    changed = setTokenEffectBackgroundTransparent(root?.bg) || changed;
+    changed = setTokenEffectBackgroundTransparent(root?.background) || changed;
+    changed = setTokenEffectBackgroundTransparent(root?.backdrop) || changed;
+
+    const children = Array.isArray(root?.children) ? root.children : [];
+    for (const child of children) {
+      const name = String(child?.name || "").trim().toLowerCase();
+      const isBackgroundLike = name === "bg" || name.includes("background") || name.includes("backdrop");
+      if (isBackgroundLike) changed = setTokenEffectBackgroundTransparent(child) || changed;
+      changed = setTokenEffectBackgroundTransparent(child?.bg) || changed;
+      changed = setTokenEffectBackgroundTransparent(child?.background) || changed;
+      changed = setTokenEffectBackgroundTransparent(child?.backdrop) || changed;
+    }
+  }
+
+  return changed;
+}
+
+function installTokenEffectBackgroundPatch() {
+  const tokenClass = CONFIG?.Token?.objectClass || globalThis.Token;
+  if (!tokenClass?.prototype) return false;
+  const proto = tokenClass.prototype;
+  if (proto[TOKEN_EFFECT_BG_PATCH_FLAG] === true) return true;
+
+  const originalDrawEffects = proto.drawEffects;
+  if (typeof originalDrawEffects !== "function") return false;
+
+  proto.drawEffects = function (...args) {
+    const finalize = () => {
+      try {
+        applyTransparentTokenEffectBackground(this);
+      } catch (error) {
+        console.warn("[bloodman] token effect background transparency patch skipped", error);
+      }
+    };
+
+    const result = originalDrawEffects.apply(this, args);
+    if (result && typeof result.then === "function") {
+      return result.then(value => {
+        finalize();
+        return value;
+      }).catch(error => {
+        finalize();
+        throw error;
+      });
+    }
+    finalize();
+    return result;
+  };
+
+  Object.defineProperty(proto, TOKEN_EFFECT_BG_PATCH_FLAG, {
+    value: true,
+    configurable: false,
+    enumerable: false,
+    writable: false
+  });
+
+  return true;
+}
+
 function getTokenActorType(tokenDoc) {
   const actorType = tokenDoc?.actor?.type;
   if (actorType) return actorType;
@@ -2009,6 +2109,7 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
 
   if (typeof tokenDoc?.object?.drawEffects === "function") {
     tokenDoc.object.drawEffects();
+    applyTransparentTokenEffectBackground(tokenDoc.object);
   }
 }
 if (!globalThis.__bmSyncZeroPvStatusForToken) {
@@ -2643,6 +2744,7 @@ const TOKEN_HUD_TURN_MIN = 1;
 const TOKEN_HUD_TURN_MAX = 12;
 const TOKEN_HUD_COUNTER_FLAG_KEY = "tokenHudTurnCounter";
 const TOKEN_HUD_RENDER_PATCH_FLAG = "__bmTokenHudRenderPatched";
+const TOKEN_EFFECT_BG_PATCH_FLAG = "__bmTokenEffectBackgroundPatched";
 const TOKEN_HUD_TURN_SELECTION_BY_TOKEN = new Map();
 const TOKEN_HUD_LAST_STATUS_BY_TOKEN = new Map();
 const TOKEN_HUD_ICON_SYNC_INTERVAL_MS = 2_000;
@@ -5390,9 +5492,13 @@ Hooks.on("renderTokenHUD", (hud, html) => {
 });
 
 Hooks.on("canvasReady", () => {
+  installTokenEffectBackgroundPatch();
   installTokenHudRenderPatch();
   installTokenHudDomObserver();
   scheduleTokenHudDomEnhancement();
+  for (const token of canvas?.tokens?.placeables || []) {
+    applyTransparentTokenEffectBackground(token);
+  }
 });
 
 Hooks.on("controlToken", () => {
@@ -5401,6 +5507,7 @@ Hooks.on("controlToken", () => {
 
 Hooks.once("ready", () => {
   console.info("[bloodman] HUD patch build 2026-02-13-b loaded");
+  installTokenEffectBackgroundPatch();
   void ensureTokenHudLocalSvgIcons({ copyMissing: true, force: true }).then(() => {
     refreshTokenHudStatusEffectIconPaths({ bumpCache: true });
   }).catch(error => {
@@ -5412,6 +5519,7 @@ Hooks.once("ready", () => {
 });
 
 Hooks.once("init", () => {
+  installTokenEffectBackgroundPatch();
   installTokenHudRenderPatch();
 
   game.settings.register("bloodman", "chaosDice", {
@@ -6318,11 +6426,13 @@ Hooks.on("preCreateToken", (doc) => {
 Hooks.on("drawToken", token => {
   void repairTokenTextureSource(token);
   scheduleRoundTokenMask(token);
+  applyTransparentTokenEffectBackground(token);
 });
 
 Hooks.on("refreshToken", token => {
   void repairTokenTextureSource(token);
   scheduleRoundTokenMask(token);
+  applyTransparentTokenEffectBackground(token);
 });
 
 Hooks.on("createToken", async (tokenDoc) => {

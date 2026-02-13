@@ -973,6 +973,70 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   right: auto !important;
 }
 
+#token-hud.bm-token-hud .palette.status-effects .effect-control,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+#token-hud.bm-token-hud .palette.status-effects .effect-control:hover,
+#token-hud.bm-token-hud .palette.status-effects .effect-control:focus,
+#token-hud.bm-token-hud .palette.status-effects .effect-control.active,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control:hover,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control:focus,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control.active {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+#token-hud.bm-token-hud .palette.status-effects .effect-control::before,
+#token-hud.bm-token-hud .palette.status-effects .effect-control::after,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control::before,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control::after {
+  display: none !important;
+}
+
+#token-hud.bm-token-hud .palette.status-effects .effect-control img,
+#token-hud.bm-token-hud .palette[data-palette="effects"] .effect-control img {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+#token-hud.bm-token-hud .status-effects,
+#token-hud.bm-token-hud .status-effects .effect-control,
+#token-hud.bm-token-hud .status-effects .effect-control:hover,
+#token-hud.bm-token-hud .status-effects .effect-control:focus,
+#token-hud.bm-token-hud .status-effects .effect-control.active,
+#token-hud.bm-token-hud .status-effects .effect-control.overlay {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+#token-hud.bm-token-hud .status-effects .effect-control::before,
+#token-hud.bm-token-hud .status-effects .effect-control::after {
+  display: none !important;
+}
+
+#token-hud.bm-token-hud .status-effects img,
+#token-hud.bm-token-hud .status-effects .effect-control img {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
 #token-hud.bm-token-hud .bm-token-hud-bottom-row {
   position: absolute;
   top: calc(100% + 8px);
