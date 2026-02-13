@@ -924,6 +924,207 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   font-family: var(--font-primary, "Signika", sans-serif);
 }
 
+/* ---------------------------------------- */
+/* Token HUD (Bloodman)                     */
+/* ---------------------------------------- */
+#token-hud.bm-token-hud .col.left,
+#token-hud.bm-token-hud .col.right {
+  top: 0;
+  height: auto;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+#token-hud.bm-token-hud .col.left {
+  align-items: flex-end;
+}
+
+#token-hud.bm-token-hud .col.right {
+  align-items: flex-start;
+}
+
+#token-hud {
+  overflow: visible !important;
+}
+
+#token-hud .col.left,
+#token-hud .col.right {
+  overflow: visible !important;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-top-row {
+  position: absolute;
+  top: calc(-1 * var(--control-size) - 16px);
+  left: 0;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 5;
+  pointer-events: all;
+  overflow: visible;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-top-row .palette.status-effects,
+#token-hud.bm-token-hud .bm-token-hud-top-row .palette[data-palette="effects"] {
+  top: auto !important;
+  bottom: calc(100% + 12px) !important;
+  left: 0 !important;
+  right: auto !important;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-row {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  z-index: 4;
+  pointer-events: all;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-sort {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-row .control-icon[data-action="config"] {
+  flex-basis: calc(var(--control-size) - 6px);
+  width: calc(var(--control-size) - 6px);
+  height: calc(var(--control-size) - 6px);
+  min-width: calc(var(--control-size) - 6px);
+  min-height: calc(var(--control-size) - 6px);
+  padding: 3px;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-row .attribute.elevation {
+  width: 96px;
+  min-width: 96px;
+  flex-basis: 96px;
+  flex-shrink: 0;
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-row .attribute.elevation input {
+  height: calc(var(--control-size) + 8px);
+  line-height: calc(var(--control-size) + 8px);
+  font-size: var(--font-size-34);
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-row .attribute.elevation > i.fas {
+  top: -7px;
+  left: -6px;
+  font-size: var(--font-size-18);
+}
+
+#token-hud.bm-token-hud .bm-token-hud-bottom-sort .control-icon[data-action="sort"] {
+  flex-basis: calc(var(--control-size) - 16px);
+  width: calc(var(--control-size) - 16px);
+  height: calc(var(--control-size) - 16px);
+  min-width: calc(var(--control-size) - 16px);
+  min-height: calc(var(--control-size) - 16px);
+  padding: 2px;
+}
+
+#token-hud .bm-token-hud-turn-control {
+  position: relative;
+  display: none;
+  align-items: center;
+  z-index: 7;
+  pointer-events: all;
+  flex: 0 0 auto;
+}
+
+#token-hud .bm-token-hud-turn-toggle {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  height: var(--control-size);
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--control-border-color);
+  border-radius: 8px;
+  background: var(--control-bg-color);
+  color: var(--control-icon-color);
+  font-family: var(--font-primary, "Signika", sans-serif);
+  font-size: var(--font-size-14);
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1;
+  box-shadow: 0 0 10px var(--color-shadow-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  pointer-events: all;
+}
+
+#token-hud .bm-token-hud-turn-control.is-visible {
+  display: inline-flex;
+}
+
+#token-hud .bm-token-hud-turn-label {
+  white-space: nowrap;
+}
+
+#token-hud .bm-token-hud-turn-caret {
+  font-size: var(--font-size-16);
+  pointer-events: none;
+}
+
+#token-hud .bm-token-hud-turn-toggle:hover,
+#token-hud .bm-token-hud-turn-toggle:focus {
+  color: var(--control-hover-icon-color);
+  border-color: var(--control-hover-border-color);
+  outline: none;
+}
+
+#token-hud .bm-token-hud-turn-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 6px);
+  right: auto;
+  bottom: auto;
+  min-width: 112px;
+  display: none;
+  flex-direction: column;
+  padding: 4px 0;
+  border: 1px solid var(--control-border-color);
+  border-radius: 8px;
+  background: var(--control-bg-color);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  z-index: 8;
+}
+
+#token-hud .bm-token-hud-turn-menu.is-open {
+  display: flex;
+}
+
+#token-hud .bm-token-hud-turn-option {
+  width: 100%;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--control-icon-color);
+  font-family: var(--font-primary, "Signika", sans-serif);
+  font-size: var(--font-size-14);
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+#token-hud .bm-token-hud-turn-option:hover,
+#token-hud .bm-token-hud-turn-option:focus,
+#token-hud .bm-token-hud-turn-option.is-selected {
+  color: var(--control-hover-icon-color);
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+
 @media (max-width: 640px) {
   .chat-message.bm-chat-roll .bm-chat-roll-head {
     grid-template-columns: 6px 30px minmax(0, 1fr);

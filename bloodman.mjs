@@ -874,6 +874,844 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = [])
 
   return tokenHasStatusInFamily(tokenDoc, family) === active;
 }
+
+function getTokenHudRootElement(htmlLike, fallback = null) {
+  if (htmlLike instanceof HTMLElement) return htmlLike;
+
+  const candidateFromCollection = Array.isArray(htmlLike)
+    ? htmlLike[0]
+    : htmlLike?.[0];
+  if (candidateFromCollection instanceof HTMLElement) return candidateFromCollection;
+
+  if (fallback instanceof HTMLElement) return fallback;
+
+  const domRoot = document.getElementById("token-hud");
+  return domRoot instanceof HTMLElement ? domRoot : null;
+}
+
+function getTokenHudStorageKey(tokenDoc) {
+  return String(tokenDoc?.uuid || tokenDoc?.id || "").trim();
+}
+
+function clampTokenHudTurnValue(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return TOKEN_HUD_TURN_MIN;
+  return Math.max(TOKEN_HUD_TURN_MIN, Math.min(TOKEN_HUD_TURN_MAX, Math.floor(numeric)));
+}
+
+function queryTokenHudControl(root, selectors = []) {
+  if (!(root instanceof HTMLElement)) return null;
+  for (const selector of selectors) {
+    if (!selector) continue;
+    const element = root.querySelector(selector);
+    if (element) return element;
+  }
+  return null;
+}
+
+function ensureTokenHudColumn(root, name) {
+  if (!(root instanceof HTMLElement) || !name) return null;
+  const existing = root.querySelector(`.col.${name}`);
+  if (existing) return existing;
+  const column = document.createElement("div");
+  column.className = `col ${name}`;
+  root.appendChild(column);
+  return column;
+}
+
+function reorderTokenHudColumn(column, orderedNodes = []) {
+  if (!(column instanceof HTMLElement)) return;
+  const unique = [];
+  const seen = new Set();
+  for (const node of orderedNodes) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (seen.has(node)) continue;
+    seen.add(node);
+    unique.push(node);
+  }
+  const extras = Array.from(column.children).filter(node => !seen.has(node));
+  column.replaceChildren(...unique, ...extras);
+}
+
+function ensureTokenHudLayoutContainer(root, className) {
+  if (!(root instanceof HTMLElement) || !className) return null;
+  let container = root.querySelector(`.${className}`);
+  if (!(container instanceof HTMLElement)) {
+    container = document.createElement("div");
+    container.className = className;
+    root.appendChild(container);
+  }
+  return container;
+}
+
+function resolveTokenHudEffectsButton(root) {
+  const directMatch = queryTokenHudControl(root, [
+    "button[data-action='togglePalette'][data-palette='effects']",
+    "[data-action='togglePalette'][data-palette='effects']",
+    "[data-action='toggleStatusEffects']",
+    "button[data-action='toggleStatusEffects']",
+    "button.control-icon.effects",
+    "button[data-action='effects']",
+    ".control-icon[data-action='togglePalette'][data-palette='effects']",
+    ".control-icon.effects",
+    ".control-icon[data-action='effects']",
+    "[data-action='effects']",
+    "[data-tooltip='HUD.AssignStatusEffects']",
+    "[data-tooltip-text='HUD.AssignStatusEffects']"
+  ]);
+  if (directMatch instanceof HTMLElement) return directMatch;
+
+  const effectsPalette = resolveTokenHudEffectsPalette(root);
+  const previousSibling = effectsPalette?.previousElementSibling;
+  if (previousSibling instanceof HTMLElement) return previousSibling;
+
+  const rightCol = root instanceof HTMLElement ? root.querySelector(".col.right") : null;
+  if (rightCol instanceof HTMLElement) {
+    const paletteSibling = Array.from(rightCol.querySelectorAll(".palette.status-effects, .palette[data-palette='effects'], .status-effects"))
+      .map(palette => palette?.previousElementSibling)
+      .find(node => node instanceof HTMLElement);
+    if (paletteSibling instanceof HTMLElement) return paletteSibling;
+  }
+
+  return null;
+}
+
+function resolveTokenHudEffectsPalette(root) {
+  let palette = queryTokenHudControl(root, [
+    ".palette[data-palette='effects']",
+    ".palette.status-effects",
+    ".status-effects"
+  ]);
+  if (!(palette instanceof HTMLElement) && root instanceof HTMLElement) {
+    palette = Array.from(root.querySelectorAll(".palette, .status-effects"))
+      .find(node => node instanceof HTMLElement && (
+        node.matches(".palette.status-effects, .palette[data-palette='effects'], .status-effects")
+        || Boolean(node.querySelector?.(".effect-control[data-status-id]"))
+      )) || null;
+  }
+  if (!(palette instanceof HTMLElement)) return null;
+  palette.classList.add("palette", "status-effects");
+  if (!palette.dataset.palette) palette.dataset.palette = "effects";
+  return palette;
+}
+
+function resolveTokenHudMovementButton(root) {
+  return queryTokenHudControl(root, [
+    "button[data-action='togglePalette'][data-palette='movementActions']",
+    "button[data-action='movement']",
+    "button[data-action='movementAction']",
+    ".control-icon[data-action='togglePalette'][data-palette='movementActions']",
+    ".control-icon[data-action='movement']"
+  ]);
+}
+
+function resolveTokenHudMovementPalette(root) {
+  const palette = queryTokenHudControl(root, [
+    ".palette[data-palette='movementActions']",
+    ".movement-actions"
+  ]);
+  if (!(palette instanceof HTMLElement)) return null;
+  palette.classList.add("palette", "movement-actions");
+  if (!palette.dataset.palette) palette.dataset.palette = "movementActions";
+  return palette;
+}
+
+function getTokenHudLocalIconDirectoryPath() {
+  return `${SYSTEM_ROOT_PATH}/images`;
+}
+
+function extractFileNameFromPath(path) {
+  const normalized = String(path || "").trim();
+  if (!normalized) return "";
+  const cleanPath = normalized.split("#")[0].split("?")[0];
+  const chunks = cleanPath.split("/");
+  return String(chunks[chunks.length - 1] || "").trim();
+}
+
+function isSvgAssetPath(path) {
+  const normalized = String(path || "").trim();
+  if (!normalized) return false;
+  return /\.svg(?:$|[?#])/i.test(normalized);
+}
+
+function collectTokenHudSvgStatusSources() {
+  const sources = new Map();
+  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
+  for (const effect of effects) {
+    if (!effect || typeof effect !== "object") continue;
+    for (const key of ["img", "icon"]) {
+      const sourcePath = String(effect[key] || "").trim();
+      if (!isSvgAssetPath(sourcePath)) continue;
+      const fileName = extractFileNameFromPath(sourcePath);
+      if (!fileName) continue;
+      const lower = fileName.toLowerCase();
+      if (!sources.has(lower)) sources.set(lower, { fileName, sourcePath });
+    }
+  }
+  return sources;
+}
+
+async function listTokenHudLocalSvgIconNames() {
+  try {
+    const browseResult = await FilePicker.browse("data", getTokenHudLocalIconDirectoryPath());
+    const names = new Set();
+    for (const filePath of Array.isArray(browseResult?.files) ? browseResult.files : []) {
+      if (!isSvgAssetPath(filePath)) continue;
+      const fileName = extractFileNameFromPath(filePath).toLowerCase();
+      if (fileName) names.add(fileName);
+    }
+    return names;
+  } catch (_error) {
+    return new Set();
+  }
+}
+
+async function copyTokenHudSvgIconToLocalFolder(fileName, sourcePath) {
+  if (!fileName || !sourcePath) return false;
+  try {
+    const response = await fetch(sourcePath, { cache: "no-store" });
+    if (!response?.ok) return false;
+    const content = await response.text();
+    if (!/<svg[\s>]/i.test(content)) return false;
+    const file = new File([content], fileName, { type: "image/svg+xml" });
+    await FilePicker.upload("data", getTokenHudLocalIconDirectoryPath(), file, {}, { notify: false });
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+async function ensureTokenHudLocalSvgIcons({ copyMissing = false, force = false } = {}) {
+  const now = Date.now();
+  if (
+    !force
+    && !copyMissing
+    && TOKEN_HUD_LOCAL_SVG_ICON_NAMES.size
+    && (now - TOKEN_HUD_LAST_ICON_SYNC_AT) < TOKEN_HUD_ICON_SYNC_INTERVAL_MS
+  ) {
+    return TOKEN_HUD_LOCAL_SVG_ICON_NAMES;
+  }
+
+  if (TOKEN_HUD_ICON_SYNC_PROMISE) return TOKEN_HUD_ICON_SYNC_PROMISE;
+
+  TOKEN_HUD_ICON_SYNC_PROMISE = (async () => {
+    const svgSources = collectTokenHudSvgStatusSources();
+    let localIconNames = await listTokenHudLocalSvgIconNames();
+
+    if (copyMissing && game.user?.isGM && svgSources.size) {
+      for (const { fileName, sourcePath } of svgSources.values()) {
+        const lower = fileName.toLowerCase();
+        if (localIconNames.has(lower)) continue;
+        const copied = await copyTokenHudSvgIconToLocalFolder(fileName, sourcePath);
+        if (copied) localIconNames.add(lower);
+      }
+      localIconNames = await listTokenHudLocalSvgIconNames();
+    }
+
+    TOKEN_HUD_LOCAL_SVG_ICON_NAMES = localIconNames;
+    TOKEN_HUD_LAST_ICON_SYNC_AT = Date.now();
+    TOKEN_HUD_ICON_CACHE_BUSTER = TOKEN_HUD_LAST_ICON_SYNC_AT;
+    return TOKEN_HUD_LOCAL_SVG_ICON_NAMES;
+  })().finally(() => {
+    TOKEN_HUD_ICON_SYNC_PROMISE = null;
+  });
+
+  return TOKEN_HUD_ICON_SYNC_PROMISE;
+}
+
+function resolveTokenHudLocalSvgIconPath(sourcePath) {
+  const normalized = String(sourcePath || "").trim();
+  if (!normalized || !isSvgAssetPath(normalized)) return normalized;
+  const fileName = extractFileNameFromPath(normalized);
+  const lower = fileName.toLowerCase();
+  if (!fileName || !TOKEN_HUD_LOCAL_SVG_ICON_NAMES.has(lower)) return normalized;
+  return `${getTokenHudLocalIconDirectoryPath()}/${fileName}?v=${TOKEN_HUD_ICON_CACHE_BUSTER}`;
+}
+
+function refreshTokenHudStatusEffectIconPaths({ bumpCache = false } = {}) {
+  if (bumpCache) TOKEN_HUD_ICON_CACHE_BUSTER = Date.now();
+  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
+  for (const effect of effects) {
+    if (!effect || typeof effect !== "object") continue;
+    const nextImg = resolveTokenHudLocalSvgIconPath(effect.img);
+    if (nextImg && nextImg !== effect.img) effect.img = nextImg;
+    const nextIcon = resolveTokenHudLocalSvgIconPath(effect.icon);
+    if (nextIcon && nextIcon !== effect.icon) effect.icon = nextIcon;
+  }
+}
+
+function arrangeTokenHudControlLayout(root) {
+  if (!(root instanceof HTMLElement)) return;
+  const leftCol = ensureTokenHudColumn(root, "left");
+  const middleCol = ensureTokenHudColumn(root, "middle");
+  const rightCol = ensureTokenHudColumn(root, "right");
+  if (!(leftCol && middleCol && rightCol)) return;
+
+  const elevation = queryTokenHudControl(root, [
+    ".attribute.elevation",
+    ".attribute[data-attribute='elevation']",
+    "[name='elevation']"
+  ])?.closest(".attribute") || null;
+
+  const sortUp = queryTokenHudControl(root, [
+    "button[data-action='sort'][data-direction='up']",
+    "button[data-action='sort-up']",
+    "button[data-action='sortUp']",
+    "button[data-direction='up'][data-action='sort']"
+  ]);
+
+  const sortDown = queryTokenHudControl(root, [
+    "button[data-action='sort'][data-direction='down']",
+    "button[data-action='sort-down']",
+    "button[data-action='sortDown']",
+    "button[data-direction='down'][data-action='sort']"
+  ]);
+
+  const config = queryTokenHudControl(root, [
+    "button[data-action='config']",
+    ".control-icon[data-action='config']"
+  ]);
+
+  const visibility = queryTokenHudControl(root, [
+    "button[data-action='visibility']",
+    ".control-icon[data-action='visibility']"
+  ]);
+
+  const effectsButton = resolveTokenHudEffectsButton(root);
+  const effectsPalette = resolveTokenHudEffectsPalette(root);
+
+  const movementButton = resolveTokenHudMovementButton(root);
+  const movementPalette = resolveTokenHudMovementPalette(root);
+
+  const target = queryTokenHudControl(root, [
+    "button[data-action='target']",
+    ".control-icon[data-action='target']"
+  ]);
+
+  const combat = queryTokenHudControl(root, [
+    "button[data-action='combat']",
+    ".control-icon[data-action='combat']"
+  ]);
+
+  const bar2 = queryTokenHudControl(root, [".attribute.bar2"]);
+  const bar1 = queryTokenHudControl(root, [".attribute.bar1"]);
+
+  const topRow = ensureTokenHudLayoutContainer(root, "bm-token-hud-top-row");
+  if (topRow instanceof HTMLElement) {
+    if (effectsButton instanceof HTMLElement) topRow.appendChild(effectsButton);
+    if (effectsPalette instanceof HTMLElement) topRow.appendChild(effectsPalette);
+  }
+
+  const bottomRow = ensureTokenHudLayoutContainer(root, "bm-token-hud-bottom-row");
+  const bottomSort = ensureTokenHudLayoutContainer(root, "bm-token-hud-bottom-sort");
+  if (bottomRow instanceof HTMLElement && bottomSort instanceof HTMLElement) {
+    if (sortUp instanceof HTMLElement) bottomSort.appendChild(sortUp);
+    if (sortDown instanceof HTMLElement) bottomSort.appendChild(sortDown);
+    reorderTokenHudColumn(bottomRow, [config, elevation, bottomSort]);
+  }
+
+  reorderTokenHudColumn(leftCol, [combat, target]);
+  reorderTokenHudColumn(middleCol, [bar2, bar1]);
+  reorderTokenHudColumn(rightCol, [
+    visibility,
+    movementButton,
+    movementPalette,
+    ...Array.from(rightCol.children).filter(node => {
+      if (!(node instanceof HTMLElement)) return false;
+      return node !== visibility && node !== movementButton && node !== movementPalette;
+    })
+  ]);
+}
+
+function getTokenHudCounterFlagData(effectDoc) {
+  const data = foundry.utils.getProperty(effectDoc, `flags.${SYSTEM_ID}.${TOKEN_HUD_COUNTER_FLAG_KEY}`);
+  return data && typeof data === "object" ? data : null;
+}
+
+function isTokenHudCounterEffect(effectDoc, statusId = "") {
+  const flagData = getTokenHudCounterFlagData(effectDoc);
+  if (!flagData) return false;
+  if (!statusId) return true;
+  return normalizeStatusValue(flagData.statusId) === normalizeStatusValue(statusId);
+}
+
+function getTokenHudCounterEffects(actor, statusId = "") {
+  const normalizedStatusId = normalizeStatusValue(statusId);
+  return getActorEffectDocuments(actor).filter(effectDoc => {
+    if (!isTokenHudCounterEffect(effectDoc)) return false;
+    if (!normalizedStatusId) return true;
+    return isTokenHudCounterEffect(effectDoc, normalizedStatusId);
+  });
+}
+
+async function clearTokenHudCounterEffects(actor, statusId = "") {
+  const counterEffects = getTokenHudCounterEffects(actor, statusId);
+  if (!counterEffects.length) return false;
+  return deleteStatusEffectDocuments(counterEffects);
+}
+
+async function cleanupTokenHudOrphanCounterEffects(actor) {
+  if (!actor) return false;
+  const orphanEffects = [];
+  for (const effectDoc of getTokenHudCounterEffects(actor)) {
+    const statusId = normalizeStatusValue(getTokenHudCounterFlagData(effectDoc)?.statusId);
+    if (!statusId) {
+      orphanEffects.push(effectDoc);
+      continue;
+    }
+    if (!actorHasStatusInFamily(actor, [statusId])) orphanEffects.push(effectDoc);
+  }
+  if (!orphanEffects.length) return false;
+  return deleteStatusEffectDocuments(orphanEffects);
+}
+
+function buildTokenHudTurnDurationData(turns) {
+  const duration = { rounds: clampTokenHudTurnValue(turns), turns: 0 };
+  const combat = game.combat || null;
+  if (combat) {
+    duration.startRound = Math.max(0, Math.floor(Number(combat.round ?? 0)));
+    duration.startTurn = Math.max(0, Math.floor(Number(combat.turn ?? 0)));
+  }
+  return duration;
+}
+
+async function setTokenHudEffectDuration(effectDoc, turns) {
+  if (!effectDoc) return false;
+  const duration = buildTokenHudTurnDurationData(turns);
+  await effectDoc.update({ duration }).catch(() => null);
+  return true;
+}
+
+function getTokenHudPrimaryStatusEffectDocument(actor, statusId) {
+  const normalizedStatusId = normalizeStatusValue(statusId);
+  if (!actor || !normalizedStatusId) return null;
+  const candidates = getActorStatusEffectDocumentsByFamily(actor, [normalizedStatusId]);
+  for (const effectDoc of candidates) {
+    if (isTokenHudCounterEffect(effectDoc)) continue;
+    const statusIds = getActiveEffectStatusIds(effectDoc);
+    if (statusIds.includes(normalizedStatusId)) return effectDoc;
+  }
+  return candidates.find(effectDoc => !isTokenHudCounterEffect(effectDoc)) || null;
+}
+
+function buildTokenHudTurnCounterEffectPayloads({ statusId, turns, primaryEffect, tokenDoc }) {
+  const totalTurns = clampTokenHudTurnValue(turns);
+  if (totalTurns <= TOKEN_HUD_TURN_MIN) return [];
+  const statusDef = findStatusEffect([statusId]) || null;
+  const statusNameKey = String(statusDef?.name ?? statusDef?.label ?? "").trim();
+  const statusName = statusNameKey
+    ? (game.i18n?.has?.(statusNameKey) ? game.i18n.localize(statusNameKey) : statusNameKey)
+    : String(primaryEffect?.name || statusId || "Etat").trim();
+  const rawStatusImg = String(statusDef?.img || statusDef?.icon || primaryEffect?.img || "icons/svg/aura.svg").trim();
+  const statusImg = resolveTokenHudLocalSvgIconPath(rawStatusImg) || rawStatusImg;
+  const normalizedStatusId = normalizeStatusValue(statusId);
+  const tokenRef = String(tokenDoc?.uuid || tokenDoc?.id || "").trim();
+  const payloads = [];
+
+  for (let roundCount = TOKEN_HUD_TURN_MIN; roundCount < totalTurns; roundCount += 1) {
+    payloads.push({
+      name: `${statusName} (${roundCount})`,
+      img: statusImg,
+      origin: tokenRef || null,
+      statuses: [],
+      changes: [],
+      duration: buildTokenHudTurnDurationData(roundCount),
+      flags: {
+        [SYSTEM_ID]: {
+          [TOKEN_HUD_COUNTER_FLAG_KEY]: {
+            statusId: normalizedStatusId,
+            token: tokenRef,
+            rounds: roundCount
+          }
+        }
+      }
+    });
+  }
+
+  return payloads;
+}
+
+async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, turns = TOKEN_HUD_TURN_MIN, overlay = false } = {}) {
+  const actor = hud?.actor || hud?.document?.actor || null;
+  const tokenDoc = hud?.document || hud?.object?.document || null;
+  const normalizedStatusId = normalizeStatusValue(statusId);
+  if (!actor || !normalizedStatusId || typeof actor.toggleStatusEffect !== "function") return false;
+
+  await clearTokenHudCounterEffects(actor, normalizedStatusId);
+
+  try {
+    await actor.toggleStatusEffect(statusId, { active: Boolean(active), overlay: Boolean(overlay) });
+  } catch (error) {
+    console.warn("[bloodman] token HUD status toggle failed", { statusId, error });
+    return false;
+  }
+
+  if (!active) {
+    await cleanupTokenHudOrphanCounterEffects(actor);
+    return true;
+  }
+
+  const primaryEffect = getTokenHudPrimaryStatusEffectDocument(actor, normalizedStatusId);
+  if (!primaryEffect) return true;
+
+  const totalTurns = clampTokenHudTurnValue(turns);
+  await setTokenHudEffectDuration(primaryEffect, totalTurns);
+
+  if (totalTurns > TOKEN_HUD_TURN_MIN) {
+    const payloads = buildTokenHudTurnCounterEffectPayloads({
+      statusId: normalizedStatusId,
+      turns: totalTurns,
+      primaryEffect,
+      tokenDoc
+    });
+    if (payloads.length) {
+      await actor.createEmbeddedDocuments("ActiveEffect", payloads).catch(error => {
+        console.warn("[bloodman] token HUD counter effects creation failed", { statusId: normalizedStatusId, error });
+      });
+    }
+  }
+
+  await cleanupTokenHudOrphanCounterEffects(actor);
+  return true;
+}
+
+function buildTokenHudTurnLabel(turns) {
+  const count = clampTokenHudTurnValue(turns);
+  return `${count} ${count > 1 ? "TOURS" : "TOUR"}`;
+}
+
+function getTokenHudTurnFieldValue(turnField) {
+  if (turnField instanceof HTMLSelectElement) {
+    return clampTokenHudTurnValue(turnField.value);
+  }
+  if (!(turnField instanceof HTMLElement)) return TOKEN_HUD_TURN_MIN;
+  const valueInput = turnField.querySelector(".bm-token-hud-turn-value");
+  if (valueInput instanceof HTMLInputElement) return clampTokenHudTurnValue(valueInput.value);
+  return clampTokenHudTurnValue(turnField.dataset.turns || TOKEN_HUD_TURN_MIN);
+}
+
+function setTokenHudTurnFieldValue(turnField, turns) {
+  const value = String(clampTokenHudTurnValue(turns));
+  if (turnField instanceof HTMLSelectElement) {
+    turnField.value = value;
+    return;
+  }
+  if (!(turnField instanceof HTMLElement)) return;
+  turnField.dataset.turns = value;
+  const valueInput = turnField.querySelector(".bm-token-hud-turn-value");
+  if (valueInput instanceof HTMLInputElement) valueInput.value = value;
+  const label = turnField.querySelector(".bm-token-hud-turn-label");
+  if (label instanceof HTMLElement) label.textContent = buildTokenHudTurnLabel(value);
+  const options = turnField.querySelectorAll(".bm-token-hud-turn-option[data-turns]");
+  for (const option of options) {
+    if (!(option instanceof HTMLElement)) continue;
+    const isSelected = option.dataset.turns === value;
+    option.classList.toggle("is-selected", isSelected);
+    option.setAttribute("aria-selected", isSelected ? "true" : "false");
+  }
+}
+
+function buildTokenHudTurnControlContent(wrapper) {
+  if (!(wrapper instanceof HTMLElement)) return null;
+  wrapper.replaceChildren();
+
+  const valueInput = document.createElement("input");
+  valueInput.type = "hidden";
+  valueInput.className = "bm-token-hud-turn-value";
+  valueInput.name = "bm-token-hud-turns";
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "bm-token-hud-turn-toggle";
+  toggle.setAttribute("aria-label", "Nombre de tours d'effet");
+  toggle.title = "Nombre de tours d'attribution d'effet d'etat (1 a 12)";
+
+  const label = document.createElement("span");
+  label.className = "bm-token-hud-turn-label";
+  label.textContent = buildTokenHudTurnLabel(TOKEN_HUD_TURN_MIN);
+
+  const caret = document.createElement("i");
+  caret.className = "fa-solid fa-chevron-down bm-token-hud-turn-caret";
+  caret.setAttribute("inert", "");
+
+  toggle.append(label, caret);
+
+  const menu = document.createElement("div");
+  menu.className = "bm-token-hud-turn-menu";
+  menu.setAttribute("role", "listbox");
+
+  for (let turns = TOKEN_HUD_TURN_MIN; turns <= TOKEN_HUD_TURN_MAX; turns += 1) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "bm-token-hud-turn-option";
+    option.dataset.turns = String(turns);
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    option.textContent = buildTokenHudTurnLabel(turns);
+    menu.appendChild(option);
+  }
+
+  wrapper.append(valueInput, toggle, menu);
+  return wrapper;
+}
+
+function ensureTokenHudTurnControl(root, hud) {
+  const topRow = ensureTokenHudLayoutContainer(root, "bm-token-hud-top-row");
+  if (!(topRow instanceof HTMLElement)) return null;
+
+  const effectsPalette = resolveTokenHudEffectsPalette(root);
+  const effectsButton = resolveTokenHudEffectsButton(root);
+  const anchorButton = effectsButton instanceof HTMLElement
+    ? effectsButton
+    : (effectsPalette?.previousElementSibling instanceof HTMLElement ? effectsPalette.previousElementSibling : null);
+  if (!(anchorButton instanceof HTMLElement)) return null;
+
+  let wrapper = topRow.querySelector(".bm-token-hud-turn-control");
+  if (!(wrapper instanceof HTMLElement)) {
+    wrapper = document.createElement("div");
+    wrapper.className = "bm-token-hud-turn-control";
+    buildTokenHudTurnControlContent(wrapper);
+  } else if (!(wrapper.querySelector(".bm-token-hud-turn-toggle") instanceof HTMLElement)) {
+    buildTokenHudTurnControlContent(wrapper);
+  }
+
+  const legacyInput = wrapper.querySelector(".bm-token-hud-turn-field");
+  if (legacyInput instanceof HTMLElement) legacyInput.remove();
+  const legacySuffix = wrapper.querySelector(".bm-token-hud-turn-suffix");
+  if (legacySuffix instanceof HTMLElement) legacySuffix.remove();
+  const legacySelect = wrapper.querySelector(".bm-token-hud-turn-select");
+  if (legacySelect instanceof HTMLElement) legacySelect.remove();
+
+  if (effectsPalette?.parentElement === topRow) {
+    topRow.insertBefore(wrapper, effectsPalette);
+  } else if (anchorButton.parentElement === topRow) {
+    topRow.insertBefore(wrapper, anchorButton.nextSibling);
+  } else if (wrapper.parentElement !== topRow) {
+    topRow.appendChild(wrapper);
+  }
+  wrapper.classList.add("is-visible");
+
+  const turnField = wrapper;
+
+  const tokenKey = getTokenHudStorageKey(hud?.document || hud?.object?.document || null);
+  const selectedTurns = tokenKey ? TOKEN_HUD_TURN_SELECTION_BY_TOKEN.get(tokenKey) : null;
+  setTokenHudTurnFieldValue(turnField, selectedTurns ?? TOKEN_HUD_TURN_MIN);
+
+  const selectedStatus = tokenKey ? TOKEN_HUD_LAST_STATUS_BY_TOKEN.get(tokenKey) : "";
+  if (selectedStatus) turnField.dataset.statusId = selectedStatus;
+
+  return turnField;
+}
+
+function syncTokenHudTurnControlUi(root) {
+  if (!(root instanceof HTMLElement)) return;
+  const wrapper = root.querySelector(".bm-token-hud-turn-control");
+  if (!(wrapper instanceof HTMLElement)) return;
+  wrapper.classList.add("is-visible");
+  wrapper.style.top = "";
+
+  const effectsPalette = resolveTokenHudEffectsPalette(root);
+  if (effectsPalette instanceof HTMLElement) {
+    effectsPalette.style.top = "";
+    effectsPalette.style.bottom = "";
+    effectsPalette.style.left = "";
+    effectsPalette.style.right = "";
+  }
+}
+
+function bindTokenHudTurnControlEvents(root, hud, turnField) {
+  if (!(root instanceof HTMLElement) || !(turnField instanceof HTMLElement)) return;
+
+  if (turnField.dataset.bmTokenHudTurnsBound !== "true") {
+    const applyTurnValue = () => {
+      const turns = getTokenHudTurnFieldValue(turnField);
+      setTokenHudTurnFieldValue(turnField, turns);
+      const tokenKey = getTokenHudStorageKey(hud?.document || hud?.object?.document || null);
+      if (tokenKey) TOKEN_HUD_TURN_SELECTION_BY_TOKEN.set(tokenKey, turns);
+
+      const statusId = String(turnField.dataset.statusId || "").trim();
+      if (!statusId) return;
+      const actor = hud?.actor || hud?.document?.actor || null;
+      if (!actor || !actorHasStatusInFamily(actor, [statusId])) return;
+
+      void applyTokenHudStatusTurnSelection(hud, statusId, { active: true, turns, overlay: false });
+    };
+
+    const toggle = turnField.querySelector(".bm-token-hud-turn-toggle");
+    const menu = turnField.querySelector(".bm-token-hud-turn-menu");
+    const closeMenu = () => menu?.classList.remove("is-open");
+
+    if (toggle instanceof HTMLButtonElement && menu instanceof HTMLElement) {
+      toggle.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        menu.classList.toggle("is-open");
+      });
+
+      menu.addEventListener("click", event => {
+        const option = event.target instanceof HTMLElement
+          ? event.target.closest(".bm-token-hud-turn-option[data-turns]")
+          : null;
+        if (!(option instanceof HTMLElement)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setTokenHudTurnFieldValue(turnField, option.dataset.turns || TOKEN_HUD_TURN_MIN);
+        applyTurnValue();
+        closeMenu();
+      });
+
+      root.addEventListener("click", event => {
+        const target = event.target;
+        if (target instanceof Node && turnField.contains(target)) return;
+        closeMenu();
+      });
+      root.addEventListener("contextmenu", () => closeMenu());
+    }
+
+    turnField.dataset.bmTokenHudTurnsBound = "true";
+  }
+
+  const effectsPalette = resolveTokenHudEffectsPalette(root);
+  if (effectsPalette && effectsPalette.dataset.bmTokenHudPaletteBound !== "true") {
+    const handleEffectSelection = event => {
+      const target = event.target instanceof HTMLElement
+        ? event.target.closest(".effect-control[data-status-id]")
+        : null;
+      if (!(target instanceof HTMLElement) || !effectsPalette.contains(target)) return;
+      const statusId = String(target.dataset.statusId || "").trim();
+      if (!statusId) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const turns = getTokenHudTurnFieldValue(turnField);
+      setTokenHudTurnFieldValue(turnField, turns);
+      turnField.dataset.statusId = statusId;
+      const tokenKey = getTokenHudStorageKey(hud?.document || hud?.object?.document || null);
+      if (tokenKey) {
+        TOKEN_HUD_TURN_SELECTION_BY_TOKEN.set(tokenKey, turns);
+        TOKEN_HUD_LAST_STATUS_BY_TOKEN.set(tokenKey, statusId);
+      }
+
+      const nextActive = !target.classList.contains("active");
+      const overlay = event.type === "contextmenu";
+      void applyTokenHudStatusTurnSelection(hud, statusId, { active: nextActive, turns, overlay });
+    };
+
+    effectsPalette.addEventListener("click", handleEffectSelection, true);
+    effectsPalette.addEventListener("contextmenu", handleEffectSelection, true);
+    effectsPalette.dataset.bmTokenHudPaletteBound = "true";
+  }
+
+  if (root.dataset.bmTokenHudSyncBound !== "true") {
+    const scheduleSync = () => {
+      requestAnimationFrame(() => syncTokenHudTurnControlUi(root));
+    };
+    root.addEventListener("click", scheduleSync);
+    root.addEventListener("contextmenu", scheduleSync);
+    root.dataset.bmTokenHudSyncBound = "true";
+  }
+}
+
+function configureTokenHudEnhancements(hud, htmlLike) {
+  const root = getTokenHudRootElement(htmlLike, hud?.element);
+  if (!root) return;
+
+  void ensureTokenHudLocalSvgIcons({ copyMissing: false });
+  refreshTokenHudStatusEffectIconPaths({ bumpCache: true });
+
+  root.classList.add("bm-token-hud");
+  root.dataset.bmTokenHudEnhanced = "true";
+  arrangeTokenHudControlLayout(root);
+
+  const turnField = ensureTokenHudTurnControl(root, hud);
+  if (!(turnField instanceof HTMLElement)) return;
+
+  bindTokenHudTurnControlEvents(root, hud, turnField);
+  syncTokenHudTurnControlUi(root);
+
+  const actor = hud?.actor || hud?.document?.actor || null;
+  if (actor) void cleanupTokenHudOrphanCounterEffects(actor);
+}
+
+function installTokenHudRenderPatch() {
+  const hudClass = CONFIG?.Token?.hudClass;
+  if (!hudClass?.prototype) return false;
+  const proto = hudClass.prototype;
+  if (proto[TOKEN_HUD_RENDER_PATCH_FLAG] === true) return true;
+
+  const originalOnRender = proto._onRender;
+  if (typeof originalOnRender !== "function") return false;
+
+  proto._onRender = async function (...args) {
+    const response = await originalOnRender.apply(this, args);
+    try {
+      configureTokenHudEnhancements(this, this.element);
+    } catch (error) {
+      console.warn("[bloodman] token HUD enhancement (patched render) skipped", error);
+    }
+    return response;
+  };
+
+  Object.defineProperty(proto, TOKEN_HUD_RENDER_PATCH_FLAG, {
+    value: true,
+    configurable: false,
+    enumerable: false,
+    writable: false
+  });
+
+  return true;
+}
+
+function scheduleTokenHudDomEnhancement(attempt = 0) {
+  if (TOKEN_HUD_DOM_SYNC_FRAME !== null) return;
+  TOKEN_HUD_DOM_SYNC_FRAME = requestAnimationFrame(() => {
+    TOKEN_HUD_DOM_SYNC_FRAME = null;
+    const root = document.getElementById("token-hud");
+    if (!(root instanceof HTMLElement)) {
+      if (attempt < 8) setTimeout(() => scheduleTokenHudDomEnhancement(attempt + 1), 40);
+      return;
+    }
+    const hud = canvas?.hud?.token || null;
+    try {
+      configureTokenHudEnhancements(hud, root);
+    } catch (error) {
+      console.warn("[bloodman] token HUD enhancement (dom observer) skipped", error);
+    }
+    const hasTurnControl = Boolean(root.querySelector(".bm-token-hud-turn-control"));
+    if (!hasTurnControl && attempt < 8) setTimeout(() => scheduleTokenHudDomEnhancement(attempt + 1), 40);
+  });
+}
+
+function installTokenHudDomObserver() {
+  if (TOKEN_HUD_DOM_OBSERVER) return true;
+  if (typeof MutationObserver !== "function") return false;
+  const hudContainer = document.getElementById("hud");
+  if (!(hudContainer instanceof HTMLElement)) return false;
+
+  TOKEN_HUD_DOM_OBSERVER = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      if (mutation.type !== "childList") continue;
+      const added = Array.from(mutation.addedNodes || []).some(node => {
+        return node instanceof HTMLElement && (node.id === "token-hud" || Boolean(node.querySelector?.("#token-hud")));
+      });
+      if (added) {
+        scheduleTokenHudDomEnhancement();
+        return;
+      }
+      const removedTokenHud = Array.from(mutation.removedNodes || []).some(node => node instanceof HTMLElement && node.id === "token-hud");
+      if (removedTokenHud) {
+        TOKEN_HUD_DOM_SYNC_FRAME = null;
+      }
+    }
+  });
+
+  TOKEN_HUD_DOM_OBSERVER.observe(hudContainer, { childList: true });
+  scheduleTokenHudDomEnhancement();
+  return true;
+}
+
 function getTokenActorType(tokenDoc) {
   const actorType = tokenDoc?.actor?.type;
   if (actorType) return actorType;
@@ -1797,9 +2635,23 @@ const REROLL_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-reroll-r
 const INITIATIVE_GROUP_BUFFER_MS = 180;
 const TOKEN_MOVE_LIMIT_EPSILON = 0.0001;
 let LAST_COMBAT_MOVE_RESET_KEY = "";
+let LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
 const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
 const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
+const TOKEN_HUD_TURN_MIN = 1;
+const TOKEN_HUD_TURN_MAX = 12;
+const TOKEN_HUD_COUNTER_FLAG_KEY = "tokenHudTurnCounter";
+const TOKEN_HUD_RENDER_PATCH_FLAG = "__bmTokenHudRenderPatched";
+const TOKEN_HUD_TURN_SELECTION_BY_TOKEN = new Map();
+const TOKEN_HUD_LAST_STATUS_BY_TOKEN = new Map();
+const TOKEN_HUD_ICON_SYNC_INTERVAL_MS = 2_000;
+let TOKEN_HUD_LOCAL_SVG_ICON_NAMES = new Set();
+let TOKEN_HUD_ICON_SYNC_PROMISE = null;
+let TOKEN_HUD_LAST_ICON_SYNC_AT = 0;
+let TOKEN_HUD_ICON_CACHE_BUSTER = Date.now();
+let TOKEN_HUD_DOM_OBSERVER = null;
+let TOKEN_HUD_DOM_SYNC_FRAME = null;
 
 function toFiniteNumber(value, fallback = 0) {
   const numeric = Number(value);
@@ -2628,6 +3480,14 @@ function getDerivedPvMax(actor, phyEffective, roleOverride) {
   return Math.round(phyEffective / 5);
 }
 
+function getResourceCharacteristicTotal(actor, key, itemBonuses = null) {
+  if (!actor || !key) return 0;
+  const bonuses = itemBonuses || getItemBonusTotals(actor);
+  return toFiniteNumber(actor.system?.characteristics?.[key]?.base, 0)
+    + toFiniteNumber(bonuses?.[key], 0)
+    + toFiniteNumber(getActorArchetypeBonus(actor, key), 0);
+}
+
 async function refreshBossSoloNpcPvMax() {
   if (!game.user.isGM) return;
   for (const actor of game.actors || []) {
@@ -2635,11 +3495,8 @@ async function refreshBossSoloNpcPvMax() {
     if (String(actor.system?.npcRole || "") !== "boss-seul") continue;
 
     const itemBonuses = getItemBonusTotals(actor);
-    const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
-      + toFiniteNumber(actor.system.modifiers?.all, 0)
-      + toFiniteNumber(actor.system.modifiers?.PHY, 0)
-      + toFiniteNumber(itemBonuses.PHY, 0)
-      + getActorArchetypeBonus(actor, "PHY");
+    // State modifiers are characteristic-roll penalties and must not alter PV/PP maxima.
+    const phyEffective = getResourceCharacteristicTotal(actor, "PHY", itemBonuses);
     const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
     const nextPvMax = Math.max(0, getDerivedPvMax(actor, phyEffective) + storedPvBonus);
     const currentPvMax = toFiniteNumber(actor.system.resources?.pv?.max, nextPvMax);
@@ -4394,6 +5251,70 @@ async function resetActiveCombatantMoveGauge(combat) {
   LAST_COMBAT_MOVE_RESET_KEY = resetKey;
 }
 
+function getTokenHudCounterPriorityValue(effectDoc) {
+  const fromFlag = Number(getTokenHudCounterFlagData(effectDoc)?.rounds);
+  if (Number.isFinite(fromFlag)) return Math.max(0, Math.floor(fromFlag));
+  const fromDuration = Number(foundry.utils.getProperty(effectDoc, "duration.rounds"));
+  if (Number.isFinite(fromDuration)) return Math.max(0, Math.floor(fromDuration));
+  return 0;
+}
+
+async function decrementTokenHudCountersForActorTurn(actor) {
+  if (!actor) return false;
+  const allCounters = getTokenHudCounterEffects(actor);
+  if (!allCounters.length) return false;
+
+  const statusIds = [...new Set(
+    allCounters
+      .map(effectDoc => normalizeStatusValue(getTokenHudCounterFlagData(effectDoc)?.statusId))
+      .filter(Boolean)
+  )];
+  if (!statusIds.length) return false;
+
+  let changed = false;
+  for (const statusId of statusIds) {
+    if (!actorHasStatusInFamily(actor, [statusId])) {
+      const cleared = await clearTokenHudCounterEffects(actor, statusId);
+      changed = changed || cleared;
+      continue;
+    }
+
+    const counters = getTokenHudCounterEffects(actor, statusId)
+      .sort((a, b) => getTokenHudCounterPriorityValue(b) - getTokenHudCounterPriorityValue(a));
+    if (!counters.length) continue;
+
+    const removed = await deleteStatusEffectDocuments([counters[0]]);
+    changed = changed || removed;
+
+    const primaryEffect = getTokenHudPrimaryStatusEffectDocument(actor, statusId);
+    if (!primaryEffect) continue;
+    const currentRounds = clampTokenHudTurnValue(
+      foundry.utils.getProperty(primaryEffect, "duration.rounds")
+    );
+    const nextRounds = Math.max(TOKEN_HUD_TURN_MIN, currentRounds - 1);
+    if (nextRounds === currentRounds) continue;
+    const updated = await setTokenHudEffectDuration(primaryEffect, nextRounds);
+    changed = changed || updated;
+  }
+
+  if (changed) await cleanupTokenHudOrphanCounterEffects(actor);
+  return changed;
+}
+
+async function decrementActiveCombatantTokenHudCounters(combat) {
+  if (!game.user?.isGM) return;
+  if (!combat?.active) return;
+  const resetKey = getCombatMoveResetKey(combat);
+  if (!resetKey || resetKey === LAST_TOKEN_HUD_COUNTER_TICK_KEY) return;
+  LAST_TOKEN_HUD_COUNTER_TICK_KEY = resetKey;
+
+  const activeCombatant = getActiveCombatant(combat);
+  const actor = getCombatantActor(activeCombatant);
+  if (!actor || actor.type !== "personnage") return;
+
+  await decrementTokenHudCountersForActorTurn(actor);
+}
+
 function getInitiativeFormulaForActor(actor) {
   const score = getFixedInitiativeScore(actor);
   // Tie-breaker: lower 1d10 wins (adds a slightly higher fraction).
@@ -4460,7 +5381,39 @@ Hooks.on("renderDocumentCreateDialog", (_app, html) => {
   injectDocumentCreateTypeIcons(html);
 });
 
+Hooks.on("renderTokenHUD", (hud, html) => {
+  try {
+    configureTokenHudEnhancements(hud, html);
+  } catch (error) {
+    console.warn("[bloodman] token HUD enhancement skipped", error);
+  }
+});
+
+Hooks.on("canvasReady", () => {
+  installTokenHudRenderPatch();
+  installTokenHudDomObserver();
+  scheduleTokenHudDomEnhancement();
+});
+
+Hooks.on("controlToken", () => {
+  scheduleTokenHudDomEnhancement();
+});
+
+Hooks.once("ready", () => {
+  console.info("[bloodman] HUD patch build 2026-02-13-b loaded");
+  void ensureTokenHudLocalSvgIcons({ copyMissing: true, force: true }).then(() => {
+    refreshTokenHudStatusEffectIconPaths({ bumpCache: true });
+  }).catch(error => {
+    console.warn("[bloodman] token HUD svg icon sync skipped", error);
+  });
+  installTokenHudRenderPatch();
+  installTokenHudDomObserver();
+  scheduleTokenHudDomEnhancement();
+});
+
 Hooks.once("init", () => {
+  installTokenHudRenderPatch();
+
   game.settings.register("bloodman", "chaosDice", {
     name: t("BLOODMAN.Settings.ChaosDiceName"),
     scope: "world",
@@ -5227,9 +6180,8 @@ async function syncActorDerivedCharacteristicsResources(actor) {
     return archetypeBonusCharacteristic === key ? archetypeBonusValue : 0;
   };
   const effective = key => {
+    // State modifiers apply to characteristic checks only, not vital resource maxima.
     return toFiniteNumber(actor.system.characteristics?.[key]?.base, 0)
-      + toFiniteNumber(actor.system.modifiers?.all, 0)
-      + toFiniteNumber(actor.system.modifiers?.[key], 0)
       + toFiniteNumber(itemBonuses?.[key], 0)
       + getArchetypeBonus(key);
   };
@@ -5417,10 +6369,17 @@ Hooks.on("preCreateCombatant", (combatant) => {
 
 Hooks.on("updateCombat", (combat, changes) => {
   if (!changes) return;
+  if (changes.active === false) {
+    LAST_COMBAT_MOVE_RESET_KEY = "";
+    LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
+  }
   if (changes.round != null || changes.turn != null || changes.active != null) {
     focusActiveCombatantToken(combat);
     resetActiveCombatantMoveGauge(combat).catch(error => {
       console.warn("[bloodman] move:gauge reset failed", error);
+    });
+    decrementActiveCombatantTokenHudCounters(combat).catch(error => {
+      console.warn("[bloodman] token HUD turn counter update failed", error);
     });
   }
 });
@@ -5430,6 +6389,9 @@ Hooks.on("combatTurnChange", (combat) => {
   resetActiveCombatantMoveGauge(combat).catch(error => {
     console.warn("[bloodman] move:gauge reset failed", error);
   });
+  decrementActiveCombatantTokenHudCounters(combat).catch(error => {
+    console.warn("[bloodman] token HUD turn counter update failed", error);
+  });
 });
 
 Hooks.on("combatStart", (combat) => {
@@ -5437,6 +6399,14 @@ Hooks.on("combatStart", (combat) => {
   resetActiveCombatantMoveGauge(combat).catch(error => {
     console.warn("[bloodman] move:gauge reset failed", error);
   });
+  decrementActiveCombatantTokenHudCounters(combat).catch(error => {
+    console.warn("[bloodman] token HUD turn counter update failed", error);
+  });
+});
+
+Hooks.on("deleteCombat", () => {
+  LAST_COMBAT_MOVE_RESET_KEY = "";
+  LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
 });
 
 Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
@@ -5573,13 +6543,12 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   );
   const getEffective = key => {
     const base = getUpdatedNumber(`system.characteristics.${key}.base`, actor.system.characteristics?.[key]?.base || 0);
-    const globalMod = getUpdatedNumber("system.modifiers.all", actor.system.modifiers?.all || 0);
-    const keyMod = getUpdatedNumber(`system.modifiers.${key}`, actor.system.modifiers?.[key] || 0);
     const itemBonus = Number(itemBonuses?.[key] || 0);
     const profileBonus = archetypeBonusCharacteristic === key && Number.isFinite(archetypeBonusValue)
       ? archetypeBonusValue
       : 0;
-    return Number(base) + Number(globalMod) + Number(keyMod) + itemBonus + profileBonus;
+    // State modifiers are characteristic-roll penalties and must not alter PV/PP maxima.
+    return Number(base) + itemBonus + profileBonus;
   };
 
   const phyEffective = getEffective("PHY");
@@ -5587,26 +6556,49 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   const roleOverride = foundry.utils.getProperty(updateData, "system.npcRole");
   const pvMax = getDerivedPvMax(actor, phyEffective, roleOverride) + Number(storedPvBonus || 0);
   const ppMax = Math.round(espEffective / 5) + Number(storedPpBonus || 0);
-  const storedPvMax = getUpdatedNumber("system.resources.pv.max", actor.system.resources?.pv?.max);
-  const storedPpMax = getUpdatedNumber("system.resources.pp.max", actor.system.resources?.pp?.max);
+
+  const pvMaxPath = "system.resources.pv.max";
+  const ppMaxPath = "system.resources.pp.max";
+  const pvCurrentPath = "system.resources.pv.current";
+  const ppCurrentPath = "system.resources.pp.current";
+  const normalizeVitalPathValue = (path, fallback) => {
+    const raw = getUpdatedRawValue(path, fallback);
+    if (raw == null) return Math.max(0, Math.floor(toFiniteNumber(fallback, 0)));
+    if (typeof raw === "string" && !raw.trim()) {
+      return Math.max(0, Math.floor(toFiniteNumber(fallback, 0)));
+    }
+    return Math.max(0, Math.floor(toFiniteNumber(raw, fallback)));
+  };
+
+  if (hasUpdatePath(pvMaxPath)) {
+    const fallbackPvMax = actor.system.resources?.pv?.max || 0;
+    foundry.utils.setProperty(updateData, pvMaxPath, normalizeVitalPathValue(pvMaxPath, fallbackPvMax));
+  }
+
+  if (hasUpdatePath(ppMaxPath)) {
+    const fallbackPpMax = actor.system.resources?.pp?.max || 0;
+    foundry.utils.setProperty(updateData, ppMaxPath, normalizeVitalPathValue(ppMaxPath, fallbackPpMax));
+  }
+
+  const storedPvMax = getUpdatedNumber(pvMaxPath, actor.system.resources?.pv?.max);
+  const storedPpMax = getUpdatedNumber(ppMaxPath, actor.system.resources?.pp?.max);
   const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : toFiniteNumber(pvMax, 0);
   const finalPpMax = Number.isFinite(storedPpMax) ? storedPpMax : toFiniteNumber(ppMax, 0);
   const allowedPvMax = Math.max(0, finalPvMax);
   const allowedPpMax = Math.max(0, finalPpMax);
 
-  const pvCurrentPath = "system.resources.pv.current";
-  const ppCurrentPath = "system.resources.pp.current";
-
   if (foundry.utils.getProperty(updateData, pvCurrentPath) != null) {
-    const requested = getUpdatedNumber(pvCurrentPath, 0);
+    const fallbackPvCurrent = actor.system.resources?.pv?.current || 0;
+    const requested = normalizeVitalPathValue(pvCurrentPath, fallbackPvCurrent);
     const nextValue = Math.min(requested, allowedPvMax);
-    foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, toFiniteNumber(nextValue, 0)));
+    foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, Math.floor(toFiniteNumber(nextValue, fallbackPvCurrent))));
   }
 
   if (foundry.utils.getProperty(updateData, ppCurrentPath) != null) {
-    const requested = getUpdatedNumber(ppCurrentPath, 0);
+    const fallbackPpCurrent = actor.system.resources?.pp?.current || 0;
+    const requested = normalizeVitalPathValue(ppCurrentPath, fallbackPpCurrent);
     const nextValue = Math.min(requested, allowedPpMax);
-    foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, toFiniteNumber(nextValue, 0)));
+    foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, Math.floor(toFiniteNumber(nextValue, fallbackPpCurrent))));
   }
 
   const voyageCurrentPath = "system.resources.voyage.current";
@@ -5660,9 +6652,10 @@ Hooks.on("updateActor", async (actor, changes) => {
   const hasCharBaseChange = CHARACTERISTICS.some(c => {
     return foundry.utils.getProperty(changes, `system.characteristics.${c.key}.base`) != null;
   });
-  const hasModChange = foundry.utils.getProperty(changes, "system.modifiers") != null;
   const hasNpcRoleChange = foundry.utils.getProperty(changes, "system.npcRole") != null;
-  if (!hasCharBaseChange && !hasModChange && !hasNpcRoleChange) return;
+  const hasArchetypeBonusChange = foundry.utils.getProperty(changes, "system.profile.archetypeBonusValue") != null
+    || foundry.utils.getProperty(changes, "system.profile.archetypeBonusCharacteristic") != null;
+  if (!hasCharBaseChange && !hasNpcRoleChange && !hasArchetypeBonusChange) return;
 
   const itemBonuses = getItemBonusTotals(actor);
   const profile = actor.system?.profile || {};
@@ -5676,13 +6669,9 @@ Hooks.on("updateActor", async (actor, changes) => {
   await setActorMoveGauge(actor, moveGauge.value, moveGauge.max);
 
   const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
-    + toFiniteNumber(actor.system.modifiers?.all, 0)
-    + toFiniteNumber(actor.system.modifiers?.PHY, 0)
     + toFiniteNumber(itemBonuses.PHY, 0)
     + getArchetypeBonus("PHY");
   const espEffective = toFiniteNumber(actor.system.characteristics?.ESP?.base, 0)
-    + toFiniteNumber(actor.system.modifiers?.all, 0)
-    + toFiniteNumber(actor.system.modifiers?.ESP, 0)
     + toFiniteNumber(itemBonuses.ESP, 0)
     + getArchetypeBonus("ESP");
   const derivedPvMax = getDerivedPvMax(actor, phyEffective);
@@ -6150,8 +7139,16 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     const totalPoints = characteristics.reduce((sum, c) => sum + Number(c.base || 0), 0);
 
-    const phy = characteristics.find(c => c.key === "PHY")?.effective ?? 0;
-    const esp = characteristics.find(c => c.key === "ESP")?.effective ?? 0;
+    const getResourceCharacteristic = key => {
+      const base = Number(data.actor.system.characteristics?.[key]?.base || 0);
+      const itemBonus = Number(itemBonuses[key] || 0);
+      const profileBonus = profileBonusCharacteristic === key && Number.isFinite(profileBonusValue)
+        ? profileBonusValue
+        : 0;
+      return base + itemBonus + profileBonus;
+    };
+    const phy = getResourceCharacteristic("PHY");
+    const esp = getResourceCharacteristic("ESP");
     const startedCombat = getStartedActiveCombat();
     const moveGaugeActive = isActorInStartedActiveCombat(this.actor, startedCombat);
     const moveGauge = normalizeActorMoveGauge(this.actor, { itemBonuses, initializeWhenMissing: true });
