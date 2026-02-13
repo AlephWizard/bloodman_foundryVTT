@@ -69,6 +69,10 @@
   height: 100%;
 }
 
+.item-aptitude.bm-item-sheet .bm-modifier-section {
+  grid-column: 1 / -1;
+}
+
 .item-aptitude.bm-item-sheet .bonus-controls {
   margin-top: 2px;
 }
@@ -111,12 +115,43 @@
   max-width: none;
 }
 
+.item-aptitude.bm-item-sheet .bonus-grid-characteristics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .item-aptitude.bm-item-sheet .bonus-grid.is-disabled {
   opacity: 0.55;
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid.is-disabled label {
   background: rgba(58, 48, 37, 0.6);
+}
+
+.item-aptitude.bm-item-sheet .bm-pa-modifier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 7px;
+  border: 1px dashed var(--bm-item-dash);
+  border-radius: 8px;
+  background: var(--bm-item-chip);
+}
+
+.item-aptitude.bm-item-sheet .bm-pa-modifier-label {
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.item-aptitude.bm-item-sheet .bm-pa-modifier-input {
+  width: 90px;
+  justify-self: end;
+}
+
+.item-aptitude.bm-item-sheet .bm-modifier-error {
+  margin: 0;
+  min-height: 0;
 }
 
 @media (max-width: 980px) {
@@ -140,5 +175,15 @@
 
   .item-aptitude.bm-item-sheet .bm-ability-damage select {
     max-width: 100%;
+  }
+
+  .item-aptitude.bm-item-sheet .bonus-grid-characteristics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .item-aptitude.bm-item-sheet .bonus-grid-characteristics {
+    grid-template-columns: 1fr;
   }
 }

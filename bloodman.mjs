@@ -2490,7 +2490,8 @@ const CARRIED_ITEM_LIMIT_BASE = 10;
 const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
-const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection"]);
+const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
+const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
@@ -2593,6 +2594,28 @@ function parseLooseNumericInput(value) {
   const numericValue = Number(compact);
   if (!Number.isFinite(numericValue)) return { ok: false, empty: false, value: 0 };
   return { ok: true, empty: false, value: numericValue };
+}
+
+function normalizeSignedModifierInput(rawValue, fallback = 0) {
+  if (rawValue == null || rawValue === "") return { value: 0, invalid: false };
+  if (typeof rawValue === "number") {
+    if (Number.isFinite(rawValue)) return { value: rawValue, invalid: false };
+    return { value: toFiniteNumber(fallback, 0), invalid: true };
+  }
+  if (typeof rawValue === "string") {
+    const parsed = parseLooseNumericInput(rawValue);
+    if (!parsed.ok) return { value: toFiniteNumber(fallback, 0), invalid: true };
+    return { value: parsed.empty ? 0 : parsed.value, invalid: false };
+  }
+  const numeric = Number(rawValue);
+  if (Number.isFinite(numeric)) return { value: numeric, invalid: false };
+  return { value: toFiniteNumber(fallback, 0), invalid: true };
+}
+
+function buildItemModifierErrorMessage(invalidFields = []) {
+  const uniqueFields = Array.from(new Set((invalidFields || []).filter(Boolean)));
+  if (!uniqueFields.length) return null;
+  return `Valeur non numerique: ${uniqueFields.join(", ")}`;
 }
 
 function roundCurrencyValue(value) {
@@ -2903,44 +2926,83 @@ function normalizeWeaponMagazineCapacityUpdate(item, updateData = null) {
 
 function normalizeCharacteristicBonusItemUpdate(item, updateData = null) {
   const type = String(item?.type || "").trim().toLowerCase();
-  if (!CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) return false;
+  const supportsCharacteristicBonuses = CHARACTERISTIC_BONUS_ITEM_TYPES.has(type);
+  const supportsPaBonus = PA_BONUS_ITEM_TYPES.has(type);
+  if (!supportsCharacteristicBonuses && !supportsPaBonus) return false;
+  const supportsUseEnabled = type === "objet" || type === "protection";
   const defaultUseEnabled = type === "protection";
+  const updateSystemData = updateData
+    ? (foundry.utils.getProperty(
+      foundry.utils.expandObject(foundry.utils.deepClone(updateData || {})),
+      "system"
+    ) || {})
+    : {};
   const sourceSystem = updateData
     ? foundry.utils.mergeObject(
       foundry.utils.deepClone(item?.system || {}),
-      foundry.utils.getProperty(updateData, "system") || {},
+      updateSystemData,
       { inplace: false }
     )
     : (item?.system || {});
 
-  const useEnabled = toCheckboxBoolean(sourceSystem?.useEnabled, defaultUseEnabled);
-  const characteristicBonusEnabled = toCheckboxBoolean(sourceSystem?.characteristicBonusEnabled, false);
+  const invalidFields = [];
+  const useEnabled = supportsUseEnabled
+    ? toCheckboxBoolean(sourceSystem?.useEnabled, defaultUseEnabled)
+    : false;
+  const characteristicBonusEnabled = supportsCharacteristicBonuses
+    ? toCheckboxBoolean(sourceSystem?.characteristicBonusEnabled, false)
+    : false;
   const characteristicBonuses = {};
-  for (const characteristic of CHARACTERISTICS) {
-    characteristicBonuses[characteristic.key] = toFiniteNumber(
-      sourceSystem?.characteristicBonuses?.[characteristic.key],
-      0
-    );
-  }
-
-  if (updateData) {
-    foundry.utils.setProperty(updateData, "system.useEnabled", useEnabled);
-    foundry.utils.setProperty(updateData, "system.characteristicBonusEnabled", characteristicBonusEnabled);
+  if (supportsCharacteristicBonuses) {
     for (const characteristic of CHARACTERISTICS) {
       const key = characteristic.key;
-      foundry.utils.setProperty(updateData, `system.characteristicBonuses.${key}`, characteristicBonuses[key]);
+      const normalizedValue = normalizeSignedModifierInput(
+        sourceSystem?.characteristicBonuses?.[key],
+        item?.system?.characteristicBonuses?.[key] ?? 0
+      );
+      characteristicBonuses[key] = normalizedValue.value;
+      if (normalizedValue.invalid) invalidFields.push(key);
     }
+  }
+  const paNormalized = supportsPaBonus
+    ? normalizeSignedModifierInput(sourceSystem?.pa, item?.system?.pa ?? 0)
+    : { value: 0, invalid: false };
+  if (supportsPaBonus && paNormalized.invalid) invalidFields.push("PA");
+  const modifierError = buildItemModifierErrorMessage(invalidFields);
+
+  if (updateData) {
+    if (supportsUseEnabled) {
+      foundry.utils.setProperty(updateData, "system.useEnabled", useEnabled);
+    }
+    if (supportsCharacteristicBonuses) {
+      foundry.utils.setProperty(updateData, "system.characteristicBonusEnabled", characteristicBonusEnabled);
+      for (const characteristic of CHARACTERISTICS) {
+        const key = characteristic.key;
+        foundry.utils.setProperty(updateData, `system.characteristicBonuses.${key}`, characteristicBonuses[key]);
+      }
+    }
+    if (supportsPaBonus) {
+      foundry.utils.setProperty(updateData, "system.pa", paNormalized.value);
+    }
+    foundry.utils.setProperty(updateData, "system.erreur", modifierError);
     return true;
   }
 
-  const sourceUpdate = {
-    "system.useEnabled": useEnabled,
-    "system.characteristicBonusEnabled": characteristicBonusEnabled
-  };
-  for (const characteristic of CHARACTERISTICS) {
-    const key = characteristic.key;
-    sourceUpdate[`system.characteristicBonuses.${key}`] = characteristicBonuses[key];
+  const sourceUpdate = {};
+  if (supportsUseEnabled) {
+    sourceUpdate["system.useEnabled"] = useEnabled;
   }
+  if (supportsCharacteristicBonuses) {
+    sourceUpdate["system.characteristicBonusEnabled"] = characteristicBonusEnabled;
+    for (const characteristic of CHARACTERISTICS) {
+      const key = characteristic.key;
+      sourceUpdate[`system.characteristicBonuses.${key}`] = characteristicBonuses[key];
+    }
+  }
+  if (supportsPaBonus) {
+    sourceUpdate["system.pa"] = paNormalized.value;
+  }
+  sourceUpdate["system.erreur"] = modifierError;
   item.updateSource(sourceUpdate);
   return true;
 }
@@ -3428,7 +3490,8 @@ function getProtectionPA(actor) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
-    if (item.type !== "protection") continue;
+    const type = String(item?.type || "").trim().toLowerCase();
+    if (!PA_BONUS_ITEM_TYPES.has(type)) continue;
     const pa = Number(item.system?.pa || 0);
     if (Number.isFinite(pa)) total += pa;
   }
@@ -5900,6 +5963,7 @@ Hooks.on("createItem", async (item, options, userId) => {
   const type = String(item.type || "").trim().toLowerCase();
   if (type === "aptitude" || type === "pouvoir") {
     await applyItemResourceBonuses(item.actor);
+    await syncActorDerivedCharacteristicsResources(item.actor);
     return;
   }
   if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
@@ -6053,6 +6117,7 @@ Hooks.on("updateItem", (item) => {
   const type = String(item.type || "").trim().toLowerCase();
   if (type === "aptitude" || type === "pouvoir") {
     applyItemResourceBonuses(item.actor);
+    syncActorDerivedCharacteristicsResources(item.actor);
     return;
   }
   if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
@@ -6065,6 +6130,7 @@ Hooks.on("deleteItem", (item) => {
   const type = String(item.type || "").trim().toLowerCase();
   if (type === "aptitude" || type === "pouvoir") {
     applyItemResourceBonuses(item.actor);
+    syncActorDerivedCharacteristicsResources(item.actor);
     return;
   }
   if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
@@ -8562,19 +8628,30 @@ class BloodmanItemSheet extends BaseItemSheet {
       if (!data.item.system) data.item.system = {};
       data.item.system.usableEnabled = isPowerUsableEnabled(this.item.system?.usableEnabled);
     }
-    if (this.item.type === "objet" || this.item.type === "protection") {
+    const supportsCharacteristicBonuses = CHARACTERISTIC_BONUS_ITEM_TYPES.has(this.item.type);
+    const supportsPaBonus = PA_BONUS_ITEM_TYPES.has(this.item.type);
+    if (supportsCharacteristicBonuses || supportsPaBonus) {
       if (!data.item.system) data.item.system = {};
-      const defaultUseEnabled = this.item.type === "protection";
-      data.item.system.useEnabled = toCheckboxBoolean(this.item.system?.useEnabled, defaultUseEnabled);
-      data.item.system.characteristicBonusEnabled = toCheckboxBoolean(this.item.system?.characteristicBonusEnabled, false);
-      const characteristicBonuses = {};
-      for (const characteristic of CHARACTERISTICS) {
-        characteristicBonuses[characteristic.key] = toFiniteNumber(
-          this.item.system?.characteristicBonuses?.[characteristic.key],
-          0
-        );
+      if (this.item.type === "objet" || this.item.type === "protection") {
+        const defaultUseEnabled = this.item.type === "protection";
+        data.item.system.useEnabled = toCheckboxBoolean(this.item.system?.useEnabled, defaultUseEnabled);
       }
-      data.item.system.characteristicBonuses = characteristicBonuses;
+      if (supportsCharacteristicBonuses) {
+        data.item.system.characteristicBonusEnabled = toCheckboxBoolean(this.item.system?.characteristicBonusEnabled, false);
+        const characteristicBonuses = {};
+        for (const characteristic of CHARACTERISTICS) {
+          characteristicBonuses[characteristic.key] = toFiniteNumber(
+            this.item.system?.characteristicBonuses?.[characteristic.key],
+            0
+          );
+        }
+        data.item.system.characteristicBonuses = characteristicBonuses;
+      }
+      if (supportsPaBonus) {
+        data.item.system.pa = toFiniteNumber(this.item.system?.pa, 0);
+      }
+      const currentError = String(this.item.system?.erreur ?? "").trim();
+      data.item.system.erreur = currentError || null;
     }
     if (isPriceManagedItemType(this.item.type)) {
       if (!data.item.system) data.item.system = {};

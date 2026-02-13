@@ -38,6 +38,10 @@
   background: var(--bm-item-surface-soft);
 }
 
+.item-pouvoir.bm-item-sheet .ability-row .bm-modifier-section {
+  grid-column: 1 / -1;
+}
+
 .item-pouvoir.bm-item-sheet .ability-section select {
   width: 100%;
   min-width: 120px;
@@ -115,8 +119,39 @@
   max-width: none;
 }
 
+.item-pouvoir.bm-item-sheet .bonus-grid-characteristics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .item-pouvoir.bm-item-sheet .bonus-grid.is-disabled {
   opacity: 0.55;
+}
+
+.item-pouvoir.bm-item-sheet .bm-pa-modifier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 7px;
+  border: 1px dashed var(--bm-item-dash);
+  border-radius: 8px;
+  background: var(--bm-item-chip);
+}
+
+.item-pouvoir.bm-item-sheet .bm-pa-modifier-label {
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.item-pouvoir.bm-item-sheet .bm-pa-modifier-input {
+  width: 90px;
+  justify-self: end;
+}
+
+.item-pouvoir.bm-item-sheet .bm-modifier-error {
+  margin: 0;
+  min-height: 0;
 }
 
 @media (max-width: 920px) {
@@ -129,6 +164,10 @@
     grid-template-columns: 1fr;
   }
 
+  .item-pouvoir.bm-item-sheet .bonus-grid-characteristics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .item-pouvoir.bm-item-sheet .power-usable-damage-section > .toggle-group {
     justify-self: start;
   }
@@ -136,6 +175,10 @@
 
 @media (max-width: 760px) {
   .item-pouvoir.bm-item-sheet .ability-row {
+    grid-template-columns: 1fr;
+  }
+
+  .item-pouvoir.bm-item-sheet .bonus-grid-characteristics {
     grid-template-columns: 1fr;
   }
 }

@@ -1,7 +1,8 @@
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
-const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection"]);
+const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
+const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
@@ -132,7 +133,8 @@ function getProtectionPA(actor) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
-    if (item.type !== "protection") continue;
+    const type = String(item?.type || "").trim().toLowerCase();
+    if (!PA_BONUS_ITEM_TYPES.has(type)) continue;
     const pa = Number(item.system?.pa || 0);
     if (Number.isFinite(pa)) total += pa;
   }
