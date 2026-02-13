@@ -1819,16 +1819,6 @@ function getTokenActorType(tokenDoc) {
   return worldActorType || "";
 }
 
-const ROUND_TOKEN_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
-const ROUND_MASK_RETRY_DELAYS_MS = [0, 90, 260];
-const ROUND_MASK_SCHEDULE_TIMERS = new Map();
-
-function shouldUseRoundTokenMask(tokenLike) {
-  const tokenDoc = tokenLike?.document || tokenLike;
-  const actorType = getTokenActorType(tokenDoc);
-  return ROUND_TOKEN_ACTOR_TYPES.has(actorType);
-}
-
 function shouldResetTokenScale(scaleValue) {
   const numeric = Number(scaleValue);
   if (!Number.isFinite(numeric) || numeric === 0) return true;
@@ -1842,177 +1832,7 @@ function shouldResetTokenOffset(offsetValue) {
 }
 
 function shouldResetTokenFit(fitValue) {
-  return String(fitValue || "").trim().toLowerCase() !== "cover";
-}
-
-function resolveTokenObject(tokenLike) {
-  if (!tokenLike) return null;
-  if (tokenLike.mesh) return tokenLike;
-  if (tokenLike.object?.mesh) return tokenLike.object;
-  const tokenId = String(tokenLike.id || tokenLike._id || "").trim();
-  if (tokenId && canvas?.tokens?.get) {
-    const byCanvas = canvas.tokens.get(tokenId);
-    if (byCanvas?.mesh) return byCanvas;
-  }
-  return null;
-}
-
-function getTokenSpriteForRoundMask(tokenObject) {
-  const mesh = tokenObject?.mesh;
-  if (!mesh || mesh.destroyed) return null;
-  if (!mesh.texture) return null;
-  return mesh;
-}
-
-function computeRoundMaskGeometry(sprite) {
-  const bounds = sprite?.getLocalBounds?.();
-  const x = Number(bounds?.x);
-  const y = Number(bounds?.y);
-  const width = Number(bounds?.width);
-  const height = Number(bounds?.height);
-  if (!(Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0)) return null;
-  const centerX = x + (width / 2);
-  const centerY = y + (height / 2);
-  const radius = (Math.min(width, height) / 2) * 0.995;
-  if (!(Number.isFinite(centerX) && Number.isFinite(centerY) && Number.isFinite(radius) && radius > 0)) return null;
-  const signature = `${centerX.toFixed(2)}|${centerY.toFixed(2)}|${radius.toFixed(2)}`;
-  return { centerX, centerY, radius, signature };
-}
-
-function clearRoundTokenMask(tokenLike) {
-  const tokenObject = resolveTokenObject(tokenLike);
-  if (!tokenObject) return false;
-  const sprite = getTokenSpriteForRoundMask(tokenObject);
-  const mask = tokenObject._bmRoundMask || null;
-  if (sprite?.mask === mask) sprite.mask = null;
-  if (mask && !mask.destroyed) {
-    if (mask.parent) {
-      try {
-        mask.parent.removeChild(mask);
-      } catch (_error) {
-        // non-fatal detach
-      }
-    }
-    try {
-      mask.destroy({ children: true });
-    } catch (_error) {
-      // non-fatal cleanup
-    }
-  }
-  tokenObject._bmRoundMask = null;
-  tokenObject._bmRoundMaskSignature = "";
-  return true;
-}
-
-function applyRoundTokenMask(tokenLike) {
-  const source = tokenLike?.document || tokenLike;
-  const tokenObject = resolveTokenObject(tokenLike);
-  if (!source || !tokenObject) return false;
-  if (!shouldUseRoundTokenMask(source)) {
-    clearRoundTokenMask(tokenObject);
-    return false;
-  }
-
-  const sprite = getTokenSpriteForRoundMask(tokenObject);
-  if (!sprite) {
-    clearRoundTokenMask(tokenObject);
-    return false;
-  }
-
-  const geometry = computeRoundMaskGeometry(sprite);
-  if (!geometry) {
-    clearRoundTokenMask(tokenObject);
-    return false;
-  }
-
-  const PIXI_NS = globalThis.PIXI;
-  if (!PIXI_NS?.Graphics) return false;
-  let mask = tokenObject._bmRoundMask || null;
-  if (!mask || mask.destroyed) {
-    mask = new PIXI_NS.Graphics();
-    mask._bmRoundMaskGraphic = true;
-    tokenObject._bmRoundMask = mask;
-    tokenObject._bmRoundMaskSignature = "";
-  }
-
-  const previousSignature = String(tokenObject._bmRoundMaskSignature || "");
-  if (previousSignature !== geometry.signature) {
-    mask.clear();
-    mask.beginFill(0xffffff, 1);
-    mask.drawCircle(geometry.centerX, geometry.centerY, geometry.radius);
-    mask.endFill();
-    tokenObject._bmRoundMaskSignature = geometry.signature;
-  }
-
-  if (mask.parent !== sprite) sprite.addChild(mask);
-  if (sprite.mask !== mask) sprite.mask = mask;
-  return true;
-}
-
-function cleanupOrphanRoundMasks() {
-  const root = canvas?.stage;
-  if (!root?.children) return;
-  const stack = [...root.children];
-  while (stack.length) {
-    const node = stack.pop();
-    if (!node) continue;
-    if (Array.isArray(node.children) && node.children.length) stack.push(...node.children);
-    if (!node._bmRoundMaskGraphic) continue;
-    const hasLivingParent = Boolean(node.parent && !node.parent.destroyed);
-    if (hasLivingParent) continue;
-    try {
-      node.destroy({ children: true });
-    } catch (_error) {
-      // non-fatal cleanup
-    }
-  }
-}
-
-function getRoundMaskScheduleKey(tokenLike) {
-  const tokenDoc = tokenLike?.document || tokenLike;
-  const tokenId = String(tokenDoc?.id || tokenDoc?._id || "").trim();
-  if (!tokenId) return "";
-  const sceneId = String(
-    tokenDoc?.parent?.id
-    || tokenDoc?.parent?._id
-    || tokenDoc?.scene?.id
-    || canvas?.scene?.id
-    || ""
-  ).trim();
-  return sceneId ? `${sceneId}:${tokenId}` : tokenId;
-}
-
-function clearScheduledRoundTokenMask(tokenLike) {
-  const scheduleKey = getRoundMaskScheduleKey(tokenLike);
-  if (!scheduleKey) return;
-  const timers = ROUND_MASK_SCHEDULE_TIMERS.get(scheduleKey);
-  if (!Array.isArray(timers) || !timers.length) return;
-  for (const timerId of timers) clearTimeout(timerId);
-  ROUND_MASK_SCHEDULE_TIMERS.delete(scheduleKey);
-}
-
-function scheduleRoundTokenMask(tokenLike) {
-  const source = tokenLike?.document || tokenLike;
-  if (!source) return;
-  const scheduleKey = getRoundMaskScheduleKey(source);
-  if (scheduleKey) clearScheduledRoundTokenMask(source);
-  if (!shouldUseRoundTokenMask(source)) {
-    clearRoundTokenMask(source);
-    return;
-  }
-  applyRoundTokenMask(source);
-
-  const timers = [];
-  const delays = ROUND_MASK_RETRY_DELAYS_MS.filter(delay => Number(delay) > 0);
-  const lastIndex = delays.length - 1;
-  delays.forEach((delay, index) => {
-    const timerId = setTimeout(() => {
-      applyRoundTokenMask(source);
-      if (scheduleKey && index === lastIndex) ROUND_MASK_SCHEDULE_TIMERS.delete(scheduleKey);
-    }, delay);
-    timers.push(timerId);
-  });
-  if (scheduleKey && timers.length) ROUND_MASK_SCHEDULE_TIMERS.set(scheduleKey, timers);
+  return String(fitValue || "").trim().toLowerCase() !== "fill";
 }
 
 function isPvBarAttribute(attribute) {
@@ -3411,20 +3231,62 @@ function getSafeTokenTextureFallback(tokenDoc) {
   return "icons/svg/mystery-man.svg";
 }
 
-async function repairTokenTextureSource(tokenLike) {
-  if (!game.user?.isGM) return false;
-  const tokenDoc = tokenLike?.document || tokenLike;
-  if (!tokenDoc?.update) return false;
-  const currentSrc = String(foundry.utils.getProperty(tokenDoc, "texture.src") || "");
-  if (!(await needsTokenImageRepair(currentSrc))) return false;
+function getTokenTexturePresentationUpdates(tokenDoc) {
+  if (!tokenDoc) return {};
+  const actorType = getTokenActorType(tokenDoc);
+  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return {};
+  const updates = {};
+  const scaleX = foundry.utils.getProperty(tokenDoc, "texture.scaleX");
+  const scaleY = foundry.utils.getProperty(tokenDoc, "texture.scaleY");
+  const offsetX = foundry.utils.getProperty(tokenDoc, "texture.offsetX");
+  const offsetY = foundry.utils.getProperty(tokenDoc, "texture.offsetY");
+  const fit = foundry.utils.getProperty(tokenDoc, "texture.fit");
+  if (shouldResetTokenScale(scaleX)) updates["texture.scaleX"] = 1;
+  if (shouldResetTokenScale(scaleY)) updates["texture.scaleY"] = 1;
+  if (shouldResetTokenOffset(offsetX)) updates["texture.offsetX"] = 0;
+  if (shouldResetTokenOffset(offsetY)) updates["texture.offsetY"] = 0;
+  if (shouldResetTokenFit(fit)) updates["texture.fit"] = "fill";
+  return updates;
+}
 
-  const actorSrc = getTokenActorImage(tokenDoc);
-  const fallbackSrc = "icons/svg/mystery-man.svg";
-  const actorSrcValid = actorSrc ? await canLoadTextureSource(actorSrc) : false;
-  const nextSrc = actorSrcValid ? actorSrc : fallbackSrc;
-  if (!nextSrc || nextSrc === currentSrc) return false;
+function resolveTokenPlaceable(tokenLike) {
+  if (!tokenLike) return null;
+  if (tokenLike.mesh) return tokenLike;
+  if (tokenLike.object?.mesh) return tokenLike.object;
+  const tokenId = String(tokenLike.id || tokenLike._id || tokenLike.document?.id || "").trim();
+  if (!tokenId || !canvas?.tokens?.get) return null;
+  const placeable = canvas.tokens.get(tokenId);
+  return placeable?.mesh ? placeable : null;
+}
+
+async function repairTokenTextureSource(tokenLike) {
+  const tokenDoc = tokenLike?.document || tokenLike;
+  if (!tokenDoc) return false;
+  const tokenObject = resolveTokenPlaceable(tokenLike);
+  const canPersistUpdate = Boolean(game.user?.isGM && tokenDoc?.update);
+  const canLocalUpdate = Boolean(tokenDoc?.updateSource);
+  if (!canPersistUpdate && !canLocalUpdate) return false;
+  const updates = getTokenTexturePresentationUpdates(tokenDoc);
+  const currentSrc = String(foundry.utils.getProperty(tokenDoc, "texture.src") || "");
+  const shouldRepairSource = canPersistUpdate ? await needsTokenImageRepair(currentSrc) : false;
+  if (!shouldRepairSource && !Object.keys(updates).length) return false;
+
+  if (shouldRepairSource) {
+    const actorSrc = getTokenActorImage(tokenDoc);
+    const fallbackSrc = "icons/svg/mystery-man.svg";
+    const actorSrcValid = actorSrc ? await canLoadTextureSource(actorSrc) : false;
+    const nextSrc = actorSrcValid ? actorSrc : fallbackSrc;
+    if (nextSrc && nextSrc !== currentSrc) updates["texture.src"] = nextSrc;
+  }
+  if (!Object.keys(updates).length) return false;
   try {
-    await tokenDoc.update({ "texture.src": nextSrc });
+    if (canPersistUpdate) {
+      await tokenDoc.update(updates);
+    } else {
+      tokenDoc.updateSource(foundry.utils.expandObject(updates));
+      tokenObject?.renderFlags?.set?.({ refreshMesh: true });
+      tokenObject?.refresh?.();
+    }
     return true;
   } catch (_error) {
     return false;
@@ -5757,7 +5619,7 @@ Hooks.once("ready", async () => {
       if (shouldResetTokenScale(protoScaleY)) updates["prototypeToken.texture.scaleY"] = 1;
       if (shouldResetTokenOffset(protoOffsetX)) updates["prototypeToken.texture.offsetX"] = 0;
       if (shouldResetTokenOffset(protoOffsetY)) updates["prototypeToken.texture.offsetY"] = 0;
-      if (shouldResetTokenFit(protoFit)) updates["prototypeToken.texture.fit"] = "cover";
+      if (shouldResetTokenFit(protoFit)) updates["prototypeToken.texture.fit"] = "fill";
       const protoSrc = foundry.utils.getProperty(actor.prototypeToken, "texture.src");
       if (await needsTokenImageRepair(protoSrc)) {
         const actorImgValid = actor.img ? await canLoadTextureSource(actor.img) : false;
@@ -6425,33 +6287,22 @@ Hooks.on("preCreateToken", (doc) => {
 
 Hooks.on("drawToken", token => {
   void repairTokenTextureSource(token);
-  scheduleRoundTokenMask(token);
   applyTransparentTokenEffectBackground(token);
 });
 
 Hooks.on("refreshToken", token => {
   void repairTokenTextureSource(token);
-  scheduleRoundTokenMask(token);
   applyTransparentTokenEffectBackground(token);
 });
 
 Hooks.on("createToken", async (tokenDoc) => {
   await repairTokenTextureSource(tokenDoc);
-  scheduleRoundTokenMask(tokenDoc);
   if (!game.user.isGM) return;
   if (getTokenActorType(tokenDoc) !== "personnage") return;
   await refreshBossSoloNpcPvMax();
-});
-
-Hooks.on("preDeleteToken", (tokenDoc) => {
-  clearScheduledRoundTokenMask(tokenDoc);
-  clearRoundTokenMask(tokenDoc);
 });
 
 Hooks.on("deleteToken", async (tokenDoc) => {
-  clearScheduledRoundTokenMask(tokenDoc);
-  clearRoundTokenMask(tokenDoc);
-  cleanupOrphanRoundMasks();
   if (!game.user.isGM) return;
   if (getTokenActorType(tokenDoc) !== "personnage") return;
   await refreshBossSoloNpcPvMax();
@@ -6463,10 +6314,8 @@ Hooks.on("canvasReady", async () => {
 });
 
 Hooks.on("canvasReady", async () => {
-  cleanupOrphanRoundMasks();
   for (const token of canvas?.tokens?.placeables || []) {
     await repairTokenTextureSource(token);
-    scheduleRoundTokenMask(token);
   }
 });
 
@@ -6938,7 +6787,6 @@ Hooks.on("preUpdateToken", (tokenDoc, changes, options, userId) => {
 });
 
 Hooks.on("updateToken", async (tokenDoc, changes, options, userId) => {
-  scheduleRoundTokenMask(tokenDoc);
   const hasTokenImageChange = foundry.utils.getProperty(changes, "texture.src") != null
     || foundry.utils.getProperty(changes, "img") != null;
   const sourceUserId = String(userId || "");
