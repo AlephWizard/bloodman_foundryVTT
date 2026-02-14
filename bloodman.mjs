@@ -3492,6 +3492,152 @@ function getPlayerCountOnScene() {
   return Math.max(1, activePlayers);
 }
 
+function getSelectedVoyageXpRecipientActors(controlledTokens = null) {
+  const tokens = Array.isArray(controlledTokens)
+    ? controlledTokens
+    : (globalThis.canvas?.tokens?.controlled || []);
+  const recipients = [];
+  const seen = new Set();
+  for (const token of tokens) {
+    const tokenDoc = token?.document || token || null;
+    const tokenActor = token?.actor || tokenDoc?.actor || null;
+    const worldActor = tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) || null : null;
+    const actor = tokenActor || worldActor;
+    if (!actor) continue;
+    const type = String(actor.type || tokenActor?.type || "").trim().toLowerCase();
+    if (type !== "personnage") continue;
+    const key = String(actor.uuid || actor.id || tokenDoc?.uuid || tokenDoc?.id || tokenDoc?.actorId || "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    recipients.push(actor);
+  }
+  return recipients;
+}
+
+function formatVoyageXpGrantLine(actorName, amount) {
+  const name = String(actorName || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
+  const fallback = `${name} a recu ${amount} point${amount > 1 ? "s" : ""} d'experience.`;
+  return tl("BLOODMAN.Notifications.VoyageXPGrantLine", fallback, { actor: name, amount });
+}
+
+async function grantVoyageXpToSelectedPlayers(rawAmount, options = {}) {
+  const amount = normalizeNonNegativeInteger(rawAmount, 0);
+  const selectedTokens = Array.isArray(options.selectedTokens)
+    ? options.selectedTokens
+    : (globalThis.canvas?.tokens?.controlled || []);
+  if (amount <= 0) {
+    return {
+      amount,
+      selectedTokens,
+      grants: [],
+      failures: [],
+      reason: "no-points"
+    };
+  }
+
+  if (!selectedTokens.length) {
+    return {
+      amount,
+      selectedTokens,
+      grants: [],
+      failures: [],
+      reason: "no-selection"
+    };
+  }
+
+  const recipients = getSelectedVoyageXpRecipientActors(selectedTokens);
+  if (!recipients.length) {
+    return {
+      amount,
+      selectedTokens,
+      grants: [],
+      failures: [],
+      reason: "no-recipients"
+    };
+  }
+
+  const grants = [];
+  const failures = [];
+  for (const actor of recipients) {
+    const actorName = String(actor?.name || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
+    if (!actor?.update) {
+      failures.push({ actorName });
+      continue;
+    }
+    const voyageTotal = normalizeNonNegativeInteger(
+      actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
+      0
+    );
+    const voyageCurrent = Math.min(
+      normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0),
+      voyageTotal
+    );
+    const nextVoyageTotal = voyageTotal + amount;
+    const nextVoyageCurrent = voyageCurrent + amount;
+
+    try {
+      await actor.update({
+        "system.resources.voyage.total": nextVoyageTotal,
+        "system.resources.voyage.current": nextVoyageCurrent,
+        "system.resources.voyage.max": nextVoyageTotal
+      });
+      grants.push({ actorName, amount });
+    } catch (error) {
+      console.warn("[bloodman] voyage XP grant failed", {
+        actorId: actor.id,
+        actorName,
+        amount,
+        error
+      });
+      failures.push({ actorName });
+    }
+  }
+
+  return {
+    amount,
+    selectedTokens,
+    grants,
+    failures,
+    reason: grants.length ? "ok" : "all-failed"
+  };
+}
+
+async function postVoyageXpGrantSummary(result) {
+  if (!result) return false;
+  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
+  const lines = [];
+
+  if (result.reason === "no-points") {
+    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantNoPoints", "Aucun point d'XP voyage octroye."));
+  } else if (result.reason === "no-selection") {
+    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantNoSelection", "Selectionnez au moins un token joueur pour attribuer de l'XP voyage."));
+  } else if (result.reason === "no-recipients") {
+    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantNoRecipients", "Aucun token joueur selectionne pour recevoir de l'XP voyage."));
+  } else if (result.reason === "all-failed") {
+    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantAllFailed", "Aucune attribution d'XP voyage n'a pu etre appliquee."));
+  } else {
+    for (const grant of result.grants || []) {
+      lines.push(formatVoyageXpGrantLine(grant.actorName, grant.amount));
+    }
+    const failureCount = Number(result.failures?.length || 0);
+    if (failureCount > 0) {
+      lines.push(
+        tl(
+          "BLOODMAN.Notifications.VoyageXPGrantPartialFailure",
+          "{count} attribution(s) d'XP voyage n'ont pas pu etre appliquees.",
+          { count: failureCount }
+        )
+      );
+    }
+  }
+
+  const contentLines = lines.map(line => `<p>${escapeHtml(line)}</p>`).join("");
+  const content = `<div class="bm-voyage-xp-grant-log"><p><strong>${escapeHtml(titleText)}</strong></p>${contentLines}</div>`;
+  await ChatMessage.create({ content }).catch(() => null);
+  return true;
+}
+
 function getProtectionPA(actor) {
   if (!actor?.items) return 0;
   let total = 0;
@@ -5866,6 +6012,50 @@ function positionChaosDiceUI() {
   root.style.transform = "translateX(-50%)";
 }
 
+function showSelectedVoyageXpGrantDialog() {
+  if (!game.user?.isGM) return;
+  if (typeof Dialog !== "function") return;
+  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
+  const promptText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Prompt", "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.");
+  const labelText = tl("BLOODMAN.Dialogs.VoyageXPGrant.ValueLabel", "XP voyage");
+  const validateLabel = tl("BLOODMAN.Common.Validate", "Valider");
+  const cancelLabel = tl("BLOODMAN.Common.Cancel", "Annuler");
+  const content = `<form class="bm-voyage-xp-dialog">
+    <p>${escapeHtml(promptText)}</p>
+    <div class="bm-damage-config bm-damage-config-inline">
+      <label for="bm-voyage-xp-amount">${escapeHtml(labelText)}</label>
+      <input id="bm-voyage-xp-amount" type="number" name="voyageXpAmount" min="0" step="1" value="0" />
+    </div>
+  </form>`;
+  const dialog = new Dialog(
+    {
+      title: titleText,
+      content,
+      buttons: {
+        validate: {
+          label: validateLabel,
+          callback: async html => {
+            const input = html?.find?.('input[name="voyageXpAmount"]');
+            const rawValue = input?.length ? input.val() : 0;
+            const result = await grantVoyageXpToSelectedPlayers(rawValue);
+            await postVoyageXpGrantSummary(result);
+          }
+        },
+        cancel: {
+          label: cancelLabel
+        }
+      },
+      default: "validate"
+    },
+    {
+      classes: ["bloodman-damage-dialog", "bloodman-voyage-xp-dialog"],
+      width: 420
+    }
+  );
+  dialog.render(true);
+}
+
 function ensureChaosDiceUI() {
   if (!game.user.isGM) return;
   if (document.getElementById("bm-chaos-dice")) return;
@@ -5875,18 +6065,22 @@ function ensureChaosDiceUI() {
   const container = document.createElement("div");
   container.id = "bm-chaos-dice";
   container.className = "bm-chaos-dice";
-  container.title = "Des du chaos";
+  container.title = tl("BLOODMAN.Settings.ChaosDiceName", "Des du chaos");
   container.innerHTML = `
-    <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="Augmenter les des du chaos">+</button>
-    <div class="bm-chaos-icon" aria-hidden="true">
-      <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
-      <span class="bm-chaos-value">0</span>
+    <button type="button" class="bm-chaos-xp-btn" aria-label="${tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage")}">XP</button>
+    <div class="bm-chaos-row">
+      <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="Augmenter les des du chaos">+</button>
+      <div class="bm-chaos-icon" aria-hidden="true">
+        <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
+        <span class="bm-chaos-value">0</span>
+      </div>
+      <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="Diminuer les des du chaos">-</button>
     </div>
-    <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="Diminuer les des du chaos">-</button>
   `;
 
   target.appendChild(container);
 
+  const xp = container.querySelector(".bm-chaos-xp-btn");
   const minus = container.querySelector(".bm-chaos-minus");
   const plus = container.querySelector(".bm-chaos-plus");
   const chaosIconImage = container.querySelector(".bm-chaos-icon img");
@@ -5907,6 +6101,10 @@ function ensureChaosDiceUI() {
   plus?.addEventListener("click", async () => {
     const current = getChaosValue();
     await setChaosValue(current + 1);
+  });
+
+  xp?.addEventListener("click", () => {
+    showSelectedVoyageXpGrantDialog();
   });
 
   updateChaosDiceUI(getChaosValue());

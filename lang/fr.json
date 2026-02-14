@@ -5,6 +5,7 @@
       "No": "Non",
       "Cancel": "Annuler",
       "Apply": "Appliquer",
+      "Validate": "Valider",
       "Roll": "Lancer",
       "Reroll": "Relance",
       "Luck": "Chance",
@@ -163,6 +164,11 @@
       "DamageSplit": {
         "Title": "Répartition des dégâts",
         "Prompt": "Répartir {damage} dégâts entre {targets} cibles."
+      },
+      "VoyageXPGrant": {
+        "Title": "Attribution XP voyage",
+        "Prompt": "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.",
+        "ValueLabel": "XP voyage"
       }
     },
     "Notifications": {
@@ -179,6 +185,12 @@
       "DamageSplitTotal": "La répartition doit totaliser {total}.",
       "MaxCarriedItems": "Limite atteinte : {max} objets transportables maximum.",
       "NotEnoughVoyageXPForAptitude": "XP voyage insuffisante pour {aptitude} (requis: {required}, disponible: {available}).",
+      "VoyageXPGrantLine": "{actor} a recu {amount} points d'experience.",
+      "VoyageXPGrantNoPoints": "Aucun point d'XP voyage octroye.",
+      "VoyageXPGrantNoSelection": "Selectionnez au moins un token joueur pour attribuer de l'XP voyage.",
+      "VoyageXPGrantNoRecipients": "Aucun token joueur selectionne pour recevoir de l'XP voyage.",
+      "VoyageXPGrantAllFailed": "Aucune attribution d'XP voyage n'a pu etre appliquee.",
+      "VoyageXPGrantPartialFailure": "{count} attribution(s) d'XP voyage n'ont pas pu etre appliquees.",
       "ItemAudioMissing": "Aucun fichier audio selectionne pour {item}.",
       "ItemAudioInvalid": "Le fichier audio de {item} est invalide ou introuvable.",
       "ItemAudioInvalidSelection": "Fichier audio invalide pour {item}. Le champ a ete vide.",
