@@ -7573,6 +7573,44 @@ class BloodmanActorSheet extends BaseActorSheet {
     return `${activeTab}|${itemCounts.total}|${itemCounts.aptitudes}|${itemCounts.pouvoirs}|${itemCounts.carried}|${transportCount}`;
   }
 
+  resizeAutoGrowTextarea(textarea) {
+    if (!textarea || String(textarea.tagName || "").toUpperCase() !== "TEXTAREA") return;
+    const computed = window.getComputedStyle ? window.getComputedStyle(textarea) : null;
+    const parseMetric = value => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const fontSize = parseMetric(computed?.fontSize) || 14;
+    const computedLineHeight = parseMetric(computed?.lineHeight);
+    const lineHeight = computedLineHeight > 0 ? computedLineHeight : Math.ceil(fontSize * 1.35);
+    const verticalChrome = parseMetric(computed?.paddingTop)
+      + parseMetric(computed?.paddingBottom)
+      + parseMetric(computed?.borderTopWidth)
+      + parseMetric(computed?.borderBottomWidth);
+
+    const defaultRows = Math.max(1, Math.round(toFiniteNumber(textarea.getAttribute("rows"), 2)));
+    const minRows = Math.max(1, Math.round(toFiniteNumber(textarea.dataset?.autogrowMinRows, defaultRows)));
+    const maxRows = Math.max(minRows, Math.round(toFiniteNumber(textarea.dataset?.autogrowMaxRows, Math.max(minRows + 2, 10))));
+    const minHeight = Math.ceil((minRows * lineHeight) + verticalChrome);
+    const maxHeight = Math.ceil((maxRows * lineHeight) + verticalChrome);
+
+    textarea.style.height = "auto";
+    const contentHeight = Math.max(minHeight, Math.ceil(Number(textarea.scrollHeight) || 0));
+    const nextHeight = Math.min(contentHeight, maxHeight);
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+  }
+
+  refreshAutoGrowTextareas(htmlLike = null) {
+    const root = htmlLike?.find ? htmlLike : this.element;
+    if (!root?.length) return;
+    const fields = root.find("textarea[data-autogrow='true']");
+    if (!fields.length) return;
+    fields.each((_index, textarea) => {
+      this.resizeAutoGrowTextarea(textarea);
+    });
+  }
+
   autoResizeToContent(force = false) {
     if (this._minimized) return;
     const root = this.element;
@@ -7616,6 +7654,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     super.activateListeners(html);
     this._syncMinimizeHeaderButton();
     const scheduleAutoResize = (force = false) => setTimeout(() => this.autoResizeToContent(force), 0);
+    const scheduleAutoGrowRefresh = () => setTimeout(() => this.refreshAutoGrowTextareas(html), 0);
 
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const basicPlayer = isBasicPlayerRole(game.user?.role);
@@ -7643,10 +7682,18 @@ class BloodmanActorSheet extends BaseActorSheet {
     setTimeout(forceEnableSheetUi, 0);
     this.refreshResourceVisuals(html);
     setTimeout(() => this.refreshResourceVisuals(html), 0);
+    this.refreshAutoGrowTextareas(html);
+    scheduleAutoGrowRefresh();
     scheduleAutoResize(true);
 
     html.find(".sheet-tabs .item").on("click", () => {
-      scheduleAutoResize();
+      scheduleAutoGrowRefresh();
+      scheduleAutoResize(true);
+    });
+
+    html.on("input change", "textarea[data-autogrow='true']", ev => {
+      this.resizeAutoGrowTextarea(ev.currentTarget);
+      scheduleAutoResize(true);
     });
 
     html.on("click", ".char-edit-toggle", ev => {

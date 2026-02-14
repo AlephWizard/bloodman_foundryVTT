@@ -228,11 +228,25 @@
           <div class="identity-right">
             <div class="field origin-field">
               <label>{{localize "BLOODMAN.Identity.Fields.Origin"}}</label>
-              <input type="text" name="system.profile.origine" value="{{profile.origine}}" />
+              <textarea
+                class="bm-autogrow-field bm-autogrow-origin"
+                name="system.profile.origine"
+                rows="2"
+                data-autogrow="true"
+                data-autogrow-min-rows="2"
+                data-autogrow-max-rows="5"
+              >{{profile.origine}}</textarea>
             </div>
             <div class="field">
               <label>{{localize "BLOODMAN.Identity.Fields.History"}}</label>
-              <textarea name="system.profile.historique" rows="4">{{profile.historique}}</textarea>
+              <textarea
+                class="bm-autogrow-field bm-autogrow-history"
+                name="system.profile.historique"
+                rows="4"
+                data-autogrow="true"
+                data-autogrow-min-rows="4"
+                data-autogrow-max-rows="10"
+              >{{profile.historique}}</textarea>
             </div>
           </div>
         </div>
@@ -432,7 +446,14 @@
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-pen"></i> {{localize "BLOODMAN.Notes.Title"}}</span>
         </div>
-        <textarea name="system.profile.notes" rows="6">{{profile.notes}}</textarea>
+        <textarea
+          class="bm-autogrow-field bm-autogrow-notes"
+          name="system.profile.notes"
+          rows="6"
+          data-autogrow="true"
+          data-autogrow-min-rows="6"
+          data-autogrow-max-rows="16"
+        >{{profile.notes}}</textarea>
       </section>
     </section>
   </section>

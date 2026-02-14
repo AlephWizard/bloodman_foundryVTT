@@ -25,6 +25,11 @@
   resize: vertical;
 }
 
+.bloodman-sheet textarea[data-autogrow="true"] {
+  resize: none;
+  overflow-y: hidden;
+}
+
 .bloodman-sheet .sheet-header {
   display: flex;
   align-items: center;
@@ -941,8 +946,10 @@
   width: 100%;
 }
 
-.origin-field input {
-  height: 26px;
+.origin-field input,
+.origin-field textarea {
+  min-height: 26px;
+  line-height: 1.35;
 }
 
 .field label {
@@ -979,6 +986,18 @@
 
 .notes-card textarea {
   min-height: 90px;
+}
+
+.origin-field textarea[data-autogrow="true"] {
+  max-height: 150px;
+}
+
+.identity-right textarea[name="system.profile.historique"][data-autogrow="true"] {
+  max-height: 260px;
+}
+
+.notes-card textarea[name="system.profile.notes"][data-autogrow="true"] {
+  max-height: 420px;
 }
 
 .aptitudes-card textarea,
