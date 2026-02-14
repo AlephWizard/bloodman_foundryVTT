@@ -4485,6 +4485,7 @@ function emitPowerUsePopup(actor, item, options = {}) {
 function canCurrentUserReceivePowerUsePopup(data) {
   const localUserId = String(game.user?.id || "").trim();
   if (!localUserId) return false;
+  if (game.user?.isGM) return true;
   const requesterUserId = String(data?.requesterUserId || "").trim();
   const isRequester = requesterUserId && requesterUserId === localUserId;
   const viewerIds = Array.isArray(data?.viewerIds)
@@ -4493,7 +4494,6 @@ function canCurrentUserReceivePowerUsePopup(data) {
   if (isRequester && viewerIds.length && !viewerIds.includes(localUserId)) return false;
   if (isRequester && !viewerIds.length) return false;
   if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
-  if (game.user?.isGM) return true;
   return isAssistantOrHigherRole(game.user?.role);
 }
 
@@ -8272,7 +8272,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const used = await applyPowerCost(this.actor, item);
     if (!used) return;
     this.markPowerActivated(item.id, true);
-    const includeRequesterUser = game.user?.isGM && this.actor?.type === "personnage-non-joueur";
+    const includeRequesterUser = game.user?.isGM;
     emitPowerUsePopup(this.actor, item, {
       fromUseButton: true,
       includeRequesterUser
