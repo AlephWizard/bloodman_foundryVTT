@@ -2492,6 +2492,7 @@ const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-jo
 const CARRIED_ITEM_TYPES = new Set(["objet", "ration", "soin"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
+const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
@@ -2520,6 +2521,11 @@ const AMMO_UPDATE_PATHS = [
 function isDamageRerollItemType(itemType) {
   const type = String(itemType || "").trim().toLowerCase();
   return DAMAGE_REROLL_ALLOWED_ITEM_TYPES.has(type);
+}
+
+function isVoyageXPCostItemType(itemType) {
+  const type = String(itemType || "").trim().toLowerCase();
+  return VOYAGE_XP_COST_ITEM_TYPES.has(type);
 }
 
 function isCarriedItemLimitedActorType(actorType) {
@@ -5696,7 +5702,7 @@ Hooks.once("ready", async () => {
     await syncActorDerivedCharacteristicsResources(actor);
 
     for (const item of actor.items) {
-      if (item.type === "aptitude") {
+      if (isVoyageXPCostItemType(item.type)) {
         const rawCost = item.system?.xpVoyageCost;
         const numericCost = Number(rawCost);
         const normalizedCost = normalizeNonNegativeInteger(rawCost, 0);
@@ -5927,9 +5933,9 @@ function ensureChaosDiceUI() {
   }
 }
 
-async function applyAptitudeVoyageCostOnCreate(actor, item) {
+async function applyVoyageXPCostOnCreate(actor, item) {
   if (!actor || !item) return;
-  if (actor.type !== "personnage" || item.type !== "aptitude") return;
+  if (actor.type !== "personnage" || !isVoyageXPCostItemType(item.type)) return;
 
   const cost = normalizeNonNegativeInteger(item.system?.xpVoyageCost, 0);
   if (cost <= 0) return;
@@ -5958,7 +5964,7 @@ Hooks.on("createItem", async (item, options, userId) => {
   const sourceUserId = String(userId || options?.userId || "");
   if (sourceUserId && sourceUserId !== game.user?.id) return;
 
-  await applyAptitudeVoyageCostOnCreate(item.actor, item);
+  await applyVoyageXPCostOnCreate(item.actor, item);
 
   const type = String(item.type || "").trim().toLowerCase();
   if (type === "aptitude" || type === "pouvoir") {
@@ -5981,7 +5987,7 @@ Hooks.on("preCreateItem", (item, createData) => {
   normalizeWeaponMagazineCapacityUpdate(item, createData);
   normalizeCharacteristicBonusItemUpdate(item, createData);
 
-  if (item?.type !== "aptitude") return;
+  if (!isVoyageXPCostItemType(item?.type)) return;
 
   const rawCost = foundry.utils.getProperty(createData || {}, "system.xpVoyageCost");
   const normalizedCost = normalizeNonNegativeInteger(
@@ -5996,17 +6002,20 @@ Hooks.on("preCreateItem", (item, createData) => {
   const availableVoyageXp = normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0);
   if (availableVoyageXp >= normalizedCost) return;
 
-  const aptitudeName = item.name || t("TYPES.Item.aptitude");
-  console.warn("[bloodman] aptitude acquisition blocked: not enough voyage XP", {
+  const type = String(item?.type || "").trim().toLowerCase();
+  const typeFallbackLabel = type ? t(`TYPES.Item.${type}`) : t("BLOODMAN.Common.Name");
+  const itemName = item.name || typeFallbackLabel;
+  console.warn("[bloodman] item acquisition blocked: not enough voyage XP", {
     actorId: actor.id,
     actorName: actor.name,
-    aptitude: aptitudeName,
+    itemType: type,
+    item: itemName,
     required: normalizedCost,
     available: availableVoyageXp
   });
   ui.notifications?.error(
     t("BLOODMAN.Notifications.NotEnoughVoyageXPForAptitude", {
-      aptitude: aptitudeName,
+      aptitude: itemName,
       required: normalizedCost,
       available: availableVoyageXp
     })
@@ -6024,7 +6033,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   normalizeWeaponMagazineCapacityUpdate(item, updateData);
   normalizeCharacteristicBonusItemUpdate(item, updateData);
 
-  if (item?.type !== "aptitude") return;
+  if (!isVoyageXPCostItemType(item?.type)) return;
   const costPath = "system.xpVoyageCost";
   const rawUpdateCost = foundry.utils.getProperty(updateData, costPath);
   const hasCostUpdate = Object.prototype.hasOwnProperty.call(updateData, costPath)
@@ -8620,7 +8629,7 @@ class BloodmanItemSheet extends BaseItemSheet {
       data.item.system.magazineCapacity = normalizeNonNegativeInteger(this.item.system?.magazineCapacity, 0);
       data.canEditMagazineCapacity = isAssistantOrHigherRole(game.user?.role);
     }
-    if (this.item.type === "aptitude") {
+    if (isVoyageXPCostItemType(this.item.type)) {
       if (!data.item.system) data.item.system = {};
       data.item.system.xpVoyageCost = normalizeNonNegativeInteger(this.item.system?.xpVoyageCost, 0);
     }

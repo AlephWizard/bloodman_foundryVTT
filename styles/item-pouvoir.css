@@ -2,6 +2,15 @@
   gap: 10px;
 }
 
+.item-pouvoir.bm-item-sheet .bm-voyage-xp-cost-row .bm-item-tag {
+  min-width: 0;
+}
+
+.item-pouvoir.bm-item-sheet .bm-voyage-xp-cost-input {
+  max-width: 160px;
+  justify-self: start;
+}
+
 .item-pouvoir.bm-item-sheet .power-cost-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 86px auto;

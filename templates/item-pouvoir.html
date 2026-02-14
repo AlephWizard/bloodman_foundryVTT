@@ -20,6 +20,11 @@
         <input class="bm-item-input" name="name" value="{{item.name}}" />
       </div>
 
+      <div class="bm-item-row bm-voyage-xp-cost-row">
+        <div class="bm-item-tag">{{localize "BLOODMAN.Items.VoyageXPCostLabel"}}</div>
+        <input class="bm-item-input bm-voyage-xp-cost-input" type="number" min="0" step="1" name="system.xpVoyageCost" value="{{item.system.xpVoyageCost}}" data-dtype="Number" />
+      </div>
+
       <div class="bm-item-row bm-item-row-note">
         <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
         <textarea class="bm-item-textarea" name="system.note">{{item.system.note}}</textarea>
