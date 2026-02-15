@@ -5673,6 +5673,8 @@ Hooks.once("ready", async () => {
   }
 
   registerDamageSocketHandlers();
+  if (!game.user?.isGM) return;
+
   for (const actor of game.actors) {
     if (!actor.isOwner) continue;
     const isCharacter = actor.type === "personnage";
@@ -6474,6 +6476,15 @@ async function applyPowerCost(actor, item) {
       allowVitalResourceUpdate: true
     });
     if (!sent) return false;
+    try {
+      if (typeof actor?.updateSource === "function") {
+        actor.updateSource(foundry.utils.deepClone({ "system.resources.pp.current": nextValue }));
+      } else {
+        foundry.utils.setProperty(actor, "system.resources.pp.current", nextValue);
+      }
+    } catch (_error) {
+      // Non-fatal optimistic update.
+    }
   }
   return true;
 }
@@ -6877,8 +6888,11 @@ Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
   }
 });
 
-Hooks.on("updateActor", async (actor, changes) => {
+Hooks.on("updateActor", async (actor, changes, _options, userId) => {
   if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  const sourceUserId = String(userId || "");
+  const currentUserId = String(game.user?.id || "");
+  if (sourceUserId && currentUserId && sourceUserId !== currentUserId) return;
   if (!game.user.isGM && !actor.isOwner) return;
   if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
   const hasCharBaseChange = CHARACTERISTICS.some(c => {
@@ -7217,7 +7231,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async applyActorUpdate(updateData, options = {}) {
-    if (!hasActorUpdatePayload(updateData)) return null;
+    if (!hasActorUpdatePayload(updateData)) return false;
     if (this.actor?.isOwner || game.user?.isGM) {
       return this.actor.update(updateData, options);
     }
@@ -7237,7 +7251,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         // Non-fatal optimistic update.
       }
     }
-    return null;
+    return sent;
   }
 
   async deleteActorItem(item) {
@@ -8193,9 +8207,10 @@ class BloodmanActorSheet extends BaseActorSheet {
         return;
       }
 
-      await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
+      const resourceUpdated = await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
         bloodmanAllowVitalResourceUpdate: true
       });
+      if (!resourceUpdated) return;
       await doCharacteristicRoll(this.actor, key);
       await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
       this.markCharacteristicReroll(key);
@@ -8422,9 +8437,10 @@ class BloodmanActorSheet extends BaseActorSheet {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
         return;
       }
-      await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
+      const resourceUpdated = await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
         bloodmanAllowVitalResourceUpdate: true
       });
+      if (!resourceUpdated) return;
       const nextPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
       const expectedPP = Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST);
       logDamageRerollValidation("resource-player-pp", {
