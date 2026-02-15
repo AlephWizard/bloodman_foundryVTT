@@ -366,7 +366,7 @@
           <div class="currency-row">
             <input type="text" name="system.equipment.monnaies" value="{{equipment.monnaies}}" />
             <span class="currency-current-label">{{localize "BLOODMAN.Equipment.CurrencyCurrentLabel"}}</span>
-            <input type="number" name="system.equipment.monnaiesActuel" min="0" max="1000000" step="0.01" value="{{equipment.monnaiesActuel}}" />
+            <input type="text" name="system.equipment.monnaiesActuel" value="{{equipment.monnaiesActuel}}" />
           </div>
         </div>
 
@@ -398,6 +398,7 @@
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
                 <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
+                {{#if this.showAptitudeUseButton}}<button type="button" class="ability-show-gm">MONTRER MJ</button>{{/if}}
                 {{#if this.displayDamageDie}}<span class="ability-roll">{{this.displayDamageDie}}</span>{{/if}}
                 {{#if this.showItemReroll}}
                   <button type="button" class="item-reroll">

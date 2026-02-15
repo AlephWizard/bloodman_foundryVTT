@@ -2602,6 +2602,97 @@ function parseLooseNumericInput(value) {
   return { ok: true, empty: false, value: numericValue };
 }
 
+function parseSimpleArithmeticInput(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { ok: true, empty: true, value: 0 };
+  const source = raw.replace(/\s+/g, "").replace(/,/g, ".");
+  if (!/^[\d+\-*/().]+$/.test(source)) return { ok: false, empty: false, value: 0 };
+
+  let index = 0;
+  const peek = () => source[index] || "";
+  const read = () => source[index++] || "";
+
+  const parseNumber = () => {
+    let token = "";
+    let dotCount = 0;
+    while (index < source.length) {
+      const char = peek();
+      if (char >= "0" && char <= "9") {
+        token += read();
+        continue;
+      }
+      if (char === ".") {
+        dotCount += 1;
+        if (dotCount > 1) break;
+        token += read();
+        continue;
+      }
+      break;
+    }
+    if (!token || token === ".") return Number.NaN;
+    const numeric = Number(token);
+    return Number.isFinite(numeric) ? numeric : Number.NaN;
+  };
+
+  const parseFactor = () => {
+    const char = peek();
+    if (char === "+") {
+      read();
+      return parseFactor();
+    }
+    if (char === "-") {
+      read();
+      const value = parseFactor();
+      return Number.isFinite(value) ? -value : Number.NaN;
+    }
+    if (char === "(") {
+      read();
+      const value = parseExpression();
+      if (peek() !== ")") return Number.NaN;
+      read();
+      return value;
+    }
+    return parseNumber();
+  };
+
+  const parseTerm = () => {
+    let value = parseFactor();
+    while (Number.isFinite(value)) {
+      const operator = peek();
+      if (operator !== "*" && operator !== "/") break;
+      read();
+      const rhs = parseFactor();
+      if (!Number.isFinite(rhs)) return Number.NaN;
+      if (operator === "*") value *= rhs;
+      else {
+        if (Math.abs(rhs) <= 1e-12) return Number.NaN;
+        value /= rhs;
+      }
+    }
+    return value;
+  };
+
+  const parseExpression = () => {
+    let value = parseTerm();
+    while (Number.isFinite(value)) {
+      const operator = peek();
+      if (operator !== "+" && operator !== "-") break;
+      read();
+      const rhs = parseTerm();
+      if (!Number.isFinite(rhs)) return Number.NaN;
+      if (operator === "+") value += rhs;
+      else value -= rhs;
+    }
+    return value;
+  };
+
+  const numericValue = parseExpression();
+  if (!Number.isFinite(numericValue) || index !== source.length) {
+    return { ok: false, empty: false, value: 0 };
+  }
+  return { ok: true, empty: false, value: numericValue };
+}
+
 function normalizeSignedModifierInput(rawValue, fallback = 0) {
   if (rawValue == null || rawValue === "") return { value: 0, invalid: false };
   if (typeof rawValue === "number") {
@@ -2632,7 +2723,7 @@ function roundCurrencyValue(value) {
 }
 
 function normalizeCurrencyCurrentValue(value, fallback = 0) {
-  const parsed = parseLooseNumericInput(value);
+  const parsed = parseSimpleArithmeticInput(value);
   if (!parsed.ok) {
     return { ok: false, value: roundCurrencyValue(Math.max(0, toFiniteNumber(fallback, 0))) };
   }
@@ -4437,14 +4528,22 @@ function getPowerUsePopupViewerIds(requesterUserId = "", options = {}) {
   return ids;
 }
 
+function getPopupItemLabel(itemType) {
+  return String(itemType || "").trim().toLowerCase() === "aptitude" ? "Aptitude" : "Pouvoir";
+}
+
 function emitPowerUsePopup(actor, item, options = {}) {
-  if (!game.socket || !actor || !item || item.type !== "pouvoir") return false;
+  if (!game.socket || !actor || !item) return false;
+  const popupItemType = String(item.type || "").trim().toLowerCase();
+  if (popupItemType !== "pouvoir" && popupItemType !== "aptitude") return false;
   const requesterUserId = String(game.user?.id || "").trim();
   const includeRequesterUser = options?.includeRequesterUser === true;
   const viewerIds = getPowerUsePopupViewerIds(requesterUserId, { includeRequesterUser });
   if (!viewerIds.length) return false;
   const randomId = () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2));
   const powerDamageFormula = item.system?.damageEnabled ? normalizeRollDieFormula(item.system?.damageDie, "d4") : "";
+  const popupItemLabel = getPopupItemLabel(popupItemType);
+  const hasPowerCost = popupItemType === "pouvoir" && toBooleanFlag(item.system?.powerCostEnabled);
   const payload = {
     type: "powerUsePopup",
     eventId: randomId(),
@@ -4454,11 +4553,15 @@ function emitPowerUsePopup(actor, item, options = {}) {
     viewerIds,
     actorId: String(actor.id || ""),
     actorName: String(actor.name || "").trim(),
+    itemId: String(item.id || ""),
+    itemType: popupItemType,
+    itemLabel: popupItemLabel,
+    itemName: String(item.name || "").trim() || popupItemLabel,
     powerId: String(item.id || ""),
-    powerName: String(item.name || "").trim() || "Pouvoir",
+    powerName: String(item.name || "").trim() || popupItemLabel,
     powerDescription: String(item.system?.note || item.system?.notes || "").trim(),
-    powerCostEnabled: toBooleanFlag(item.system?.powerCostEnabled),
-    powerCost: Math.max(0, Math.floor(toFiniteNumber(item.system?.powerCost, 0))),
+    powerCostEnabled: hasPowerCost,
+    powerCost: hasPowerCost ? Math.max(0, Math.floor(toFiniteNumber(item.system?.powerCost, 0))) : 0,
     damageEnabled: toBooleanFlag(item.system?.damageEnabled),
     damageFormula: String(powerDamageFormula || "").trim(),
     context: {
@@ -4502,7 +4605,9 @@ function showPowerUsePopup(data) {
   const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
   const actorName = String(data.actorName || "").trim();
   const requesterUserName = String(data.requesterUserName || "").trim();
-  const powerName = String(data.powerName || "").trim() || "Pouvoir";
+  const popupItemType = String(data.itemType || "").trim().toLowerCase();
+  const popupItemLabel = getPopupItemLabel(popupItemType);
+  const powerName = String(data.itemName || data.powerName || "").trim() || popupItemLabel;
   const descriptionHtml = formatMultilineTextToHtml(data.powerDescription);
   const noDescriptionText = escapeHtml("Aucune description.");
   const damageEnabled = data.damageEnabled === true;
@@ -4514,13 +4619,14 @@ function showPowerUsePopup(data) {
   const actorLabel = escapeHtml(actorName || "Joueur");
   const requesterLabel = escapeHtml(requesterUserName || actorName || "Joueur");
   const powerLabel = escapeHtml(powerName);
+  const itemLabel = escapeHtml(popupItemLabel);
   const damageLabel = escapeHtml(damageText);
   const costLabel = escapeHtml(costText);
-  const title = `Pouvoir utilise - ${actorName || requesterUserName || "Joueur"}`;
+  const title = `${popupItemLabel} utilise - ${actorName || requesterUserName || "Joueur"}`;
   const content = `<div class="bm-power-use-popup">
     <p><strong>Joueur :</strong> ${requesterLabel}</p>
     <p><strong>Personnage :</strong> ${actorLabel}</p>
-    <p><strong>Pouvoir :</strong> ${powerLabel}</p>
+    <p><strong>${itemLabel} :</strong> ${powerLabel}</p>
     <p><strong>Cout :</strong> ${costLabel}</p>
     <p><strong>Degats :</strong> ${damageLabel}</p>
     <p><strong>Description :</strong></p>
@@ -7468,6 +7574,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const aptitudes = itemBuckets.aptitude.map(item => {
       const dataItem = buildItemDisplayData(item);
+      dataItem.showAptitudeUseButton = isPlayerActor;
       dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
       return dataItem;
     });
@@ -7821,6 +7928,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       await this.usePower(item);
+    });
+
+    html.find(".ability-show-gm").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const li = ev.currentTarget.closest(".item");
+      const item = this.getItemFromListElement(li);
+      await this.useAptitude(item);
     });
 
     html.find(".item-reroll").click(ev => {
@@ -8340,6 +8455,15 @@ class BloodmanActorSheet extends BaseActorSheet {
       includeRequesterUser
     });
     this.render(false);
+  }
+
+  async useAptitude(item) {
+    if (!item || item.type !== "aptitude") return;
+    const includeRequesterUser = game.user?.isGM;
+    emitPowerUsePopup(this.actor, item, {
+      fromUseButton: true,
+      includeRequesterUser
+    });
   }
 
   async useItem(item) {

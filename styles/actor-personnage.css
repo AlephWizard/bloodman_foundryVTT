@@ -787,6 +787,7 @@
 }
 
 .item-use,
+.ability-show-gm,
 .power-use,
 .weapon-reload {
   display: inline-flex;
@@ -801,6 +802,7 @@
   color: var(--bm-white);
 }
 
+.ability-show-gm,
 .power-use {
   padding: 1px 5px;
   min-height: 18px;
