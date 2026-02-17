@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><g class="" transform="translate(0,0)" style="touch-action: none;"><path d="M256 29.816l-231 154v106.368l231-154 231 154V183.816zm0 128.043L105 259.783v90.283l151-101.925 151 101.925v-90.283zm0 112l-87 58.725v67.6l87-58 87 58v-67.6zm0 89.957l-87 58v64.368l87-58 87 58v-64.368z" fill="#ffffff" fill-opacity="1" transform="translate(0, 512) scale(1, -1) rotate(0, 256, 256)"></path></g></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Calque_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 512 512">
+  <!-- Generator: Adobe Illustrator 29.6.0, SVG Export Plug-In . SVG Version: 2.1.1 Build 207)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #344693;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M256,482.2L25,328.2v-106.4l231,154,231-154v106.4l-231,154ZM256,354.1l-151-101.9v-90.3l151,101.9,151-101.9v90.3l-151,101.9ZM256,242.1l-87-58.7v-67.6l87,58,87-58v67.6l-87,58.7ZM256,152.2l-87-58V29.8l87,58,87-58v64.4l-87,58Z"/>
+</svg>

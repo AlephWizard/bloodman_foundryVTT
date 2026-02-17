@@ -2590,6 +2590,7 @@ const REROLL_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-reroll-r
 const INITIATIVE_GROUP_BUFFER_MS = 180;
 const TOKEN_MOVE_LIMIT_EPSILON = 0.0001;
 let LAST_COMBAT_MOVE_RESET_KEY = "";
+let LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
 let LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
 const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
@@ -5565,6 +5566,41 @@ async function resetActiveCombatantMoveGauge(combat) {
   LAST_COMBAT_MOVE_RESET_KEY = resetKey;
 }
 
+function getCombatMoveHistoryResetKey(combat) {
+  if (!combat?.active) return "";
+  const combatId = String(combat?.id || "");
+  const round = Number(combat?.round ?? 0);
+  const turn = Number(combat?.turn ?? -1);
+  if (!combatId || round <= 0 || turn < 0) return "";
+  return `${combatId}:${round}:${turn}`;
+}
+
+async function resetCombatMovementHistory(combat) {
+  if (!game.user?.isGM) return;
+  if (!combat?.active) return;
+  const resetKey = getCombatMoveHistoryResetKey(combat);
+  if (!resetKey || resetKey === LAST_COMBAT_MOVE_HISTORY_RESET_KEY) return;
+  LAST_COMBAT_MOVE_HISTORY_RESET_KEY = resetKey;
+
+  if (typeof combat.clearMovementHistories === "function") {
+    try {
+      await combat.clearMovementHistories();
+      return;
+    } catch (error) {
+      console.warn("[bloodman] combat move history reset failed (combat.clearMovementHistories)", error);
+    }
+  }
+
+  for (const combatant of combat.combatants || []) {
+    if (typeof combatant?.clearMovementHistory !== "function") continue;
+    try {
+      await combatant.clearMovementHistory();
+    } catch (error) {
+      console.warn("[bloodman] combat move history reset failed (combatant.clearMovementHistory)", error);
+    }
+  }
+}
+
 function getTokenHudCounterPriorityValue(effectDoc) {
   const fromFlag = Number(getTokenHudCounterFlagData(effectDoc)?.rounds);
   if (Number.isFinite(fromFlag)) return Math.max(0, Math.floor(fromFlag));
@@ -6786,12 +6822,16 @@ Hooks.on("updateCombat", (combat, changes) => {
   if (!changes) return;
   if (changes.active === false) {
     LAST_COMBAT_MOVE_RESET_KEY = "";
+    LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
     LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
   }
   if (changes.round != null || changes.turn != null || changes.active != null) {
     focusActiveCombatantToken(combat);
     resetActiveCombatantMoveGauge(combat).catch(error => {
       console.warn("[bloodman] move:gauge reset failed", error);
+    });
+    resetCombatMovementHistory(combat).catch(error => {
+      console.warn("[bloodman] combat move history reset failed", error);
     });
     decrementActiveCombatantTokenHudCounters(combat).catch(error => {
       console.warn("[bloodman] token HUD turn counter update failed", error);
@@ -6804,6 +6844,9 @@ Hooks.on("combatTurnChange", (combat) => {
   resetActiveCombatantMoveGauge(combat).catch(error => {
     console.warn("[bloodman] move:gauge reset failed", error);
   });
+  resetCombatMovementHistory(combat).catch(error => {
+    console.warn("[bloodman] combat move history reset failed", error);
+  });
   decrementActiveCombatantTokenHudCounters(combat).catch(error => {
     console.warn("[bloodman] token HUD turn counter update failed", error);
   });
@@ -6814,6 +6857,9 @@ Hooks.on("combatStart", (combat) => {
   resetActiveCombatantMoveGauge(combat).catch(error => {
     console.warn("[bloodman] move:gauge reset failed", error);
   });
+  resetCombatMovementHistory(combat).catch(error => {
+    console.warn("[bloodman] combat move history reset failed", error);
+  });
   decrementActiveCombatantTokenHudCounters(combat).catch(error => {
     console.warn("[bloodman] token HUD turn counter update failed", error);
   });
@@ -6821,6 +6867,7 @@ Hooks.on("combatStart", (combat) => {
 
 Hooks.on("deleteCombat", () => {
   LAST_COMBAT_MOVE_RESET_KEY = "";
+  LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
   LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
 });
 
@@ -7374,6 +7421,17 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.getPowerUseState().clear();
   }
 
+  async resetMovementGaugeToMax() {
+    if (!game.user?.isGM) return false;
+    if (!this.actor) return false;
+    if (this.actor.type !== "personnage" && this.actor.type !== "personnage-non-joueur") return false;
+
+    const gauge = normalizeActorMoveGauge(this.actor, { initializeWhenMissing: true });
+    await setActorMoveGauge(this.actor, gauge.max, gauge.max);
+    this.render(false);
+    return true;
+  }
+
   isPowerActivated(itemId) {
     const key = String(itemId || "").trim();
     if (!key) return false;
@@ -7488,6 +7546,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const canEditRestrictedFields = canToggleCharacteristicsEdit;
     const canEditXpChecks = canToggleCharacteristicsEdit;
     const canOpenItemSheets = canCurrentUserOpenItemSheets();
+    const canResetMoveGauge = Boolean(game.user?.isGM);
+    const moveResetLabel = tl("BLOODMAN.Resources.MoveResetAction", "Recharger PM");
     if (!canToggleCharacteristicsEdit) this._characteristicsEditEnabled = false;
     const characteristicsEditEnabled = canToggleCharacteristicsEdit && Boolean(this._characteristicsEditEnabled);
     const modifiers = foundry.utils.mergeObject(buildDefaultModifiers(), data.actor.system.modifiers || {}, {
@@ -7713,6 +7773,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       canEditTokenImage,
       canEditAmmoFields,
       canOpenItemSheets,
+      canResetMoveGauge,
+      moveResetLabel,
       characteristicsEditEnabled,
       characteristics,
       totalPoints,
@@ -7943,6 +8005,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       ev.stopPropagation();
       const key = ev.currentTarget.dataset.key;
       this.clearCharacteristicReroll(key);
+    });
+
+    html.find(".move-reset-btn").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      await this.resetMovementGaugeToMax();
     });
 
     html.find(".weapon-roll").click(ev => {

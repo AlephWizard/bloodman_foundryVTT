@@ -123,6 +123,16 @@
                     {{#if this.showMoveValue}}
                       <span class="move-slot">
                         <input type="number" class="move-box" value="{{this.moveValue}}" readonly />
+                        {{#if ../canResetMoveGauge}}
+                          <button
+                            type="button"
+                            class="move-reset-btn"
+                            aria-label="{{../moveResetLabel}}"
+                            title="{{../moveResetLabel}}"
+                          >
+                            <i class="fa-solid fa-rotate-right"></i>
+                          </button>
+                        {{/if}}
                       </span>
                     {{/if}}
                     {{#if this.showReroll}}
