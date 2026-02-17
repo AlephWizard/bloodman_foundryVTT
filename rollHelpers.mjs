@@ -1,4 +1,12 @@
+import { bmLog } from "./utils/logger.mjs";
+import {
+  canUserProcessPrivilegedRequests,
+  getActivePrivilegedOperatorIds,
+  isAssistantOrHigherRole,
+  isCurrentUserPrimaryPrivilegedOperator
+} from "./utils/privileged-users.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
+
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
@@ -52,7 +60,7 @@ function safeWarn(message) {
   try {
     ui.notifications?.warn(message);
   } catch (error) {
-    console.warn("[bloodman] notify.warn failed", message, error);
+    bmLog.warn("notify.warn failed", { message, error });
   }
 }
 
@@ -181,53 +189,8 @@ function getTokenCurrentPv(tokenLike) {
   return NaN;
 }
 
-function getActivePrivilegedOperatorIds() {
-  return game.users
-    ?.filter(user => user?.active && (user.isGM || isAssistantOrHigherRole(user.role)))
-    .map(user => user.id) || [];
-}
-
-function isAssistantOrHigherRole(role) {
-  const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
-  return Number(role ?? 0) >= assistantRole;
-}
-
-function canUserProcessPrivilegedRequests(user = null) {
-  const candidate = user || game.user;
-  if (candidate?.active === false) return false;
-  if (candidate.isGM) return true;
-  return isAssistantOrHigherRole(candidate.role);
-}
-
-function getPrivilegedOperatorPriority(user = null) {
-  if (!canUserProcessPrivilegedRequests(user)) return Number.POSITIVE_INFINITY;
-  return user?.isGM ? 0 : 1;
-}
-
-function isCurrentUserPrimaryPrivilegedOperator() {
-  const currentUser = game.user;
-  if (!canUserProcessPrivilegedRequests(currentUser)) return false;
-
-  const activeOperators = Array.from(game.users || [])
-    .filter(user => canUserProcessPrivilegedRequests(user))
-    .sort((left, right) => {
-      const priorityDelta = getPrivilegedOperatorPriority(left) - getPrivilegedOperatorPriority(right);
-      if (priorityDelta !== 0) return priorityDelta;
-      return String(left?.id || "").localeCompare(String(right?.id || ""));
-    });
-  if (!activeOperators.length) return false;
-  return String(activeOperators[0]?.id || "") === String(currentUser?.id || "");
-}
-
 function getDamageChatRecipientIds() {
-  const gmAssistantIds = [];
-  for (const user of game.users || []) {
-    if (!user?.active) continue;
-    const userId = String(user.id || "").trim();
-    if (!userId) continue;
-    if (user.isGM || isAssistantOrHigherRole(user.role)) gmAssistantIds.push(userId);
-  }
-  return { gmAssistantIds };
+  return { gmAssistantIds: getActivePrivilegedOperatorIds() };
 }
 
 export async function postDamageTakenChatMessage({ name = "Cible", amount = 0, pa = 0, speakerAlias = "" } = {}) {
@@ -248,20 +211,14 @@ export async function postDamageTakenChatMessage({ name = "Cible", amount = 0, p
       content: t("BLOODMAN.Rolls.Damage.Take", { name: safeName, amount: safeAmount, pa: safePa })
     });
   } catch (error) {
-    console.error("[bloodman] damage:chat armor detail failed", error);
+    bmLog.error("damage:chat armor detail failed", { error });
   }
 }
 
 function getDamageConfigPopupViewerIds(requesterUserId = "") {
-  const ids = new Set();
+  const ids = new Set(getActivePrivilegedOperatorIds());
   const requesterId = String(requesterUserId || "").trim();
   if (requesterId) ids.add(requesterId);
-  for (const user of game.users || []) {
-    if (!user?.active) continue;
-    const userId = String(user.id || "").trim();
-    if (!userId) continue;
-    if (user.isGM || isAssistantOrHigherRole(user.role)) ids.add(userId);
-  }
   return [...ids];
 }
 
@@ -299,7 +256,7 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
   try {
     game.socket.emit(SYSTEM_SOCKET, payload);
   } catch (error) {
-    console.error("[bloodman] damage:config popup socket emit failed", error);
+    bmLog.error("damage:config popup socket emit failed", { error });
   }
   const observerIds = viewerIds.filter(id => id && id !== requesterUserId);
   if (ENABLE_CHAT_TRANSPORT_FALLBACK && useChatFallback && observerIds.length && typeof ChatMessage?.create === "function") {
@@ -308,7 +265,7 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
       whisper: observerIds,
       flags: { bloodman: { damageConfigPopup: payload } }
     }).catch(error => {
-      console.error("[bloodman] damage:config popup chat fallback failed", error);
+      bmLog.error("damage:config popup chat fallback failed", { error });
     });
   }
   return true;
@@ -336,7 +293,7 @@ function requestActorSheetUpdate(actor, updateData, options = {}) {
       }
     });
   } catch (error) {
-    console.error("[bloodman] actor:update socket emit failed", error);
+    bmLog.error("actor:update socket emit failed", { error });
     return false;
   }
   return true;
@@ -361,7 +318,7 @@ function requestDeleteActorItem(actor, item) {
       itemName: String(item.name || "")
     });
   } catch (error) {
-    console.error("[bloodman] item:delete socket emit failed", error);
+    bmLog.error("item:delete socket emit failed", { error });
     return false;
   }
   return true;
@@ -397,7 +354,7 @@ async function deleteItemWithFallback(item, actor = null) {
     try {
       await item.delete();
     } catch (error) {
-      console.warn("[bloodman] item:delete direct failed, fallback to socket", error);
+      bmLog.warn("item:delete direct failed, fallback to socket", { error });
     }
     const itemId = String(item.id || "");
     if (itemId && !parentActor?.items?.has(itemId)) return true;
@@ -487,7 +444,7 @@ async function rememberDamageDialogConfig(config = {}) {
   try {
     await game.user.setFlag("bloodman", DAMAGE_DIALOG_CONFIG_USER_FLAG, payload);
   } catch (error) {
-    console.warn("[bloodman] damage:remember config failed", error);
+    bmLog.warn("damage:remember config failed", { error });
   }
 }
 
@@ -1005,11 +962,11 @@ export async function doCharacteristicRoll(actor, key) {
 async function requestDamageFromGM(token, damage, options = {}) {
   if (!game.socket) return false;
   const payload = buildDamageRequestPayload(token, damage, options);
-  console.debug("[bloodman] damage:send", payload);
+  bmLog.debug("damage:send", payload);
   try {
     game.socket.emit(SYSTEM_SOCKET, payload);
   } catch (error) {
-    console.error("[bloodman] damage:socket emit failed", error);
+    bmLog.error("damage:socket emit failed", { error });
     return false;
   }
 
@@ -1022,7 +979,7 @@ async function requestDamageFromGM(token, damage, options = {}) {
         flags: { bloodman: { damageRequest: payload } }
       });
     } catch (error) {
-      console.error("[bloodman] damage:fallback chat failed", error);
+      bmLog.error("damage:fallback chat failed", { error });
       // Socket delivery already succeeded; keep reroll context available to players.
     }
   }
@@ -1276,7 +1233,7 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
     if (!Number.isFinite(output.points_de_vie_apres)) {
       output.erreur = tl("BLOODMAN.Notifications.DamageApplyFailed", "Impossible d'appliquer les degats a la cible.");
     }
-    console.debug("[bloodman] damage:output", output);
+    bmLog.debug("damage:output", output);
     outputs.push(output);
 
   }
@@ -1321,7 +1278,7 @@ export async function doDamageRoll(actor, item) {
   if (!config) return null;
 
   const backendInput = buildDamageBackendInput(actor, config);
-  console.debug("[bloodman] damage:input", backendInput);
+  bmLog.debug("damage:input", backendInput);
 
   const rollId = generateRandomId();
   const damageOutcome = await evaluateConfiguredDamageOutcome(config);
@@ -1345,7 +1302,7 @@ export async function doDamageRoll(actor, item) {
       try {
         await item.update({ "system.loadedAmmo": nextMagazine });
       } catch (error) {
-        console.warn("[bloodman] damage:weapon loaded ammo update failed", {
+        bmLog.warn("damage:weapon loaded ammo update failed", {
           actorId: actor?.id,
           itemId: item?.id,
           nextMagazine,
@@ -1440,14 +1397,14 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
     try {
       allowed = Boolean(await options.beforeRoll(config));
     } catch (error) {
-      console.error("[bloodman] damage:beforeRoll failed", error);
+      bmLog.error("damage:beforeRoll failed", { error });
       allowed = false;
     }
     if (!allowed) return null;
   }
 
   const backendInput = buildDamageBackendInput(actor, config);
-  console.debug("[bloodman] damage:input", backendInput);
+  bmLog.debug("damage:input", backendInput);
 
   const rollId = generateRandomId();
   const damageOutcome = await evaluateConfiguredDamageOutcome(config);

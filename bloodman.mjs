@@ -1,4 +1,13 @@
 import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./rollHelpers.mjs";
+import { bmLog } from "./utils/logger.mjs";
+import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } from "./utils/settings.mjs";
+import {
+  getActivePrivilegedOperatorIds,
+  getActiveGMUserIds,
+  isAssistantOrHigherRole,
+  isCurrentUserPrimaryPrivilegedOperator,
+  registerPrivilegedUsersCacheHooks
+} from "./utils/privileged-users.mjs";
 
 const BaseActorSheet = foundry?.appv1?.sheets?.ActorSheet ?? ActorSheet;
 const BaseItemSheet = foundry?.appv1?.sheets?.ItemSheet ?? ItemSheet;
@@ -40,7 +49,7 @@ function safeWarn(message) {
   try {
     ui.notifications?.warn(message);
   } catch (error) {
-    console.warn("[bloodman] notify.warn failed", message, error);
+    bmLog.warn("notify.warn failed", { message, error });
   }
 }
 
@@ -260,7 +269,7 @@ function decorateCreateTypeSelect(selectEl) {
     } catch (_cleanupError) {
       // non-fatal cleanup
     }
-    console.warn("[bloodman] create type icon picker disabled for this select", error);
+    bmLog.warn("[bloodman] create type icon picker disabled for this select", error);
     return;
   }
 }
@@ -289,7 +298,7 @@ function injectDocumentCreateTypeIcons(htmlLike) {
     );
     for (const selectEl of fallbackSelects) decorateCreateTypeSelect(selectEl);
   } catch (error) {
-    console.warn("[bloodman] create type icon injection skipped", error);
+    bmLog.warn("[bloodman] create type icon injection skipped", error);
   }
 }
 
@@ -325,38 +334,6 @@ function isBasicPlayerRole(role) {
 
 const CHARACTERISTIC_BASE_MIN = 30;
 const CHARACTERISTIC_BASE_MAX = 95;
-
-function isAssistantOrHigherRole(role) {
-  const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
-  return Number(role ?? 0) >= assistantRole;
-}
-
-function canUserProcessPrivilegedRequests(user = null) {
-  const candidate = user || game.user;
-  if (candidate?.active === false) return false;
-  if (candidate.isGM) return true;
-  return isAssistantOrHigherRole(candidate.role);
-}
-
-function getPrivilegedOperatorPriority(user = null) {
-  if (!canUserProcessPrivilegedRequests(user)) return Number.POSITIVE_INFINITY;
-  return user?.isGM ? 0 : 1;
-}
-
-function isCurrentUserPrimaryPrivilegedOperator() {
-  const currentUser = game.user;
-  if (!canUserProcessPrivilegedRequests(currentUser)) return false;
-
-  const activeOperators = Array.from(game.users || [])
-    .filter(user => canUserProcessPrivilegedRequests(user))
-    .sort((left, right) => {
-      const priorityDelta = getPrivilegedOperatorPriority(left) - getPrivilegedOperatorPriority(right);
-      if (priorityDelta !== 0) return priorityDelta;
-      return String(left?.id || "").localeCompare(String(right?.id || ""));
-    });
-  if (!activeOperators.length) return false;
-  return String(activeOperators[0]?.id || "") === String(currentUser?.id || "");
-}
 
 function canUserRoleOpenItemSheets(role) {
   return isAssistantOrHigherRole(role);
@@ -1390,7 +1367,7 @@ async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, 
   try {
     await actor.toggleStatusEffect(statusId, { active: Boolean(active), overlay: Boolean(overlay) });
   } catch (error) {
-    console.warn("[bloodman] token HUD status toggle failed", { statusId, error });
+    bmLog.warn("[bloodman] token HUD status toggle failed", { statusId, error });
     return false;
   }
 
@@ -1414,7 +1391,7 @@ async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, 
     });
     if (payloads.length) {
       await actor.createEmbeddedDocuments("ActiveEffect", payloads).catch(error => {
-        console.warn("[bloodman] token HUD counter effects creation failed", { statusId: normalizedStatusId, error });
+        bmLog.warn("[bloodman] token HUD counter effects creation failed", { statusId: normalizedStatusId, error });
       });
     }
   }
@@ -1697,7 +1674,7 @@ function installTokenHudRenderPatch() {
     try {
       configureTokenHudEnhancements(this, this.element);
     } catch (error) {
-      console.warn("[bloodman] token HUD enhancement (patched render) skipped", error);
+      bmLog.warn("[bloodman] token HUD enhancement (patched render) skipped", error);
     }
     return response;
   };
@@ -1725,7 +1702,7 @@ function scheduleTokenHudDomEnhancement(attempt = 0) {
     try {
       configureTokenHudEnhancements(hud, root);
     } catch (error) {
-      console.warn("[bloodman] token HUD enhancement (dom observer) skipped", error);
+      bmLog.warn("[bloodman] token HUD enhancement (dom observer) skipped", error);
     }
     const hasTurnControl = Boolean(root.querySelector(".bm-token-hud-turn-control"));
     if (!hasTurnControl && attempt < 8) setTimeout(() => scheduleTokenHudDomEnhancement(attempt + 1), 40);
@@ -1832,7 +1809,7 @@ function installTokenEffectBackgroundPatch() {
       try {
         applyTransparentTokenEffectBackground(this);
       } catch (error) {
-        console.warn("[bloodman] token effect background transparency patch skipped", error);
+        bmLog.warn("[bloodman] token effect background transparency patch skipped", error);
       }
     };
 
@@ -1958,20 +1935,20 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
   if (actorType === "personnage") {
     if (bleeding) {
       const okBleed = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess, bleedingFamily);
-      if (!okBleed) console.warn("[bloodman] status:bleeding sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
+      if (!okBleed) bmLog.warn("[bloodman] status:bleeding sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
     if (dead) {
       const okDeadClear = await setTokenStatusEffect(tokenDoc, dead, false, deadFamily);
-      if (!okDeadClear) console.warn("[bloodman] status:dead clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
+      if (!okDeadClear) bmLog.warn("[bloodman] status:dead clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
   } else {
     if (dead) {
       const okDead = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess, deadFamily);
-      if (!okDead) console.warn("[bloodman] status:dead sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
+      if (!okDead) bmLog.warn("[bloodman] status:dead sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
     if (bleeding) {
       const okBleedClear = await setTokenStatusEffect(tokenDoc, bleeding, false, bleedingFamily);
-      if (!okBleedClear) console.warn("[bloodman] status:bleeding clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
+      if (!okBleedClear) bmLog.warn("[bloodman] status:bleeding clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
     }
   }
 
@@ -2395,7 +2372,7 @@ async function setActorStatePresetActive(actor, stateId, active) {
   const currentLabel = String(actor.system?.modifiers?.label || "");
   const currentSelection = resolveStatePresetSelection(currentLabel);
   if (currentSelection.invalidTokens.length) {
-    console.warn("[bloodman] state:preset sync skipped (invalid label)", {
+    bmLog.warn("[bloodman] state:preset sync skipped (invalid label)", {
       actorId: actor.id,
       actorName: actor.name,
       invalidTokens: currentSelection.invalidTokens
@@ -2417,7 +2394,7 @@ async function setActorStatePresetActive(actor, stateId, active) {
     await actor.update({ "system.modifiers.label": nextLabel });
     return true;
   } catch (error) {
-    console.warn("[bloodman] state:preset sync failed", {
+    bmLog.warn("[bloodman] state:preset sync failed", {
       actorId: actor.id,
       actorName: actor.name,
       stateId: presetId,
@@ -2600,9 +2577,9 @@ function logDamageRerollValidation(scope, details = {}) {
     .filter(([key]) => key.startsWith("ok"))
     .every(([, value]) => value === true);
   if (allGood) {
-    console.debug("[bloodman] reroll:validate", payload);
+    bmLog.debug("reroll:validate", payload);
   } else {
-    console.warn("[bloodman] reroll:validate", payload);
+    bmLog.warn("reroll:validate", payload);
   }
 }
 const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
@@ -3232,7 +3209,7 @@ async function playItemAudio(item, options = {}) {
     await AudioHelper.play({ src: audioFile, volume: 0.9, autoplay: true, loop: false }, broadcast);
     return true;
   } catch (error) {
-    console.error("[bloodman] audio:play failed", { itemType: item.type, itemId: item.id, audioFile, error });
+    bmLog.error("[bloodman] audio:play failed", { itemType: item.type, itemId: item.id, audioFile, error });
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
     return false;
   }
@@ -3787,7 +3764,7 @@ async function grantVoyageXpToSelectedPlayers(rawAmount, options = {}) {
       });
       grants.push({ actorName, amount });
     } catch (error) {
-      console.warn("[bloodman] voyage XP grant failed", {
+      bmLog.warn("[bloodman] voyage XP grant failed", {
         actorId: actor.id,
         actorName,
         amount,
@@ -4662,23 +4639,15 @@ async function handleDamageConfigPopupMessage(data, source = "socket") {
   if (eventId) rememberDamageConfigPopupRequest(eventId);
   if (!canCurrentUserReceiveDamageConfigPopup(data)) return false;
   const shown = showDamageConfigObserverPopup(data);
-  if (!shown) console.warn("[bloodman] damage:config popup display failed", { source, eventId, payload: data });
+  if (!shown) bmLog.warn("[bloodman] damage:config popup display failed", { source, eventId, payload: data });
   return shown;
 }
 
 function getPowerUsePopupViewerIds(requesterUserId = "", options = {}) {
   const requesterId = String(requesterUserId || "").trim();
   const includeRequesterUser = options?.includeRequesterUser === true;
-  const ids = [];
-  for (const user of game.users || []) {
-    if (!user?.active) continue;
-    const userId = String(user.id || "").trim();
-    if (!userId) continue;
-    if (!user.isGM && !isAssistantOrHigherRole(user.role)) continue;
-    if (!includeRequesterUser && requesterId && userId === requesterId) continue;
-    ids.push(userId);
-  }
-  return ids;
+  return getActivePrivilegedOperatorIds()
+    .filter(userId => includeRequesterUser || !requesterId || userId !== requesterId);
 }
 
 function getPopupItemLabel(itemType) {
@@ -4724,7 +4693,7 @@ function emitPowerUsePopup(actor, item, options = {}) {
   try {
     game.socket.emit(SYSTEM_SOCKET, payload);
   } catch (error) {
-    console.error("[bloodman] power:popup socket emit failed", error);
+    bmLog.error("[bloodman] power:popup socket emit failed", error);
   }
   if (ENABLE_CHAT_TRANSPORT_FALLBACK && typeof ChatMessage?.create === "function") {
     void ChatMessage.create({
@@ -4732,7 +4701,7 @@ function emitPowerUsePopup(actor, item, options = {}) {
       whisper: viewerIds,
       flags: { bloodman: { powerUsePopup: payload } }
     }).catch(error => {
-      console.error("[bloodman] power:popup chat fallback failed", error);
+      bmLog.error("[bloodman] power:popup chat fallback failed", error);
     });
   }
   return true;
@@ -4810,7 +4779,7 @@ async function handlePowerUsePopupMessage(data, source = "socket") {
   if (eventId) rememberPowerUsePopupRequest(eventId);
   if (!canCurrentUserReceivePowerUsePopup(data)) return false;
   const shown = showPowerUsePopup(data);
-  if (!shown) console.warn("[bloodman] power:popup display failed", { source, eventId, payload: data });
+  if (!shown) bmLog.warn("[bloodman] power:popup display failed", { source, eventId, payload: data });
   return shown;
 }
 
@@ -4933,7 +4902,7 @@ async function handleDamageRerollRequest(data) {
     itemType = String(item?.type || itemType).toLowerCase();
   }
   if (!isDamageRerollItemType(itemType)) {
-    console.warn("[bloodman] reroll:ignored non-damage item", {
+    bmLog.warn("reroll:ignored non-damage item", {
       rollId: data.rollId,
       itemId: data.itemId,
       itemType
@@ -4943,7 +4912,7 @@ async function handleDamageRerollRequest(data) {
   const targets = normalizeRerollTargets(data.targets);
   if (!targets.length) return;
   const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
-  console.debug("[bloodman] reroll:recv", {
+  bmLog.debug("reroll:recv", {
     attackerUserId: data.attackerUserId,
     attackerId: data.attackerId,
     rollId: data.rollId,
@@ -4957,7 +4926,7 @@ async function handleDamageRerollRequest(data) {
     const share = Math.max(0, Math.floor(Number(target.share || 0)));
     const tokenDoc = await resolveDamageTokenDocument(target);
     if (!tokenDoc) {
-      console.warn("[bloodman] reroll:target unresolved", {
+      bmLog.warn("reroll:target unresolved", {
         rollId: data.rollId,
         target
       });
@@ -5087,7 +5056,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
   if (requestId && wasDamageRequestProcessed(requestId)) return;
   if (requestId) rememberDamageRequest(requestId);
 
-  console.debug("[bloodman] damage:recv", { source, ...data });
+  bmLog.debug("damage:recv", { source, ...data });
 
   const tokenDoc = await resolveDamageTokenDocument(data);
   const { tokenActor, uuidActor, worldActor } = await resolveDamageActors(tokenDoc, data);
@@ -5110,11 +5079,11 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     const paEffective = Math.max(0, paInitial - penetration);
     const finalDamage = Math.max(0, share - paEffective);
     const nextValue = Math.max(0, current - finalDamage);
-    console.debug("[bloodman] damage:apply token-unlinked", { current, paInitial, paEffective, penetration, share, finalDamage, nextValue, tokenId: tokenDoc.id });
+    bmLog.debug("damage:apply token-unlinked", { current, paInitial, paEffective, penetration, share, finalDamage, nextValue, tokenId: tokenDoc.id });
     try {
       await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
     } catch (error) {
-      console.error("[bloodman] damage:update tokenDoc failed", error);
+      bmLog.error("damage:update tokenDoc failed", { error });
     }
     await postDamageTakenChatMessage({
       name: fallbackName,
@@ -5131,7 +5100,7 @@ async function handleIncomingDamageRequest(data, source = "socket") {
       hpAfter: nextValue
     };
     emitDamageAppliedMessage(data, result, tokenDoc, share);
-    console.debug("[bloodman] damage:output", {
+    bmLog.debug("damage:output", {
       degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
       jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
       bonus_brut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
@@ -5148,11 +5117,11 @@ async function handleIncomingDamageRequest(data, source = "socket") {
   }
 
   if (tokenActor) {
-    console.debug("[bloodman] damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
+    bmLog.debug("damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
     const result = await applyDamageToActor(tokenActor, share, { targetName: fallbackName, penetration });
     if (result) {
       emitDamageAppliedMessage(data, result, tokenDoc, share);
-      console.debug("[bloodman] damage:output", {
+      bmLog.debug("damage:output", {
         degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
         jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
         bonus_brut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
@@ -5169,13 +5138,13 @@ async function handleIncomingDamageRequest(data, source = "socket") {
     return;
   }
   if (uuidActor) {
-    console.debug("[bloodman] damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
+    bmLog.debug("damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
     const result = await applyDamageToActor(uuidActor, share, { targetName: fallbackName, penetration });
     if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
     return;
   }
   if (worldActor) {
-    console.debug("[bloodman] damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
+    bmLog.debug("damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
     const result = await applyDamageToActor(worldActor, share, { targetName: fallbackName, penetration });
     if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
     return;
@@ -5770,7 +5739,7 @@ async function resetCombatMovementHistory(combat) {
       await combat.clearMovementHistories();
       return;
     } catch (error) {
-      console.warn("[bloodman] combat move history reset failed (combat.clearMovementHistories)", error);
+      bmLog.warn("[bloodman] combat move history reset failed (combat.clearMovementHistories)", error);
     }
   }
 
@@ -5779,7 +5748,7 @@ async function resetCombatMovementHistory(combat) {
     try {
       await combatant.clearMovementHistory();
     } catch (error) {
-      console.warn("[bloodman] combat move history reset failed (combatant.clearMovementHistory)", error);
+      bmLog.warn("[bloodman] combat move history reset failed (combatant.clearMovementHistory)", error);
     }
   }
 }
@@ -5902,7 +5871,7 @@ function injectCreateTypeIconsFromHook(htmlLike, sourceHook = "unknown") {
     if (!root.querySelector("select, input[name='type']")) return;
     injectDocumentCreateTypeIcons(root);
   } catch (error) {
-    console.warn(`[bloodman] ${sourceHook} type icon hook skipped`, error);
+    bmLog.warn(`[bloodman] ${sourceHook} type icon hook skipped`, error);
   }
 }
 
@@ -5938,7 +5907,7 @@ Hooks.on("renderTokenHUD", (hud, html) => {
   try {
     configureTokenHudEnhancements(hud, html);
   } catch (error) {
-    console.warn("[bloodman] token HUD enhancement skipped", error);
+    bmLog.warn("token HUD enhancement skipped", { error });
   }
 });
 
@@ -5957,12 +5926,13 @@ Hooks.on("controlToken", () => {
 });
 
 Hooks.once("ready", () => {
-  console.info("[bloodman] HUD patch build 2026-02-13-b loaded");
+  initializeBloodmanLoggerFromSettings();
+  bmLog.info("HUD patch build 2026-02-13-b loaded");
   installTokenEffectBackgroundPatch();
   void ensureTokenHudLocalSvgIcons({ copyMissing: true, force: true }).then(() => {
     refreshTokenHudStatusEffectIconPaths({ bumpCache: true });
   }).catch(error => {
-    console.warn("[bloodman] token HUD svg icon sync skipped", error);
+    bmLog.warn("token HUD svg icon sync skipped", { error });
   });
   installTokenHudRenderPatch();
   installTokenHudDomObserver();
@@ -5970,6 +5940,9 @@ Hooks.once("ready", () => {
 });
 
 Hooks.once("init", () => {
+  registerBloodmanCoreSettings();
+  registerPrivilegedUsersCacheHooks();
+  initializeBloodmanLoggerFromSettings();
   installTokenEffectBackgroundPatch();
   installTokenHudRenderPatch();
 
@@ -6047,13 +6020,13 @@ Hooks.once("ready", async () => {
       window.__bmCreateTypeIconObserver = observer;
     }
   } catch (error) {
-    console.warn("[bloodman] create type icon ready hook skipped", error);
+    bmLog.warn("create type icon ready hook skipped", { error });
   }
 
   try {
     registerDamageSocketHandlers();
   } catch (error) {
-    console.error("[bloodman] socket handler registration failed", error);
+    bmLog.error("socket handler registration failed", { error });
   }
   if (!game.user?.isGM) return;
 
@@ -6319,10 +6292,6 @@ Hooks.once("ready", async () => {
 function clampChaosValue(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function getActiveGMUserIds() {
-  return game.users?.filter(user => user.active && user.isGM).map(user => user.id) || [];
 }
 
 function getChaosValue() {
@@ -6620,7 +6589,7 @@ Hooks.on("preCreateItem", (item, createData) => {
   const type = String(item?.type || "").trim().toLowerCase();
   const typeFallbackLabel = type ? t(`TYPES.Item.${type}`) : t("BLOODMAN.Common.Name");
   const itemName = item.name || typeFallbackLabel;
-  console.warn("[bloodman] item acquisition blocked: not enough voyage XP", {
+  bmLog.warn("[bloodman] item acquisition blocked: not enough voyage XP", {
     actorId: actor.id,
     actorName: actor.name,
     itemType: type,
@@ -6766,7 +6735,7 @@ function handleChatMessageRenderHook(message, htmlLike, sourceHook = "renderChat
   try {
     decorateBloodmanChatRollMessage(message, htmlLike);
   } catch (error) {
-    console.warn(`[bloodman] chat:roll decorate skipped (${sourceHook})`, error);
+    bmLog.warn(`chat:roll decorate skipped (${sourceHook})`, { error });
   }
 }
 
@@ -7073,13 +7042,13 @@ Hooks.on("updateCombat", (combat, changes) => {
   if (changes.round != null || changes.turn != null || changes.active != null) {
     focusActiveCombatantToken(combat);
     resetActiveCombatantMoveGauge(combat).catch(error => {
-      console.warn("[bloodman] move:gauge reset failed", error);
+      bmLog.warn("[bloodman] move:gauge reset failed", error);
     });
     resetCombatMovementHistory(combat).catch(error => {
-      console.warn("[bloodman] combat move history reset failed", error);
+      bmLog.warn("[bloodman] combat move history reset failed", error);
     });
     decrementActiveCombatantTokenHudCounters(combat).catch(error => {
-      console.warn("[bloodman] token HUD turn counter update failed", error);
+      bmLog.warn("[bloodman] token HUD turn counter update failed", error);
     });
   }
 });
@@ -7087,26 +7056,26 @@ Hooks.on("updateCombat", (combat, changes) => {
 Hooks.on("combatTurnChange", (combat) => {
   focusActiveCombatantToken(combat);
   resetActiveCombatantMoveGauge(combat).catch(error => {
-    console.warn("[bloodman] move:gauge reset failed", error);
+    bmLog.warn("[bloodman] move:gauge reset failed", error);
   });
   resetCombatMovementHistory(combat).catch(error => {
-    console.warn("[bloodman] combat move history reset failed", error);
+    bmLog.warn("[bloodman] combat move history reset failed", error);
   });
   decrementActiveCombatantTokenHudCounters(combat).catch(error => {
-    console.warn("[bloodman] token HUD turn counter update failed", error);
+    bmLog.warn("[bloodman] token HUD turn counter update failed", error);
   });
 });
 
 Hooks.on("combatStart", (combat) => {
   focusActiveCombatantToken(combat);
   resetActiveCombatantMoveGauge(combat).catch(error => {
-    console.warn("[bloodman] move:gauge reset failed", error);
+    bmLog.warn("[bloodman] move:gauge reset failed", error);
   });
   resetCombatMovementHistory(combat).catch(error => {
-    console.warn("[bloodman] combat move history reset failed", error);
+    bmLog.warn("[bloodman] combat move history reset failed", error);
   });
   decrementActiveCombatantTokenHudCounters(combat).catch(error => {
-    console.warn("[bloodman] token HUD turn counter update failed", error);
+    bmLog.warn("[bloodman] token HUD turn counter update failed", error);
   });
 });
 
@@ -8783,7 +8752,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         const created = await this.actor.createEmbeddedDocuments("Item", [sourceData]);
         createdItem = created?.[0] || null;
       } catch (error) {
-        console.warn("[bloodman] actor transfer:create failed", {
+        bmLog.warn("[bloodman] actor transfer:create failed", {
           sourceActorId: sourceActor?.id,
           targetActorId: this.actor?.id,
           itemId: droppedItem?.id,
@@ -8796,7 +8765,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       try {
         await sourceActor.deleteEmbeddedDocuments("Item", [droppedItem.id]);
       } catch (error) {
-        console.warn("[bloodman] actor transfer:delete source failed", {
+        bmLog.warn("[bloodman] actor transfer:delete source failed", {
           sourceActorId: sourceActor?.id,
           targetActorId: this.actor?.id,
           itemId: droppedItem?.id,
@@ -9198,7 +9167,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         usedDice3d = true;
       }
     } catch (error) {
-      console.warn("[bloodman] luck:dice3d feedback failed", error);
+      bmLog.warn("[bloodman] luck:dice3d feedback failed", error);
     }
     const diceSound = String(CONFIG?.sounds?.dice || "").trim();
 
@@ -9333,7 +9302,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       );
       await item.update({ "system.loadedAmmo": nextMagazine });
     } catch (error) {
-      console.warn("[bloodman] weapon reload: loaded ammo update failed", {
+      bmLog.warn("[bloodman] weapon reload: loaded ammo update failed", {
         actorId: this.actor?.id,
         itemId: item?.id,
         nextStock,
@@ -9596,7 +9565,7 @@ class BloodmanActorSheet extends BaseActorSheet {
           flags: { bloodman: { rerollDamageRequest: rerollPayload } }
         }).catch(() => null);
       }
-      console.debug("[bloodman] reroll:send", {
+      bmLog.debug("reroll:send", {
         requestId,
         attackerUserId: game.user?.id || "",
         attackerId: context.attackerId || this.actor.id,

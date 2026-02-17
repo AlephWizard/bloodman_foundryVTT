@@ -229,7 +229,14 @@
       "DropBlockedForPlayerRole": "Le role Joueur ne permet pas de deplacer des elements du menu vers la fiche."
     },
     "Settings": {
-      "ChaosDiceName": "Dés du chaos"
+      "ChaosDiceName": "Dés du chaos",
+      "DebugLogLevelName": "Niveau de logs Bloodman",
+      "DebugLogLevelHint": "Controle la verbosite des logs console du systeme Bloodman.",
+      "LogLevelOff": "Desactive",
+      "LogLevelError": "Erreurs",
+      "LogLevelWarn": "Avertissements",
+      "LogLevelInfo": "Infos",
+      "LogLevelDebug": "Debug"
     }
   },
   "TYPES.Actor.personnage": "Joueur",
