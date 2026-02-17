@@ -4,8 +4,9 @@
   "description": "One game to rule them all",
   "version": "0.13.0",
   "compatibility": {
-    "minimum": 13,
-    "verified": 13
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
   },
   "authors": [
     {
@@ -46,5 +47,6 @@
       "aptitude": {},
       "pouvoir": {}
     }
-  }
+  },
+  "socket": true
 }

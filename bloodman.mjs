@@ -310,6 +310,33 @@ function isAssistantOrHigherRole(role) {
   return Number(role ?? 0) >= assistantRole;
 }
 
+function canUserProcessPrivilegedRequests(user = null) {
+  const candidate = user || game.user;
+  if (candidate?.active === false) return false;
+  if (candidate.isGM) return true;
+  return isAssistantOrHigherRole(candidate.role);
+}
+
+function getPrivilegedOperatorPriority(user = null) {
+  if (!canUserProcessPrivilegedRequests(user)) return Number.POSITIVE_INFINITY;
+  return user?.isGM ? 0 : 1;
+}
+
+function isCurrentUserPrimaryPrivilegedOperator() {
+  const currentUser = game.user;
+  if (!canUserProcessPrivilegedRequests(currentUser)) return false;
+
+  const activeOperators = Array.from(game.users || [])
+    .filter(user => canUserProcessPrivilegedRequests(user))
+    .sort((left, right) => {
+      const priorityDelta = getPrivilegedOperatorPriority(left) - getPrivilegedOperatorPriority(right);
+      if (priorityDelta !== 0) return priorityDelta;
+      return String(left?.id || "").localeCompare(String(right?.id || ""));
+    });
+  if (!activeOperators.length) return false;
+  return String(activeOperators[0]?.id || "") === String(currentUser?.id || "");
+}
+
 function canUserRoleOpenItemSheets(role) {
   return isAssistantOrHigherRole(role);
 }
@@ -3759,7 +3786,7 @@ function getResourceCharacteristicTotal(actor, key, itemBonuses = null) {
 }
 
 async function refreshBossSoloNpcPvMax() {
-  if (!game.user.isGM) return;
+  if (!game.user?.isGM) return;
   for (const actor of game.actors || []) {
     if (actor?.type !== "personnage-non-joueur") continue;
     if (String(actor.system?.npcRole || "") !== "boss-seul") continue;
@@ -5314,6 +5341,7 @@ function registerDamageSocketHandlers() {
   }
   const handler = async data => {
     if (!data) return;
+    const canHandlePrivilegedRequests = isCurrentUserPrimaryPrivilegedOperator();
     if (data.type === "damageConfigPopup") {
       await handleDamageConfigPopupMessage(data, "socket");
       return;
@@ -5327,23 +5355,23 @@ function registerDamageSocketHandlers() {
       return;
     }
     if (data.type === "rerollDamage") {
-      if (game.user.isGM) await handleDamageRerollRequest(data);
+      if (canHandlePrivilegedRequests) await handleDamageRerollRequest(data);
       return;
     }
     if (data.type === "updateVitalResources") {
-      if (game.user.isGM) await handleVitalResourceUpdateRequest(data);
+      if (canHandlePrivilegedRequests) await handleVitalResourceUpdateRequest(data);
       return;
     }
     if (data.type === "updateActorSheetData") {
-      if (game.user.isGM) await handleActorSheetUpdateRequest(data);
+      if (canHandlePrivilegedRequests) await handleActorSheetUpdateRequest(data);
       return;
     }
     if (data.type === "deleteActorItem") {
-      if (game.user.isGM) await handleDeleteItemRequest(data);
+      if (canHandlePrivilegedRequests) await handleDeleteItemRequest(data);
       return;
     }
-    if (!game.user.isGM) return;
     if (data.type === "adjustChaosDice") {
+      if (!canHandlePrivilegedRequests) return;
       const delta = Number(data.delta);
       if (!Number.isFinite(delta) || delta === 0) return;
       const requestId = String(data.requestId || "");
@@ -5353,6 +5381,7 @@ function registerDamageSocketHandlers() {
       return;
     }
     if (data.type !== "applyDamage") return;
+    if (!canHandlePrivilegedRequests) return;
     await handleIncomingDamageRequest(data, "socket");
   };
   game.socket.on(SYSTEM_SOCKET, handler);
@@ -5412,7 +5441,7 @@ async function setActorMoveGauge(actor, nextValue, maxValue) {
     return;
   }
   const sent = requestActorSheetUpdate(actor, updateData);
-  if (!sent) safeWarn("Mise a jour impossible: aucun GM actif.");
+  if (!sent) safeWarn("Mise a jour impossible: aucun GM ou assistant actif.");
 }
 
 function getTokenMoveDistanceInCells(tokenDoc, changes) {
@@ -5647,23 +5676,43 @@ async function syncCombatantNameForToken(tokenDoc) {
   }
 }
 
-Hooks.on("renderDialog", (_app, html) => {
-  injectDocumentCreateTypeIcons(html);
-});
-
-Hooks.on("renderApplication", (_app, html) => {
+function injectCreateTypeIconsFromHook(htmlLike, sourceHook = "unknown") {
   try {
-    const root = html?.[0] || html;
+    const root = htmlLike?.[0] || htmlLike;
     if (!(root instanceof HTMLElement)) return;
     if (!root.querySelector("select, input[name='type']")) return;
     injectDocumentCreateTypeIcons(root);
   } catch (error) {
-    console.warn("[bloodman] renderApplication type icon hook skipped", error);
+    console.warn(`[bloodman] ${sourceHook} type icon hook skipped`, error);
   }
+}
+
+Hooks.on("renderDialog", (_app, html) => {
+  injectCreateTypeIconsFromHook(html, "renderDialog");
+});
+
+Hooks.on("renderApplication", (_app, html) => {
+  injectCreateTypeIconsFromHook(html, "renderApplication");
+});
+
+Hooks.on("renderApplicationV1", (_app, html) => {
+  injectCreateTypeIconsFromHook(html, "renderApplicationV1");
+});
+
+Hooks.on("renderApplicationV2", (_app, element) => {
+  injectCreateTypeIconsFromHook(element, "renderApplicationV2");
 });
 
 Hooks.on("renderDocumentCreateDialog", (_app, html) => {
-  injectDocumentCreateTypeIcons(html);
+  injectCreateTypeIconsFromHook(html, "renderDocumentCreateDialog");
+});
+
+Hooks.on("renderDocumentCreateDialogV1", (_app, html) => {
+  injectCreateTypeIconsFromHook(html, "renderDocumentCreateDialogV1");
+});
+
+Hooks.on("renderDocumentCreateDialogV2", (_app, element) => {
+  injectCreateTypeIconsFromHook(element, "renderDocumentCreateDialogV2");
 });
 
 Hooks.on("renderTokenHUD", (hud, html) => {
@@ -5765,20 +5814,28 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
-  refreshAllCreateTypeIcons();
-  if (!window.__bmCreateTypeIconObserver) {
-    const observer = new MutationObserver(() => {
-      try {
-        refreshAllCreateTypeIcons();
-      } catch (_error) {
-        // non-fatal UI decoration
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    window.__bmCreateTypeIconObserver = observer;
+  try {
+    refreshAllCreateTypeIcons();
+    if (!window.__bmCreateTypeIconObserver) {
+      const observer = new MutationObserver(() => {
+        try {
+          refreshAllCreateTypeIcons();
+        } catch (_error) {
+          // non-fatal UI decoration
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      window.__bmCreateTypeIconObserver = observer;
+    }
+  } catch (error) {
+    console.warn("[bloodman] create type icon ready hook skipped", error);
   }
 
-  registerDamageSocketHandlers();
+  try {
+    registerDamageSocketHandlers();
+  } catch (error) {
+    console.error("[bloodman] socket handler registration failed", error);
+  }
   if (!game.user?.isGM) return;
 
   for (const actor of game.actors) {
@@ -6384,7 +6441,8 @@ Hooks.on("createChatMessage", async (message) => {
     return;
   }
 
-  if (!game.user.isGM) return;
+  const canHandlePrivilegedRequests = isCurrentUserPrimaryPrivilegedOperator();
+  if (!canHandlePrivilegedRequests) return;
   if (isInitiativeRollMessage(message)) {
     queueInitiativeRollMessage(message);
     return;
@@ -6416,12 +6474,20 @@ Hooks.on("createChatMessage", async (message) => {
 });
 
 Hooks.on("renderChatMessage", (message, html) => {
-  try {
-    decorateBloodmanChatRollMessage(message, html);
-  } catch (error) {
-    console.warn("[bloodman] chat:roll decorate skipped", error);
-  }
+  handleChatMessageRenderHook(message, html, "renderChatMessage");
 });
+
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  handleChatMessageRenderHook(message, html, "renderChatMessageHTML");
+});
+
+function handleChatMessageRenderHook(message, htmlLike, sourceHook = "renderChatMessage") {
+  try {
+    decorateBloodmanChatRollMessage(message, htmlLike);
+  } catch (error) {
+    console.warn(`[bloodman] chat:roll decorate skipped (${sourceHook})`, error);
+  }
+}
 
 Hooks.on("renderHotbar", () => {
   positionChaosDiceUI();
@@ -7346,7 +7412,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       allowVitalResourceUpdate: Boolean(options?.bloodmanAllowVitalResourceUpdate),
       allowAmmoUpdate: Boolean(options?.bloodmanAllowAmmoUpdate)
     });
-    if (!sent) safeWarn("Mise à jour impossible: aucun GM actif.");
+    if (!sent) safeWarn("Mise a jour impossible: aucun GM ou assistant actif.");
     if (sent) {
       // Keep the local sheet responsive while the GM applies the real update.
       try {
@@ -7372,7 +7438,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (itemId && !this.actor?.items?.has(itemId)) return true;
     }
     const sent = requestDeleteActorItem(this.actor, item);
-    if (!sent) safeWarn("Suppression impossible: aucun GM actif.");
+    if (!sent) safeWarn("Suppression impossible: aucun GM ou assistant actif.");
     return sent;
   }
 

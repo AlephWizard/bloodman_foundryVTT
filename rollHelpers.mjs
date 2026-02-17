@@ -163,13 +163,42 @@ function getTokenCurrentPv(tokenLike) {
   return NaN;
 }
 
-function getActiveGMIds() {
-  return game.users?.filter(user => user.isGM && user.active).map(user => user.id) || [];
+function getActivePrivilegedOperatorIds() {
+  return game.users
+    ?.filter(user => user?.active && (user.isGM || isAssistantOrHigherRole(user.role)))
+    .map(user => user.id) || [];
 }
 
 function isAssistantOrHigherRole(role) {
   const assistantRole = Number(CONST?.USER_ROLES?.ASSISTANT ?? 3);
   return Number(role ?? 0) >= assistantRole;
+}
+
+function canUserProcessPrivilegedRequests(user = null) {
+  const candidate = user || game.user;
+  if (candidate?.active === false) return false;
+  if (candidate.isGM) return true;
+  return isAssistantOrHigherRole(candidate.role);
+}
+
+function getPrivilegedOperatorPriority(user = null) {
+  if (!canUserProcessPrivilegedRequests(user)) return Number.POSITIVE_INFINITY;
+  return user?.isGM ? 0 : 1;
+}
+
+function isCurrentUserPrimaryPrivilegedOperator() {
+  const currentUser = game.user;
+  if (!canUserProcessPrivilegedRequests(currentUser)) return false;
+
+  const activeOperators = Array.from(game.users || [])
+    .filter(user => canUserProcessPrivilegedRequests(user))
+    .sort((left, right) => {
+      const priorityDelta = getPrivilegedOperatorPriority(left) - getPrivilegedOperatorPriority(right);
+      if (priorityDelta !== 0) return priorityDelta;
+      return String(left?.id || "").localeCompare(String(right?.id || ""));
+    });
+  if (!activeOperators.length) return false;
+  return String(activeOperators[0]?.id || "") === String(currentUser?.id || "");
 }
 
 function getDamageChatRecipientIds() {
@@ -350,7 +379,7 @@ async function updateActorWithFallback(actor, updateData, options = {}) {
     allowAmmoUpdate
   });
   if (!sent) {
-    safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ actif."));
+    safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
   }
   return null;
 }
@@ -369,7 +398,7 @@ async function deleteItemWithFallback(item, actor = null) {
   }
   const sent = requestDeleteActorItem(parentActor, item);
   if (!sent) {
-    safeWarn(tl("BLOODMAN.Notifications.ItemDeleteRequiresGM", "Suppression impossible: aucun MJ actif."));
+    safeWarn(tl("BLOODMAN.Notifications.ItemDeleteRequiresGM", "Suppression impossible: aucun MJ ou assistant actif."));
   }
   return sent;
 }
@@ -423,7 +452,7 @@ function getChaosValue() {
 }
 
 async function setChaosValue(nextValue) {
-  if (!game.user.isGM) return;
+  if (!isCurrentUserPrimaryPrivilegedOperator()) return;
   const clamped = Math.max(0, Math.floor(Number(nextValue) || 0));
   await game.settings.set("bloodman", "chaosDice", clamped);
 }
@@ -962,12 +991,12 @@ async function requestDamageFromGM(token, damage, options = {}) {
     return false;
   }
 
-  const gmIds = getActiveGMIds();
-  if (gmIds.length) {
+  const privilegedIds = getActivePrivilegedOperatorIds();
+  if (privilegedIds.length) {
     try {
       await ChatMessage.create({
         content: DAMAGE_REQUEST_CHAT_MARKUP,
-        whisper: gmIds,
+        whisper: privilegedIds,
         flags: { bloodman: { damageRequest: payload } }
       });
     } catch (error) {
@@ -1049,7 +1078,7 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
     safeWarn(t("BLOODMAN.Notifications.NoTargetSelected"));
     return { outputs: [], contextTargets: [] };
   }
-  const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
+  const hasActivePrivilegedOperator = game.users?.some(user => canUserProcessPrivilegedRequests(user)) || false;
   const penetration = toNonNegativeInt(options.penetration, 0);
   const outputs = [];
   const contextTargets = [];
@@ -1155,7 +1184,7 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
   for (const token of targets) {
     const share = allocations ? Number(allocations[token.id] || 0) : total;
     if (!Number.isFinite(share) || share <= 0) continue;
-    if (!game.user.isGM && hasActiveGM) {
+    if (!canUserProcessPrivilegedRequests(game.user) && hasActivePrivilegedOperator) {
       const ok = await requestDamageFromGM(token, share, {
         ...options,
         rollId,
@@ -1174,7 +1203,7 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
     }
     const targetActor = getTokenActor(token);
     if (!targetActor) continue;
-    if (!targetActor.isOwner && !game.user.isGM) {
+    if (!targetActor.isOwner && !canUserProcessPrivilegedRequests(game.user)) {
       safeWarn(t("BLOODMAN.Notifications.NoActiveGMApplyDamage"));
       continue;
     }
