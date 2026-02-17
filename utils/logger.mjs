@@ -6,10 +6,15 @@ const LOG_LEVEL_PRIORITY = Object.freeze({
   off: 99
 });
 
-const DEFAULT_LOG_LEVEL = "warn";
+const DEFAULT_LOG_LEVEL = "error";
 const LOG_PREFIX = "[bloodman]";
+const LOG_BURST_WINDOW_MS = 2_000;
+const LOG_BURST_MAX = 250;
 
 let runtimeLogLevel = DEFAULT_LOG_LEVEL;
+let burstWindowStart = Date.now();
+let burstCount = 0;
+let burstSuppressed = 0;
 
 function normalizeLevel(level) {
   const key = String(level || "").trim().toLowerCase();
@@ -22,8 +27,27 @@ function shouldLog(level) {
   return messagePriority >= threshold;
 }
 
+function canWriteLogNow() {
+  const now = Date.now();
+  if ((now - burstWindowStart) >= LOG_BURST_WINDOW_MS) {
+    if (burstSuppressed > 0) {
+      console.warn(`${LOG_PREFIX} log burst limited: ${burstSuppressed} message(s) suppressed`);
+    }
+    burstWindowStart = now;
+    burstCount = 0;
+    burstSuppressed = 0;
+  }
+  if (burstCount >= LOG_BURST_MAX) {
+    burstSuppressed += 1;
+    return false;
+  }
+  burstCount += 1;
+  return true;
+}
+
 function write(level, message, context) {
   if (!shouldLog(level)) return;
+  if (!canWriteLogNow()) return;
   const method = level === "error" ? "error" : level === "warn" ? "warn" : level === "info" ? "info" : "debug";
   const normalizedMessage = String(message || "").trim();
   const payload = normalizedMessage.startsWith(LOG_PREFIX)

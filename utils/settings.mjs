@@ -33,7 +33,7 @@ export function registerBloodmanCoreSettings() {
       info: t("BLOODMAN.Settings.LogLevelInfo", LOG_LEVEL_CHOICES.info),
       debug: t("BLOODMAN.Settings.LogLevelDebug", LOG_LEVEL_CHOICES.debug)
     },
-    default: "warn",
+    default: "error",
     onChange: value => {
       setLogLevel(value);
     }
@@ -44,7 +44,6 @@ export function initializeBloodmanLoggerFromSettings() {
   configureLoggerFromSettings({
     systemId: SYSTEM_ID,
     settingKey: BLOODMAN_SETTING_KEYS.DEBUG_LOG_LEVEL,
-    fallbackLevel: "warn"
+    fallbackLevel: "error"
   });
 }
-
