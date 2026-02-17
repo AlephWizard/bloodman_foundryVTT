@@ -3053,20 +3053,70 @@ function normalizeItemPriceUpdate(item, updateData = null) {
 function normalizeWeaponMagazineCapacityUpdate(item, updateData = null) {
   const type = String(item?.type || "").trim().toLowerCase();
   if (type !== "arme") return false;
-  const path = "system.magazineCapacity";
+  const capacityPath = "system.magazineCapacity";
+  const loadedAmmoPath = "system.loadedAmmo";
+  const weaponTypePath = "system.weaponType";
+  const infiniteAmmoPath = "system.infiniteAmmo";
+  const actorAmmoMagazineFallback = normalizeNonNegativeInteger(item?.actor?.system?.ammo?.magazine, 0);
   if (updateData) {
-    const hasCapacityUpdate = Object.prototype.hasOwnProperty.call(updateData, path)
-      || foundry.utils.getProperty(updateData, path) !== undefined;
-    if (!hasCapacityUpdate) return false;
+    const hasRelevantUpdate = [
+      capacityPath,
+      loadedAmmoPath,
+      weaponTypePath,
+      infiniteAmmoPath
+    ].some(path => (
+      Object.prototype.hasOwnProperty.call(updateData, path)
+      || foundry.utils.getProperty(updateData, path) !== undefined
+    ));
+    if (!hasRelevantUpdate) return false;
+
     const nextCapacity = normalizeNonNegativeInteger(
-      foundry.utils.getProperty(updateData, path),
+      getUpdatedPathValue(updateData, capacityPath, item?.system?.magazineCapacity ?? 0),
       item?.system?.magazineCapacity ?? 0
     );
-    foundry.utils.setProperty(updateData, path, nextCapacity);
+    const nextWeaponType = normalizeWeaponType(
+      getUpdatedPathValue(updateData, weaponTypePath, item?.system?.weaponType || "distance")
+    );
+    const weaponType = nextWeaponType || "distance";
+    const infiniteAmmo = toCheckboxBoolean(
+      getUpdatedPathValue(updateData, infiniteAmmoPath, item?.system?.infiniteAmmo),
+      false
+    );
+    const consumesAmmo = getWeaponCategory(weaponType) === "distance" && !infiniteAmmo;
+    const usesMagazine = consumesAmmo && nextCapacity > 0;
+
+    const fallbackLoadedAmmo = normalizeWeaponLoadedAmmoValue(
+      item?.system?.loadedAmmo,
+      actorAmmoMagazineFallback,
+      usesMagazine ? nextCapacity : 0
+    );
+    const nextLoadedAmmo = normalizeWeaponLoadedAmmoValue(
+      getUpdatedPathValue(updateData, loadedAmmoPath, fallbackLoadedAmmo),
+      fallbackLoadedAmmo,
+      usesMagazine ? nextCapacity : 0
+    );
+
+    foundry.utils.setProperty(updateData, weaponTypePath, weaponType);
+    foundry.utils.setProperty(updateData, capacityPath, nextCapacity);
+    foundry.utils.setProperty(updateData, loadedAmmoPath, nextLoadedAmmo);
     return true;
   }
+
   const sourceCapacity = normalizeNonNegativeInteger(item?.system?.magazineCapacity, 0);
-  item.updateSource({ [path]: sourceCapacity });
+  const sourceWeaponType = normalizeWeaponType(item?.system?.weaponType || "distance") || "distance";
+  const sourceInfiniteAmmo = toCheckboxBoolean(item?.system?.infiniteAmmo, false);
+  const sourceConsumesAmmo = getWeaponCategory(sourceWeaponType) === "distance" && !sourceInfiniteAmmo;
+  const sourceUsesMagazine = sourceConsumesAmmo && sourceCapacity > 0;
+  const sourceLoadedAmmo = normalizeWeaponLoadedAmmoValue(
+    item?.system?.loadedAmmo,
+    actorAmmoMagazineFallback,
+    sourceUsesMagazine ? sourceCapacity : 0
+  );
+  item.updateSource({
+    [weaponTypePath]: sourceWeaponType,
+    [capacityPath]: sourceCapacity,
+    [loadedAmmoPath]: sourceLoadedAmmo
+  });
   return true;
 }
 
@@ -3214,6 +3264,19 @@ function buildDefaultResources(options = {}) {
 
 function buildDefaultAmmo() {
   return { type: "", stock: 0, magazine: 0, value: 0 };
+}
+
+function normalizeWeaponLoadedAmmoValue(value, fallback = 0, capacity = 0) {
+  const normalizedCapacity = normalizeNonNegativeInteger(capacity, 0);
+  const numeric = normalizeNonNegativeInteger(value, fallback);
+  if (normalizedCapacity <= 0) return 0;
+  return Math.min(numeric, normalizedCapacity);
+}
+
+function getWeaponLoadedAmmo(item, options = {}) {
+  const capacity = normalizeNonNegativeInteger(item?.system?.magazineCapacity, 0);
+  const fallback = normalizeNonNegativeInteger(options.fallback, 0);
+  return normalizeWeaponLoadedAmmoValue(item?.system?.loadedAmmo, fallback, capacity);
 }
 
 function normalizeAmmoType(value) {
@@ -5329,6 +5392,37 @@ async function handleDeleteItemRequest(data) {
   }
 }
 
+async function handleReorderActorItemsRequest(data) {
+  if (!game.user.isGM || !data) return;
+  const requesterId = String(data.requesterId || "");
+  const requester = game.users?.get(requesterId);
+  if (!requester) return;
+  const actor = await resolveActorForSheetRequest(data);
+  if (!actor) return;
+  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
+  const ownerLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
+  const hasOwnerAccess = typeof actor.testUserPermission === "function"
+    ? actor.testUserPermission(requester, ownerLevel, { exact: false })
+    : false;
+  if (!hasOwnerAccess) return;
+
+  const requestedUpdates = Array.isArray(data.updates) ? data.updates : [];
+  if (!requestedUpdates.length) return;
+
+  const safeUpdates = requestedUpdates
+    .map(entry => {
+      const itemId = String(entry?._id || entry?.id || "").trim();
+      if (!itemId || !actor.items?.has(itemId)) return null;
+      const fallbackSort = toFiniteNumber(actor.items.get(itemId)?.sort, 0);
+      const sortValue = Math.max(0, Math.floor(toFiniteNumber(entry?.sort, fallbackSort)));
+      return { _id: itemId, sort: sortValue };
+    })
+    .filter(Boolean);
+  if (!safeUpdates.length) return;
+
+  await actor.updateEmbeddedDocuments("Item", safeUpdates);
+}
+
 function getSocketActorBaseId(actor) {
   return String(actor?.token?.actorId || actor?.parent?.actorId || actor?.baseActor?.id || actor?.id || "");
 }
@@ -5381,6 +5475,29 @@ function requestDeleteActorItem(actor, item) {
   return true;
 }
 
+function requestReorderActorItems(actor, updates = []) {
+  if (!actor || !game.socket || !Array.isArray(updates)) return false;
+  const sanitizedUpdates = updates
+    .map(entry => {
+      const itemId = String(entry?._id || entry?.id || "").trim();
+      if (!itemId) return null;
+      const sortValue = Math.max(0, Math.floor(toFiniteNumber(entry?.sort, 0)));
+      return { _id: itemId, sort: sortValue };
+    })
+    .filter(Boolean);
+  if (!sanitizedUpdates.length) return false;
+
+  game.socket.emit(SYSTEM_SOCKET, {
+    type: "reorderActorItems",
+    requesterId: String(game.user?.id || ""),
+    actorUuid: String(actor.uuid || ""),
+    actorId: String(actor.id || ""),
+    actorBaseId: getSocketActorBaseId(actor),
+    updates: sanitizedUpdates
+  });
+  return true;
+}
+
 
 function registerDamageSocketHandlers() {
   if (!game.socket) return;
@@ -5421,6 +5538,10 @@ function registerDamageSocketHandlers() {
     }
     if (data.type === "deleteActorItem") {
       if (canHandlePrivilegedRequests) await handleDeleteItemRequest(data);
+      return;
+    }
+    if (data.type === "reorderActorItems") {
+      if (canHandlePrivilegedRequests) await handleReorderActorItemsRequest(data);
       return;
     }
     if (data.type === "adjustChaosDice") {
@@ -6111,17 +6232,37 @@ Hooks.once("ready", async () => {
         continue;
       }
       if (item.type !== "arme") continue;
-      const normalized = normalizeWeaponType(item.system?.weaponType);
-      if (normalized && normalized !== item.system?.weaponType) {
-        await item.update({ "system.weaponType": normalized });
+      const weaponUpdates = {};
+      const normalizedWeaponType = normalizeWeaponType(item.system?.weaponType);
+      if (normalizedWeaponType && normalizedWeaponType !== item.system?.weaponType) {
+        weaponUpdates["system.weaponType"] = normalizedWeaponType;
       }
-      if (!normalized && !item.system?.weaponType) {
-        await item.update({ "system.weaponType": "distance" });
+      if (!normalizedWeaponType && !item.system?.weaponType) {
+        weaponUpdates["system.weaponType"] = "distance";
       }
+      const effectiveWeaponType = normalizeWeaponType(
+        weaponUpdates["system.weaponType"] ?? item.system?.weaponType
+      ) || "distance";
       const rawMagazineCapacity = Number(item.system?.magazineCapacity);
       const magazineCapacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
       if (!Number.isFinite(rawMagazineCapacity) || rawMagazineCapacity < 0 || rawMagazineCapacity !== Math.floor(rawMagazineCapacity)) {
-        await item.update({ "system.magazineCapacity": magazineCapacity });
+        weaponUpdates["system.magazineCapacity"] = magazineCapacity;
+      }
+      const infiniteAmmo = toCheckboxBoolean(item.system?.infiniteAmmo, false);
+      const consumesAmmo = getWeaponCategory(effectiveWeaponType) === "distance" && !infiniteAmmo;
+      const usesMagazine = consumesAmmo && magazineCapacity > 0;
+      const normalizedLoadedAmmo = normalizeWeaponLoadedAmmoValue(
+        item.system?.loadedAmmo,
+        actor.system?.ammo?.magazine ?? 0,
+        usesMagazine ? magazineCapacity : 0
+      );
+      const hasStoredLoadedAmmo = foundry.utils.getProperty(item, "system.loadedAmmo") != null;
+      const rawLoadedAmmo = Number(item.system?.loadedAmmo);
+      if (!hasStoredLoadedAmmo || !Number.isFinite(rawLoadedAmmo) || rawLoadedAmmo !== normalizedLoadedAmmo) {
+        weaponUpdates["system.loadedAmmo"] = normalizedLoadedAmmo;
+      }
+      if (Object.keys(weaponUpdates).length) {
+        await item.update(weaponUpdates);
       }
     }
   }
@@ -6447,7 +6588,8 @@ Hooks.on("preCreateItem", (item, createData) => {
   }
 
   normalizeItemPriceUpdate(item, createData);
-  normalizeWeaponMagazineCapacityUpdate(item, createData);
+  const normalizedWeaponAmmo = normalizeWeaponMagazineCapacityUpdate(item, createData);
+  if (!normalizedWeaponAmmo) normalizeWeaponMagazineCapacityUpdate(item);
   normalizeCharacteristicBonusItemUpdate(item, createData);
 
   if (!isVoyageXPCostItemType(item?.type)) return;
@@ -7585,6 +7727,257 @@ class BloodmanActorSheet extends BaseActorSheet {
     return exactById || candidates[0];
   }
 
+  getItemListColumnCountFromElement(element) {
+    const list = element?.matches?.(".item-list")
+      ? element
+      : element?.closest?.(".item-list");
+    if (!list) return 1;
+    if (list.classList?.contains("item-list-three-columns")) return 3;
+    if (list.classList?.contains("item-list-two-columns")) return 2;
+    const rawColumns = Number(list.dataset?.gridColumns || list.getAttribute?.("data-grid-columns") || 1);
+    if (!Number.isFinite(rawColumns)) return 1;
+    return Math.max(1, Math.floor(rawColumns));
+  }
+
+  getItemReorderPayloadFromEvent(eventLike) {
+    const event = eventLike?.originalEvent || eventLike;
+    const transfer = event?.dataTransfer;
+    if (!transfer) return null;
+    const types = Array.from(transfer.types || []);
+    if (!types.includes("application/x-bloodman-item-reorder")) return null;
+    const rawPayload = transfer.getData("application/x-bloodman-item-reorder");
+    if (!rawPayload) return null;
+    let parsed = null;
+    try {
+      parsed = JSON.parse(rawPayload);
+    } catch (_error) {
+      return null;
+    }
+    const actorId = String(parsed?.actorId || "").trim();
+    const actorUuid = String(parsed?.actorUuid || "").trim();
+    const itemId = String(parsed?.itemId || "").trim();
+    const itemType = String(parsed?.itemType || "").trim().toLowerCase();
+    if (!actorId || !itemId || !itemType) return null;
+    return { actorId, actorUuid, itemId, itemType };
+  }
+
+  clearItemReorderVisualState(rootLike = null) {
+    const root = rootLike?.find ? rootLike : this.element;
+    if (!root?.length) return;
+    root.find(".item-list.is-reorder-target").removeClass("is-reorder-target");
+    root.find(".item.is-reorder-drop-before").removeClass("is-reorder-drop-before");
+    root.find(".item.is-reorder-drop-after").removeClass("is-reorder-drop-after");
+    root.find(".item.is-reorder-dragging").removeClass("is-reorder-dragging");
+  }
+
+  getItemReorderSortBefore(eventLike, targetLi, columns = 1) {
+    const event = eventLike?.originalEvent || eventLike;
+    const target = targetLi instanceof HTMLElement ? targetLi : null;
+    if (!target) return true;
+    const rect = target.getBoundingClientRect?.();
+    if (!rect || !(rect.width > 0) || !(rect.height > 0)) return true;
+    const pointerX = Number(event?.clientX);
+    const pointerY = Number(event?.clientY);
+    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) return true;
+    const midX = rect.left + (rect.width / 2);
+    const midY = rect.top + (rect.height / 2);
+    if (columns <= 1) return pointerY < midY;
+
+    const distanceX = Math.abs(pointerX - midX) / rect.width;
+    const distanceY = Math.abs(pointerY - midY) / rect.height;
+    if (distanceX >= distanceY) return pointerX < midX;
+    return pointerY < midY;
+  }
+
+  buildItemReorderUpdates(sourceItem, targetItem, options = {}) {
+    if (!sourceItem || !targetItem || !this.actor) return [];
+    const sourceId = String(sourceItem.id || "");
+    const targetId = String(targetItem.id || "");
+    if (!sourceId || !targetId || sourceId === targetId) return [];
+    const sortBefore = options.sortBefore !== false;
+    const itemType = String(sourceItem.type || "").trim().toLowerCase();
+    if (!itemType || itemType !== String(targetItem.type || "").trim().toLowerCase()) return [];
+
+    if (globalThis.SortingHelpers?.performIntegerSort) {
+      try {
+        const siblings = this.actor.items
+          .filter(entry => (
+            entry
+            && String(entry.type || "").trim().toLowerCase() === itemType
+            && String(entry.id || "") !== sourceId
+          ))
+          .map(entry => entry.toObject());
+        return globalThis.SortingHelpers.performIntegerSort(sourceItem, {
+          target: targetItem,
+          siblings,
+          sortBefore,
+          sortKey: "sort"
+        });
+      } catch (_error) {
+        // Fallback below if helper fails in synthetic contexts.
+      }
+    }
+
+    const ordered = this.actor.items
+      .filter(entry => String(entry?.type || "").trim().toLowerCase() === itemType && String(entry?.id || "") !== sourceId)
+      .sort((left, right) => {
+        const leftSort = toFiniteNumber(left?.sort, 0);
+        const rightSort = toFiniteNumber(right?.sort, 0);
+        if (leftSort !== rightSort) return leftSort - rightSort;
+        return String(left?.id || "").localeCompare(String(right?.id || ""));
+      });
+    if (!ordered.length) return [];
+
+    let insertIndex = ordered.findIndex(entry => String(entry?.id || "") === targetId);
+    if (insertIndex < 0) insertIndex = ordered.length - 1;
+    if (!sortBefore) insertIndex += 1;
+    insertIndex = Math.max(0, Math.min(insertIndex, ordered.length));
+
+    ordered.splice(insertIndex, 0, sourceItem);
+    const sortStep = 1000;
+    return ordered
+      .map((entry, index) => {
+        const normalizedSort = (index + 1) * sortStep;
+        const currentSort = Math.floor(toFiniteNumber(entry?.sort, 0));
+        if (currentSort === normalizedSort) return null;
+        return { _id: String(entry?.id || ""), sort: normalizedSort };
+      })
+      .filter(Boolean);
+  }
+
+  async applyActorItemOrderUpdates(updates = []) {
+    if (!this.actor || !Array.isArray(updates) || !updates.length) return false;
+    const sanitizedUpdates = updates
+      .map(entry => {
+        const itemId = String(entry?._id || entry?.id || "").trim();
+        if (!itemId) return null;
+        const sortValue = Math.max(0, Math.floor(toFiniteNumber(entry?.sort, 0)));
+        return { _id: itemId, sort: sortValue };
+      })
+      .filter(Boolean);
+    if (!sanitizedUpdates.length) return false;
+
+    if (this.actor?.isOwner || game.user?.isGM) {
+      await this.actor.updateEmbeddedDocuments("Item", sanitizedUpdates);
+      return true;
+    }
+    const sent = requestReorderActorItems(this.actor, sanitizedUpdates);
+    if (!sent) safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
+    return sent;
+  }
+
+  onItemReorderDragStart(eventLike) {
+    const event = eventLike?.originalEvent || eventLike;
+    const li = event?.currentTarget?.closest?.("li.item[data-item-id]");
+    const item = this.getItemFromListElement(li);
+    if (!li || !item || !event?.dataTransfer) return;
+
+    const payload = {
+      actorId: String(this.actor?.id || ""),
+      actorUuid: String(this.actor?.uuid || ""),
+      itemId: String(item.id || ""),
+      itemType: String(item.type || "").trim().toLowerCase()
+    };
+    if (!payload.actorId || !payload.itemId || !payload.itemType) return;
+
+    try {
+      event.dataTransfer.setData("application/x-bloodman-item-reorder", JSON.stringify(payload));
+      event.dataTransfer.effectAllowed = "move";
+    } catch (_error) {
+      return;
+    }
+    li.classList.add("is-reorder-dragging");
+  }
+
+  onItemReorderDragOver(eventLike) {
+    const event = eventLike?.originalEvent || eventLike;
+    const payload = this.getItemReorderPayloadFromEvent(event);
+    if (!payload) return;
+    if (payload.actorId !== String(this.actor?.id || "")) return;
+
+    const list = event?.currentTarget;
+    if (!(list instanceof HTMLElement)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+
+    this.clearItemReorderVisualState();
+    list.classList.add("is-reorder-target");
+    const targetLi = event?.target?.closest?.("li.item[data-item-id]");
+    if (!targetLi || !list.contains(targetLi)) return;
+    const targetItem = this.getItemFromListElement(targetLi);
+    if (!targetItem || String(targetItem.type || "").trim().toLowerCase() !== payload.itemType) return;
+
+    const columns = this.getItemListColumnCountFromElement(list);
+    const sortBefore = this.getItemReorderSortBefore(event, targetLi, columns);
+    targetLi.classList.add(sortBefore ? "is-reorder-drop-before" : "is-reorder-drop-after");
+  }
+
+  onItemReorderDragEnd() {
+    this.clearItemReorderVisualState();
+  }
+
+  onItemReorderDragLeave(eventLike) {
+    const event = eventLike?.originalEvent || eventLike;
+    const list = event?.currentTarget;
+    if (!(list instanceof HTMLElement)) return;
+    const relatedTarget = event?.relatedTarget;
+    if (relatedTarget instanceof HTMLElement && list.contains(relatedTarget)) return;
+    list.classList.remove("is-reorder-target");
+    list.querySelectorAll(".is-reorder-drop-before").forEach(node => node.classList.remove("is-reorder-drop-before"));
+    list.querySelectorAll(".is-reorder-drop-after").forEach(node => node.classList.remove("is-reorder-drop-after"));
+  }
+
+  async onItemReorderDrop(eventLike) {
+    const event = eventLike?.originalEvent || eventLike;
+    const payload = this.getItemReorderPayloadFromEvent(event);
+    if (!payload) return;
+    if (payload.actorId !== String(this.actor?.id || "")) return;
+
+    const sourceItem = this.actor?.items?.get(payload.itemId) || null;
+    if (!sourceItem) return;
+
+    const list = event?.currentTarget;
+    if (!(list instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    let targetLi = event?.target?.closest?.("li.item[data-item-id]");
+    if (!targetLi || !list.contains(targetLi)) targetLi = null;
+    let targetItem = targetLi ? this.getItemFromListElement(targetLi) : null;
+    let sortBefore = false;
+
+    const sourceType = String(sourceItem.type || "").trim().toLowerCase();
+    if (!targetItem || String(targetItem.type || "").trim().toLowerCase() !== sourceType) {
+      const fallbackTarget = this.actor.items
+        .filter(entry => String(entry?.type || "").trim().toLowerCase() === sourceType && String(entry?.id || "") !== String(sourceItem.id || ""))
+        .sort((left, right) => {
+          const leftSort = toFiniteNumber(left?.sort, 0);
+          const rightSort = toFiniteNumber(right?.sort, 0);
+          if (leftSort !== rightSort) return leftSort - rightSort;
+          return String(left?.id || "").localeCompare(String(right?.id || ""));
+        })
+        .at(-1);
+      targetItem = fallbackTarget || null;
+      sortBefore = false;
+    } else {
+      const columns = this.getItemListColumnCountFromElement(list);
+      sortBefore = this.getItemReorderSortBefore(event, targetLi, columns);
+    }
+    if (!targetItem || String(targetItem.id || "") === String(sourceItem.id || "")) {
+      this.clearItemReorderVisualState();
+      return;
+    }
+
+    const updates = this.buildItemReorderUpdates(sourceItem, targetItem, { sortBefore });
+    if (!updates.length) {
+      this.clearItemReorderVisualState();
+      return;
+    }
+    const applied = await this.applyActorItemOrderUpdates(updates);
+    this.clearItemReorderVisualState();
+    if (applied) this.render(false);
+  }
+
   async _updateObject(_event, formData) {
     if (this.actor?.isOwner || game.user?.isGM) {
       return super._updateObject(_event, formData);
@@ -7803,16 +8196,23 @@ class BloodmanActorSheet extends BaseActorSheet {
       const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(weapon.system?.infiniteAmmo, false);
       const magazineCapacity = normalizeNonNegativeInteger(weapon.system?.magazineCapacity, 0);
       const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
-      const magazineForWeapon = usesDirectStock
+      const ammoStock = consumesAmmo
         ? Math.max(0, ammo.stock)
-        : Math.min(ammo.magazine, magazineCapacity);
-      const magazineMissingAmmo = !usesDirectStock && magazineForWeapon < magazineCapacity;
+        : 0;
+      const ammoType = consumesAmmo ? normalizeAmmoType(ammo.type) : "";
+      const loadedAmmo = usesDirectStock
+        ? ammoStock
+        : getWeaponLoadedAmmo(item, { fallback: ammo.magazine });
+      const magazineMissingAmmo = !usesDirectStock && loadedAmmo < magazineCapacity;
       weapon.magazineCapacity = magazineCapacity;
-      weapon.ammoCapacityDisplay = usesDirectStock ? Math.max(0, ammo.stock) : magazineCapacity;
+      weapon.ammoType = ammoType;
+      weapon.ammoStock = ammoStock;
+      weapon.usesDirectStock = usesDirectStock;
+      weapon.ammoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
       weapon.showAmmoState = consumesAmmo;
-      weapon.ammoMagazine = magazineForWeapon;
-      weapon.showReloadButton = consumesAmmo && ammo.stock > 0 && magazineMissingAmmo;
-      weapon.reloadBlocked = !usesDirectStock && ammo.stock <= 0;
+      weapon.ammoMagazine = loadedAmmo;
+      weapon.showReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
+      weapon.reloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
       weapon.showItemReroll = shouldShowItemReroll(item.id);
       return weapon;
     });
@@ -7993,6 +8393,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     };
     forceEnableSheetUi();
     setTimeout(forceEnableSheetUi, 0);
+    html.find("li.item[data-item-id]").attr("draggable", true);
     this.refreshResourceVisuals(html);
     setTimeout(() => this.refreshResourceVisuals(html), 0);
     this.refreshAutoGrowTextareas(html);
@@ -8089,6 +8490,26 @@ class BloodmanActorSheet extends BaseActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       await this.reloadWeapon(item);
+    });
+
+    html.on("dragstart", "li.item[data-item-id]", ev => {
+      this.onItemReorderDragStart(ev);
+    });
+
+    html.on("dragover", "ol.item-list", ev => {
+      this.onItemReorderDragOver(ev);
+    });
+
+    html.on("dragleave", "ol.item-list", ev => {
+      this.onItemReorderDragLeave(ev);
+    });
+
+    html.on("dragend", "li.item[data-item-id]", () => {
+      this.onItemReorderDragEnd();
+    });
+
+    html.on("drop", "ol.item-list", async ev => {
+      await this.onItemReorderDrop(ev);
     });
 
     html.find(".ability-roll").click(ev => {
@@ -8313,11 +8734,105 @@ class BloodmanActorSheet extends BaseActorSheet {
     return 1;
   }
 
-  async resolveDropPermissionState(dropData) {
-    if (game.user?.isGM) return { allowed: true };
-    const entries = Array.isArray(dropData?.items) && dropData.items.length
+  getDropEntries(dropData) {
+    return Array.isArray(dropData?.items) && dropData.items.length
       ? dropData.items
       : [dropData];
+  }
+
+  async resolveActorTransferEntries(dropData) {
+    const entries = this.getDropEntries(dropData);
+    const transfers = [];
+    for (const entry of entries) {
+      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
+      if (!droppedItem) continue;
+      const sourceActor = droppedItem.actor;
+      if (!sourceActor || sourceActor?.id === this.actor?.id) continue;
+      transfers.push({ entry, droppedItem, sourceActor });
+    }
+    return transfers;
+  }
+
+  async applyActorToActorItemTransfer(transferEntries = []) {
+    if (!transferEntries.length) return null;
+    if (!this.actor) return null;
+    const ownerLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
+    const canManageTarget = game.user?.isGM
+      || this.actor?.isOwner
+      || (
+        typeof this.actor?.testUserPermission === "function"
+        && this.actor.testUserPermission(game.user, ownerLevel, { exact: false })
+      );
+    if (!canManageTarget) {
+      ui.notifications?.warn(t("BLOODMAN.Notifications.DropRequiresLimitedPermission"));
+      return null;
+    }
+
+    const createdItems = [];
+    for (const transfer of transferEntries) {
+      const droppedItem = transfer?.droppedItem;
+      const sourceActor = transfer?.sourceActor;
+      if (!droppedItem || !sourceActor) continue;
+      if (sourceActor?.id === this.actor?.id) continue;
+
+      const canManageSource = game.user?.isGM
+        || sourceActor?.isOwner
+        || droppedItem?.isOwner
+        || (
+          typeof sourceActor?.testUserPermission === "function"
+          && sourceActor.testUserPermission(game.user, ownerLevel, { exact: false })
+        );
+      if (!canManageSource) {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.DropRequiresLimitedPermission"));
+        continue;
+      }
+
+      const sourceData = foundry.utils.deepClone(droppedItem.toObject());
+      delete sourceData._id;
+
+      let createdItem = null;
+      try {
+        const created = await this.actor.createEmbeddedDocuments("Item", [sourceData]);
+        createdItem = created?.[0] || null;
+      } catch (error) {
+        console.warn("[bloodman] actor transfer:create failed", {
+          sourceActorId: sourceActor?.id,
+          targetActorId: this.actor?.id,
+          itemId: droppedItem?.id,
+          error
+        });
+        continue;
+      }
+      if (!createdItem) continue;
+
+      try {
+        await sourceActor.deleteEmbeddedDocuments("Item", [droppedItem.id]);
+      } catch (error) {
+        console.warn("[bloodman] actor transfer:delete source failed", {
+          sourceActorId: sourceActor?.id,
+          targetActorId: this.actor?.id,
+          itemId: droppedItem?.id,
+          error
+        });
+        try {
+          await this.actor.deleteEmbeddedDocuments("Item", [createdItem.id]);
+        } catch (_rollbackError) {
+          // Best-effort rollback to avoid accidental duplication when source deletion fails.
+        }
+        continue;
+      }
+
+      createdItems.push(createdItem);
+    }
+
+    if (!createdItems.length) return null;
+    this.render(false);
+    return createdItems.length === 1 ? createdItems[0] : createdItems;
+  }
+
+  async resolveDropPermissionState(dropData) {
+    if (game.user?.isGM) return { allowed: true };
+    const entries = this.getDropEntries(dropData);
     const canDropMenuItems = canCurrentUserDropMenuItems();
     const limitedLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 1);
 
@@ -8353,9 +8868,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async resolveDropPurchaseSummary(dropData) {
-    const entries = Array.isArray(dropData?.items) && dropData.items.length
-      ? dropData.items
-      : [dropData];
+    const entries = this.getDropEntries(dropData);
     let totalCost = 0;
     let hasInvalidPrice = false;
 
@@ -8364,6 +8877,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!droppedItem) continue;
       const sourceActor = droppedItem.actor;
       if (sourceActor?.id === this.actor?.id) continue;
+      // Actor-to-actor exchange is a free handoff, not a purchase.
+      if (sourceActor) continue;
       const priceState = this.getDroppedItemUnitPrice(droppedItem);
       if (!priceState.ok) {
         hasInvalidPrice = true;
@@ -8380,34 +8895,147 @@ class BloodmanActorSheet extends BaseActorSheet {
     };
   }
 
-  async confirmInsufficientFundsDrop(totalCost, currentCurrency) {
-    if (!game.user?.isGM) return false;
-    if (typeof Dialog !== "function") return false;
+  sanitizeDropDialogText(value, maxLength = 160) {
+    const plain = String(value ?? "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!plain) return "";
+    const cap = Math.max(20, Math.floor(toFiniteNumber(maxLength, 160)));
+    if (plain.length <= cap) return plain;
+    return `${plain.slice(0, cap - 3).trim()}...`;
+  }
+
+  buildDroppedItemSpecificities(item, options = {}) {
+    const details = [];
+    if (!item) return details;
+
+    const itemType = String(item.type || "").trim().toLowerCase();
+    const quantity = Math.max(1, Math.floor(toFiniteNumber(options.quantity, 1)));
+    const priceState = options.priceState || this.getDroppedItemUnitPrice(item);
+
+    const typeLabel = itemType ? t(`TYPES.Item.${itemType}`) : "";
+    if (typeLabel && typeLabel !== `TYPES.Item.${itemType}`) {
+      details.push(`Type : ${typeLabel}`);
+    }
+    if (quantity > 1) {
+      details.push(`Quantite : ${quantity}`);
+    }
+    if (priceState?.ok && priceState.value > 0) {
+      details.push(`Prix unitaire : ${formatCurrencyValue(priceState.value)}`);
+    }
+    if (itemType === "arme") {
+      const damageDie = normalizeRollDieFormula(item.system?.damageDie, "d4");
+      if (damageDie) details.push(`Degats : ${damageDie}`);
+      const weaponType = getWeaponCategory(item.system?.weaponType);
+      if (weaponType === "distance") details.push("Categorie : Distance");
+      if (weaponType === "corps") details.push("Categorie : Corps a corps");
+      const magazineCapacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
+      if (magazineCapacity > 0) {
+        const loadedAmmo = getWeaponLoadedAmmo(item, { fallback: 0 });
+        details.push(`Chargeur : ${loadedAmmo} / ${magazineCapacity}`);
+      }
+    }
+    if (itemType === "soin") {
+      const healDie = normalizeRollDieFormula(item.system?.healDie, "d4");
+      if (healDie) details.push(`Soin : ${healDie}`);
+    }
+    if (itemType === "protection") {
+      const paValue = Math.max(0, Math.floor(toFiniteNumber(item.system?.pa, 0)));
+      details.push(`PA : ${paValue}`);
+    }
+    const noteText = this.sanitizeDropDialogText(item.system?.note || item.system?.notes || "", 130);
+    if (noteText) details.push(`Note : ${noteText}`);
+
+    return details;
+  }
+
+  async buildDropDecisionPreview(dropData, purchase = null) {
+    const entries = this.getDropEntries(dropData);
+    const resolvedItems = [];
+    for (const entry of entries) {
+      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
+      if (!droppedItem) continue;
+      const sourceActor = droppedItem.actor;
+      if (sourceActor?.id === this.actor?.id) continue;
+      const quantity = this.getDropItemQuantity(entry, droppedItem);
+      const priceState = this.getDroppedItemUnitPrice(droppedItem);
+      resolvedItems.push({ droppedItem, sourceActor, quantity, priceState });
+    }
+    if (!resolvedItems.length) return null;
+
+    const targetName = String(this.actor?.name || "").trim() || t("BLOODMAN.Common.Name");
+    const firstItemName = String(resolvedItems[0]?.droppedItem?.name || "").trim() || t("BLOODMAN.Common.Name");
+    const intro = tl(
+      "BLOODMAN.Dialogs.DropDecision.Intro",
+      "Vous vous appretez a glisser '{item}' sur la fiche de '{sheet}'.",
+      {
+        item: firstItemName,
+        sheet: targetName
+      }
+    );
+    const question = tl(
+      "BLOODMAN.Dialogs.DropDecision.Question",
+      "Voulez-vous deplacer cet objet gratuitement ?"
+    );
+    const costLabel = tl("BLOODMAN.Dialogs.DropDecision.CostLabel", "Cout");
+    const specificsLabel = tl("BLOODMAN.Dialogs.DropDecision.SpecificitiesLabel", "Specificites");
+
+    const specificities = [];
+    for (const itemContext of resolvedItems.slice(0, 4)) {
+      const itemName = String(itemContext?.droppedItem?.name || "").trim() || t("BLOODMAN.Common.Name");
+      const itemDetails = this.buildDroppedItemSpecificities(itemContext.droppedItem, {
+        quantity: itemContext.quantity,
+        priceState: itemContext.priceState
+      });
+      if (resolvedItems.length > 1) {
+        specificities.push(`${itemName} :`);
+        specificities.push(...itemDetails.map(detail => `- ${detail}`));
+      } else {
+        specificities.push(...itemDetails);
+      }
+    }
+    if (resolvedItems.length > 4) {
+      specificities.push(tl(
+        "BLOODMAN.Dialogs.DropDecision.MoreItems",
+        "+ {count} objet(s) supplementaire(s).",
+        { count: resolvedItems.length - 4 }
+      ));
+    }
+    if (!specificities.length) {
+      specificities.push(tl("BLOODMAN.Dialogs.DropDecision.NoSpecificities", "Aucune specificite disponible."));
+    }
+
+    const totalCost = roundCurrencyValue(Number(purchase?.totalCost || 0));
+    return {
+      intro,
+      question,
+      costLabel,
+      specificsLabel,
+      firstItemName,
+      targetName,
+      specificities,
+      totalCost,
+      hasInvalidPrice: Boolean(purchase?.hasInvalidPrice)
+    };
+  }
+
+  async promptDropDecision(preview) {
+    if (!preview || typeof Dialog !== "function") return "fermer";
     const escapeHtml = value => (
       foundry.utils?.escapeHTML
         ? foundry.utils.escapeHTML(String(value ?? ""))
         : String(value ?? "")
     );
-    const title = tl(
-      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Title",
-      "Fonds insuffisants"
-    );
-    const prompt = tl(
-      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Prompt",
-      "Voulez-vous vraiment glisser cet objet malgre que les fonds sont insuffisants ?"
-    );
-    const details = tl(
-      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Details",
-      "Cout: {cost} | Actuel: {current}",
-      {
-        cost: formatCurrencyValue(totalCost),
-        current: formatCurrencyValue(currentCurrency)
-      }
-    );
     const eyebrow = tl(
-      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Eyebrow",
-      "Verification MJ"
+      "BLOODMAN.Dialogs.DropDecision.Eyebrow",
+      "Deplacement d'objet"
     );
+    const title = tl("BLOODMAN.Dialogs.DropDecision.Title", "Transfert d'objet");
+    const details = `${preview.costLabel}: ${formatCurrencyValue(preview.totalCost)}`;
+    const specificsMarkup = preview.specificities
+      .map(line => `<li>${escapeHtml(line)}</li>`)
+      .join("");
     const content = `<form class="bm-drop-insufficient-funds">
       <div class="bm-drop-insufficient-shell">
         <div class="bm-drop-insufficient-head">
@@ -8416,10 +9044,13 @@ class BloodmanActorSheet extends BaseActorSheet {
           </div>
           <div class="bm-drop-insufficient-head-copy">
             <p class="bm-drop-insufficient-eyebrow">${escapeHtml(eyebrow)}</p>
-            <p class="bm-drop-insufficient-prompt">${escapeHtml(prompt)}</p>
+            <p class="bm-drop-insufficient-intro">${escapeHtml(preview.intro)}</p>
+            <p class="bm-drop-insufficient-prompt">${escapeHtml(preview.question)}</p>
           </div>
         </div>
         <p class="bm-drop-insufficient-details">${escapeHtml(details)}</p>
+        <p class="bm-drop-insufficient-specificities-title">${escapeHtml(preview.specificsLabel)}</p>
+        <ul class="bm-drop-insufficient-specificities">${specificsMarkup}</ul>
       </div>
     </form>`;
 
@@ -8428,7 +9059,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       const finish = value => {
         if (settled) return;
         settled = true;
-        resolve(Boolean(value));
+        resolve(String(value || "fermer"));
       };
 
       new Dialog(
@@ -8436,21 +9067,25 @@ class BloodmanActorSheet extends BaseActorSheet {
           title,
           content,
           buttons: {
-            yes: {
-              label: t("BLOODMAN.Common.Yes"),
-              callback: () => finish(true)
+            buy: {
+              label: tl("BLOODMAN.Dialogs.DropDecision.ActionBuy", "Achat"),
+              callback: () => finish("achat")
             },
-            no: {
-              label: t("BLOODMAN.Common.No"),
-              callback: () => finish(false)
+            free: {
+              label: tl("BLOODMAN.Dialogs.DropDecision.ActionFree", "Deplacer gratuitement"),
+              callback: () => finish("deplacer_gratuitement")
+            },
+            close: {
+              label: tl("BLOODMAN.Dialogs.DropDecision.ActionClose", "Fermer"),
+              callback: () => finish("fermer")
             }
           },
-          default: "no",
-          close: () => finish(false)
+          default: "close",
+          close: () => finish("fermer")
         },
         {
-          classes: ["bloodman-insufficient-funds-dialog"],
-          width: 460
+          classes: ["bloodman-insufficient-funds-dialog", "bloodman-drop-decision-dialog"],
+          width: 560
         }
       ).render(true);
     });
@@ -8470,37 +9105,44 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (reachedLimit) return null;
 
     const purchase = await this.resolveDropPurchaseSummary(data);
-    if (purchase.hasInvalidPrice) {
-      ui.notifications?.warn(t("BLOODMAN.Notifications.InvalidPurchasePrice"));
-      return null;
+    const preview = await this.buildDropDecisionPreview(data, purchase);
+    if (!preview) {
+      return super._onDropItem(event, data);
     }
+    const selectedAction = await this.promptDropDecision(preview);
+    if (selectedAction === "fermer") return null;
 
     let previousCurrency = null;
     let deductedBeforeDrop = false;
-    if (purchase.totalCost > 0) {
+    const shouldBuy = selectedAction === "achat";
+    if (shouldBuy) {
+      if (purchase.hasInvalidPrice) {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.InvalidPurchasePrice"));
+        return null;
+      }
       previousCurrency = this.getActorCurrencyCurrentValue();
       if (previousCurrency + 0.000001 < purchase.totalCost) {
-        if (!game.user?.isGM) {
-          ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughCurrency", {
-            cost: formatCurrencyValue(purchase.totalCost),
-            current: formatCurrencyValue(previousCurrency)
-          }));
-          return null;
-        }
-        const confirmedFreeTransfer = await this.confirmInsufficientFundsDrop(
-          purchase.totalCost,
-          previousCurrency
-        );
-        if (!confirmedFreeTransfer) return null;
-      } else {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughCurrency", {
+          cost: formatCurrencyValue(purchase.totalCost),
+          current: formatCurrencyValue(previousCurrency)
+        }));
+        return null;
+      }
+      if (purchase.totalCost > 0) {
         const nextCurrency = roundCurrencyValue(previousCurrency - purchase.totalCost);
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": nextCurrency });
         deductedBeforeDrop = true;
       }
     }
 
+    const dropEntries = this.getDropEntries(data);
+    const actorTransferEntries = await this.resolveActorTransferEntries(data);
+    const hasOnlyActorTransfers = actorTransferEntries.length > 0 && actorTransferEntries.length === dropEntries.length;
+
     try {
-      const dropped = await super._onDropItem(event, data);
+      const dropped = hasOnlyActorTransfers
+        ? await this.applyActorToActorItemTransfer(actorTransferEntries)
+        : await super._onDropItem(event, data);
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
       }
@@ -8515,15 +9157,20 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async _reachedCarriedItemsLimit(data) {
     if (!isCarriedItemLimitedActorType(this.actor?.type)) return false;
-    const droppedItem = await Item.implementation.fromDropData(data).catch(() => null);
-    if (!droppedItem || !CARRIED_ITEM_TYPES.has(droppedItem.type)) return false;
-
-    const sourceActor = droppedItem.actor;
-    if (sourceActor?.id === this.actor.id) return false;
+    const entries = this.getDropEntries(data);
+    let incomingCarriedItemCount = 0;
+    for (const entry of entries) {
+      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
+      if (!droppedItem || !CARRIED_ITEM_TYPES.has(droppedItem.type)) continue;
+      const sourceActor = droppedItem.actor;
+      if (sourceActor?.id === this.actor.id) continue;
+      incomingCarriedItemCount += 1;
+    }
+    if (incomingCarriedItemCount <= 0) return false;
 
     const carriedCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
     const carriedItemsLimit = getActorCarriedItemsLimit(this.actor);
-    if (carriedCount < carriedItemsLimit) return false;
+    if ((carriedCount + incomingCarriedItemCount) <= carriedItemsLimit) return false;
 
     ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: carriedItemsLimit }));
     return true;
@@ -8670,32 +9317,43 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (capacity <= 0) return;
     const ammoState = normalizeAmmoState(this.actor?.system?.ammo, {
       fallback: buildDefaultAmmo(),
-      capacity: capacity > 0 ? capacity : 0
+      capacity
     });
-    const currentMagazine = capacity > 0
-      ? Math.min(ammoState.magazine, capacity)
-      : Math.max(0, ammoState.magazine);
-    const targetCapacity = capacity > 0 ? capacity : (currentMagazine + Math.max(0, ammoState.stock));
+    const ammoStock = Math.max(0, ammoState.stock);
+    const currentMagazine = getWeaponLoadedAmmo(item, { fallback: ammoState.magazine });
+    const targetCapacity = capacity > 0 ? capacity : (currentMagazine + ammoStock);
     const needed = Math.max(0, targetCapacity - currentMagazine);
     if (needed <= 0) return;
-    if (ammoState.stock <= 0) {
+    if (ammoStock <= 0) {
       ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
       return;
     }
 
-    const transferred = Math.min(needed, ammoState.stock);
-    const nextStock = Math.max(0, ammoState.stock - transferred);
+    const transferred = Math.min(needed, ammoStock);
+    const nextStock = Math.max(0, ammoStock - transferred);
     const nextMagazine = capacity > 0
       ? Math.min(capacity, currentMagazine + transferred)
       : Math.max(0, currentMagazine + transferred);
 
-    await this.applyActorUpdate({
-      "system.ammo.stock": nextStock,
-      "system.ammo.magazine": nextMagazine,
-      "system.ammo.value": nextStock
-    }, {
-      bloodmanAllowAmmoUpdate: true
-    });
+    try {
+      await this.applyActorUpdate(
+        {
+          "system.ammo.stock": nextStock,
+          "system.ammo.value": nextStock
+        },
+        { bloodmanAllowAmmoUpdate: true }
+      );
+      await item.update({ "system.loadedAmmo": nextMagazine });
+    } catch (error) {
+      console.warn("[bloodman] weapon reload: loaded ammo update failed", {
+        actorId: this.actor?.id,
+        itemId: item?.id,
+        nextStock,
+        nextMagazine,
+        error
+      });
+      safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
+    }
     this.render(false);
   }
 
@@ -9317,11 +9975,17 @@ class BloodmanItemSheet extends BaseItemSheet {
     if (this.item.type === "arme") {
       if (!data.item.system) data.item.system = {};
       const weaponType = getWeaponCategory(this.item.system?.weaponType);
+      const magazineCapacity = normalizeNonNegativeInteger(this.item.system?.magazineCapacity, 0);
+      const consumesAmmo = weaponType === "distance" && !toCheckboxBoolean(this.item.system?.infiniteAmmo, false);
+      const loadedAmmo = normalizeWeaponLoadedAmmoValue(this.item.system?.loadedAmmo, 0, consumesAmmo ? magazineCapacity : 0);
       data.weaponTypeDistance = weaponType === "distance";
       data.weaponTypeMelee = weaponType === "corps";
       // Weapons predate the damageEnabled flag; treat missing as enabled for backward compatibility.
       data.weaponDamageEnabled = this.item.system?.damageEnabled !== false;
-      data.item.system.magazineCapacity = normalizeNonNegativeInteger(this.item.system?.magazineCapacity, 0);
+      data.item.system.magazineCapacity = magazineCapacity;
+      data.item.system.loadedAmmo = loadedAmmo;
+      data.weaponUsesAmmo = consumesAmmo;
+      data.weaponUsesMagazine = consumesAmmo && magazineCapacity > 0;
       data.canEditMagazineCapacity = isAssistantOrHigherRole(game.user?.role);
     }
     if (isVoyageXPCostItemType(this.item.type)) {

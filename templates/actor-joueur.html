@@ -272,7 +272,7 @@
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
           <input type="text" name="system.equipment.armes" value="{{equipment.armes}}" />
-          <ol class="item-list weapon-list">
+          <ol class="item-list weapon-list item-list-three-columns">
             {{#each weapons}}
               <li class="item weapon-item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>

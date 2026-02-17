@@ -1021,6 +1021,13 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   color: var(--bm-insufficient-fg);
 }
 
+.bm-drop-insufficient-funds .bm-drop-insufficient-intro {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--bm-insufficient-muted);
+}
+
 .bm-drop-insufficient-funds .bm-drop-insufficient-details {
   margin: 0;
   border: 1px solid var(--bm-insufficient-border);
@@ -1032,6 +1039,34 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   padding: 7px 9px;
 }
 
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  color: var(--bm-insufficient-muted);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--bm-insufficient-border);
+  border-radius: 8px;
+  background: var(--bm-insufficient-field);
+  color: var(--bm-insufficient-fg);
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities li {
+  margin: 0;
+}
+
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
 .window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons {
   margin-top: 8px;
@@ -1039,7 +1074,7 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   border: 0 !important;
   background: transparent !important;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1059,9 +1094,19 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   box-shadow: none !important;
 }
 
-.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="yes"],
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="yes"] {
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"] {
   border-color: var(--bm-insufficient-accent) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"] {
+  border-color: #7aa764 !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="close"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="close"] {
+  border-color: var(--bm-insufficient-border) !important;
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,

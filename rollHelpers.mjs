@@ -426,38 +426,21 @@ function toNonNegativeInt(value, fallback = 0) {
   return Math.max(0, Math.floor(numeric));
 }
 
-function buildDefaultAmmoState() {
-  return { type: "", stock: 0, magazine: 0, value: 0 };
-}
-
-function normalizeAmmoType(value) {
-  return String(value ?? "").trim();
-}
-
-function normalizeAmmoState(rawAmmo = null, options = {}) {
-  const fallbackBase = options.fallback ?? buildDefaultAmmoState();
-  const fallback = foundry.utils.mergeObject(buildDefaultAmmoState(), fallbackBase || {}, { inplace: false });
-  const source = foundry.utils.mergeObject(fallback, rawAmmo || {}, { inplace: false });
-  const type = normalizeAmmoType(source.type);
-
-  const fallbackStock = toNonNegativeInt(fallback.stock ?? fallback.value, 0);
-  const fallbackMagazine = toNonNegativeInt(fallback.magazine ?? fallback.value, 0);
-  const stock = toNonNegativeInt(source.stock ?? source.value, fallbackStock);
-  let magazine = toNonNegativeInt(source.magazine ?? source.value, fallbackMagazine);
-
-  const capacity = toNonNegativeInt(options.capacity, 0);
-  if (capacity > 0) magazine = Math.min(magazine, capacity);
-
-  return {
-    type,
-    stock,
-    magazine,
-    value: stock
-  };
-}
-
 function getWeaponMagazineCapacity(item) {
   return toNonNegativeInt(item?.system?.magazineCapacity, 0);
+}
+
+function normalizeWeaponLoadedAmmoValue(value, fallback = 0, capacity = 0) {
+  const normalizedCapacity = toNonNegativeInt(capacity, 0);
+  const numeric = toNonNegativeInt(value, fallback);
+  if (normalizedCapacity <= 0) return 0;
+  return Math.min(numeric, normalizedCapacity);
+}
+
+function getWeaponLoadedAmmo(item, options = {}) {
+  const capacity = getWeaponMagazineCapacity(item);
+  const fallback = toNonNegativeInt(options.fallback, 0);
+  return normalizeWeaponLoadedAmmoValue(item?.system?.loadedAmmo, fallback, capacity);
 }
 
 function generateRandomId() {
@@ -1291,14 +1274,14 @@ export async function doDamageRoll(actor, item) {
   const consumesAmmo = weaponType === "distance" && !infiniteAmmo;
   const magazineCapacity = getWeaponMagazineCapacity(item);
   const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
-  const ammoState = normalizeAmmoState(actor?.system?.ammo, {
-    fallback: buildDefaultAmmoState(),
-    capacity: magazineCapacity
-  });
+  const ammoStock = consumesAmmo ? toNonNegativeInt(actor?.system?.ammo?.stock, 0) : 0;
+  const currentMagazine = usesDirectStock
+    ? 0
+    : getWeaponLoadedAmmo(item, { fallback: 0 });
   if (consumesAmmo) {
     const currentAmmo = usesDirectStock
-      ? Number(ammoState.stock)
-      : Number(ammoState.magazine);
+      ? Number(ammoStock)
+      : Number(currentMagazine);
     if (!Number.isFinite(currentAmmo) || currentAmmo <= 0) {
       ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
       return null;
@@ -1328,8 +1311,7 @@ export async function doDamageRoll(actor, item) {
 
   if (consumesAmmo) {
     if (usesDirectStock) {
-      const currentStock = toNonNegativeInt(ammoState.stock, 0);
-      const nextStock = Math.max(0, currentStock - 1);
+      const nextStock = Math.max(0, ammoStock - 1);
       await updateActorWithFallback(
         actor,
         {
@@ -1339,9 +1321,19 @@ export async function doDamageRoll(actor, item) {
         { allowAmmoUpdate: true }
       );
     } else {
-      const currentMagazine = toNonNegativeInt(ammoState.magazine, 0);
       const nextMagazine = Math.max(0, currentMagazine - 1);
-      await updateActorWithFallback(actor, { "system.ammo.magazine": nextMagazine }, { allowAmmoUpdate: true });
+      try {
+        await item.update({ "system.loadedAmmo": nextMagazine });
+      } catch (error) {
+        console.warn("[bloodman] damage:weapon loaded ammo update failed", {
+          actorId: actor?.id,
+          itemId: item?.id,
+          nextMagazine,
+          error
+        });
+        safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
+        return null;
+      }
     }
   }
 

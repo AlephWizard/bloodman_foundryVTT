@@ -95,6 +95,16 @@
       </div>
       <label class="inline-label">{{localize "BLOODMAN.Items.MagazineCapacityLabel"}}</label>
       <input type="number" name="system.magazineCapacity" min="0" step="1" value="{{item.system.magazineCapacity}}" {{#unless canEditMagazineCapacity}}readonly{{/unless}} />
+      <label class="inline-label">{{localize "BLOODMAN.Items.LoadedAmmoLabel"}}</label>
+      <input
+        type="number"
+        name="system.loadedAmmo"
+        min="0"
+        step="1"
+        value="{{item.system.loadedAmmo}}"
+        {{#unless canEditMagazineCapacity}}readonly{{/unless}}
+        {{#unless weaponUsesMagazine}}disabled{{/unless}}
+      />
     </div>
   </div>
 </form>

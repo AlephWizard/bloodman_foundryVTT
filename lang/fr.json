@@ -118,6 +118,8 @@
       "UsableLabel": "UTILISABLE :",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
       "MagazineCapacityLabel": "CAPACITE MAGASIN :",
+      "AmmoTypeLabel": "TYPE DE MUNITION :",
+      "LoadedAmmoLabel": "BALLE(S) CHARGEE(S) :",
       "VoyageXPCostLabel": "COUT XP VOYAGE :",
       "AudioFileLabel": "FICHIER SON :",
       "AudioFilePlaceholder": "systems/bloodman/sounds/effet.ogg",
@@ -175,6 +177,19 @@
         "Eyebrow": "Verification MJ",
         "Prompt": "Voulez-vous vraiment glisser cet objet malgre que les fonds sont insuffisants ?",
         "Details": "Cout: {cost} | Actuel: {current}"
+      },
+      "DropDecision": {
+        "Title": "Transfert d'objet",
+        "Eyebrow": "Deplacement d'objet",
+        "Intro": "Vous vous appretez a glisser '{item}' sur la fiche de '{sheet}'.",
+        "Question": "Voulez-vous deplacer cet objet gratuitement ?",
+        "CostLabel": "Cout",
+        "SpecificitiesLabel": "Specificites",
+        "ActionBuy": "Achat",
+        "ActionFree": "Deplacer gratuitement",
+        "ActionClose": "Fermer",
+        "MoreItems": "+ {count} objet(s) supplementaire(s).",
+        "NoSpecificities": "Aucune specificite disponible."
       }
     },
     "Notifications": {
