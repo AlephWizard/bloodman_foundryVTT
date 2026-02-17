@@ -88,6 +88,7 @@ const CREATE_TYPE_EMOJI_BY_ICON = {
 };
 const CREATE_TYPE_REFRESH_DEBOUNCE_MS = 120;
 const CREATE_TYPE_REFRESH_MAX_ROOTS = 40;
+const ENABLE_CREATE_TYPE_ICON_OBSERVER = false;
 let CREATE_TYPE_REFRESH_TIMER_ID = null;
 let CREATE_TYPE_REFRESH_RUNNING = false;
 let CREATE_TYPE_REFRESH_PENDING = false;
@@ -285,7 +286,7 @@ function injectDocumentCreateTypeIcons(htmlLike) {
   try {
     const root = htmlLike?.[0] || htmlLike;
     if (root instanceof HTMLElement) {
-      const typeSelects = root.querySelectorAll("select");
+      const typeSelects = root.querySelectorAll("select[name='type']");
       for (const selectEl of typeSelects) decorateCreateTypeSelect(selectEl);
 
       const typeInputs = root.querySelectorAll("input[name='type']");
@@ -301,7 +302,7 @@ function injectDocumentCreateTypeIcons(htmlLike) {
     }
 
     const fallbackSelects = document.querySelectorAll(
-      ".window-app select, .application select, dialog select"
+      ".window-app select[name='type'], .application select[name='type'], dialog select[name='type']"
     );
     for (const selectEl of fallbackSelects) decorateCreateTypeSelect(selectEl);
   } catch (error) {
@@ -311,15 +312,15 @@ function injectDocumentCreateTypeIcons(htmlLike) {
 
 function refreshAllCreateTypeIcons() {
   const selectNodes = document.querySelectorAll(
-    ".window-app select, .application select, dialog select"
+    ".window-app select[name='type'], .application select[name='type'], dialog select[name='type']"
   );
   for (const selectEl of selectNodes) decorateCreateTypeSelect(selectEl);
 }
 
 function shouldRefreshCreateTypeIconsForNode(node) {
   if (!(node instanceof HTMLElement)) return false;
-  if (node.matches("select, input[name='type'], .window-app, .application, dialog")) return true;
-  return Boolean(node.querySelector("select, input[name='type']"));
+  if (node.matches("select[name='type'], input[name='type'], .window-app, .application, dialog")) return true;
+  return Boolean(node.querySelector("select[name='type'], input[name='type']"));
 }
 
 function scheduleCreateTypeIconsRefresh() {
@@ -353,10 +354,14 @@ function flushCreateTypeIconsRefreshQueue() {
   try {
     const roots = Array.from(CREATE_TYPE_REFRESH_ROOTS).filter(node => node?.isConnected);
     CREATE_TYPE_REFRESH_ROOTS.clear();
-    if (!roots.length || roots.length > CREATE_TYPE_REFRESH_MAX_ROOTS) {
-      refreshAllCreateTypeIcons();
-    } else {
-      for (const root of roots) injectDocumentCreateTypeIcons(root);
+    if (!roots.length) return;
+    const cappedRoots = roots.slice(0, CREATE_TYPE_REFRESH_MAX_ROOTS);
+    for (const root of cappedRoots) injectDocumentCreateTypeIcons(root);
+    if (roots.length > cappedRoots.length) {
+      for (const root of roots.slice(cappedRoots.length)) {
+        if (root?.isConnected) CREATE_TYPE_REFRESH_ROOTS.add(root);
+      }
+      CREATE_TYPE_REFRESH_PENDING = true;
     }
   } catch (error) {
     bmLog.warn("create type icon refresh queue failed", { error });
@@ -5928,7 +5933,7 @@ function injectCreateTypeIconsFromHook(htmlLike, sourceHook = "unknown") {
   try {
     const root = htmlLike?.[0] || htmlLike;
     if (!(root instanceof HTMLElement)) return;
-    if (!root.querySelector("select, input[name='type']")) return;
+    if (!root.querySelector("select[name='type'], input[name='type']")) return;
     injectDocumentCreateTypeIcons(root);
   } catch (error) {
     bmLog.warn(`[bloodman] ${sourceHook} type icon hook skipped`, error);
@@ -6068,7 +6073,17 @@ Hooks.once("init", () => {
 Hooks.once("ready", async () => {
   try {
     refreshAllCreateTypeIcons();
-    if (!window.__bmCreateTypeIconObserver) {
+    const existingObserver = window.__bmCreateTypeIconObserver;
+    if (existingObserver && typeof existingObserver.disconnect === "function") {
+      try {
+        existingObserver.disconnect();
+      } catch (_disconnectError) {
+        // ignore stale observer cleanup failure
+      }
+      window.__bmCreateTypeIconObserver = null;
+    }
+
+    if (ENABLE_CREATE_TYPE_ICON_OBSERVER && !window.__bmCreateTypeIconObserver) {
       const observer = new MutationObserver(mutations => {
         queueCreateTypeIconsRefreshFromMutations(mutations);
       });
