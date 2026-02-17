@@ -271,7 +271,10 @@
 
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
-          <input type="text" name="system.equipment.armes" value="{{equipment.armes}}" />
+          <div class="weapon-header-row">
+            <input type="text" name="system.equipment.armes" value="{{equipment.armes}}" />
+            <button type="button" class="weapon-simple-attack">{{localize "BLOODMAN.Common.SimpleAttack"}}</button>
+          </div>
           <ol class="item-list weapon-list item-list-three-columns">
             {{#each weapons}}
               <li class="item weapon-item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">

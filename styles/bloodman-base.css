@@ -409,26 +409,6 @@
   animation: bm-chaos-bounce 1.35s ease-in-out infinite;
 }
 
-.window-app .window-header .header-button.bloodman-minimize {
-  font-size: 0;
-  min-width: 20px;
-  justify-content: center;
-}
-
-.window-app .window-header .header-button.bloodman-minimize i {
-  font-size: 14px;
-  margin-right: 0;
-}
-
-.window-app.minimized .window-header .header-button.bloodman-minimize {
-  display: inline-flex !important;
-  align-items: center;
-}
-
-.window-app.minimized .window-header .header-button:not(.close):not(.bloodman-minimize) {
-  display: none;
-}
-
 @keyframes bm-chaos-bounce {
   0% {
     transform: scale(1) translateY(0);
@@ -475,6 +455,28 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   --bm-damage-muted: #5f556f;
   --bm-damage-border: #a49ab8;
   --bm-damage-border-strong: #1b1723;
+}
+
+.window-app.bloodman-damage-dialog-simple-attack,
+.window-app.dialog.bloodman-damage-dialog-simple-attack {
+  --bm-damage-bg: #121910;
+  --bm-damage-bg-soft: #1a2416;
+  --bm-damage-field: #182114;
+  --bm-damage-fg: #f1f8ee;
+  --bm-damage-muted: #bfd0b8;
+  --bm-damage-border: #4f6246;
+  --bm-damage-border-strong: #e2eedc;
+}
+
+body.theme-light .window-app.bloodman-damage-dialog-simple-attack,
+body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
+  --bm-damage-bg: #edf5e9;
+  --bm-damage-bg-soft: #e4efde;
+  --bm-damage-field: #ffffff;
+  --bm-damage-fg: #1e291a;
+  --bm-damage-muted: #53674b;
+  --bm-damage-border: #9fb198;
+  --bm-damage-border-strong: #1e291a;
 }
 
 .bm-damage-config .bm-damage-config-shell {
@@ -606,6 +608,13 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   background-size: 5px 5px, 5px 5px;
   background-repeat: no-repeat;
   padding-right: 30px;
+}
+
+.bm-damage-config.bm-damage-config--simple-attack select:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  border-style: dashed;
+  color: var(--bm-damage-muted);
 }
 
 .bm-damage-config input[type="number"] {

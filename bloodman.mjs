@@ -2606,6 +2606,7 @@ function logDamageRerollValidation(scope, details = {}) {
   }
 }
 const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
+const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const CHAOS_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-chaos-request</span>";
 const REROLL_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-reroll-request</span>";
 const INITIATIVE_GROUP_BUFFER_MS = 180;
@@ -3948,6 +3949,8 @@ function buildDamageConfigObserverState(data) {
   const sourceName = String(data?.sourceName || "").trim();
   const requesterName = String(game.users?.get(String(data?.requesterUserId || ""))?.name || "").trim();
   const config = data?.config && typeof data.config === "object" ? data.config : {};
+  const dialogVariant = String(data?.dialogVariant || config?.dialogVariant || "").trim().toLowerCase();
+  const isSimpleAttackVariant = dialogVariant === "simple-attack";
   const formula = String(config.formula || "1d4").trim() || "1d4";
   const damageLabel = String(config.degats || "").trim().toUpperCase() || formula.toUpperCase();
   const bonusBrut = Math.max(0, Math.floor(toFiniteNumber(config.bonusBrut, 0)));
@@ -3960,6 +3963,8 @@ function buildDamageConfigObserverState(data) {
   const keepHighestText = `2 jets, garder le plus haut: ${keepHighest ? yesLabel : noLabel}`;
   return {
     escapeHtml,
+    dialogVariant,
+    isSimpleAttackVariant,
     formula,
     damageLabel,
     bonusBrut,
@@ -3974,7 +3979,8 @@ function buildDamageConfigObserverState(data) {
 
 function getDamageConfigObserverContent(state) {
   const safe = state.escapeHtml;
-  return `<form class="bm-damage-config">
+  const formVariantClass = state?.isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
+  return `<form class="bm-damage-config${formVariantClass}">
     <div class="bm-damage-config-shell">
       <div class="bm-damage-config-head">
         <div class="bm-damage-config-icon-wrap" aria-hidden="true">
@@ -4013,6 +4019,8 @@ function getDamageConfigObserverContent(state) {
 function updateDamageConfigObserverDialog(dialog, state) {
   const root = dialog?.element;
   if (!root?.length) return false;
+  root.find("form.bm-damage-config").toggleClass("bm-damage-config--simple-attack", state?.isSimpleAttackVariant === true);
+  root.closest(".window-app").toggleClass("bloodman-damage-dialog-simple-attack", state?.isSimpleAttackVariant === true);
   root.find("[data-bm-popup-field='hint']").text(`${state.actorDisplay} - ${state.sourceDisplay}`);
   root.find("[data-bm-popup-field='damage']").val(`${state.damageLabel} (${state.formula})`);
   root.find("[data-bm-popup-field='bonus']").val(String(state.bonusBrut));
@@ -4636,7 +4644,9 @@ function showDamageConfigObserverPopup(data) {
       }
     },
     {
-      classes: ["bloodman-damage-dialog"],
+      classes: state?.isSimpleAttackVariant
+        ? ["bloodman-damage-dialog", "bloodman-damage-dialog-simple-attack"]
+        : ["bloodman-damage-dialog"],
       width: 500
     }
   );
@@ -4716,7 +4726,7 @@ function emitPowerUsePopup(actor, item, options = {}) {
   } catch (error) {
     console.error("[bloodman] power:popup socket emit failed", error);
   }
-  if (typeof ChatMessage?.create === "function") {
+  if (ENABLE_CHAT_TRANSPORT_FALLBACK && typeof ChatMessage?.create === "function") {
     void ChatMessage.create({
       content: POWER_USE_POPUP_CHAT_MARKUP,
       whisper: viewerIds,
@@ -6338,7 +6348,7 @@ async function requestChaosDelta(delta) {
     game.socket.emit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric, requestId });
   }
   const gmIds = getActiveGMUserIds();
-  if (!gmIds.length) return;
+  if (!ENABLE_CHAT_TRANSPORT_FALLBACK || !gmIds.length) return;
   await ChatMessage.create({
     content: CHAOS_REQUEST_CHAT_MARKUP,
     whisper: gmIds,
@@ -6715,6 +6725,31 @@ Hooks.on("createChatMessage", async (message) => {
   scheduleTransientChatMessageDeletion(message, 250);
 });
 
+function isTransportRelayChatMessage(message) {
+  const bloodmanFlags = foundry.utils.getProperty(message, "flags.bloodman") || {};
+  if (!bloodmanFlags || typeof bloodmanFlags !== "object") return false;
+  if (bloodmanFlags.damageConfigPopup) return true;
+  if (bloodmanFlags.powerUsePopup) return true;
+  if (bloodmanFlags.damageRequest) return true;
+  if (bloodmanFlags.chaosDeltaRequest) return true;
+  if (bloodmanFlags.rerollDamageRequest) return true;
+
+  const content = String(message?.content || "").toLowerCase();
+  if (!content) return false;
+  return content.includes("bloodman-damage-config-popup")
+    || content.includes("bloodman-power-use-popup")
+    || content.includes("bloodman-damage-request")
+    || content.includes("bloodman-chaos-request")
+    || content.includes("bloodman-reroll-request");
+}
+
+function hideTransientRelayChatMessage(htmlLike) {
+  const root = htmlLike?.[0] || htmlLike;
+  if (!(root instanceof HTMLElement)) return;
+  root.style.display = "none";
+  root.classList.add("bm-chat-relay-hidden");
+}
+
 Hooks.on("renderChatMessage", (message, html) => {
   handleChatMessageRenderHook(message, html, "renderChatMessage");
 });
@@ -6724,6 +6759,10 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 });
 
 function handleChatMessageRenderHook(message, htmlLike, sourceHook = "renderChatMessage") {
+  if (isTransportRelayChatMessage(message)) {
+    hideTransientRelayChatMessage(htmlLike);
+    return;
+  }
   try {
     decorateBloodmanChatRollMessage(message, htmlLike);
   } catch (error) {
@@ -7551,62 +7590,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
   }
 
-  _getHeaderButtons() {
-    const baseButtons = typeof super._getHeaderButtons === "function"
-      ? super._getHeaderButtons()
-      : [];
-    const buttons = baseButtons.filter(button => {
-      const cls = String(button?.class || "");
-      return !cls.includes("minimize") && !cls.includes("maximize");
-    });
-
-    buttons.unshift({
-      label: "",
-      class: "bloodman-minimize",
-      icon: this._minimized ? "far fa-window-maximize" : "far fa-window-minimize",
-      onclick: event => {
-        event?.preventDefault?.();
-        if (this._minimized && typeof this.maximize === "function") return this.maximize();
-        if (!this._minimized && typeof this.minimize === "function") return this.minimize();
-        return null;
-      }
-    });
-
-    return buttons;
-  }
-
-  _syncMinimizeHeaderButton() {
-    const root = this.element;
-    if (!root?.length) return;
-    const button = root.find(".window-header .header-button.bloodman-minimize");
-    if (!button.length) return;
-    const icon = button.find("i");
-    icon.removeClass("fa-window-minimize fa-window-maximize");
-    icon.addClass(this._minimized ? "fa-window-maximize" : "fa-window-minimize");
-    button.attr(
-      "title",
-      this._minimized
-        ? (game?.i18n?.localize?.("BLOODMAN.Common.Maximize") || "Agrandir")
-        : (game?.i18n?.localize?.("BLOODMAN.Common.Minimize") || "Reduire")
-    );
-  }
-
-  async minimize(...args) {
-    this.clearPowerUseState();
-    this._lastAutoResizeKey = "";
-    const result = await super.minimize(...args);
-    this._syncMinimizeHeaderButton();
-    return result;
-  }
-
-  async maximize(...args) {
-    this._lastAutoResizeKey = "";
-    const result = await super.maximize(...args);
-    this._syncMinimizeHeaderButton();
-    this.render(false);
-    return result;
-  }
-
   get isEditable() {
     if (super.isEditable) return true;
     if (this.actor?.type === "personnage") return true;
@@ -8365,7 +8348,6 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
-    this._syncMinimizeHeaderButton();
     const scheduleAutoResize = (force = false) => setTimeout(() => this.autoResizeToContent(force), 0);
     const scheduleAutoGrowRefresh = () => setTimeout(() => this.refreshAutoGrowTextareas(html), 0);
 
@@ -8482,6 +8464,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       this.rollDamage(item);
+    });
+
+    html.find(".weapon-simple-attack").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      await this.rollSimpleAttack();
     });
 
     html.find(".weapon-reload").click(async ev => {
@@ -9357,6 +9345,26 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.render(false);
   }
 
+  async rollSimpleAttack() {
+    if (!this.actor) return;
+    const sourceName = tl("BLOODMAN.Common.SimpleAttack", "Attaque simple");
+    const damageDialog = {
+      variant: "simple-attack",
+      rememberConfig: false
+    };
+    if (!game.user?.isGM) {
+      damageDialog.fixedFormula = "1d4";
+      damageDialog.lockFormula = true;
+    }
+    const result = await doDirectDamageRoll(this.actor, "1d4", sourceName, {
+      itemType: "arme",
+      itemName: sourceName,
+      damageDialog
+    });
+    if (!result) return;
+    this.render(false);
+  }
+
   async rollAbilityDamage(item) {
     if (!item) return;
     const isUsablePower = item.type === "pouvoir" && isPowerUsableEnabled(item.system?.usableEnabled);
@@ -9581,7 +9589,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       };
       if (game.socket) game.socket.emit(SYSTEM_SOCKET, rerollPayload);
       const gmIds = getActiveGMUserIds();
-      if (gmIds.length) {
+      if (ENABLE_CHAT_TRANSPORT_FALLBACK && gmIds.length) {
         await ChatMessage.create({
           content: REROLL_REQUEST_CHAT_MARKUP,
           whisper: gmIds,

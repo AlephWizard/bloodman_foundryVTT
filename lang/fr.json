@@ -12,6 +12,7 @@
       "LuckRoll": "Jet de chance",
       "Eat": "Manger",
       "Use": "Utiliser",
+      "SimpleAttack": "Attaque simple",
       "Reload": "Recharger",
       "Delete": "Supprimer",
       "Total": "Total",
@@ -156,6 +157,8 @@
       },
       "DamageConfig": {
         "Title": "Configuration du jet de dégâts",
+        "SimpleAttackEyebrow": "Attaque",
+        "SimpleAttackHint": "Configuration de l'attaque",
         "RawBonusLabel": "Dégâts bruts +",
         "PenetrationLabel": "Pénétration +"
       },

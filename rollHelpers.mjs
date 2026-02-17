@@ -4,6 +4,7 @@ const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
+const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
 const DAMAGE_DIALOG_CONFIG_USER_FLAG = "damageDialogConfig";
@@ -220,15 +221,13 @@ function isCurrentUserPrimaryPrivilegedOperator() {
 
 function getDamageChatRecipientIds() {
   const gmAssistantIds = [];
-  const playerIds = [];
   for (const user of game.users || []) {
     if (!user?.active) continue;
     const userId = String(user.id || "").trim();
     if (!userId) continue;
     if (user.isGM || isAssistantOrHigherRole(user.role)) gmAssistantIds.push(userId);
-    else playerIds.push(userId);
   }
-  return { gmAssistantIds, playerIds };
+  return { gmAssistantIds };
 }
 
 export async function postDamageTakenChatMessage({ name = "Cible", amount = 0, pa = 0, speakerAlias = "" } = {}) {
@@ -239,19 +238,7 @@ export async function postDamageTakenChatMessage({ name = "Cible", amount = 0, p
   if (safeAmount <= 0) return;
   const alias = String(speakerAlias || safeName).trim() || safeName;
   const speaker = { alias };
-  const { gmAssistantIds, playerIds } = getDamageChatRecipientIds();
-
-  if (safeAmount > 1 && playerIds.length) {
-    try {
-      await ChatMessage.create({
-        speaker,
-        whisper: playerIds,
-        content: t("BLOODMAN.Rolls.Damage.TakePublic", { name: safeName })
-      });
-    } catch (error) {
-      console.error("[bloodman] damage:chat public failed", error);
-    }
-  }
+  const { gmAssistantIds } = getDamageChatRecipientIds();
 
   if (!gmAssistantIds.length) return;
   try {
@@ -289,6 +276,7 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
   const eventId = generateRandomId();
   const action = String(options.action || "open").trim().toLowerCase() || "open";
   const useChatFallback = options.useChatFallback === true;
+  const dialogVariant = String(options.dialogVariant || "").trim().toLowerCase();
   const payload = {
     type: DAMAGE_CONFIG_POPUP_SOCKET_TYPE,
     eventId,
@@ -299,6 +287,7 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
     actorId: String(actor?.id || ""),
     actorName: String(actor?.name || "").trim(),
     sourceName: String(sourceName || "").trim(),
+    dialogVariant,
     config: {
       degats: String(config?.degats || "").trim().toUpperCase(),
       formula: normalizeDamageFormula(config?.formula),
@@ -313,7 +302,7 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
     console.error("[bloodman] damage:config popup socket emit failed", error);
   }
   const observerIds = viewerIds.filter(id => id && id !== requesterUserId);
-  if (useChatFallback && observerIds.length && typeof ChatMessage?.create === "function") {
+  if (ENABLE_CHAT_TRANSPORT_FALLBACK && useChatFallback && observerIds.length && typeof ChatMessage?.create === "function") {
     void ChatMessage.create({
       content: DAMAGE_CONFIG_POPUP_CHAT_MARKUP,
       whisper: observerIds,
@@ -602,10 +591,24 @@ async function promptDamageConfiguration({
   defaultFormula = "1d4",
   defaultBonus = 0,
   defaultPenetration = 0,
-  defaultRollKeepHighest = false
+  defaultRollKeepHighest = false,
+  dialogVariant = "",
+  fixedFormula = "",
+  lockFormula = false,
+  rememberConfig = true
 } = {}) {
+  const variant = String(dialogVariant || "").trim().toLowerCase();
+  const isSimpleAttackVariant = variant === "simple-attack";
+  const normalizedDefaultFormula = normalizeDamageFormula(defaultFormula) || "1d4";
+  const normalizedFixedFormula = normalizeDamageFormula(fixedFormula);
+  const lockFormulaSelection = Boolean(lockFormula);
+  const restrictedFormula = normalizedFixedFormula || normalizedDefaultFormula;
   const rememberedConfig = getRememberedDamageDialogConfig();
-  const selectedDefault = getDamageOptionByFormula(rememberedConfig?.formula) || getDefaultDamageOption(defaultFormula);
+  const selectedDefault = getDamageOptionByFormula(
+    lockFormulaSelection
+      ? restrictedFormula
+      : (rememberedConfig?.formula || normalizedDefaultFormula)
+  ) || getDefaultDamageOption(normalizedDefaultFormula);
   const initialBonus = rememberedConfig
     ? toNonNegativeInt(rememberedConfig.bonusBrut, toNonNegativeInt(defaultBonus, 0))
     : toNonNegativeInt(defaultBonus, 0);
@@ -618,6 +621,13 @@ async function promptDamageConfiguration({
   const titleSource = sourceName ? ` (${sourceName})` : "";
   const damageDieLabel = tl("BLOODMAN.Items.DamageDieLabel", "De de degat");
   const settingsLabel = tl("BLOODMAN.Dialogs.DamageConfig.SettingsLabel", "Reglages du jet");
+  const titleLabel = tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats");
+  const eyebrowLabel = isSimpleAttackVariant
+    ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackEyebrow", "Attaque")
+    : settingsLabel;
+  const hintLabel = isSimpleAttackVariant
+    ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackHint", "Configuration de l'attaque simple")
+    : titleLabel;
   const rollHighestLabel = tl("BLOODMAN.Dialogs.DamageConfig.RollHighestLabel", "2 jets, garder le plus haut");
   const rollHighestHint = tl(
     "BLOODMAN.Dialogs.DamageConfig.RollHighestHint",
@@ -627,11 +637,14 @@ async function promptDamageConfiguration({
   const rawBonusLabel = tl("BLOODMAN.Dialogs.DamageConfig.RawBonusLabel", "Degats bruts +").replace(/\s\+$/, "&nbsp;+");
   const penetrationLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationLabel", "Penetration +").replace(/\s\+$/, "&nbsp;+");
 
-  const options = DAMAGE_CONFIG_OPTIONS
+  const availableDamageOptions = lockFormulaSelection ? [selectedDefault] : DAMAGE_CONFIG_OPTIONS;
+  const options = availableDamageOptions
     .map(option => `<option value="${option.formula}" ${option.formula === selectedDefault.formula ? "selected" : ""}>${option.label}</option>`)
     .join("");
+  const selectDisabledAttr = lockFormulaSelection ? " disabled" : "";
+  const formVariantClass = isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
 
-  const content = `<form class="bm-damage-config">
+  const content = `<form class="bm-damage-config${formVariantClass}">
     <div class="bm-damage-config-shell">
       <div class="bm-damage-config-head">
         <div class="bm-damage-config-icon-wrap" aria-hidden="true">
@@ -640,14 +653,14 @@ async function promptDamageConfiguration({
           </div>
         </div>
         <div class="bm-damage-config-head-copy">
-          <p class="bm-damage-config-eyebrow">${settingsLabel}</p>
-          <p class="bm-damage-config-hint">${tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats")}</p>
+          <p class="bm-damage-config-eyebrow">${eyebrowLabel}</p>
+          <p class="bm-damage-config-hint">${hintLabel}</p>
         </div>
       </div>
       <div class="bm-damage-config-grid">
         <div class="bm-damage-config-row bm-damage-config-row-wide">
           <label>${damageDieLabel}</label>
-          <select name="degats">${options}</select>
+          <select name="degats"${selectDisabledAttr}>${options}</select>
         </div>
         <div class="bm-damage-config-row bm-damage-config-inline">
           <label>${rawBonusLabel}</label>
@@ -692,7 +705,8 @@ async function promptDamageConfiguration({
     emitDamageConfigPopup(actor, sourceName, payloadConfig, {
       requestId: popupRequestId,
       action,
-      useChatFallback
+      useChatFallback,
+      dialogVariant: variant
     });
   };
   const flushPopupUpdate = ({ useChatFallback = true } = {}) => {
@@ -735,12 +749,14 @@ async function promptDamageConfiguration({
 
     new Dialog(
       {
-        title: `${tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats")}${titleSource}`,
+        title: `${titleLabel}${titleSource}`,
         content,
         render: html => {
           const readCurrentConfig = () => {
-            const selectedFormula = normalizeDamageFormula(html.find("select[name='degats']").val());
-            const option = getDamageOptionByFormula(selectedFormula) || getDefaultDamageOption(selectedFormula);
+            const selectedFormula = lockFormulaSelection
+              ? selectedDefault.formula
+              : normalizeDamageFormula(html.find("select[name='degats']").val());
+            const option = getDamageOptionByFormula(selectedFormula) || selectedDefault;
             return {
               degats: option?.label || selectedFormula.toUpperCase(),
               formula: option?.formula || selectedFormula,
@@ -757,8 +773,10 @@ async function promptDamageConfiguration({
           roll: {
             label: tl("BLOODMAN.Common.Roll", "Lancer"),
             callback: html => {
-              const selectedFormula = normalizeDamageFormula(html.find("select[name='degats']").val());
-              const option = getDamageOptionByFormula(selectedFormula);
+              const selectedFormula = lockFormulaSelection
+                ? selectedDefault.formula
+                : normalizeDamageFormula(html.find("select[name='degats']").val());
+              const option = getDamageOptionByFormula(selectedFormula) || (lockFormulaSelection ? selectedDefault : null);
               if (!option) {
                 safeWarn(tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide."));
                 return false;
@@ -786,7 +804,7 @@ async function promptDamageConfiguration({
                 rollKeepHighest,
                 attaquant_id: actor?.id || ""
               };
-              void rememberDamageDialogConfig(config);
+              if (rememberConfig) void rememberDamageDialogConfig(config);
               flushPopupUpdate({ useChatFallback: true });
               emitPopupState(config, "update", { useChatFallback: true });
               finish(config);
@@ -801,7 +819,9 @@ async function promptDamageConfiguration({
         }
       },
       {
-        classes: ["bloodman-damage-dialog"],
+        classes: isSimpleAttackVariant
+          ? ["bloodman-damage-dialog", "bloodman-damage-dialog-simple-attack"]
+          : ["bloodman-damage-dialog"],
         width: 500
       }
     ).render(true);
@@ -994,7 +1014,7 @@ async function requestDamageFromGM(token, damage, options = {}) {
   }
 
   const privilegedIds = getActivePrivilegedOperatorIds();
-  if (privilegedIds.length) {
+  if (ENABLE_CHAT_TRANSPORT_FALLBACK && privilegedIds.length) {
     try {
       await ChatMessage.create({
         content: DAMAGE_REQUEST_CHAT_MARKUP,
@@ -1399,12 +1419,19 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
   if (!actor) return null;
   const defaultFormula = normalizeDamageFormula(formula) || "1d4";
   const defaultBonus = getRawDamageBonus(actor);
+  const damageDialogOptions = options?.damageDialog && typeof options.damageDialog === "object"
+    ? options.damageDialog
+    : {};
   const config = await promptDamageConfiguration({
     actor,
     sourceName,
     defaultFormula,
     defaultBonus,
-    defaultPenetration: 0
+    defaultPenetration: 0,
+    dialogVariant: String(damageDialogOptions.variant || "").trim().toLowerCase(),
+    fixedFormula: String(damageDialogOptions.fixedFormula || "").trim(),
+    lockFormula: damageDialogOptions.lockFormula === true,
+    rememberConfig: damageDialogOptions.rememberConfig !== false
   });
   if (!config) return null;
 
