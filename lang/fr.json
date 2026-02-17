@@ -169,6 +169,12 @@
         "Title": "Attribution XP voyage",
         "Prompt": "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.",
         "ValueLabel": "XP voyage"
+      },
+      "InsufficientFundsTransfer": {
+        "Title": "Fonds insuffisants",
+        "Eyebrow": "Verification MJ",
+        "Prompt": "Voulez-vous vraiment glisser cet objet malgre que les fonds sont insuffisants ?",
+        "Details": "Cout: {cost} | Actuel: {current}"
       }
     },
     "Notifications": {

@@ -917,6 +917,167 @@ body.theme-light .window-app.dialog.bloodman-growth-dialog {
   }
 }
 
+.window-app.bloodman-insufficient-funds-dialog,
+.window-app.dialog.bloodman-insufficient-funds-dialog {
+  --bm-insufficient-bg: #1d1212;
+  --bm-insufficient-bg-soft: #2a1919;
+  --bm-insufficient-field: #261616;
+  --bm-insufficient-fg: #f7efef;
+  --bm-insufficient-muted: #d5bebe;
+  --bm-insufficient-border: #694545;
+  --bm-insufficient-border-strong: #f0d4d4;
+  --bm-insufficient-accent: #ba3d3d;
+}
+
+body.theme-light .window-app.bloodman-insufficient-funds-dialog,
+body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
+  --bm-insufficient-bg: #f7ecec;
+  --bm-insufficient-bg-soft: #f1e1e1;
+  --bm-insufficient-field: #ffffff;
+  --bm-insufficient-fg: #2f2020;
+  --bm-insufficient-muted: #705555;
+  --bm-insufficient-border: #ba9a9a;
+  --bm-insufficient-border-strong: #2f2020;
+  --bm-insufficient-accent: #8a2828;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .window-header,
+.window-app.dialog.bloodman-insufficient-funds-dialog .window-header {
+  background: linear-gradient(180deg, var(--bm-insufficient-bg-soft), var(--bm-insufficient-bg));
+  border-bottom: 1px solid var(--bm-insufficient-border);
+}
+
+.window-app.bloodman-insufficient-funds-dialog .window-content,
+.window-app.dialog.bloodman-insufficient-funds-dialog .window-content {
+  background: var(--bm-insufficient-bg) !important;
+  color: var(--bm-insufficient-fg);
+  padding: 10px;
+}
+
+.bm-drop-insufficient-funds {
+  margin: 0;
+  font-family: "Oswald", sans-serif;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-shell {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--bm-insufficient-border);
+  border-radius: 12px;
+  background: linear-gradient(166deg, var(--bm-insufficient-bg-soft), var(--bm-insufficient-bg));
+  color: var(--bm-insufficient-fg);
+  padding: 10px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-head {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--bm-insufficient-border);
+  background: var(--bm-insufficient-field);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-ring i {
+  color: var(--bm-insufficient-accent);
+  font-size: 16px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-head-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  color: var(--bm-insufficient-muted);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-prompt {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--bm-insufficient-fg);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-details {
+  margin: 0;
+  border: 1px solid var(--bm-insufficient-border);
+  border-radius: 8px;
+  background: var(--bm-insufficient-field);
+  color: var(--bm-insufficient-muted);
+  font-size: 12px;
+  line-height: 1.25;
+  padding: 7px 9px;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons {
+  margin-top: 8px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button {
+  min-height: 38px;
+  border: 1px solid var(--bm-insufficient-border-strong) !important;
+  border-radius: 8px;
+  background: var(--bm-insufficient-field) !important;
+  color: var(--bm-insufficient-fg) !important;
+  font-family: "Oswald", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.35px;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="yes"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="yes"] {
+  border-color: var(--bm-insufficient-accent) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:focus,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:focus {
+  filter: brightness(1.08);
+  box-shadow: none;
+}
+
+@media (max-width: 520px) {
+  .window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
+  .window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
 .bm-doc-type-label-with-icon {
   display: inline-flex;
   align-items: center;

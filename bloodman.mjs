@@ -8368,6 +8368,82 @@ class BloodmanActorSheet extends BaseActorSheet {
     };
   }
 
+  async confirmInsufficientFundsDrop(totalCost, currentCurrency) {
+    if (!game.user?.isGM) return false;
+    if (typeof Dialog !== "function") return false;
+    const escapeHtml = value => (
+      foundry.utils?.escapeHTML
+        ? foundry.utils.escapeHTML(String(value ?? ""))
+        : String(value ?? "")
+    );
+    const title = tl(
+      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Title",
+      "Fonds insuffisants"
+    );
+    const prompt = tl(
+      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Prompt",
+      "Voulez-vous vraiment glisser cet objet malgre que les fonds sont insuffisants ?"
+    );
+    const details = tl(
+      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Details",
+      "Cout: {cost} | Actuel: {current}",
+      {
+        cost: formatCurrencyValue(totalCost),
+        current: formatCurrencyValue(currentCurrency)
+      }
+    );
+    const eyebrow = tl(
+      "BLOODMAN.Dialogs.InsufficientFundsTransfer.Eyebrow",
+      "Verification MJ"
+    );
+    const content = `<form class="bm-drop-insufficient-funds">
+      <div class="bm-drop-insufficient-shell">
+        <div class="bm-drop-insufficient-head">
+          <div class="bm-drop-insufficient-icon-wrap" aria-hidden="true">
+            <div class="bm-drop-insufficient-icon-ring"><i class="fa-solid fa-triangle-exclamation"></i></div>
+          </div>
+          <div class="bm-drop-insufficient-head-copy">
+            <p class="bm-drop-insufficient-eyebrow">${escapeHtml(eyebrow)}</p>
+            <p class="bm-drop-insufficient-prompt">${escapeHtml(prompt)}</p>
+          </div>
+        </div>
+        <p class="bm-drop-insufficient-details">${escapeHtml(details)}</p>
+      </div>
+    </form>`;
+
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        resolve(Boolean(value));
+      };
+
+      new Dialog(
+        {
+          title,
+          content,
+          buttons: {
+            yes: {
+              label: t("BLOODMAN.Common.Yes"),
+              callback: () => finish(true)
+            },
+            no: {
+              label: t("BLOODMAN.Common.No"),
+              callback: () => finish(false)
+            }
+          },
+          default: "no",
+          close: () => finish(false)
+        },
+        {
+          classes: ["bloodman-insufficient-funds-dialog"],
+          width: 460
+        }
+      ).render(true);
+    });
+  }
+
   async _onDropItem(event, data) {
     const permissionState = await this.resolveDropPermissionState(data);
     if (!permissionState.allowed) {
@@ -8392,15 +8468,23 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (purchase.totalCost > 0) {
       previousCurrency = this.getActorCurrencyCurrentValue();
       if (previousCurrency + 0.000001 < purchase.totalCost) {
-        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughCurrency", {
-          cost: formatCurrencyValue(purchase.totalCost),
-          current: formatCurrencyValue(previousCurrency)
-        }));
-        return null;
+        if (!game.user?.isGM) {
+          ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughCurrency", {
+            cost: formatCurrencyValue(purchase.totalCost),
+            current: formatCurrencyValue(previousCurrency)
+          }));
+          return null;
+        }
+        const confirmedFreeTransfer = await this.confirmInsufficientFundsDrop(
+          purchase.totalCost,
+          previousCurrency
+        );
+        if (!confirmedFreeTransfer) return null;
+      } else {
+        const nextCurrency = roundCurrencyValue(previousCurrency - purchase.totalCost);
+        await this.applyActorUpdate({ "system.equipment.monnaiesActuel": nextCurrency });
+        deductedBeforeDrop = true;
       }
-      const nextCurrency = roundCurrencyValue(previousCurrency - purchase.totalCost);
-      await this.applyActorUpdate({ "system.equipment.monnaiesActuel": nextCurrency });
-      deductedBeforeDrop = true;
     }
 
     try {
