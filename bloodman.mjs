@@ -86,6 +86,12 @@ const CREATE_TYPE_EMOJI_BY_ICON = {
   "fa-hand-fist": "\u{270A}",
   "fa-bolt": "\u{26A1}"
 };
+const CREATE_TYPE_REFRESH_DEBOUNCE_MS = 120;
+const CREATE_TYPE_REFRESH_MAX_ROOTS = 40;
+let CREATE_TYPE_REFRESH_TIMER_ID = null;
+let CREATE_TYPE_REFRESH_RUNNING = false;
+let CREATE_TYPE_REFRESH_PENDING = false;
+const CREATE_TYPE_REFRESH_ROOTS = new Set();
 
 function normalizeCreateTypeLabel(value) {
   return String(value || "")
@@ -258,7 +264,8 @@ function decorateCreateTypeSelect(selectEl) {
       if (!option.dataset.bmTypeLabel) option.dataset.bmTypeLabel = baseLabel;
       const iconClass = getCreateTypeIconByTypeKey(option.value) || getCreateTypeIconByLabelText(baseLabel);
       const emoji = getCreateTypeEmoji(iconClass);
-      option.textContent = emoji ? `${emoji} ${baseLabel}` : baseLabel;
+      const nextLabel = emoji ? `${emoji} ${baseLabel}` : baseLabel;
+      if (String(option.textContent || "") !== nextLabel) option.textContent = nextLabel;
     }
   } catch (error) {
     try {
@@ -307,6 +314,59 @@ function refreshAllCreateTypeIcons() {
     ".window-app select, .application select, dialog select"
   );
   for (const selectEl of selectNodes) decorateCreateTypeSelect(selectEl);
+}
+
+function shouldRefreshCreateTypeIconsForNode(node) {
+  if (!(node instanceof HTMLElement)) return false;
+  if (node.matches("select, input[name='type'], .window-app, .application, dialog")) return true;
+  return Boolean(node.querySelector("select, input[name='type']"));
+}
+
+function scheduleCreateTypeIconsRefresh() {
+  if (CREATE_TYPE_REFRESH_TIMER_ID) return;
+  CREATE_TYPE_REFRESH_TIMER_ID = setTimeout(() => {
+    CREATE_TYPE_REFRESH_TIMER_ID = null;
+    flushCreateTypeIconsRefreshQueue();
+  }, CREATE_TYPE_REFRESH_DEBOUNCE_MS);
+}
+
+function queueCreateTypeIconsRefreshFromMutations(mutations = []) {
+  let hasRelevantMutation = false;
+  for (const mutation of mutations || []) {
+    if (!mutation?.addedNodes?.length) continue;
+    for (const node of mutation.addedNodes) {
+      if (!shouldRefreshCreateTypeIconsForNode(node)) continue;
+      CREATE_TYPE_REFRESH_ROOTS.add(node);
+      hasRelevantMutation = true;
+    }
+  }
+  if (!hasRelevantMutation) return;
+  scheduleCreateTypeIconsRefresh();
+}
+
+function flushCreateTypeIconsRefreshQueue() {
+  if (CREATE_TYPE_REFRESH_RUNNING) {
+    CREATE_TYPE_REFRESH_PENDING = true;
+    return;
+  }
+  CREATE_TYPE_REFRESH_RUNNING = true;
+  try {
+    const roots = Array.from(CREATE_TYPE_REFRESH_ROOTS).filter(node => node?.isConnected);
+    CREATE_TYPE_REFRESH_ROOTS.clear();
+    if (!roots.length || roots.length > CREATE_TYPE_REFRESH_MAX_ROOTS) {
+      refreshAllCreateTypeIcons();
+    } else {
+      for (const root of roots) injectDocumentCreateTypeIcons(root);
+    }
+  } catch (error) {
+    bmLog.warn("create type icon refresh queue failed", { error });
+  } finally {
+    CREATE_TYPE_REFRESH_RUNNING = false;
+    if (CREATE_TYPE_REFRESH_PENDING || CREATE_TYPE_REFRESH_ROOTS.size > 0) {
+      CREATE_TYPE_REFRESH_PENDING = false;
+      scheduleCreateTypeIconsRefresh();
+    }
+  }
 }
 
 function canUserRoleEditCharacteristics(role) {
@@ -6009,12 +6069,8 @@ Hooks.once("ready", async () => {
   try {
     refreshAllCreateTypeIcons();
     if (!window.__bmCreateTypeIconObserver) {
-      const observer = new MutationObserver(() => {
-        try {
-          refreshAllCreateTypeIcons();
-        } catch (_error) {
-          // non-fatal UI decoration
-        }
+      const observer = new MutationObserver(mutations => {
+        queueCreateTypeIconsRefreshFromMutations(mutations);
       });
       observer.observe(document.body, { childList: true, subtree: true });
       window.__bmCreateTypeIconObserver = observer;
