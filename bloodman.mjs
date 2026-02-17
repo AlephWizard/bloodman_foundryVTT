@@ -15,6 +15,27 @@ function tl(key, fallback, data = null) {
   return localized && localized !== key ? localized : fallback;
 }
 
+const CHAT_ROLL_TYPES = Object.freeze({
+  GENERIC: "generic",
+  CHARACTERISTIC: "characteristic",
+  DAMAGE: "damage",
+  EXPERIENCE: "experience",
+  HEAL: "heal",
+  LUCK: "luck"
+});
+const CHAT_ROLL_TYPE_SET = new Set(Object.values(CHAT_ROLL_TYPES));
+
+function normalizeChatRollType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return CHAT_ROLL_TYPE_SET.has(normalized) ? normalized : CHAT_ROLL_TYPES.GENERIC;
+}
+
+function buildChatRollFlags(chatRollType, extraBloodman = null) {
+  const bloodmanFlags = { chatRollType: normalizeChatRollType(chatRollType) };
+  if (extraBloodman && typeof extraBloodman === "object") Object.assign(bloodmanFlags, extraBloodman);
+  return { bloodman: bloodmanFlags };
+}
+
 function safeWarn(message) {
   try {
     ui.notifications?.warn(message);
@@ -4086,13 +4107,36 @@ function resolveChatPseudoName(actor, message) {
   return t("BLOODMAN.Common.Name");
 }
 
+function resolveChatRollType(message) {
+  const flaggedType = normalizeChatRollType(foundry.utils.getProperty(message, "flags.bloodman.chatRollType"));
+  if (flaggedType !== CHAT_ROLL_TYPES.GENERIC) return flaggedType;
+  if (foundry.utils.getProperty(message, "flags.bloodman.luckRoll")) return CHAT_ROLL_TYPES.LUCK;
+  return CHAT_ROLL_TYPES.GENERIC;
+}
+
+function resolveChatRollTypeLabel(chatRollType) {
+  const type = normalizeChatRollType(chatRollType);
+  if (type === CHAT_ROLL_TYPES.CHARACTERISTIC) return tl("BLOODMAN.Chat.RollTypes.Characteristic", "Caracteristique");
+  if (type === CHAT_ROLL_TYPES.DAMAGE) return tl("BLOODMAN.Chat.RollTypes.Damage", "Degats");
+  if (type === CHAT_ROLL_TYPES.EXPERIENCE) return tl("BLOODMAN.Chat.RollTypes.Experience", "Experience");
+  if (type === CHAT_ROLL_TYPES.HEAL) return tl("BLOODMAN.Chat.RollTypes.Heal", "Soin");
+  if (type === CHAT_ROLL_TYPES.LUCK) return tl("BLOODMAN.Chat.RollTypes.Luck", "Chance");
+  return tl("BLOODMAN.Chat.RollTypes.Generic", "Jet");
+}
+
+function toChatRollTypeClassSuffix(chatRollType) {
+  const type = normalizeChatRollType(chatRollType);
+  return /^[a-z0-9-]+$/.test(type) ? type : CHAT_ROLL_TYPES.GENERIC;
+}
+
 function shouldDecorateChatRollMessage(message, actor) {
   if (!message) return false;
   const hasRoll = Array.isArray(message?.rolls) && message.rolls.length > 0;
   const hasLuckFlag = Boolean(foundry.utils.getProperty(message, "flags.bloodman.luckRoll"));
-  if (!hasRoll && !hasLuckFlag) return false;
+  const hasChatRollTypeFlag = Boolean(String(foundry.utils.getProperty(message, "flags.bloodman.chatRollType") || "").trim());
+  if (!hasRoll && !hasLuckFlag && !hasChatRollTypeFlag) return false;
   const actorType = String(actor?.type || "");
-  return actorType === "personnage" || actorType === "personnage-non-joueur" || hasLuckFlag;
+  return actorType === "personnage" || actorType === "personnage-non-joueur" || hasLuckFlag || hasChatRollTypeFlag;
 }
 
 function decorateBloodmanChatRollMessage(message, html) {
@@ -4110,21 +4154,29 @@ function decorateBloodmanChatRollMessage(message, html) {
   const tokenImage = resolveChatTokenImage(actor, tokenDoc);
   const pseudo = resolveChatPseudoName(actor, message);
   const accent = resolveChatAccentColor(message);
+  const chatRollType = resolveChatRollType(message);
+  const chatRollTypeClass = toChatRollTypeClassSuffix(chatRollType);
+  const chatRollTypeLabel = resolveChatRollTypeLabel(chatRollType);
 
   const escapedPseudo = escapeChatMarkup(pseudo);
   const escapedImage = escapeChatMarkup(tokenImage);
   const escapedAccent = escapeChatMarkup(accent);
+  const escapedTypeLabel = escapeChatMarkup(chatRollTypeLabel);
   const originalContent = contentEl.innerHTML;
 
-  contentEl.innerHTML = `<div class="bm-chat-roll-frame" style="--bm-chat-roll-accent:${escapedAccent};">
+  contentEl.innerHTML = `<div class="bm-chat-roll-frame" style="--bm-chat-roll-author-accent:${escapedAccent};">
     <div class="bm-chat-roll-head">
       <span class="bm-chat-roll-accent-band" aria-hidden="true"></span>
       <div class="bm-chat-roll-token"><img src="${escapedImage}" alt="${escapedPseudo}" /></div>
-      <div class="bm-chat-roll-pseudo">${escapedPseudo}</div>
+      <div class="bm-chat-roll-pseudo-wrap">
+        <div class="bm-chat-roll-pseudo">${escapedPseudo}</div>
+        <div class="bm-chat-roll-type">${escapedTypeLabel}</div>
+      </div>
     </div>
     <div class="bm-chat-roll-inner bm-chat-roll-native">${originalContent}</div>
   </div>`;
-  root.classList.add("bm-chat-roll");
+  root.classList.add("bm-chat-roll", `bm-chat-roll--${chatRollTypeClass}`);
+  root.dataset.bmChatRollType = chatRollTypeClass;
 }
 
 async function flushInitiativeGroupBuffer(key) {
@@ -8422,15 +8474,13 @@ class BloodmanActorSheet extends BaseActorSheet {
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content,
-      flags: {
-        bloodman: {
-          luckRoll: {
-            chance: chanceValue,
-            roll: luckValue,
-            outcome
-          }
+      flags: buildChatRollFlags(CHAT_ROLL_TYPES.LUCK, {
+        luckRoll: {
+          chance: chanceValue,
+          roll: luckValue,
+          outcome
         }
-      },
+      }),
       ...(usedDice3d || !diceSound ? {} : { sound: diceSound })
     });
   }
@@ -8628,7 +8678,8 @@ class BloodmanActorSheet extends BaseActorSheet {
         });
         roll.toMessage({
           speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-          flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total })
+          flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total }),
+          flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
         });
         await playItemAudio(healAudioRef);
         await this.deleteActorItem(item);
@@ -8747,7 +8798,8 @@ class BloodmanActorSheet extends BaseActorSheet {
         name: this.actor.name,
         amount: totalDamage,
         source: context.itemName ? ` (${context.itemName})` : ""
-      })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration}${modeTag ? ` | ${modeTag}` : ""} | ${t("BLOODMAN.Common.Reroll")}</small>`
+      })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration}${modeTag ? ` | ${modeTag}` : ""} | ${t("BLOODMAN.Common.Reroll")}</small>`,
+      flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE)
     });
 
     if (!game.user.isGM && hasActiveGM) {
@@ -9035,7 +9087,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total })
+        flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total }),
+        flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
       });
       return true;
     }
@@ -9081,7 +9134,8 @@ class BloodmanActorSheet extends BaseActorSheet {
         roll: roll.total,
         effective,
         result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
-      })
+      }),
+      flags: buildChatRollFlags(CHAT_ROLL_TYPES.EXPERIENCE)
     });
     this.render(false);
   }

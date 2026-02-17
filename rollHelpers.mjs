@@ -22,6 +22,12 @@ const DAMAGE_CONFIG_OPTIONS = [
   { label: "2D10", formula: "2d10" },
   { label: "2D12", formula: "2d12" }
 ];
+const CHAT_ROLL_TYPES = Object.freeze({
+  CHARACTERISTIC: "characteristic",
+  DAMAGE: "damage",
+  HEAL: "heal",
+  EXPERIENCE: "experience"
+});
 
 function t(key, data = null) {
   if (!globalThis.game?.i18n) return key;
@@ -34,6 +40,11 @@ function tl(key, fallback, data = null) {
   // Foundry returns the key itself if the localization entry is missing.
   if (!localized || localized === key) return fallback || key;
   return localized;
+}
+
+function buildChatRollFlags(chatRollType) {
+  const type = String(chatRollType || "").trim().toLowerCase() || "generic";
+  return { bloodman: { chatRollType: type } };
 }
 
 function safeWarn(message) {
@@ -982,7 +993,8 @@ export async function doCharacteristicRoll(actor, key) {
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
   r.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`
+    flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
+    flags: buildChatRollFlags(CHAT_ROLL_TYPES.CHARACTERISTIC)
   });
   return { roll: r, success, effective, critical: isCritSuccess ? "success" : isCritFailure ? "failure" : "" };
 }
@@ -1335,7 +1347,8 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, damageOutcome.modeTag)
+    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, damageOutcome.modeTag),
+    flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE)
   });
 
   const applyResult = await applyDamageToTargets(
@@ -1382,7 +1395,8 @@ export async function doHealRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: actor.name, amount: roll.total })
+    flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: actor.name, amount: roll.total }),
+    flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
   });
 
   await deleteItemWithFallback(item, actor);
@@ -1424,7 +1438,8 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, damageOutcome.modeTag)
+    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, damageOutcome.modeTag),
+    flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE)
   });
 
   const applyResult = await applyDamageToTargets(
@@ -1480,7 +1495,8 @@ export async function doGrowthRoll(actor, key) {
       roll: roll.total,
       effective,
       result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
-    })
+    }),
+    flags: buildChatRollFlags(CHAT_ROLL_TYPES.EXPERIENCE)
   });
 
   return { roll, success, effective, grew: success };

@@ -851,11 +851,32 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   }
 }
 
+#chat-log,
+#chat-controls,
+#chat-form,
+#chat-form textarea {
+  background: #9da399 !important;
+}
+
+#chat-form textarea {
+  color: #121614 !important;
+  border: 1px solid rgba(18, 22, 20, 0.35) !important;
+}
+
+#chat-form textarea::placeholder {
+  color: rgba(18, 22, 20, 0.72) !important;
+}
+
 .chat-message.bm-chat-roll {
-  border: 1px solid #171a21;
+  --bm-chat-roll-accent: #4966da;
+  --bm-chat-roll-surface-top: #17191d;
+  --bm-chat-roll-surface-bottom: #08090b;
+  --bm-chat-roll-token-border: #5e6ca8;
+  --bm-chat-roll-token-bg: #385493;
+  border: 1px solid #1e2226;
   border-radius: 0;
   overflow: hidden;
-  background: #0b0c0d;
+  background: #0e1113;
 }
 
 .chat-message.bm-chat-roll .message-header {
@@ -881,14 +902,14 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
 }
 
 .chat-message.bm-chat-roll .bm-chat-roll-frame {
-  --bm-chat-roll-accent: #4966da;
+  --bm-chat-roll-accent: var(--bm-chat-roll-type-accent, var(--bm-chat-roll-author-accent, #4966da));
   padding: 6px 7px 7px;
   color: #ffffff;
   font-family: var(--font-primary, "Signika", sans-serif);
   border-left: 2px solid rgba(255, 255, 255, 0.08);
   background:
     radial-gradient(120% 160% at 0% 0%, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 52%),
-    linear-gradient(165deg, #17191d 0%, #08090b 74%);
+    linear-gradient(165deg, var(--bm-chat-roll-surface-top) 0%, var(--bm-chat-roll-surface-bottom) 74%);
 }
 
 .chat-message.bm-chat-roll .bm-chat-roll-head {
@@ -908,8 +929,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   width: 36px;
   height: 36px;
   border-radius: 0;
-  border: 1px solid #8f1b23;
-  background: #ca3338;
+  border: 1px solid var(--bm-chat-roll-token-border);
+  background: var(--bm-chat-roll-token-bg);
   overflow: hidden;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
 }
@@ -919,6 +940,12 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+.chat-message.bm-chat-roll .bm-chat-roll-pseudo-wrap {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
 }
 
 .chat-message.bm-chat-roll .bm-chat-roll-pseudo {
@@ -935,6 +962,24 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   text-overflow: ellipsis;
 }
 
+.chat-message.bm-chat-roll .bm-chat-roll-type {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: var(--bm-chat-roll-accent);
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-message.bm-chat-roll .bm-chat-roll-inner {
   margin-top: 6px;
   color: #ffffff;
@@ -944,6 +989,46 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
 .chat-message.bm-chat-roll .bm-chat-roll-native * {
   color: #ffffff !important;
   font-family: var(--font-primary, "Signika", sans-serif);
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--characteristic {
+  --bm-chat-roll-type-accent: #1d4e89;
+  --bm-chat-roll-surface-top: #182338;
+  --bm-chat-roll-surface-bottom: #0a111d;
+  --bm-chat-roll-token-border: #3f74b5;
+  --bm-chat-roll-token-bg: #2e5f9d;
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--damage {
+  --bm-chat-roll-type-accent: #620000;
+  --bm-chat-roll-surface-top: #351416;
+  --bm-chat-roll-surface-bottom: #180809;
+  --bm-chat-roll-token-border: #8a2626;
+  --bm-chat-roll-token-bg: #6a1518;
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--experience {
+  --bm-chat-roll-type-accent: #35693f;
+  --bm-chat-roll-surface-top: #1c2a20;
+  --bm-chat-roll-surface-bottom: #0d1610;
+  --bm-chat-roll-token-border: #4f8a5b;
+  --bm-chat-roll-token-bg: #2f6f3d;
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--heal {
+  --bm-chat-roll-type-accent: #1a6a61;
+  --bm-chat-roll-surface-top: #1a2a28;
+  --bm-chat-roll-surface-bottom: #0b1414;
+  --bm-chat-roll-token-border: #3e8a80;
+  --bm-chat-roll-token-bg: #1f756b;
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--luck {
+  --bm-chat-roll-type-accent: #7d5a00;
+  --bm-chat-roll-surface-top: #2f2614;
+  --bm-chat-roll-surface-bottom: #171208;
+  --bm-chat-roll-token-border: #a9872e;
+  --bm-chat-roll-token-bg: #7e5d1e;
 }
 
 /* ---------------------------------------- */
@@ -1217,7 +1302,11 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
     gap: 5px;
   }
 
-  .chat-message.bm-chat-roll .bm-chat-roll-accent-band,
+  .chat-message.bm-chat-roll .bm-chat-roll-accent-band {
+    width: 6px;
+    height: 30px;
+  }
+
   .chat-message.bm-chat-roll .bm-chat-roll-token {
     width: 30px;
     height: 30px;
