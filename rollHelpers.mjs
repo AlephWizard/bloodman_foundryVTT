@@ -106,6 +106,12 @@ function normalizeCharacteristicKey(value) {
   return BONUS_KEYS.has(key) ? key : "";
 }
 
+function getCharacteristicDisplayLabel(key) {
+  const normalized = normalizeCharacteristicKey(key);
+  if (!normalized) return String(key || "").trim().toUpperCase() || "CARACTERISTIQUE";
+  return tl(`BLOODMAN.Characteristics.Keys.${normalized}`, normalized);
+}
+
 function normalizeArchetypeBonusValue(value, fallback = 0) {
   if (value == null || value === "") return Math.trunc(Number(fallback) || 0);
   const numeric = Number(value);
@@ -966,6 +972,7 @@ function buildDamageContext(actor, config, {
 
 export async function doCharacteristicRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
+  const characteristicLabel = getCharacteristicDisplayLabel(key);
 
   const r = await new Roll("1d100").evaluate();
   const rollTotal = Number(r.total) || 0;
@@ -975,7 +982,7 @@ export async function doCharacteristicRoll(actor, key) {
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
   r.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${outcome}</b><br>${rollTotal}`
+    flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`
   });
   return { roll: r, success, effective, critical: isCritSuccess ? "success" : isCritFailure ? "failure" : "" };
 }

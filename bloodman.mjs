@@ -7389,7 +7389,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   render(force, options = {}) {
-    if (Boolean(force) && !options?.bloodmanKeepRerollState) {
+    if (options?.bloodmanResetRerollState === true) {
       this.clearRerollDisplayState();
     }
     return super.render(force, options);
@@ -8980,7 +8980,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (this.actor.type !== "personnage") return;
     if (this.actor?.isOwner || game.user?.isGM) {
       await doGrowthRoll(this.actor, key);
-      this.clearCharacteristicRerollState();
       this.render(false);
       return;
     }
@@ -9016,7 +9015,6 @@ class BloodmanActorSheet extends BaseActorSheet {
         result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
       })
     });
-    this.clearCharacteristicRerollState();
     this.render(false);
   }
 
