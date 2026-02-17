@@ -1471,10 +1471,13 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
 
 export async function doGrowthRoll(actor, key) {
   const effective = getEffectiveCharacteristic(actor, key);
+  const characteristicLabel = getCharacteristicDisplayLabel(key);
   const base = Number(actor.system.characteristics?.[key]?.base || 0);
 
   const roll = await new Roll("1d100").evaluate();
-  const success = roll.total > effective;
+  const rollTotal = Number(roll.total) || 0;
+  const success = rollTotal > effective;
+  const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
   const xpPath = `system.characteristics.${key}.xp`;
   const basePath = `system.characteristics.${key}.base`;
 
@@ -1489,13 +1492,7 @@ export async function doGrowthRoll(actor, key) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: t("BLOODMAN.Rolls.Growth.Chat", {
-      name: actor.name,
-      key,
-      roll: roll.total,
-      effective,
-      result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
-    }),
+    flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.EXPERIENCE)
   });
 

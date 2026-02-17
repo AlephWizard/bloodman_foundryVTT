@@ -1251,6 +1251,7 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 
 .chat-message.bm-chat-roll .bm-chat-roll-frame {
   --bm-chat-roll-accent: var(--bm-chat-roll-type-accent, var(--bm-chat-roll-author-accent, #4966da));
+  --bm-chat-roll-band-accent: var(--bm-chat-roll-author-accent, var(--bm-chat-roll-accent));
   padding: 6px 7px 7px;
   color: #ffffff;
   font-family: var(--font-primary, "Signika", sans-serif);
@@ -1270,7 +1271,7 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 .chat-message.bm-chat-roll .bm-chat-roll-accent-band {
   width: 8px;
   height: 36px;
-  background: var(--bm-chat-roll-accent);
+  background: var(--bm-chat-roll-band-accent);
 }
 
 .chat-message.bm-chat-roll .bm-chat-roll-token {

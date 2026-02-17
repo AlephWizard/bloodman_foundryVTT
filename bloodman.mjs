@@ -9210,7 +9210,11 @@ class BloodmanActorSheet extends BaseActorSheet {
       + toFiniteNumber(archetypeBonus, 0);
 
     const roll = await new Roll("1d100").evaluate();
-    const success = Number(roll.total || 0) > effective;
+    const rollTotal = Number(roll.total || 0);
+    const success = rollTotal > effective;
+    const characteristicLabelKey = CHARACTERISTICS.find(c => c.key === key)?.labelKey || "";
+    const characteristicLabel = characteristicLabelKey ? t(characteristicLabelKey) : key;
+    const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
     const xpPath = `system.characteristics.${key}.xp`;
     const basePath = `system.characteristics.${key}.base`;
     await this.applyActorUpdate({
@@ -9224,13 +9228,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: t("BLOODMAN.Rolls.Growth.Chat", {
-        name: this.actor.name,
-        key,
-        roll: roll.total,
-        effective,
-        result: t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure")
-      }),
+      flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
       flags: buildChatRollFlags(CHAT_ROLL_TYPES.EXPERIENCE)
     });
     this.render(false);
