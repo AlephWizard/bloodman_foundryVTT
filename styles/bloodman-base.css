@@ -327,7 +327,8 @@
 
 #bm-chaos-dice {
   position: fixed;
-  right: 18px;
+  left: 18px;
+  right: auto;
   bottom: 72px;
   display: inline-flex;
   flex-direction: column;

@@ -6228,33 +6228,34 @@ function positionChaosDiceUI() {
   if (root.parentElement !== document.body) {
     document.body.appendChild(root);
   }
-  const hotbarRect = getVisibleRect(document.getElementById("hotbar"));
   const macroStripRect = getVisibleRect(
     document.querySelector("#hotbar #macro-list")
     || document.querySelector("#hotbar ol#macro-list")
     || document.querySelector("#hotbar #action-bar")
     || document.querySelector("#hotbar ol#action-bar")
+    || document.querySelector("#hotbar .macro-list")
+    || document.querySelector("#hotbar .action-bar")
   );
+  const hotbarRect = getVisibleRect(document.getElementById("hotbar"));
   const sidebarRect = getVisibleRect(document.getElementById("sidebar"))
     || getVisibleRect(document.getElementById("ui-right"));
-  const anchorRect = hotbarRect || macroStripRect || null;
+  const anchorRect = macroStripRect || hotbarRect || null;
   const rootRect = root.getBoundingClientRect();
   const halfWidth = Math.max(18, (rootRect.width || 60) / 2);
   const viewportMargin = 8;
-  const rightGap = 14;
+  const sideGap = 72;
   const bottomOffset = 30;
 
-  let centerX = Math.round(window.innerWidth / 2);
+  // Default to the left edge when hotbar geometry is unavailable.
+  let centerX = Math.round(viewportMargin + halfWidth);
   if (anchorRect) {
-    centerX = Math.round(anchorRect.right + rightGap + halfWidth);
-  } else if (sidebarRect) {
-    centerX = Math.round(sidebarRect.left - halfWidth - rightGap);
+    centerX = Math.round(anchorRect.left - sideGap - halfWidth);
   }
 
+  const leftBoundary = viewportMargin + halfWidth;
   const rightBoundary = sidebarRect
     ? (sidebarRect.left - viewportMargin - halfWidth)
     : (window.innerWidth - viewportMargin - halfWidth);
-  const leftBoundary = viewportMargin + halfWidth;
   const maxCenter = Math.max(leftBoundary, rightBoundary);
   const clampedX = Math.max(leftBoundary, Math.min(maxCenter, centerX));
 
@@ -6365,19 +6366,30 @@ function ensureChaosDiceUI() {
 
   if (!window.__bmChaosDiceObserver) {
     const observer = new ResizeObserver(() => positionChaosDiceUI());
+    const leftUi = document.getElementById("ui-left");
+    const controls = document.getElementById("controls");
+    const navigation = document.getElementById("navigation");
+    const players = document.getElementById("players");
     const sidebar = document.getElementById("sidebar");
     const tabs = document.getElementById("sidebar-tabs");
     const chatForm = document.getElementById("chat-form");
     const hotbar = document.getElementById("hotbar");
+    if (leftUi) observer.observe(leftUi);
+    if (controls) observer.observe(controls);
+    if (navigation) observer.observe(navigation);
+    if (players) observer.observe(players);
     if (sidebar) observer.observe(sidebar);
     if (tabs) observer.observe(tabs);
     if (chatForm) observer.observe(chatForm);
     if (hotbar) observer.observe(hotbar);
     window.addEventListener("resize", positionChaosDiceUI);
 
-    if (sidebar) {
+    const mutationTargets = [leftUi, controls, navigation, players, sidebar].filter(Boolean);
+    if (mutationTargets.length) {
       const mutation = new MutationObserver(() => positionChaosDiceUI());
-      mutation.observe(sidebar, { attributes: true, attributeFilter: ["class", "style"] });
+      for (const targetElement of mutationTargets) {
+        mutation.observe(targetElement, { attributes: true, attributeFilter: ["class", "style"] });
+      }
       window.__bmChaosDiceMutation = mutation;
     }
     window.__bmChaosDiceObserver = observer;
