@@ -9144,20 +9144,50 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (this.actor.type !== "personnage") return;
     const labelKey = CHARACTERISTICS.find(c => c.key === key)?.labelKey || "";
     const label = labelKey ? t(labelKey) : key;
-    new Dialog({
-      title: t("BLOODMAN.Dialogs.Growth.Title"),
-      content: `<p>${t("BLOODMAN.Dialogs.Growth.Prompt", { label })}</p>`,
-      buttons: {
-        roll: {
-          label: t("BLOODMAN.Common.Roll"),
-          callback: async () => this.rollGrowth(key)
+    const escapeHtml = value => (
+      foundry.utils?.escapeHTML
+        ? foundry.utils.escapeHTML(String(value ?? ""))
+        : String(value ?? "")
+    );
+    const fallbackPrompt = `Lancer un jet d'experience pour ${label} ?`;
+    const localizedPrompt = tl("BLOODMAN.Dialogs.Growth.Prompt", fallbackPrompt, { label });
+    const promptText = String(localizedPrompt || fallbackPrompt)
+      .replace(/<\/?strong>/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    const content = `<form class="bm-growth-dialog">
+      <div class="bm-growth-shell">
+        <div class="bm-growth-head">
+          <div class="bm-growth-icon-wrap" aria-hidden="true">
+            <div class="bm-growth-icon-ring"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          </div>
+          <div class="bm-growth-head-copy">
+            <p class="bm-growth-eyebrow">${escapeHtml(tl("BLOODMAN.Chat.RollTypes.Experience", "Experience"))}</p>
+            <p class="bm-growth-prompt">${escapeHtml(promptText)}</p>
+          </div>
+        </div>
+      </div>
+    </form>`;
+    new Dialog(
+      {
+        title: t("BLOODMAN.Dialogs.Growth.Title"),
+        content,
+        buttons: {
+          roll: {
+            label: t("BLOODMAN.Common.Roll"),
+            callback: async () => this.rollGrowth(key)
+          },
+          cancel: {
+            label: t("BLOODMAN.Common.Cancel")
+          }
         },
-        cancel: {
-          label: t("BLOODMAN.Common.Cancel")
-        }
+        default: "roll"
       },
-      default: "roll"
-    }).render(true);
+      {
+        classes: ["bloodman-growth-dialog"],
+        width: 430
+      }
+    ).render(true);
   }
 }
 

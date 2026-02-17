@@ -731,6 +731,192 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   color: var(--bm-damage-fg) !important;
 }
 
+.window-app.bloodman-growth-dialog,
+.window-app.dialog.bloodman-growth-dialog {
+  --bm-growth-bg: #121915;
+  --bm-growth-bg-soft: #1a251e;
+  --bm-growth-field: #16201a;
+  --bm-growth-fg: #f2f8f4;
+  --bm-growth-muted: #bdcdbc;
+  --bm-growth-border: #495a4e;
+  --bm-growth-border-strong: #d9e7db;
+  --bm-growth-accent: #6fa85f;
+}
+
+body.theme-light .window-app.bloodman-growth-dialog,
+body.theme-light .window-app.dialog.bloodman-growth-dialog {
+  --bm-growth-bg: #edf4ed;
+  --bm-growth-bg-soft: #e2ece3;
+  --bm-growth-field: #ffffff;
+  --bm-growth-fg: #1e2821;
+  --bm-growth-muted: #4d6050;
+  --bm-growth-border: #95a899;
+  --bm-growth-border-strong: #1e2821;
+  --bm-growth-accent: #3f7b34;
+}
+
+.window-app.bloodman-growth-dialog .window-header,
+.window-app.dialog.bloodman-growth-dialog .window-header {
+  background: linear-gradient(180deg, var(--bm-growth-bg-soft), var(--bm-growth-bg));
+  border-bottom: 1px solid var(--bm-growth-border);
+}
+
+.window-app.bloodman-growth-dialog .window-content,
+.window-app.dialog.bloodman-growth-dialog .window-content {
+  background: var(--bm-growth-bg) !important;
+  color: var(--bm-growth-fg);
+  padding: 10px;
+}
+
+.bm-growth-dialog {
+  margin: 0;
+  font-family: "Oswald", sans-serif;
+}
+
+.bm-growth-dialog .bm-growth-shell {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--bm-growth-border);
+  border-radius: 12px;
+  background: linear-gradient(168deg, var(--bm-growth-bg-soft), var(--bm-growth-bg));
+  color: var(--bm-growth-fg);
+  padding: 10px;
+}
+
+.bm-growth-dialog .bm-growth-head {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.bm-growth-dialog .bm-growth-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bm-growth-dialog .bm-growth-icon-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--bm-growth-border);
+  background: var(--bm-growth-field);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bm-growth-dialog .bm-growth-icon-ring i {
+  color: var(--bm-growth-accent);
+  font-size: 16px;
+}
+
+.bm-growth-dialog .bm-growth-head-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.bm-growth-dialog .bm-growth-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  color: var(--bm-growth-muted);
+}
+
+.bm-growth-dialog .bm-growth-prompt {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--bm-growth-fg);
+}
+
+.bm-growth-dialog .bm-growth-target-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--bm-growth-border);
+  border-radius: 9px;
+  background: var(--bm-growth-field);
+  padding: 7px 9px;
+}
+
+.bm-growth-dialog .bm-growth-target-label {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--bm-growth-muted);
+  line-height: 1;
+}
+
+.bm-growth-dialog .bm-growth-target-value {
+  justify-self: end;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--bm-growth-fg);
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.window-app.bloodman-growth-dialog .dialog-buttons,
+.window-app.dialog.bloodman-growth-dialog .dialog-buttons {
+  margin-top: 8px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.window-app.bloodman-growth-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-growth-dialog .dialog-buttons button {
+  min-height: 38px;
+  border: 1px solid var(--bm-growth-border-strong) !important;
+  border-radius: 8px;
+  background: var(--bm-growth-field) !important;
+  color: var(--bm-growth-fg) !important;
+  font-family: "Oswald", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.35px;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-growth-dialog .dialog-buttons button:hover,
+.window-app.bloodman-growth-dialog .dialog-buttons button:focus,
+.window-app.dialog.bloodman-growth-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-growth-dialog .dialog-buttons button:focus {
+  filter: brightness(1.08);
+  box-shadow: none;
+}
+
+@media (max-width: 520px) {
+  .window-app.bloodman-growth-dialog .dialog-buttons,
+  .window-app.dialog.bloodman-growth-dialog .dialog-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-growth-dialog .bm-growth-target-row {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-growth-dialog .bm-growth-target-value {
+    justify-self: start;
+  }
+}
+
 .bm-doc-type-label-with-icon {
   display: inline-flex;
   align-items: center;
