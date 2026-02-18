@@ -8,6 +8,102 @@ import {
   isCurrentUserPrimaryPrivilegedOperator,
   registerPrivilegedUsersCacheHooks
 } from "./utils/privileged-users.mjs";
+import {
+  compatFromUuid,
+  compatFromUuidSync,
+  compatGetDocumentClass,
+  foundryVersion,
+  getFoundryGeneration,
+  getDragEventData,
+  hasSocket,
+  socketEmit,
+  socketOn,
+  socketOff
+} from "./src/compat/index.mjs";
+import {
+  registerBloodmanMigrationSettings,
+  runBloodmanMigrations
+} from "./src/migrations/index.mjs";
+import { buildCanvasReadyHooks } from "./src/hooks/canvas-ready.mjs";
+import { buildItemDerivedSyncHooks } from "./src/hooks/item-derived-sync.mjs";
+import { buildActorUpdateHooks } from "./src/hooks/actor-update.mjs";
+import { buildActorPreUpdateHooks } from "./src/hooks/actor-pre-update.mjs";
+import { buildActorUpdateSanitizer } from "./src/hooks/actor-update-sanitize.mjs";
+import { buildActorSocketRequestHandlers } from "./src/hooks/actor-socket-requests.mjs";
+import { buildActorSocketRequestClient } from "./src/hooks/actor-socket-request-client.mjs";
+import { buildSystemSocketHooks } from "./src/hooks/system-socket.mjs";
+import { buildDamageRerollHooks } from "./src/hooks/damage-reroll.mjs";
+import { buildDamageRequestHooks } from "./src/hooks/damage-request.mjs";
+import { buildDamageAppliedMessageHelpers } from "./src/hooks/damage-applied-message.mjs";
+import { buildInitiativeGroupingHooks } from "./src/hooks/initiative-grouping.mjs";
+import { buildDamageConfigPopupHooks } from "./src/hooks/damage-config-popup.mjs";
+import { buildPowerUsePopupHooks } from "./src/hooks/power-use-popup.mjs";
+import { buildChatRelayHelpers } from "./src/hooks/chat-relay.mjs";
+import { buildChatRollDecorationHooks } from "./src/hooks/chat-roll-decoration.mjs";
+import { buildChatMessageRoutingHooks } from "./src/hooks/chat-message-routing.mjs";
+import { buildTokenCombatHooks } from "./src/hooks/token-combat.mjs";
+import {
+  toFiniteNumber as ruleToFiniteNumber,
+  normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
+  normalizeArchetypeBonusValue as ruleNormalizeArchetypeBonusValue,
+  computeArchetypeCharacteristicBonus as ruleComputeArchetypeCharacteristicBonus,
+  computeDerivedPvMax,
+  computeItemCharacteristicBonusTotals,
+  computeNormalizedMoveGauge,
+  computeItemResourceBonusTotals,
+  computeItemResourceBonusUpdateData,
+  computeResourceCharacteristicEffectiveScores,
+  computeDerivedResourceSyncUpdateData
+} from "./src/rules/derived-resources.mjs";
+import { buildMovementCombatRules } from "./src/rules/movement-combat.mjs";
+import {
+  hasActorUpdatePayload,
+  normalizeVitalResourceValue as normalizeRuleVitalResourceValue
+} from "./src/rules/actor-requests.mjs";
+import { buildSocketActorResolutionHelpers } from "./src/rules/socket-actor-resolution.mjs";
+import { createRequestRetentionTracker } from "./src/rules/request-dedupe.mjs";
+import { buildDamageTargetResolution } from "./src/rules/damage-target-resolution.mjs";
+import { buildDamageRerollUtils } from "./src/rules/damage-reroll-utils.mjs";
+import { buildDamageCurrentHelpers } from "./src/rules/damage-current.mjs";
+import { getDamagePayloadField, toBooleanFlag } from "./src/rules/damage-payload-fields.mjs";
+import { normalizeRollDieFormula } from "./src/rules/roll-formula.mjs";
+import { buildPowerCostRules } from "./src/rules/power-cost.mjs";
+import { createItemPriceRules } from "./src/rules/item-price.mjs";
+import { createWeaponAmmoRules } from "./src/rules/weapon-ammo.mjs";
+import { createWeaponReloadRules } from "./src/rules/weapon-reload.mjs";
+import { createItemAudioRules } from "./src/rules/item-audio.mjs";
+import { createItemModifierRules } from "./src/rules/item-modifiers.mjs";
+import { createEquipmentCurrencyRules } from "./src/rules/equipment-currency.mjs";
+import { createAmmoStateRules } from "./src/rules/ammo-state.mjs";
+import { createDefaultDataBuilders } from "./src/rules/default-data.mjs";
+import { createUpdatePathHelpers } from "./src/rules/update-paths.mjs";
+import { createResourceGaugeRules } from "./src/rules/resource-gauge.mjs";
+import { createStatePresetRules } from "./src/rules/state-presets.mjs";
+import { createItemBucketRules } from "./src/rules/item-buckets.mjs";
+import { createItemAudioPlaybackRules } from "./src/rules/item-audio-playback.mjs";
+import { createItemTypeFlagRules } from "./src/rules/item-type-flags.mjs";
+import { validateNumericEquality as ruleValidateNumericEquality, createNumericValidationLogger } from "./src/rules/numeric-validation.mjs";
+import { createDropDecisionRules } from "./src/rules/drop-decision.mjs";
+import { createDropEvaluationRules } from "./src/rules/drop-evaluation.mjs";
+import { createActorItemTransferRules } from "./src/rules/actor-item-transfer.mjs";
+import { createDropFlowRules } from "./src/rules/drop-flow.mjs";
+import { createCharacteristicRerollRules } from "./src/rules/characteristic-reroll.mjs";
+import { createItemRerollFlowRules } from "./src/rules/item-reroll-flow.mjs";
+import { createItemRerollExecutionRules } from "./src/rules/item-reroll-execution.mjs";
+import { createItemUseFlowRules } from "./src/rules/item-use-flow.mjs";
+import { createGrowthRollRules } from "./src/rules/growth-roll.mjs";
+import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
+import { createActorSheetLayoutRules } from "./src/ui/actor-sheet-layout.mjs";
+import { createItemSheetPricePreviewRules } from "./src/ui/item-sheet-price-preview.mjs";
+import {
+  parseLooseNumericInput as ruleParseLooseNumericInput,
+  parseSimpleArithmeticInput as ruleParseSimpleArithmeticInput,
+  normalizeSignedModifierInput as ruleNormalizeSignedModifierInput,
+  buildItemModifierErrorMessage as ruleBuildItemModifierErrorMessage
+} from "./src/rules/numeric-input.mjs";
+import {
+  planActorUpdateRestrictionByRole,
+} from "./src/rules/actor-updates.mjs";
 
 const BaseActorSheet = foundry?.appv1?.sheets?.ActorSheet ?? ActorSheet;
 const BaseItemSheet = foundry?.appv1?.sheets?.ItemSheet ?? ItemSheet;
@@ -2289,145 +2385,26 @@ const STATE_PRESETS = [
 ];
 const STATE_PRESET_BY_ID = new Map(STATE_PRESETS.map(preset => [preset.id, preset]));
 const STATE_PRESET_ORDER = STATE_PRESETS.map(preset => preset.id);
-
-function normalizeStatePresetToken(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  return raw
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, " ")
-    .trim();
-}
-
-function splitStatePresetLabel(rawValue) {
-  const raw = String(rawValue ?? "");
-  if (!raw.trim()) return [];
-  return raw
-    .split(/[\n\r,;|]+/)
-    .map(token => String(token || "").trim())
-    .filter(Boolean);
-}
-
-function buildStatePresetAliasMap() {
-  const aliasMap = new Map();
-  const registerAlias = (token, stateId) => {
-    const normalized = normalizeStatePresetToken(token);
-    if (!normalized || aliasMap.has(normalized)) return;
-    aliasMap.set(normalized, stateId);
-  };
-
-  for (const preset of STATE_PRESETS) {
-    registerAlias(preset.id, preset.id);
-    registerAlias(preset.name, preset.id);
-    registerAlias(preset.shortName, preset.id);
-    const levelMatch = String(preset.name || "").match(/^NIV\s*(\d+)/i);
-    if (levelMatch?.[1]) registerAlias(`NIV ${levelMatch[1]}`, preset.id);
-  }
-
-  return aliasMap;
-}
-
-const STATE_PRESET_ALIAS_MAP = buildStatePresetAliasMap();
-
-function resolveStatePresetIdFromToken(token) {
-  const normalized = normalizeStatePresetToken(token);
-  if (!normalized) return "";
-  const direct = STATE_PRESET_ALIAS_MAP.get(normalized);
-  if (direct) return direct;
-  for (const preset of STATE_PRESETS) {
-    const shortToken = normalizeStatePresetToken(preset.shortName);
-    if (!shortToken) continue;
-    if (normalized.includes(shortToken)) return preset.id;
-  }
-  return "";
-}
-
-function buildStatePresetLabelFromIds(stateIds = []) {
-  if (!Array.isArray(stateIds) || !stateIds.length) return "";
-  const selected = new Set(stateIds.map(id => String(id || "").trim()).filter(Boolean));
-  const names = [];
-  for (const presetId of STATE_PRESET_ORDER) {
-    if (!selected.has(presetId)) continue;
-    const preset = STATE_PRESET_BY_ID.get(presetId);
-    if (!preset) continue;
-    names.push(preset.name);
-  }
-  return names.join(" ; ");
-}
-
-function resolveStatePresetSelection(rawLabel) {
-  const tokens = splitStatePresetLabel(rawLabel);
-  const selectedIds = [];
-  const seen = new Set();
-  const invalidTokens = [];
-
-  for (const token of tokens) {
-    const stateId = resolveStatePresetIdFromToken(token);
-    if (!stateId) {
-      invalidTokens.push(token);
-      continue;
-    }
-    if (seen.has(stateId)) continue;
-    seen.add(stateId);
-    selectedIds.push(stateId);
-  }
-
-  const orderedIds = STATE_PRESET_ORDER.filter(stateId => seen.has(stateId));
-  return {
-    ids: orderedIds,
-    invalidTokens,
-    label: buildStatePresetLabelFromIds(orderedIds)
-  };
-}
-
-function buildStatePresetModifierTotals(stateIds = []) {
-  const totals = { all: 0 };
-  for (const characteristic of CHARACTERISTICS) totals[characteristic.key] = 0;
-
-  for (const stateId of stateIds) {
-    const preset = STATE_PRESET_BY_ID.get(String(stateId || "").trim());
-    if (!preset) continue;
-    totals.all += toFiniteNumber(preset.modifierAll, 0);
-    const modifierByKey = preset.modifierByKey || {};
-    for (const characteristic of CHARACTERISTICS) {
-      totals[characteristic.key] += toFiniteNumber(modifierByKey[characteristic.key], 0);
-    }
-  }
-
-  return totals;
-}
-
-function buildStateModifierUpdateFromLabel(rawLabel) {
-  const selection = resolveStatePresetSelection(rawLabel);
-  if (selection.invalidTokens.length) {
-    return {
-      ok: false,
-      invalidTokens: selection.invalidTokens,
-      ids: selection.ids,
-      label: selection.label,
-      totals: buildStatePresetModifierTotals(selection.ids)
-    };
-  }
-  return {
-    ok: true,
-    invalidTokens: [],
-    ids: selection.ids,
-    label: selection.label,
-    totals: buildStatePresetModifierTotals(selection.ids)
-  };
-}
-
-function applyStateModifierUpdateToData(updateData, label, totals) {
-  if (!updateData || typeof updateData !== "object") return;
-  foundry.utils.setProperty(updateData, "system.modifiers.label", String(label || "").trim());
-  foundry.utils.setProperty(updateData, "system.modifiers.all", toFiniteNumber(totals?.all, 0));
-  for (const characteristic of CHARACTERISTICS) {
-    const key = characteristic.key;
-    foundry.utils.setProperty(updateData, `system.modifiers.${key}`, toFiniteNumber(totals?.[key], 0));
-  }
-}
+const statePresetRules = createStatePresetRules({
+  statePresets: STATE_PRESETS,
+  statePresetById: STATE_PRESET_BY_ID,
+  statePresetOrder: STATE_PRESET_ORDER,
+  characteristics: CHARACTERISTICS,
+  toFiniteNumber,
+  setProperty: foundry.utils.setProperty,
+  translate: t,
+  translateWithFallback: tl
+});
+const {
+  buildStatePresetLabelFromIds,
+  resolveStatePresetSelection,
+  buildStateModifierUpdateFromLabel,
+  applyStateModifierUpdateToData,
+  buildStatePresetModifierLabel,
+  buildStatePresetTooltip,
+  buildStatePresetDisplayData,
+  buildInvalidStatePresetMessage
+} = statePresetRules;
 
 async function setActorStatePresetActive(actor, stateId, active) {
   if (!actor) return false;
@@ -2488,80 +2465,6 @@ async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
   await setActorStatePresetActive(actor, PLAYER_ZERO_PV_STATE_PRESET_ID, isZeroOrLess);
 }
 
-function buildStatePresetModifierLabel(preset) {
-  if (!preset) return tl("BLOODMAN.StateBar.NoModifier", "Aucun modificateur");
-  const parts = [];
-  const allValue = toFiniteNumber(preset.modifierAll, 0);
-  if (allValue !== 0) {
-    parts.push(`${allValue > 0 ? "+" : ""}${allValue}% ALL CARACS`);
-  }
-  const grouped = new Map();
-  for (const characteristic of CHARACTERISTICS) {
-    const value = toFiniteNumber(preset.modifierByKey?.[characteristic.key], 0);
-    if (value === 0) continue;
-    const group = grouped.get(value) || [];
-    group.push(characteristic.key);
-    grouped.set(value, group);
-  }
-  for (const [value, keys] of grouped.entries()) {
-    parts.push(`${value > 0 ? "+" : ""}${value}% ${keys.join(" / ")}`);
-  }
-  if (!parts.length) return tl("BLOODMAN.StateBar.NoModifier", "Aucun modificateur");
-  return parts.join(" ; ");
-}
-
-function buildStatePresetTooltip(preset) {
-  if (!preset) return "";
-  const categoryLabel = preset.category === "psychic"
-    ? tl("BLOODMAN.StateBar.PsychicStates", "Etats psychiques")
-    : tl("BLOODMAN.StateBar.BodyStates", "Etats corporels");
-  const durationLabel = preset.duration
-    ? `${tl("BLOODMAN.StateBar.DurationLabel", "Duree")} : ${preset.duration}`
-    : "";
-  const descriptionLabel = preset.description
-    ? `${tl("BLOODMAN.StateBar.DescriptionLabel", "Description")} : ${preset.description}`
-    : "";
-  return [preset.name, categoryLabel, buildStatePresetModifierLabel(preset), durationLabel, descriptionLabel]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function buildStatePresetDisplayData(rawLabel) {
-  const selection = resolveStatePresetSelection(rawLabel);
-  const selected = new Set(selection.ids);
-  const psychic = [];
-  const body = [];
-  for (const preset of STATE_PRESETS) {
-    const entry = {
-      id: preset.id,
-      name: preset.name,
-      category: preset.category,
-      duration: preset.duration || "",
-      description: preset.description || "",
-      modifierLabel: buildStatePresetModifierLabel(preset),
-      tooltip: buildStatePresetTooltip(preset),
-      selected: selected.has(preset.id)
-    };
-    if (preset.category === "psychic") psychic.push(entry);
-    else body.push(entry);
-  }
-  return {
-    ids: selection.ids,
-    invalidTokens: selection.invalidTokens,
-    psychic,
-    body
-  };
-}
-
-function buildInvalidStatePresetMessage(invalidTokens = []) {
-  const states = invalidTokens
-    .map(token => String(token || "").trim())
-    .filter(Boolean)
-    .join(", ");
-  const localized = t("BLOODMAN.Notifications.InvalidStateName", { states: states || "?" });
-  if (localized && localized !== "BLOODMAN.Notifications.InvalidStateName") return localized;
-  return `Etat inconnu: ${states || "?"}.`;
-}
 const ACTOR_TOKEN_IMAGE_UPDATE_PATHS = [
   "prototypeToken.texture.src",
   "token.img"
@@ -2581,6 +2484,7 @@ const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["arme", "objet", "ration", "soin"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
+const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin"]);
@@ -2600,6 +2504,10 @@ const VITAL_RESOURCE_PATHS = new Set([
   "system.resources.pp.current",
   "system.resources.pp.max"
 ]);
+const VITAL_RESOURCE_PATH_LIST = Array.from(VITAL_RESOURCE_PATHS);
+const VITAL_RESOURCE_INPUT_SELECTOR = VITAL_RESOURCE_PATH_LIST
+  .map(path => `input[name='${path}']`)
+  .join(", ");
 const AMMO_UPDATE_PATHS = [
   "system.ammo",
   "system.ammo.type",
@@ -2608,45 +2516,27 @@ const AMMO_UPDATE_PATHS = [
   "system.ammo.value"
 ];
 
-function isDamageRerollItemType(itemType) {
-  const type = String(itemType || "").trim().toLowerCase();
-  return DAMAGE_REROLL_ALLOWED_ITEM_TYPES.has(type);
-}
+const itemTypeFlagRules = createItemTypeFlagRules({
+  damageRerollAllowedItemTypes: DAMAGE_REROLL_ALLOWED_ITEM_TYPES,
+  voyageXpCostItemTypes: VOYAGE_XP_COST_ITEM_TYPES,
+  carriedItemLimitActorTypes: CARRIED_ITEM_LIMIT_ACTOR_TYPES,
+  carriedItemLimitBase: CARRIED_ITEM_LIMIT_BASE,
+  carriedItemLimitWithBag: CARRIED_ITEM_LIMIT_WITH_BAG
+});
+const {
+  isDamageRerollItemType,
+  isVoyageXPCostItemType,
+  isCarriedItemLimitedActorType,
+  isBagSlotsEnabled,
+  getActorCarriedItemsLimit
+} = itemTypeFlagRules;
 
-function isVoyageXPCostItemType(itemType) {
-  const type = String(itemType || "").trim().toLowerCase();
-  return VOYAGE_XP_COST_ITEM_TYPES.has(type);
-}
-
-function isCarriedItemLimitedActorType(actorType) {
-  const type = String(actorType || "").trim().toLowerCase();
-  return CARRIED_ITEM_LIMIT_ACTOR_TYPES.has(type);
-}
-
-function isBagSlotsEnabled(actor) {
-  return Boolean(actor?.system?.equipment?.bagSlotsEnabled);
-}
-
-function getActorCarriedItemsLimit(actor) {
-  return isBagSlotsEnabled(actor) ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
-}
-
-function validateNumericEquality(a, b) {
-  if (!Number.isFinite(Number(a)) || !Number.isFinite(Number(b))) return false;
-  return Number(a) === Number(b);
-}
-
-function logDamageRerollValidation(scope, details = {}) {
-  const payload = { scope, ...details };
-  const allGood = Object.entries(payload)
-    .filter(([key]) => key.startsWith("ok"))
-    .every(([, value]) => value === true);
-  if (allGood) {
-    bmLog.debug("reroll:validate", payload);
-  } else {
-    bmLog.warn("reroll:validate", payload);
-  }
-}
+const validateNumericEquality = ruleValidateNumericEquality;
+const numericValidationLogger = createNumericValidationLogger({
+  debug: (...args) => bmLog.debug(...args),
+  warn: (...args) => bmLog.warn(...args)
+});
+const { logNumericValidation: logDamageRerollValidation } = numericValidationLogger;
 const DAMAGE_REQUEST_RETENTION_MS = 2 * 60 * 1000;
 const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const CHAOS_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-chaos-request</span>";
@@ -2656,6 +2546,11 @@ const TOKEN_MOVE_LIMIT_EPSILON = 0.0001;
 let LAST_COMBAT_MOVE_RESET_KEY = "";
 let LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
 let LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
+function resetCombatRuntimeKeys() {
+  LAST_COMBAT_MOVE_RESET_KEY = "";
+  LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
+  LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
+}
 const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
 const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
 const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
@@ -2675,288 +2570,63 @@ let TOKEN_HUD_DOM_OBSERVER = null;
 let TOKEN_HUD_DOM_SYNC_FRAME = null;
 
 function toFiniteNumber(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
+  return ruleToFiniteNumber(value, fallback);
 }
 
 function normalizeNonNegativeInteger(value, fallback = 0) {
   return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
 }
 
-function parseLooseNumericInput(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return { ok: true, empty: true, value: 0 };
-  const compact = raw.replace(/\s+/g, "").replace(",", ".");
-  const numericPattern = /^[-+]?(?:\d+|\d*\.\d+)$/;
-  if (!numericPattern.test(compact)) return { ok: false, empty: false, value: 0 };
-  const numericValue = Number(compact);
-  if (!Number.isFinite(numericValue)) return { ok: false, empty: false, value: 0 };
-  return { ok: true, empty: false, value: numericValue };
-}
+const parseLooseNumericInput = ruleParseLooseNumericInput;
+const parseSimpleArithmeticInput = ruleParseSimpleArithmeticInput;
+const normalizeSignedModifierInput = (rawValue, fallback = 0) => (
+  ruleNormalizeSignedModifierInput(rawValue, fallback, toFiniteNumber, parseLooseNumericInput)
+);
+const buildItemModifierErrorMessage = ruleBuildItemModifierErrorMessage;
+const updatePathHelpers = createUpdatePathHelpers({
+  getProperty: foundry.utils.getProperty
+});
+const { hasUpdatePath, getUpdatedPathValue } = updatePathHelpers;
+const defaultDataBuilders = createDefaultDataBuilders({
+  characteristics: CHARACTERISTICS
+});
+const {
+  buildDefaultCharacteristics,
+  buildDefaultModifiers,
+  buildDefaultResources,
+  buildDefaultProfile,
+  buildDefaultEquipment
+} = defaultDataBuilders;
 
-function parseSimpleArithmeticInput(value) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return { ok: true, empty: true, value: 0 };
-  const source = raw.replace(/\s+/g, "").replace(/,/g, ".");
-  if (!/^[\d+\-*/().]+$/.test(source)) return { ok: false, empty: false, value: 0 };
+const equipmentCurrencyRules = createEquipmentCurrencyRules({
+  parseSimpleArithmeticInput,
+  toFiniteNumber,
+  currencyCurrentMax: CURRENCY_CURRENT_MAX,
+  hasUpdatePath,
+  getUpdatedPathValue,
+  buildDefaultEquipment,
+  mergeObject: foundry.utils.mergeObject,
+  setProperty: foundry.utils.setProperty,
+  translate: t
+});
+const {
+  roundCurrencyValue,
+  normalizeCurrencyCurrentValue,
+  formatCurrencyValue,
+  buildInvalidCurrencyCurrentMessage,
+  normalizeActorEquipmentCurrencyUpdateData
+} = equipmentCurrencyRules;
 
-  let index = 0;
-  const peek = () => source[index] || "";
-  const read = () => source[index++] || "";
+const resourceGaugeRules = createResourceGaugeRules({
+  toFiniteNumber
+});
+const { resolveResourceGaugeState, applyResourceGaugeState } = resourceGaugeRules;
 
-  const parseNumber = () => {
-    let token = "";
-    let dotCount = 0;
-    while (index < source.length) {
-      const char = peek();
-      if (char >= "0" && char <= "9") {
-        token += read();
-        continue;
-      }
-      if (char === ".") {
-        dotCount += 1;
-        if (dotCount > 1) break;
-        token += read();
-        continue;
-      }
-      break;
-    }
-    if (!token || token === ".") return Number.NaN;
-    const numeric = Number(token);
-    return Number.isFinite(numeric) ? numeric : Number.NaN;
-  };
-
-  const parseFactor = () => {
-    const char = peek();
-    if (char === "+") {
-      read();
-      return parseFactor();
-    }
-    if (char === "-") {
-      read();
-      const value = parseFactor();
-      return Number.isFinite(value) ? -value : Number.NaN;
-    }
-    if (char === "(") {
-      read();
-      const value = parseExpression();
-      if (peek() !== ")") return Number.NaN;
-      read();
-      return value;
-    }
-    return parseNumber();
-  };
-
-  const parseTerm = () => {
-    let value = parseFactor();
-    while (Number.isFinite(value)) {
-      const operator = peek();
-      if (operator !== "*" && operator !== "/") break;
-      read();
-      const rhs = parseFactor();
-      if (!Number.isFinite(rhs)) return Number.NaN;
-      if (operator === "*") value *= rhs;
-      else {
-        if (Math.abs(rhs) <= 1e-12) return Number.NaN;
-        value /= rhs;
-      }
-    }
-    return value;
-  };
-
-  const parseExpression = () => {
-    let value = parseTerm();
-    while (Number.isFinite(value)) {
-      const operator = peek();
-      if (operator !== "+" && operator !== "-") break;
-      read();
-      const rhs = parseTerm();
-      if (!Number.isFinite(rhs)) return Number.NaN;
-      if (operator === "+") value += rhs;
-      else value -= rhs;
-    }
-    return value;
-  };
-
-  const numericValue = parseExpression();
-  if (!Number.isFinite(numericValue) || index !== source.length) {
-    return { ok: false, empty: false, value: 0 };
-  }
-  return { ok: true, empty: false, value: numericValue };
-}
-
-function normalizeSignedModifierInput(rawValue, fallback = 0) {
-  if (rawValue == null || rawValue === "") return { value: 0, invalid: false };
-  if (typeof rawValue === "number") {
-    if (Number.isFinite(rawValue)) return { value: rawValue, invalid: false };
-    return { value: toFiniteNumber(fallback, 0), invalid: true };
-  }
-  if (typeof rawValue === "string") {
-    const parsed = parseLooseNumericInput(rawValue);
-    if (!parsed.ok) return { value: toFiniteNumber(fallback, 0), invalid: true };
-    return { value: parsed.empty ? 0 : parsed.value, invalid: false };
-  }
-  const numeric = Number(rawValue);
-  if (Number.isFinite(numeric)) return { value: numeric, invalid: false };
-  return { value: toFiniteNumber(fallback, 0), invalid: true };
-}
-
-function buildItemModifierErrorMessage(invalidFields = []) {
-  const uniqueFields = Array.from(new Set((invalidFields || []).filter(Boolean)));
-  if (!uniqueFields.length) return null;
-  return `Valeur non numerique: ${uniqueFields.join(", ")}`;
-}
-
-function roundCurrencyValue(value) {
-  const rounded = Math.round((Number(value) || 0) * 100) / 100;
-  const whole = Math.round(rounded);
-  if (Math.abs(rounded - whole) <= 0.000001) return whole;
-  return rounded;
-}
-
-function normalizeCurrencyCurrentValue(value, fallback = 0) {
-  const parsed = parseSimpleArithmeticInput(value);
-  if (!parsed.ok) {
-    return { ok: false, value: roundCurrencyValue(Math.max(0, toFiniteNumber(fallback, 0))) };
-  }
-  const numeric = parsed.empty ? 0 : parsed.value;
-  if (!Number.isFinite(numeric) || numeric < 0 || numeric > CURRENCY_CURRENT_MAX) {
-    return { ok: false, value: roundCurrencyValue(Math.max(0, toFiniteNumber(fallback, 0))) };
-  }
-  return { ok: true, value: roundCurrencyValue(numeric) };
-}
-
-function formatCurrencyValue(value) {
-  const normalized = roundCurrencyValue(Math.max(0, toFiniteNumber(value, 0)));
-  if (Number.isInteger(normalized)) return String(normalized);
-  return normalized.toFixed(2).replace(/\.?0+$/, "");
-}
-
-function buildInvalidCurrencyCurrentMessage() {
-  const localized = t("BLOODMAN.Notifications.InvalidCurrencyCurrent");
-  if (localized && localized !== "BLOODMAN.Notifications.InvalidCurrencyCurrent") return localized;
-  return "La valeur Actuel doit etre un nombre entre 0 et 1000000.";
-}
-
-function normalizeActorEquipmentCurrencyUpdateData(actor, updateData) {
-  if (!updateData || typeof updateData !== "object") return { changed: false, invalid: false };
-  const equipmentPath = "system.equipment";
-  const currencyTypePath = "system.equipment.monnaies";
-  const currencyCurrentPath = "system.equipment.monnaiesActuel";
-  const hasEquipmentRootUpdate = hasUpdatePath(updateData, equipmentPath);
-  const hasCurrencyTypeUpdate = hasUpdatePath(updateData, currencyTypePath);
-  const hasCurrencyCurrentUpdate = hasUpdatePath(updateData, currencyCurrentPath);
-  if (!hasEquipmentRootUpdate && !hasCurrencyTypeUpdate && !hasCurrencyCurrentUpdate) {
-    return { changed: false, invalid: false };
-  }
-
-  const currentEquipment = foundry.utils.mergeObject(buildDefaultEquipment(), actor?.system?.equipment || {}, {
-    inplace: false
-  });
-
-  const rootUpdate = hasEquipmentRootUpdate ? getUpdatedPathValue(updateData, equipmentPath, {}) : {};
-  const rootSource = rootUpdate && typeof rootUpdate === "object" ? rootUpdate : {};
-  const nextEquipment = foundry.utils.mergeObject(currentEquipment, rootSource, { inplace: false });
-  if (hasCurrencyTypeUpdate) {
-    nextEquipment.monnaies = getUpdatedPathValue(updateData, currencyTypePath, nextEquipment.monnaies);
-  }
-  if (hasCurrencyCurrentUpdate) {
-    nextEquipment.monnaiesActuel = getUpdatedPathValue(updateData, currencyCurrentPath, nextEquipment.monnaiesActuel);
-  }
-
-  const normalizedType = String(nextEquipment.monnaies ?? "").trim();
-  const normalizedCurrent = normalizeCurrencyCurrentValue(
-    nextEquipment.monnaiesActuel,
-    currentEquipment.monnaiesActuel ?? 0
-  );
-  if (!normalizedCurrent.ok) {
-    return {
-      changed: false,
-      invalid: true,
-      message: buildInvalidCurrencyCurrentMessage()
-    };
-  }
-
-  nextEquipment.monnaies = normalizedType;
-  nextEquipment.monnaiesActuel = normalizedCurrent.value;
-
-  if (hasEquipmentRootUpdate) {
-    foundry.utils.setProperty(updateData, equipmentPath, nextEquipment);
-  } else {
-    foundry.utils.setProperty(updateData, currencyTypePath, nextEquipment.monnaies);
-    foundry.utils.setProperty(updateData, currencyCurrentPath, nextEquipment.monnaiesActuel);
-  }
-
-  return {
-    changed: true,
-    invalid: false,
-    currencyCurrent: nextEquipment.monnaiesActuel
-  };
-}
-
-function resolveResourceGaugeState(currentValue, maxValue, options = {}) {
-  const useUnitMaxWhenZero = options.useUnitMaxWhenZero === true;
-  const current = Math.max(0, toFiniteNumber(currentValue, 0));
-  const maxRaw = Math.max(0, toFiniteNumber(maxValue, 0));
-  const denominator = maxRaw > 0 ? maxRaw : (useUnitMaxWhenZero ? 1 : 0);
-  const ratio = denominator > 0 ? Math.max(0, Math.min(1, current / denominator)) : 0;
-  const percent = Math.max(0, Math.min(100, ratio * 100));
-  const stateClass = ratio <= 0
-    ? "is-empty"
-    : ratio <= 0.25
-      ? "is-critical"
-      : ratio <= 0.5
-        ? "is-warning"
-        : "is-healthy";
-  return {
-    ratio,
-    fill: `${percent.toFixed(2)}%`,
-    steps: Math.max(1, Math.round(maxRaw || 1)),
-    stateClass
-  };
-}
-
-function applyResourceGaugeState(resource, options = {}) {
-  if (!resource || typeof resource !== "object") return;
-  const gauge = resolveResourceGaugeState(resource.current, resource.max, options);
-  resource.ratio = gauge.ratio.toFixed(4);
-  resource.fill = gauge.fill;
-  resource.steps = gauge.steps;
-  resource.stateClass = gauge.stateClass;
-}
-
-function buildTypedItemBuckets(items = []) {
-  const buckets = Object.fromEntries(ITEM_BUCKET_TYPES.map(type => [type, []]));
-  for (const item of items || []) {
-    const type = String(item?.type || "").trim().toLowerCase();
-    if (Array.isArray(buckets[type])) buckets[type].push(item);
-  }
-  return buckets;
-}
-
-function getActorItemCounts(items = []) {
-  const counts = {
-    total: 0,
-    aptitudes: 0,
-    pouvoirs: 0,
-    carried: 0
-  };
-  for (const item of items || []) {
-    if (!item) continue;
-    counts.total += 1;
-    const type = String(item.type || "").trim().toLowerCase();
-    if (type === "aptitude") counts.aptitudes += 1;
-    if (type === "pouvoir") counts.pouvoirs += 1;
-    if (CARRIED_ITEM_TYPES.has(type)) counts.carried += 1;
-  }
-  return counts;
-}
-
-function normalizeRollDieFormula(value, fallback = "d4") {
-  const raw = String(value ?? fallback ?? "d4").trim();
-  if (!raw) return "1d4";
-  return /^\d/.test(raw) ? raw : `1${raw}`;
-}
+const itemBucketRules = createItemBucketRules({
+  itemBucketTypes: ITEM_BUCKET_TYPES,
+  carriedItemTypes: CARRIED_ITEM_TYPES
+});
+const { buildTypedItemBuckets, getActorItemCounts } = itemBucketRules;
 
 function waitMs(ms) {
   const delay = Math.max(0, Math.floor(toFiniteNumber(ms, 0)));
@@ -2964,545 +2634,234 @@ function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, delay));
 }
 
-function isAudioEnabledItemType(itemType) {
-  const type = String(itemType || "").trim().toLowerCase();
-  return AUDIO_ENABLED_ITEM_TYPES.has(type);
-}
-
-function normalizeItemAudioFile(value) {
-  const path = String(value || "").trim();
-  if (!path) return "";
-  const cleanPath = path.split("#")[0].split("?")[0].trim();
-  if (!cleanPath || !AUDIO_FILE_EXTENSION_PATTERN.test(cleanPath)) return "";
-  return path;
-}
-
-function getItemAudioName(item) {
-  const fallbackType = String(item?.type || "").trim();
-  const fallbackName = fallbackType ? t(`TYPES.Item.${fallbackType}`) : t("BLOODMAN.Common.Name");
-  return String(item?.name || fallbackName || "").trim() || t("BLOODMAN.Common.Name");
-}
-
-function normalizeItemAudioUpdate(item, updateData = null) {
-  if (!item || !isAudioEnabledItemType(item.type)) return { changed: false, invalid: false };
-  const path = "system.audioFile";
-  if (updateData) {
-    const hasUpdateData = Object.prototype.hasOwnProperty.call(updateData, path)
-      || foundry.utils.getProperty(updateData, path) !== undefined;
-    if (!hasUpdateData) return { changed: false, invalid: false };
-    const rawValue = foundry.utils.getProperty(updateData, path);
-    const wasProvided = String(rawValue || "").trim().length > 0;
-    const normalized = normalizeItemAudioFile(rawValue);
-    foundry.utils.setProperty(updateData, path, normalized);
-    const current = String(rawValue || "").trim();
-    return {
-      changed: current !== normalized,
-      invalid: wasProvided && !normalized
-    };
-  }
-
-  const rawValue = item.system?.audioFile;
-  const wasProvided = String(rawValue || "").trim().length > 0;
-  const normalized = normalizeItemAudioFile(rawValue);
-  item.updateSource({ [path]: normalized });
-  const current = String(item.system?.audioFile || "").trim();
-  return {
-    changed: current !== normalized,
-    invalid: wasProvided && !normalized
-  };
-}
-
-function isPriceManagedItemType(itemType) {
-  const type = String(itemType || "").trim().toLowerCase();
-  return PRICE_ITEM_TYPES.has(type);
-}
-
-function resolveItemPricePreviewState(rawValue) {
-  const raw = String(rawValue ?? "").trim();
-  if (!raw) return { salePrice: "", errorMessage: "" };
-  const compact = raw.replace(/\s+/g, "").replace(",", ".");
-  const numericPattern = /^[-+]?(?:\d+|\d*\.\d+)$/;
-  const numericValue = Number(compact);
-  const invalidLabel = t("BLOODMAN.Items.PriceInvalid");
-  const errorMessage = invalidLabel && invalidLabel !== "BLOODMAN.Items.PriceInvalid"
-    ? invalidLabel
-    : "Le prix doit etre un nombre valide.";
-  if (!numericPattern.test(compact) || !Number.isFinite(numericValue) || numericValue < 0) {
-    return { salePrice: "", errorMessage };
-  }
-  const salePrice = Math.ceil(numericValue * 0.2);
-  return { salePrice: String(salePrice), errorMessage: "" };
-}
-
-function resolveItemSalePriceState(rawPriceValue, rawSalePriceValue) {
-  const pricePreview = resolveItemPricePreviewState(rawPriceValue);
-  const salePriceRaw = String(rawSalePriceValue ?? "").trim();
-  if (salePriceRaw) {
-    return {
-      salePrice: salePriceRaw,
-      errorMessage: pricePreview.errorMessage
-    };
-  }
-  return {
-    salePrice: pricePreview.errorMessage ? "" : pricePreview.salePrice,
-    errorMessage: pricePreview.errorMessage
-  };
-}
-
-function isItemSalePriceManual(rawPriceValue, rawSalePriceValue) {
-  const salePriceRaw = String(rawSalePriceValue ?? "").trim();
-  if (!salePriceRaw) return false;
-  const pricePreview = resolveItemPricePreviewState(rawPriceValue);
-  if (pricePreview.errorMessage) return true;
-  return salePriceRaw !== String(pricePreview.salePrice ?? "").trim();
-}
-
-function normalizeItemPriceUpdate(item, updateData = null) {
-  if (!isPriceManagedItemType(item?.type)) return false;
-  const pricePath = "system.price";
-  const salePricePath = "system.salePrice";
-  if (updateData) {
-    const hasPriceUpdate = Object.prototype.hasOwnProperty.call(updateData, pricePath)
-      || foundry.utils.getProperty(updateData, pricePath) !== undefined;
-    const hasSalePriceUpdate = Object.prototype.hasOwnProperty.call(updateData, salePricePath)
-      || foundry.utils.getProperty(updateData, salePricePath) !== undefined;
-    if (!hasPriceUpdate && !hasSalePriceUpdate) return false;
-
-    const nextPrice = hasPriceUpdate
-      ? String(foundry.utils.getProperty(updateData, pricePath) ?? "").trim()
-      : String(item?.system?.price ?? "").trim();
-    const currentPrice = String(item?.system?.price ?? "").trim();
-    const currentSalePrice = String(item?.system?.salePrice ?? "").trim();
-    const saleWasManual = isItemSalePriceManual(currentPrice, currentSalePrice);
-    const nextSalePrice = hasSalePriceUpdate
-      ? String(foundry.utils.getProperty(updateData, salePricePath) ?? "").trim()
-      : (saleWasManual ? currentSalePrice : "");
-    const nextState = resolveItemSalePriceState(nextPrice, nextSalePrice);
-
-    foundry.utils.setProperty(updateData, pricePath, nextPrice);
-    foundry.utils.setProperty(updateData, salePricePath, nextState.salePrice);
-    return true;
-  }
-  const sourcePrice = String(item?.system?.price ?? "").trim();
-  const sourceSalePrice = String(item?.system?.salePrice ?? "").trim();
-  const sourceState = resolveItemSalePriceState(sourcePrice, sourceSalePrice);
-  item.updateSource({
-    [pricePath]: sourcePrice,
-    [salePricePath]: sourceState.salePrice
-  });
-  return true;
-}
-
-function normalizeWeaponMagazineCapacityUpdate(item, updateData = null) {
-  const type = String(item?.type || "").trim().toLowerCase();
-  if (type !== "arme") return false;
-  const capacityPath = "system.magazineCapacity";
-  const loadedAmmoPath = "system.loadedAmmo";
-  const weaponTypePath = "system.weaponType";
-  const infiniteAmmoPath = "system.infiniteAmmo";
-  const actorAmmoMagazineFallback = normalizeNonNegativeInteger(item?.actor?.system?.ammo?.magazine, 0);
-  if (updateData) {
-    const hasRelevantUpdate = [
-      capacityPath,
-      loadedAmmoPath,
-      weaponTypePath,
-      infiniteAmmoPath
-    ].some(path => (
-      Object.prototype.hasOwnProperty.call(updateData, path)
-      || foundry.utils.getProperty(updateData, path) !== undefined
-    ));
-    if (!hasRelevantUpdate) return false;
-
-    const nextCapacity = normalizeNonNegativeInteger(
-      getUpdatedPathValue(updateData, capacityPath, item?.system?.magazineCapacity ?? 0),
-      item?.system?.magazineCapacity ?? 0
-    );
-    const nextWeaponType = normalizeWeaponType(
-      getUpdatedPathValue(updateData, weaponTypePath, item?.system?.weaponType || "distance")
-    );
-    const weaponType = nextWeaponType || "distance";
-    const infiniteAmmo = toCheckboxBoolean(
-      getUpdatedPathValue(updateData, infiniteAmmoPath, item?.system?.infiniteAmmo),
-      false
-    );
-    const consumesAmmo = getWeaponCategory(weaponType) === "distance" && !infiniteAmmo;
-    const usesMagazine = consumesAmmo && nextCapacity > 0;
-
-    const fallbackLoadedAmmo = normalizeWeaponLoadedAmmoValue(
-      item?.system?.loadedAmmo,
-      actorAmmoMagazineFallback,
-      usesMagazine ? nextCapacity : 0
-    );
-    const nextLoadedAmmo = normalizeWeaponLoadedAmmoValue(
-      getUpdatedPathValue(updateData, loadedAmmoPath, fallbackLoadedAmmo),
-      fallbackLoadedAmmo,
-      usesMagazine ? nextCapacity : 0
-    );
-
-    foundry.utils.setProperty(updateData, weaponTypePath, weaponType);
-    foundry.utils.setProperty(updateData, capacityPath, nextCapacity);
-    foundry.utils.setProperty(updateData, loadedAmmoPath, nextLoadedAmmo);
-    return true;
-  }
-
-  const sourceCapacity = normalizeNonNegativeInteger(item?.system?.magazineCapacity, 0);
-  const sourceWeaponType = normalizeWeaponType(item?.system?.weaponType || "distance") || "distance";
-  const sourceInfiniteAmmo = toCheckboxBoolean(item?.system?.infiniteAmmo, false);
-  const sourceConsumesAmmo = getWeaponCategory(sourceWeaponType) === "distance" && !sourceInfiniteAmmo;
-  const sourceUsesMagazine = sourceConsumesAmmo && sourceCapacity > 0;
-  const sourceLoadedAmmo = normalizeWeaponLoadedAmmoValue(
-    item?.system?.loadedAmmo,
-    actorAmmoMagazineFallback,
-    sourceUsesMagazine ? sourceCapacity : 0
-  );
-  item.updateSource({
-    [weaponTypePath]: sourceWeaponType,
-    [capacityPath]: sourceCapacity,
-    [loadedAmmoPath]: sourceLoadedAmmo
-  });
-  return true;
-}
-
-function normalizeCharacteristicBonusItemUpdate(item, updateData = null) {
-  const type = String(item?.type || "").trim().toLowerCase();
-  const supportsCharacteristicBonuses = CHARACTERISTIC_BONUS_ITEM_TYPES.has(type);
-  const supportsPaBonus = PA_BONUS_ITEM_TYPES.has(type);
-  if (!supportsCharacteristicBonuses && !supportsPaBonus) return false;
-  const supportsUseEnabled = type === "objet" || type === "protection";
-  const defaultUseEnabled = type === "protection";
-  const updateSystemData = updateData
-    ? (foundry.utils.getProperty(
-      foundry.utils.expandObject(foundry.utils.deepClone(updateData || {})),
-      "system"
-    ) || {})
-    : {};
-  const sourceSystem = updateData
-    ? foundry.utils.mergeObject(
-      foundry.utils.deepClone(item?.system || {}),
-      updateSystemData,
-      { inplace: false }
-    )
-    : (item?.system || {});
-
-  const invalidFields = [];
-  const useEnabled = supportsUseEnabled
-    ? toCheckboxBoolean(sourceSystem?.useEnabled, defaultUseEnabled)
-    : false;
-  const characteristicBonusEnabled = supportsCharacteristicBonuses
-    ? toCheckboxBoolean(sourceSystem?.characteristicBonusEnabled, false)
-    : false;
-  const characteristicBonuses = {};
-  if (supportsCharacteristicBonuses) {
-    for (const characteristic of CHARACTERISTICS) {
-      const key = characteristic.key;
-      const normalizedValue = normalizeSignedModifierInput(
-        sourceSystem?.characteristicBonuses?.[key],
-        item?.system?.characteristicBonuses?.[key] ?? 0
-      );
-      characteristicBonuses[key] = normalizedValue.value;
-      if (normalizedValue.invalid) invalidFields.push(key);
+function queueUiMicrotask(callback) {
+  if (typeof callback !== "function") return null;
+  return setTimeout(() => {
+    try {
+      callback();
+    } catch (error) {
+      bmLog.warn("ui microtask failed", { error });
     }
-  }
-  const paNormalized = supportsPaBonus
-    ? normalizeSignedModifierInput(sourceSystem?.pa, item?.system?.pa ?? 0)
-    : { value: 0, invalid: false };
-  if (supportsPaBonus && paNormalized.invalid) invalidFields.push("PA");
-  const modifierError = buildItemModifierErrorMessage(invalidFields);
-
-  if (updateData) {
-    if (supportsUseEnabled) {
-      foundry.utils.setProperty(updateData, "system.useEnabled", useEnabled);
-    }
-    if (supportsCharacteristicBonuses) {
-      foundry.utils.setProperty(updateData, "system.characteristicBonusEnabled", characteristicBonusEnabled);
-      for (const characteristic of CHARACTERISTICS) {
-        const key = characteristic.key;
-        foundry.utils.setProperty(updateData, `system.characteristicBonuses.${key}`, characteristicBonuses[key]);
-      }
-    }
-    if (supportsPaBonus) {
-      foundry.utils.setProperty(updateData, "system.pa", paNormalized.value);
-    }
-    foundry.utils.setProperty(updateData, "system.erreur", modifierError);
-    return true;
-  }
-
-  const sourceUpdate = {};
-  if (supportsUseEnabled) {
-    sourceUpdate["system.useEnabled"] = useEnabled;
-  }
-  if (supportsCharacteristicBonuses) {
-    sourceUpdate["system.characteristicBonusEnabled"] = characteristicBonusEnabled;
-    for (const characteristic of CHARACTERISTICS) {
-      const key = characteristic.key;
-      sourceUpdate[`system.characteristicBonuses.${key}`] = characteristicBonuses[key];
-    }
-  }
-  if (supportsPaBonus) {
-    sourceUpdate["system.pa"] = paNormalized.value;
-  }
-  sourceUpdate["system.erreur"] = modifierError;
-  item.updateSource(sourceUpdate);
-  return true;
+  }, 0);
 }
 
-async function playItemAudio(item, options = {}) {
-  if (!item || !isAudioEnabledItemType(item.type)) return false;
-  const requestedDelay = Number(options?.delayMs);
-  const delayMs = Number.isFinite(requestedDelay)
-    ? Math.max(0, Math.floor(requestedDelay))
-    : ITEM_AUDIO_POST_ROLL_DELAY_MS;
-  const broadcast = options?.broadcast !== false;
-  const rawAudioFile = String(item.system?.audioFile || "").trim();
-  if (!rawAudioFile) return false;
-  const audioFile = normalizeItemAudioFile(rawAudioFile);
-  const itemName = getItemAudioName(item);
-
-  if (delayMs > 0) await waitMs(delayMs);
-
-  if (!audioFile) {
-    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
-    return false;
-  }
-
-  if (typeof AudioHelper?.play !== "function") {
-    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
-    return false;
-  }
-
-  try {
-    await AudioHelper.play({ src: audioFile, volume: 0.9, autoplay: true, loop: false }, broadcast);
-    return true;
-  } catch (error) {
-    bmLog.error("[bloodman] audio:play failed", { itemType: item.type, itemId: item.id, audioFile, error });
-    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalid", { item: itemName }));
-    return false;
-  }
+function clearUiMicrotask(taskId) {
+  if (taskId == null) return;
+  clearTimeout(taskId);
 }
 
-function buildDefaultCharacteristics() {
-  const characteristics = {};
-  for (const c of CHARACTERISTICS) characteristics[c.key] = { base: 50, xp: [false, false, false] };
-  return characteristics;
-}
+const itemAudioRules = createItemAudioRules({
+  audioEnabledItemTypes: AUDIO_ENABLED_ITEM_TYPES,
+  audioFileExtensionPattern: AUDIO_FILE_EXTENSION_PATTERN,
+  getProperty: foundry.utils.getProperty,
+  setProperty: foundry.utils.setProperty,
+  translate: t
+});
+const {
+  isAudioEnabledItemType,
+  normalizeItemAudioFile,
+  getItemAudioName,
+  normalizeItemAudioUpdate
+} = itemAudioRules;
 
-function buildDefaultModifiers() {
-  const modifiers = { label: "", all: 0 };
-  for (const c of CHARACTERISTICS) modifiers[c.key] = 0;
-  return modifiers;
-}
+const itemPriceRules = createItemPriceRules({
+  priceItemTypes: PRICE_ITEM_TYPES,
+  getProperty: foundry.utils.getProperty,
+  setProperty: foundry.utils.setProperty,
+  translate: t
+});
+const {
+  isPriceManagedItemType,
+  resolveItemPricePreviewState,
+  resolveItemSalePriceState,
+  isItemSalePriceManual,
+  normalizeItemPriceUpdate
+} = itemPriceRules;
+const itemSheetPricePreviewRules = createItemSheetPricePreviewRules({
+  resolveItemPricePreviewState,
+  isItemSalePriceManual
+});
+const {
+  resolveSaleManualFlag: resolveItemSaleManualFlag,
+  resolveItemPricePreviewUiState
+} = itemSheetPricePreviewRules;
+const uiRefreshQueueRules = createUiRefreshQueueRules();
+const {
+  mergeDeferredForce,
+  resolveDeferredRoot
+} = uiRefreshQueueRules;
+const actorSheetLayoutRules = createActorSheetLayoutRules({ toFiniteNumber });
+const {
+  resolveAutoResizeKey: resolveActorSheetAutoResizeKey,
+  resolveTextareaAutoGrowState,
+  resolveSheetWindowTargetHeight
+} = actorSheetLayoutRules;
 
-function buildDefaultResources(options = {}) {
-  const includeVoyage = options.includeVoyage !== false;
-  const resources = {
-    pv: { current: 0, max: 0, itemBonus: 0 },
-    pp: { current: 0, max: 0, itemBonus: 0 },
-    move: { value: 0, max: 0 }
-  };
-  if (includeVoyage) {
-    resources.voyage = { current: 0, total: 0, max: 0 };
-  }
-  return resources;
-}
+const weaponAmmoRules = createWeaponAmmoRules({
+  normalizeNonNegativeInteger,
+  normalizeWeaponType,
+  toCheckboxBoolean,
+  getWeaponCategory,
+  getProperty: foundry.utils.getProperty,
+  setProperty: foundry.utils.setProperty
+});
+const {
+  normalizeWeaponLoadedAmmoValue,
+  getWeaponLoadedAmmo,
+  normalizeWeaponMagazineCapacityUpdate
+} = weaponAmmoRules;
 
-function buildDefaultAmmo() {
-  return { type: "", stock: 0, magazine: 0, value: 0 };
-}
+const itemModifierRules = createItemModifierRules({
+  characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
+  paBonusItemTypes: PA_BONUS_ITEM_TYPES,
+  characteristics: CHARACTERISTICS,
+  toCheckboxBoolean,
+  normalizeSignedModifierInput,
+  buildItemModifierErrorMessage,
+  deepClone: foundry.utils.deepClone,
+  expandObject: foundry.utils.expandObject,
+  mergeObject: foundry.utils.mergeObject,
+  getProperty: foundry.utils.getProperty,
+  setProperty: foundry.utils.setProperty
+});
+const { normalizeCharacteristicBonusItemUpdate } = itemModifierRules;
 
-function normalizeWeaponLoadedAmmoValue(value, fallback = 0, capacity = 0) {
-  const normalizedCapacity = normalizeNonNegativeInteger(capacity, 0);
-  const numeric = normalizeNonNegativeInteger(value, fallback);
-  if (normalizedCapacity <= 0) return 0;
-  return Math.min(numeric, normalizedCapacity);
-}
+const itemAudioPlaybackRules = createItemAudioPlaybackRules({
+  isAudioEnabledItemType,
+  normalizeItemAudioFile,
+  getItemAudioName,
+  waitMs,
+  translate: t,
+  notifyError: message => ui.notifications?.error(message),
+  getPlayAudio: () => (typeof AudioHelper?.play === "function" ? (...args) => AudioHelper.play(...args) : null),
+  logError: (...args) => bmLog.error(...args),
+  defaultDelayMs: ITEM_AUDIO_POST_ROLL_DELAY_MS
+});
+const { playItemAudio } = itemAudioPlaybackRules;
 
-function getWeaponLoadedAmmo(item, options = {}) {
-  const capacity = normalizeNonNegativeInteger(item?.system?.magazineCapacity, 0);
-  const fallback = normalizeNonNegativeInteger(options.fallback, 0);
-  return normalizeWeaponLoadedAmmoValue(item?.system?.loadedAmmo, fallback, capacity);
-}
+const dropDecisionRules = createDropDecisionRules({
+  parseLooseNumericInput,
+  roundCurrencyValue,
+  formatCurrencyValue,
+  toFiniteNumber,
+  normalizeRollDieFormula,
+  getWeaponCategory,
+  normalizeNonNegativeInteger,
+  getWeaponLoadedAmmo,
+  fromDropData: entry => Item.implementation.fromDropData(entry),
+  translate: t,
+  translateWithFallback: tl
+});
+const {
+  getDropItemQuantity: resolveDropItemQuantity,
+  getDropEntries: resolveDropEntries,
+  getDroppedItemUnitPrice: resolveDroppedItemUnitPrice,
+  buildDropDecisionPreview: buildDropDecisionPreviewData,
+  resolveDropPreviewItems
+} = dropDecisionRules;
+const dropEvaluationRules = createDropEvaluationRules({
+  fromDropData: entry => Item.implementation.fromDropData(entry),
+  roundCurrencyValue,
+  getDropItemQuantity: resolveDropItemQuantity,
+  getDroppedItemUnitPrice: resolveDroppedItemUnitPrice,
+  carriedItemTypes: CARRIED_ITEM_TYPES
+});
+const {
+  resolveActorTransferEntries: resolveActorTransferEntriesFromDrop,
+  resolveDropPermissionState: resolveDropPermissionStateFromEntries,
+  resolveDropPurchaseSummary: resolveDropPurchaseSummaryFromEntries,
+  computeIncomingCarriedItemCount
+} = dropEvaluationRules;
+const dropFlowRules = createDropFlowRules({
+  toFiniteNumber,
+  roundCurrencyValue
+});
+const {
+  resolveDropPermissionNotificationKey,
+  isDropDecisionClosed,
+  isDropDecisionBuy,
+  resolveDropPurchaseState,
+  shouldUseActorTransferPath,
+  isCarriedItemsLimitExceeded
+} = dropFlowRules;
+const actorItemTransferRules = createActorItemTransferRules({
+  translate: t,
+  warn: message => ui.notifications?.warn(message),
+  deepClone: foundry.utils.deepClone,
+  logWarn: (...args) => bmLog.warn(...args)
+});
+const { applyActorToActorItemTransfer: applyActorToActorItemTransferRule } = actorItemTransferRules;
+const characteristicRerollRules = createCharacteristicRerollRules({ toFiniteNumber });
+const {
+  resolveCharacteristicRerollPlan,
+  resolveCharacteristicXpProgress
+} = characteristicRerollRules;
+const itemUseFlowRules = createItemUseFlowRules({
+  toFiniteNumber,
+  normalizeRollDieFormula
+});
+const {
+  resolveAbilityDamageRollPlan,
+  resolveItemRerollRollPlan,
+  resolveItemUsePlan,
+  resolveHealUseMode,
+  resolveManualHealNextValue,
+  isObjectUseEnabled,
+  buildHealAudioReference
+} = itemUseFlowRules;
+const growthRollRules = createGrowthRollRules({ toFiniteNumber });
+const {
+  computeGrowthEffectiveScore,
+  resolveGrowthOutcome,
+  buildGrowthUpdateData
+} = growthRollRules;
 
-function normalizeAmmoType(value) {
-  return String(value ?? "").trim();
-}
-
-function getActorAmmoCapacityLimit(actor) {
-  if (!actor?.items) return 0;
-  let maxCapacity = 0;
-  for (const item of actor.items) {
-    if (String(item?.type || "").trim().toLowerCase() !== "arme") continue;
-    const weaponType = getWeaponCategory(item.system?.weaponType);
-    if (weaponType !== "distance") continue;
-    if (toCheckboxBoolean(item.system?.infiniteAmmo, false)) continue;
-    const capacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
-    if (capacity > maxCapacity) maxCapacity = capacity;
-  }
-  return maxCapacity;
-}
-
-function normalizeAmmoState(rawAmmo = null, options = {}) {
-  const fallbackBase = options.fallback ?? buildDefaultAmmo();
-  const fallback = foundry.utils.mergeObject(buildDefaultAmmo(), fallbackBase || {}, { inplace: false });
-  const source = foundry.utils.mergeObject(fallback, rawAmmo || {}, { inplace: false });
-  const type = normalizeAmmoType(source.type);
-
-  const fallbackStock = normalizeNonNegativeInteger(fallback.stock ?? fallback.value, 0);
-  const fallbackMagazine = normalizeNonNegativeInteger(fallback.magazine ?? fallback.value, 0);
-
-  const stockRaw = source.stock ?? source.value ?? fallbackStock;
-  const magazineRaw = source.magazine ?? source.value ?? fallbackMagazine;
-
-  let stock = normalizeNonNegativeInteger(stockRaw, fallbackStock);
-  let magazine = normalizeNonNegativeInteger(magazineRaw, fallbackMagazine);
-
-  const capacity = normalizeNonNegativeInteger(options.capacity, 0);
-  if (capacity > 0) magazine = Math.min(magazine, capacity);
-
-  stock = Math.max(0, stock);
-  magazine = Math.max(0, magazine);
-
-  return {
-    type,
-    stock,
-    magazine,
-    value: stock
-  };
-}
-
-function areAmmoStatesEqual(currentAmmo = null, nextAmmo = null) {
-  const currentType = normalizeAmmoType(currentAmmo?.type);
-  const nextType = normalizeAmmoType(nextAmmo?.type);
-  if (currentType !== nextType) return false;
-  const currentStock = normalizeNonNegativeInteger(currentAmmo?.stock ?? currentAmmo?.value, 0);
-  const nextStock = normalizeNonNegativeInteger(nextAmmo?.stock ?? nextAmmo?.value, 0);
-  if (currentStock !== nextStock) return false;
-  const currentMagazine = normalizeNonNegativeInteger(currentAmmo?.magazine, 0);
-  const nextMagazine = normalizeNonNegativeInteger(nextAmmo?.magazine, 0);
-  return currentMagazine === nextMagazine;
-}
-
-function hasUpdatePath(updateData, path) {
-  if (!updateData || !path) return false;
-  return Object.prototype.hasOwnProperty.call(updateData, path)
-    || foundry.utils.getProperty(updateData, path) !== undefined;
-}
-
-function getUpdatedPathValue(updateData, path, fallback) {
-  if (Object.prototype.hasOwnProperty.call(updateData, path)) return updateData[path];
-  const nested = foundry.utils.getProperty(updateData, path);
-  return nested === undefined ? fallback : nested;
-}
-
-function normalizeActorAmmoUpdateData(actor, updateData) {
-  if (!updateData || typeof updateData !== "object") return false;
-  const ammoPath = "system.ammo";
-  const ammoTypePath = "system.ammo.type";
-  const ammoStockPath = "system.ammo.stock";
-  const ammoMagazinePath = "system.ammo.magazine";
-  const ammoLegacyValuePath = "system.ammo.value";
-
-  const hasAmmoRootUpdate = hasUpdatePath(updateData, ammoPath);
-  const hasAmmoTypeUpdate = hasUpdatePath(updateData, ammoTypePath);
-  const hasAmmoStockUpdate = hasUpdatePath(updateData, ammoStockPath);
-  const hasAmmoMagazineUpdate = hasUpdatePath(updateData, ammoMagazinePath);
-  const hasAmmoLegacyValueUpdate = hasUpdatePath(updateData, ammoLegacyValuePath);
-  const hasAnyAmmoUpdate = hasAmmoRootUpdate
-    || hasAmmoTypeUpdate
-    || hasAmmoStockUpdate
-    || hasAmmoMagazineUpdate
-    || hasAmmoLegacyValueUpdate;
-  if (!hasAnyAmmoUpdate) return false;
-
-  const capacity = getActorAmmoCapacityLimit(actor);
-  const currentAmmo = normalizeAmmoState(actor?.system?.ammo, {
-    fallback: buildDefaultAmmo(),
-    capacity
-  });
-
-  const rootAmmoUpdate = hasAmmoRootUpdate ? getUpdatedPathValue(updateData, ammoPath, {}) : {};
-  const rootAmmoSource = rootAmmoUpdate && typeof rootAmmoUpdate === "object" ? rootAmmoUpdate : {};
-  const nextRawAmmo = foundry.utils.mergeObject(currentAmmo, rootAmmoSource, { inplace: false });
-
-  if (hasAmmoTypeUpdate) {
-    nextRawAmmo.type = getUpdatedPathValue(updateData, ammoTypePath, nextRawAmmo.type);
-  }
-  if (hasAmmoStockUpdate) {
-    nextRawAmmo.stock = getUpdatedPathValue(updateData, ammoStockPath, nextRawAmmo.stock);
-  }
-  if (hasAmmoMagazineUpdate) {
-    nextRawAmmo.magazine = getUpdatedPathValue(updateData, ammoMagazinePath, nextRawAmmo.magazine);
-  }
-  if (hasAmmoLegacyValueUpdate && !hasAmmoStockUpdate) {
-    nextRawAmmo.stock = getUpdatedPathValue(updateData, ammoLegacyValuePath, nextRawAmmo.stock);
-  }
-
-  const normalizedAmmo = normalizeAmmoState(nextRawAmmo, {
-    fallback: currentAmmo,
-    capacity
-  });
-
-  unsetUpdatePath(updateData, ammoPath);
-  foundry.utils.setProperty(updateData, ammoTypePath, normalizedAmmo.type);
-  foundry.utils.setProperty(updateData, ammoStockPath, normalizedAmmo.stock);
-  foundry.utils.setProperty(updateData, ammoMagazinePath, normalizedAmmo.magazine);
-  foundry.utils.setProperty(updateData, ammoLegacyValuePath, normalizedAmmo.value);
-  return true;
-}
-
-function buildDefaultProfile() {
-  return {
-    archetype: "",
-    archetypeBonusValue: 0,
-    archetypeBonusCharacteristic: "",
-    vice: "",
-    poids: "",
-    taille: "",
-    age: "",
-    origine: "",
-    historique: "",
-    quickNotes: "",
-    notes: "",
-    aptitudes: "",
-    pouvoirs: ""
-  };
-}
-
-function buildDefaultEquipment() {
-  return {
-    armes: "",
-    protections: "",
-    objets: "",
-    monnaies: "",
-    monnaiesActuel: 0,
-    transports: "",
-    transportNpcs: [],
-    bagSlotsEnabled: false
-  };
-}
+const ammoStateRules = createAmmoStateRules({
+  normalizeNonNegativeInteger,
+  toCheckboxBoolean,
+  getWeaponCategory,
+  hasUpdatePath,
+  getUpdatedPathValue,
+  unsetUpdatePath,
+  setProperty: foundry.utils.setProperty,
+  mergeObject: foundry.utils.mergeObject
+});
+const {
+  buildDefaultAmmo,
+  normalizeAmmoType,
+  getActorAmmoCapacityLimit,
+  normalizeAmmoState,
+  areAmmoStatesEqual,
+  normalizeActorAmmoUpdateData
+} = ammoStateRules;
+const weaponReloadRules = createWeaponReloadRules({
+  normalizeNonNegativeInteger,
+  toCheckboxBoolean,
+  getWeaponCategory,
+  normalizeAmmoState,
+  buildDefaultAmmo,
+  getWeaponLoadedAmmo
+});
+const { resolveWeaponReloadPlan } = weaponReloadRules;
 
 function isMissingTokenImage(src) {
   return !src || src === "icons/svg/mystery-man.svg";
 }
 
 function normalizeCharacteristicKey(value) {
-  const key = String(value || "").trim().toUpperCase();
-  return CHARACTERISTIC_KEYS.has(key) ? key : "";
+  return ruleNormalizeCharacteristicKey(value, CHARACTERISTIC_KEYS);
 }
 
 function normalizeArchetypeBonusValue(value, fallback = 0) {
-  if (value == null || value === "") return Math.trunc(toFiniteNumber(fallback, 0));
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return Number.NaN;
-  return Math.trunc(numeric);
+  return ruleNormalizeArchetypeBonusValue(value, fallback);
 }
 
 function getArchetypeCharacteristicBonus(profile, characteristicKey) {
-  const key = normalizeCharacteristicKey(characteristicKey);
-  if (!key) return 0;
-  const selectedKey = normalizeCharacteristicKey(profile?.archetypeBonusCharacteristic);
-  if (!selectedKey || selectedKey !== key) return 0;
-  const value = normalizeArchetypeBonusValue(profile?.archetypeBonusValue, 0);
-  return Number.isFinite(value) ? value : 0;
+  return ruleComputeArchetypeCharacteristicBonus({
+    profile,
+    characteristicKey,
+    characteristicKeys: CHARACTERISTIC_KEYS
+  });
 }
 
 function getActorArchetypeBonus(actor, characteristicKey) {
@@ -3897,12 +3256,12 @@ function getProtectionPA(actor) {
 }
 
 function getDerivedPvMax(actor, phyEffective, roleOverride) {
-  if (actor?.type !== "personnage-non-joueur") return Math.round(phyEffective / 5);
-  const role = ((roleOverride ?? actor.system?.npcRole) || "").toString();
-  if (role === "sbire") return Math.round(phyEffective / 10);
-  if (role === "sbire-fort") return Math.round(phyEffective / 5);
-  if (role === "boss-seul") return Math.round(phyEffective / 5) * getPlayerCountOnScene();
-  return Math.round(phyEffective / 5);
+  return computeDerivedPvMax({
+    actorType: actor?.type,
+    npcRole: (roleOverride ?? actor?.system?.npcRole) || "",
+    phyEffective,
+    playerCount: getPlayerCountOnScene()
+  });
 }
 
 function getResourceCharacteristicTotal(actor, key, itemBonuses = null) {
@@ -3934,213 +3293,35 @@ async function refreshBossSoloNpcPvMax() {
   }
 }
 
-const PROCESSED_DAMAGE_REQUESTS = new Map();
-const PROCESSED_DAMAGE_CONFIG_POPUPS = new Map();
-const PROCESSED_POWER_USE_POPUPS = new Map();
-const PROCESSED_CHAOS_REQUESTS = new Map();
-const PROCESSED_REROLL_REQUESTS = new Map();
-const INITIATIVE_GROUP_BUFFER = new Map();
-const ACTIVE_DAMAGE_CONFIG_POPUPS = new Map();
+const damageRequestTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
+const damageConfigPopupTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
+const powerUsePopupTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
+const chaosRequestTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
+const rerollRequestTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
 const POWER_USE_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-power-use-popup</span>";
 
-function rememberDamageRequest(requestId) {
-  if (!requestId) return;
-  const now = Date.now();
-  PROCESSED_DAMAGE_REQUESTS.set(requestId, now);
-  for (const [key, value] of PROCESSED_DAMAGE_REQUESTS.entries()) {
-    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_DAMAGE_REQUESTS.delete(key);
+const { rememberRequest: rememberDamageRequest, wasRequestProcessed: wasDamageRequestProcessed } = damageRequestTracker;
+const { rememberRequest: rememberDamageConfigPopupRequest, wasRequestProcessed: wasDamageConfigPopupRequestProcessed } = damageConfigPopupTracker;
+const { rememberRequest: rememberPowerUsePopupRequest, wasRequestProcessed: wasPowerUsePopupRequestProcessed } = powerUsePopupTracker;
+const { rememberRequest: rememberChaosRequest, wasRequestProcessed: wasChaosRequestProcessed } = chaosRequestTracker;
+const { rememberRequest: rememberRerollRequest, wasRequestProcessed: wasRerollRequestProcessed } = rerollRequestTracker;
+
+const chatRelayHelpers = buildChatRelayHelpers({
+  getCurrentUser: () => game.user,
+  getMessagesCollection: () => game.messages,
+  toFiniteNumber,
+  scheduleTimeout: (callback, timeout) => setTimeout(callback, timeout),
+  getProperty: foundry.utils.getProperty,
+  isHtmlElement: value => {
+    if (typeof HTMLElement === "function") return value instanceof HTMLElement;
+    return Boolean(value?.style && value?.classList);
   }
-}
-
-function wasDamageRequestProcessed(requestId) {
-  if (!requestId) return false;
-  return PROCESSED_DAMAGE_REQUESTS.has(requestId);
-}
-
-function rememberDamageConfigPopupRequest(requestId) {
-  if (!requestId) return;
-  const now = Date.now();
-  PROCESSED_DAMAGE_CONFIG_POPUPS.set(requestId, now);
-  for (const [key, value] of PROCESSED_DAMAGE_CONFIG_POPUPS.entries()) {
-    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_DAMAGE_CONFIG_POPUPS.delete(key);
-  }
-}
-
-function wasDamageConfigPopupRequestProcessed(requestId) {
-  if (!requestId) return false;
-  return PROCESSED_DAMAGE_CONFIG_POPUPS.has(requestId);
-}
-
-function rememberPowerUsePopupRequest(requestId) {
-  if (!requestId) return;
-  const now = Date.now();
-  PROCESSED_POWER_USE_POPUPS.set(requestId, now);
-  for (const [key, value] of PROCESSED_POWER_USE_POPUPS.entries()) {
-    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_POWER_USE_POPUPS.delete(key);
-  }
-}
-
-function wasPowerUsePopupRequestProcessed(requestId) {
-  if (!requestId) return false;
-  return PROCESSED_POWER_USE_POPUPS.has(requestId);
-}
-
-function buildDamageConfigObserverState(data) {
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
-  const actorName = String(data?.actorName || "").trim();
-  const sourceName = String(data?.sourceName || "").trim();
-  const requesterName = String(game.users?.get(String(data?.requesterUserId || ""))?.name || "").trim();
-  const config = data?.config && typeof data.config === "object" ? data.config : {};
-  const dialogVariant = String(data?.dialogVariant || config?.dialogVariant || "").trim().toLowerCase();
-  const isSimpleAttackVariant = dialogVariant === "simple-attack";
-  const formula = String(config.formula || "1d4").trim() || "1d4";
-  const damageLabel = String(config.degats || "").trim().toUpperCase() || formula.toUpperCase();
-  const bonusBrut = Math.max(0, Math.floor(toFiniteNumber(config.bonusBrut, 0)));
-  const penetration = Math.max(0, Math.floor(toFiniteNumber(config.penetration, 0)));
-  const keepHighest = config.rollKeepHighest === true;
-  const yesLabel = t("BLOODMAN.Common.Yes");
-  const noLabel = t("BLOODMAN.Common.No");
-  const actorDisplay = actorName || requesterName || "Attaquant";
-  const sourceDisplay = sourceName || "-";
-  const keepHighestText = `2 jets, garder le plus haut: ${keepHighest ? yesLabel : noLabel}`;
-  return {
-    escapeHtml,
-    dialogVariant,
-    isSimpleAttackVariant,
-    formula,
-    damageLabel,
-    bonusBrut,
-    penetration,
-    keepHighest,
-    actorDisplay,
-    sourceDisplay,
-    keepHighestText,
-    title: `Jet de degats - ${actorDisplay}`
-  };
-}
-
-function getDamageConfigObserverContent(state) {
-  const safe = state.escapeHtml;
-  const formVariantClass = state?.isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
-  return `<form class="bm-damage-config${formVariantClass}">
-    <div class="bm-damage-config-shell">
-      <div class="bm-damage-config-head">
-        <div class="bm-damage-config-icon-wrap" aria-hidden="true">
-          <div class="bm-damage-config-icon-ring"><i class="fa-solid fa-skull"></i></div>
-        </div>
-        <div class="bm-damage-config-head-copy">
-          <p class="bm-damage-config-eyebrow">Suivi MJ</p>
-          <p class="bm-damage-config-hint" data-bm-popup-field="hint">${safe(state.actorDisplay)} - ${safe(state.sourceDisplay)}</p>
-        </div>
-      </div>
-      <div class="bm-damage-config-grid">
-        <div class="bm-damage-config-row bm-damage-config-row-wide">
-          <label>Degats</label>
-          <input type="text" data-bm-popup-field="damage" value="${safe(state.damageLabel)} (${safe(state.formula)})" disabled />
-        </div>
-        <div class="bm-damage-config-row bm-damage-config-inline">
-          <label>Degats bruts +</label>
-          <input type="number" data-bm-popup-field="bonus" value="${state.bonusBrut}" disabled />
-        </div>
-        <div class="bm-damage-config-row bm-damage-config-inline">
-          <label>Penetration +</label>
-          <input type="number" data-bm-popup-field="penetration" value="${state.penetration}" disabled />
-        </div>
-      </div>
-      <label class="bm-damage-config-toggle">
-        <input type="checkbox" data-bm-popup-field="roll-keep-highest" disabled ${state.keepHighest ? "checked" : ""} />
-        <span class="bm-damage-config-toggle-indicator" aria-hidden="true">2x</span>
-        <span class="bm-damage-config-toggle-copy">
-          <span class="bm-damage-config-toggle-title" data-bm-popup-field="keep-highest-text">${safe(state.keepHighestText)}</span>
-        </span>
-      </label>
-    </div>
-  </form>`;
-}
-
-function updateDamageConfigObserverDialog(dialog, state) {
-  const root = dialog?.element;
-  if (!root?.length) return false;
-  root.find("form.bm-damage-config").toggleClass("bm-damage-config--simple-attack", state?.isSimpleAttackVariant === true);
-  root.closest(".window-app").toggleClass("bloodman-damage-dialog-simple-attack", state?.isSimpleAttackVariant === true);
-  root.find("[data-bm-popup-field='hint']").text(`${state.actorDisplay} - ${state.sourceDisplay}`);
-  root.find("[data-bm-popup-field='damage']").val(`${state.damageLabel} (${state.formula})`);
-  root.find("[data-bm-popup-field='bonus']").val(String(state.bonusBrut));
-  root.find("[data-bm-popup-field='penetration']").val(String(state.penetration));
-  root.find("[data-bm-popup-field='roll-keep-highest']").prop("checked", state.keepHighest);
-  root.find("[data-bm-popup-field='keep-highest-text']").text(state.keepHighestText);
-  return true;
-}
-
-function closeDamageConfigObserverDialog(requestId) {
-  const key = String(requestId || "").trim();
-  if (!key) return false;
-  const dialog = ACTIVE_DAMAGE_CONFIG_POPUPS.get(key);
-  if (!dialog) return false;
-  ACTIVE_DAMAGE_CONFIG_POPUPS.delete(key);
-  try {
-    dialog.close();
-  } catch (_error) {
-    // ignore
-  }
-  return true;
-}
-
-function rememberChaosRequest(requestId) {
-  if (!requestId) return;
-  const now = Date.now();
-  PROCESSED_CHAOS_REQUESTS.set(requestId, now);
-  for (const [key, value] of PROCESSED_CHAOS_REQUESTS.entries()) {
-    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_CHAOS_REQUESTS.delete(key);
-  }
-}
-
-function wasChaosRequestProcessed(requestId) {
-  if (!requestId) return false;
-  return PROCESSED_CHAOS_REQUESTS.has(requestId);
-}
-
-function rememberRerollRequest(requestId) {
-  if (!requestId) return;
-  const now = Date.now();
-  PROCESSED_REROLL_REQUESTS.set(requestId, now);
-  for (const [key, value] of PROCESSED_REROLL_REQUESTS.entries()) {
-    if (now - value > DAMAGE_REQUEST_RETENTION_MS) PROCESSED_REROLL_REQUESTS.delete(key);
-  }
-}
-
-function wasRerollRequestProcessed(requestId) {
-  if (!requestId) return false;
-  return PROCESSED_REROLL_REQUESTS.has(requestId);
-}
-
-function isInitiativeRollMessage(message) {
-  if (!message) return false;
-  if (foundry.utils.getProperty(message, "flags.bloodman.initiativeGroupSummary")) return false;
-  const coreFlag = foundry.utils.getProperty(message, "flags.core.initiativeRoll");
-  if (coreFlag != null) return Boolean(coreFlag);
-  if (!message.speaker?.combatant) return false;
-  if (!Array.isArray(message.rolls) || message.rolls.length === 0) return false;
-  const flavor = String(message.flavor || "").toLowerCase();
-  return flavor.includes("initiative");
-}
-
-function getInitiativeRollTotalFromMessage(message, combat) {
-  const roll = Array.isArray(message?.rolls) && message.rolls.length ? message.rolls[0] : null;
-  const total = Number(roll?.total);
-  if (Number.isFinite(total)) return total;
-  const combatantId = message?.speaker?.combatant;
-  const combatant = combatantId ? combat?.combatants?.get(combatantId) : null;
-  const initiative = Number(combatant?.initiative);
-  return Number.isFinite(initiative) ? initiative : 0;
-}
-
-function getInitiativeNameFromMessage(message, combat) {
-  const combatantId = message?.speaker?.combatant;
-  const combatant = combatantId ? combat?.combatants?.get(combatantId) : null;
-  if (combatant) return getCombatantDisplayName(combatant) || combatant.name || message?.speaker?.alias || "Combattant";
-  return message?.speaker?.alias || message?.alias || "Combattant";
-}
+});
+const {
+  scheduleTransientChatMessageDeletion,
+  isTransportRelayChatMessage,
+  hideTransientRelayChatMessage
+} = chatRelayHelpers;
 
 function escapeChatMarkup(value) {
   const raw = String(value ?? "");
@@ -4152,1564 +3333,314 @@ function escapeChatMarkup(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
-function getChatSpeakerTokenDocument(message) {
-  if (!message) return null;
-  const tokenId = String(message?.speaker?.token || "");
-  if (!tokenId) return null;
-  const sceneId = String(message?.speaker?.scene || canvas?.scene?.id || "");
-  const scene = sceneId ? game.scenes?.get(sceneId) : canvas?.scene;
-  if (!scene) return null;
-  return scene.tokens?.get(tokenId) || scene.tokens?.contents?.find(token => token.id === tokenId) || null;
-}
-
-function getChatSpeakerActor(message) {
-  const actorId = String(message?.speaker?.actor || "");
-  if (actorId) {
-    const actor = game.actors?.get(actorId) || null;
-    if (actor) return actor;
+const chatRollDecorationHooks = buildChatRollDecorationHooks({
+  getGame: () => game,
+  getCanvas: () => canvas,
+  getProperty: foundry.utils.getProperty,
+  normalizeChatRollType,
+  chatRollTypes: CHAT_ROLL_TYPES,
+  t,
+  tl,
+  escapeChatMarkup,
+  isHtmlElement: value => {
+    if (typeof HTMLElement === "function") return value instanceof HTMLElement;
+    return Boolean(value?.querySelector && value?.classList);
   }
-  const tokenDoc = getChatSpeakerTokenDocument(message);
-  return tokenDoc?.actor || (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null) || null;
-}
+});
+const { decorateBloodmanChatRollMessage } = chatRollDecorationHooks;
 
-function resolveChatTokenImage(actor, tokenDoc) {
-  const tokenSrc = String(foundry.utils.getProperty(tokenDoc, "texture.src") || "").trim();
-  if (tokenSrc) return tokenSrc;
-  const prototypeSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
-  if (prototypeSrc) return prototypeSrc;
-  const actorImage = String(actor?.img || "").trim();
-  if (actorImage) return actorImage;
-  return "icons/svg/mystery-man.svg";
-}
-
-function resolveChatAccentColor(message) {
-  const userId = String(message?.user?.id || message?.user || "");
-  const author = (userId ? game.users?.get(userId) : null) || message?.author || null;
-  const raw = author?.color;
-  if (typeof raw === "string" && raw.trim()) return normalizeChatCssColor(raw.trim());
-  const cssValue = typeof raw?.css === "string"
-    ? raw.css
-    : (typeof raw?.css === "function" ? raw.css() : "");
-  if (cssValue) return normalizeChatCssColor(cssValue);
-  const fallback = String(raw || "").trim();
-  if (fallback && fallback !== "[object Object]") return normalizeChatCssColor(fallback);
-  return "#2f66d9";
-}
-
-function normalizeChatCssColor(value, fallback = "#2f66d9") {
-  const raw = String(value || "").trim();
-  if (!raw) return fallback;
-  const supportsApi = Boolean(globalThis.CSS && typeof globalThis.CSS.supports === "function");
-  if (!supportsApi) return raw;
-  return globalThis.CSS.supports("color", raw) ? raw : fallback;
-}
-
-function resolveChatPseudoName(actor, message) {
-  const candidates = [
-    foundry.utils.getProperty(actor, "system.profile.pseudonyme"),
-    foundry.utils.getProperty(actor, "system.profile.pseudo"),
-    actor?.name,
-    message?.speaker?.alias,
-    message?.alias
-  ];
-  for (const candidate of candidates) {
-    const label = String(candidate || "").trim();
-    if (label) return label;
-  }
-  return t("BLOODMAN.Common.Name");
-}
-
-function resolveChatRollType(message) {
-  const flaggedType = normalizeChatRollType(foundry.utils.getProperty(message, "flags.bloodman.chatRollType"));
-  if (flaggedType !== CHAT_ROLL_TYPES.GENERIC) return flaggedType;
-  if (foundry.utils.getProperty(message, "flags.bloodman.luckRoll")) return CHAT_ROLL_TYPES.LUCK;
-  return CHAT_ROLL_TYPES.GENERIC;
-}
-
-function resolveChatRollTypeLabel(chatRollType) {
-  const type = normalizeChatRollType(chatRollType);
-  if (type === CHAT_ROLL_TYPES.CHARACTERISTIC) return tl("BLOODMAN.Chat.RollTypes.Characteristic", "Caracteristique");
-  if (type === CHAT_ROLL_TYPES.DAMAGE) return tl("BLOODMAN.Chat.RollTypes.Damage", "Degats");
-  if (type === CHAT_ROLL_TYPES.EXPERIENCE) return tl("BLOODMAN.Chat.RollTypes.Experience", "Experience");
-  if (type === CHAT_ROLL_TYPES.HEAL) return tl("BLOODMAN.Chat.RollTypes.Heal", "Soin");
-  if (type === CHAT_ROLL_TYPES.LUCK) return tl("BLOODMAN.Chat.RollTypes.Luck", "Chance");
-  return tl("BLOODMAN.Chat.RollTypes.Generic", "Jet");
-}
-
-function toChatRollTypeClassSuffix(chatRollType) {
-  const type = normalizeChatRollType(chatRollType);
-  return /^[a-z0-9-]+$/.test(type) ? type : CHAT_ROLL_TYPES.GENERIC;
-}
-
-function shouldDecorateChatRollMessage(message, actor) {
-  if (!message) return false;
-  const hasRoll = Array.isArray(message?.rolls) && message.rolls.length > 0;
-  const hasLuckFlag = Boolean(foundry.utils.getProperty(message, "flags.bloodman.luckRoll"));
-  const hasChatRollTypeFlag = Boolean(String(foundry.utils.getProperty(message, "flags.bloodman.chatRollType") || "").trim());
-  if (!hasRoll && !hasLuckFlag && !hasChatRollTypeFlag) return false;
-  const actorType = String(actor?.type || "");
-  return actorType === "personnage" || actorType === "personnage-non-joueur" || hasLuckFlag || hasChatRollTypeFlag;
-}
-
-function decorateBloodmanChatRollMessage(message, html) {
-  const root = html?.[0] || html;
-  if (!(root instanceof HTMLElement)) return;
-  if (root.classList.contains("bm-chat-roll")) return;
-
-  const actor = getChatSpeakerActor(message);
-  if (!shouldDecorateChatRollMessage(message, actor)) return;
-  const contentEl = root.querySelector(".message-content");
-  if (!contentEl) return;
-  if (contentEl.querySelector(".bm-chat-roll-frame")) return;
-
-  const tokenDoc = getChatSpeakerTokenDocument(message);
-  const tokenImage = resolveChatTokenImage(actor, tokenDoc);
-  const pseudo = resolveChatPseudoName(actor, message);
-  const accent = resolveChatAccentColor(message);
-  const chatRollType = resolveChatRollType(message);
-  const chatRollTypeClass = toChatRollTypeClassSuffix(chatRollType);
-  const chatRollTypeLabel = resolveChatRollTypeLabel(chatRollType);
-
-  const escapedPseudo = escapeChatMarkup(pseudo);
-  const escapedImage = escapeChatMarkup(tokenImage);
-  const escapedAccent = escapeChatMarkup(accent);
-  const escapedTypeLabel = escapeChatMarkup(chatRollTypeLabel);
-  const originalContent = contentEl.innerHTML;
-
-  contentEl.innerHTML = `<div class="bm-chat-roll-frame" style="--bm-chat-roll-author-accent:${escapedAccent};">
-    <div class="bm-chat-roll-head">
-      <span class="bm-chat-roll-accent-band" aria-hidden="true"></span>
-      <div class="bm-chat-roll-token"><img src="${escapedImage}" alt="${escapedPseudo}" /></div>
-      <div class="bm-chat-roll-pseudo-wrap">
-        <div class="bm-chat-roll-pseudo">${escapedPseudo}</div>
-        <div class="bm-chat-roll-type">${escapedTypeLabel}</div>
-      </div>
-    </div>
-    <div class="bm-chat-roll-inner bm-chat-roll-native">${originalContent}</div>
-  </div>`;
-  root.classList.add("bm-chat-roll", `bm-chat-roll--${chatRollTypeClass}`);
-  root.dataset.bmChatRollType = chatRollTypeClass;
-}
-
-async function flushInitiativeGroupBuffer(key) {
-  const entry = INITIATIVE_GROUP_BUFFER.get(key);
-  if (!entry) return;
-  INITIATIVE_GROUP_BUFFER.delete(key);
-  const messages = entry.messages.filter(message => message && !message.deleted);
-  if (messages.length <= 1) return;
-
-  const combat = game.combats?.get(entry.combatId) || game.combat || null;
-  const rows = messages.map(message => ({
-    name: getInitiativeNameFromMessage(message, combat),
-    total: getInitiativeRollTotalFromMessage(message, combat)
-  }));
-  rows.sort((a, b) => Number(b.total) - Number(a.total));
-
-  const contentRows = rows
-    .map(row => `<li><b>${row.name}</b> : ${row.total}</li>`)
-    .join("");
-  await ChatMessage.create({
-    speaker: { alias: combat?.name || "Initiative" },
-    content: `<div class="bm-initiative-group"><p><b>Initiatives (Lancer pour tous)</b></p><ul>${contentRows}</ul></div>`,
-    flags: { bloodman: { initiativeGroupSummary: true } }
-  }).catch(() => null);
-
-  for (const message of messages) {
-    if (!message?.id || !message.isOwner) continue;
-    await message.delete().catch(() => null);
-  }
-}
-
-function queueInitiativeRollMessage(message) {
-  const combatId = String(message?.speaker?.combat || game.combat?.id || "");
-  if (!combatId) return;
-  const key = `${combatId}:${game.user?.id || ""}`;
-  const existing = INITIATIVE_GROUP_BUFFER.get(key);
-  if (existing) {
-    existing.messages.push(message);
-    if (existing.timer) clearTimeout(existing.timer);
-    existing.timer = setTimeout(() => {
-      flushInitiativeGroupBuffer(key);
-    }, INITIATIVE_GROUP_BUFFER_MS);
-    return;
-  }
-  const timer = setTimeout(() => {
-    flushInitiativeGroupBuffer(key);
-  }, INITIATIVE_GROUP_BUFFER_MS);
-  INITIATIVE_GROUP_BUFFER.set(key, { combatId, messages: [message], timer });
-}
-
-function getDamagePayloadField(data, keys = []) {
-  if (!data || !Array.isArray(keys)) return undefined;
-  for (const key of keys) {
-    const value = data?.[key];
-    if (value == null || value === "") continue;
-    return value;
-  }
-  return undefined;
-}
-
-function toBooleanFlag(value) {
-  if (value === true) return true;
-  if (typeof value === "string") return value.trim().toLowerCase() === "true";
-  return false;
-}
+const initiativeGroupingHooks = buildInitiativeGroupingHooks({
+  initiativeGroupBufferMs: INITIATIVE_GROUP_BUFFER_MS,
+  getProperty: foundry.utils.getProperty,
+  getCombatantDisplayName,
+  escapeChatMarkup,
+  getGame: () => game,
+  createChatMessage: data => ChatMessage.create(data)
+});
+const { isInitiativeRollMessage, queueInitiativeRollMessage } = initiativeGroupingHooks;
 
 function isPowerUsableEnabled(value) {
   if (value == null || value === "") return true;
   return toBooleanFlag(value);
 }
 
-function normalizeRerollTarget(target, { includeAliases = false } = {}) {
-  const source = target && typeof target === "object" ? target : {};
-  const tokenId = String(getDamagePayloadField(source, ["tokenId", "tokenid", "token_id"]) || "");
-  const tokenUuid = String(getDamagePayloadField(source, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
-  const sceneId = String(getDamagePayloadField(source, ["sceneId", "sceneid", "scene_id"]) || "");
-  const actorId = String(getDamagePayloadField(source, ["actorId", "actorid", "actor_id"]) || "");
-  const targetActorLink = toBooleanFlag(
-    getDamagePayloadField(source, ["targetActorLink", "targetactorlink", "target_actor_link"])
-  );
-
-  const normalized = {
-    ...source,
-    tokenId,
-    tokenUuid,
-    sceneId,
-    actorId,
-    targetActorLink
-  };
-
-  if (includeAliases) {
-    normalized.tokenid = tokenId;
-    normalized.tokenuuid = tokenUuid;
-    normalized.sceneid = sceneId;
-    normalized.actorid = actorId;
-    normalized.targetactorlink = targetActorLink;
-  }
-
-  return normalized;
-}
-
-function normalizeRerollTargets(targets, { includeAliases = false } = {}) {
-  if (!Array.isArray(targets)) return [];
-  return targets.map(target => normalizeRerollTarget(target, { includeAliases }));
-}
-
-function buildFallbackRerollTargets(selectedTargets, requestedTotal) {
-  const selected = Array.isArray(selectedTargets) ? selectedTargets : [];
-  if (!selected.length) return [];
-  const baseShare = selected.length > 0 ? Math.floor(requestedTotal / selected.length) : 0;
-  let remainder = Math.max(0, requestedTotal - baseShare * selected.length);
-
-  return selected.map(token => {
-    const tokenDoc = token?.document || token;
-    const bonus = remainder > 0 ? 1 : 0;
-    if (remainder > 0) remainder -= 1;
-    return normalizeRerollTarget({
-      tokenId: tokenDoc?.id || token?.id || "",
-      tokenUuid: tokenDoc?.uuid || "",
-      sceneId: tokenDoc?.parent?.id || tokenDoc?.scene?.id || canvas?.scene?.id || "",
-      actorId: tokenDoc?.actorId || token?.actor?.id || "",
-      targetActorLink: Boolean(tokenDoc?.actorLink),
-      targetName: resolveCombatTargetName(tokenDoc?.name || token?.name, token?.actor?.name, "Cible"),
-      share: Math.max(0, baseShare + bonus),
-      baseShare: Math.max(0, baseShare + bonus),
-      hpBefore: Number(getTokenCurrentPv(tokenDoc)),
-      hpAfter: Number.NaN,
-      pending: true
-    });
-  }).filter(target => Number(target.share) > 0);
-}
-
-async function resolveDamageTokenDocument(data) {
-  if (!data) return null;
-  const tokenUuid = String(getDamagePayloadField(data, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
-  if (tokenUuid) {
-    const resolved = await fromUuid(tokenUuid).catch(() => null);
-    const tokenDoc = resolved?.document || resolved || null;
-    if (tokenDoc) return tokenDoc;
-  }
-  const sceneId = String(getDamagePayloadField(data, ["sceneId", "sceneid", "scene_id"]) || "");
-  const tokenId = String(getDamagePayloadField(data, ["tokenId", "tokenid", "token_id"]) || "");
-  if (sceneId && tokenId) {
-    const scene = game.scenes?.get(sceneId);
-    const tokenDoc = scene?.tokens?.get(tokenId) || null;
-    if (tokenDoc) return tokenDoc;
-  }
-  if (tokenId) {
-    const activeTokenDoc = canvas?.scene?.tokens?.get(tokenId) || null;
-    if (activeTokenDoc) return activeTokenDoc;
-    for (const scene of game.scenes || []) {
-      const candidate = scene?.tokens?.get(tokenId);
-      if (candidate) return candidate;
-    }
-  }
-
-  const actorId = String(getDamagePayloadField(data, ["actorId", "actorid", "actor_id"]) || "");
-  if (actorId) {
-    const targetNameRaw = String(getDamagePayloadField(data, ["targetName", "targetname", "target_name"]) || "").trim().toLowerCase();
-    const scenes = sceneId ? [game.scenes?.get(sceneId)].filter(Boolean) : Array.from(game.scenes || []);
-    const actorMatches = [];
-    for (const scene of scenes) {
-      for (const tokenDoc of scene?.tokens || []) {
-        if (String(tokenDoc?.actorId || "") !== actorId) continue;
-        actorMatches.push(tokenDoc);
-      }
-    }
-    if (actorMatches.length === 1) return actorMatches[0];
-    if (targetNameRaw) {
-      const named = actorMatches.filter(tokenDoc => {
-        const tokenName = String(tokenDoc?.name || "").trim().toLowerCase();
-        const actorName = String(tokenDoc?.actor?.name || "").trim().toLowerCase();
-        return tokenName === targetNameRaw || actorName === targetNameRaw;
-      });
-      if (named.length === 1) return named[0];
-    }
-  }
-  return null;
-}
-
-async function resolveDamageActors(tokenDoc, data) {
-  let tokenActor = tokenDoc?.actor || null;
-  if (!tokenActor && tokenDoc && typeof tokenDoc.getActor === "function") {
-    tokenActor = await tokenDoc.getActor().catch(() => null);
-  }
-  if (!tokenActor && tokenDoc?.object?.actor) tokenActor = tokenDoc.object.actor;
-
-  const actorUuid = String(getDamagePayloadField(data, ["actorUuid", "actoruuid", "actor_uuid"]) || "");
-  const actorId = String(getDamagePayloadField(data, ["actorId", "actorid", "actor_id"]) || "");
-  const uuidActor = actorUuid ? await fromUuid(actorUuid).catch(() => null) : null;
-  const worldActor = actorId ? game.actors.get(actorId) : null;
-  return { tokenActor, uuidActor, worldActor };
-}
-
-function resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent) {
-  if (Number.isFinite(fallbackCurrent)) return fallbackCurrent;
-  const tokenActorCurrent = Number(tokenActor?.system?.resources?.pv?.current);
-  if (Number.isFinite(tokenActorCurrent)) return tokenActorCurrent;
-  const tokenDeltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
-  if (Number.isFinite(tokenDeltaCurrent)) return tokenDeltaCurrent;
-  const tokenActorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
-  return tokenActorDataCurrent;
-}
-
-function getRerollTargetKey(target) {
-  if (!target) return "";
-  return String(
-    getDamagePayloadField(target, [
-      "tokenUuid", "tokenuuid", "token_uuid",
-      "tokenId", "tokenid", "token_id",
-      "actorId", "actorid", "actor_id"
-    ]) || ""
-  );
-}
-
-function isSameRerollTarget(a, b) {
-  if (!a || !b) return false;
-  const keyA = getRerollTargetKey(a);
-  const keyB = getRerollTargetKey(b);
-  if (keyA && keyB) return keyA === keyB;
-  const actorA = String(getDamagePayloadField(a, ["actorId", "actorid", "actor_id"]) || "");
-  const actorB = String(getDamagePayloadField(b, ["actorId", "actorid", "actor_id"]) || "");
-  if (actorA && actorB) return actorA === actorB;
-  const tokenA = String(getDamagePayloadField(a, ["tokenId", "tokenid", "token_id"]) || "");
-  const tokenB = String(getDamagePayloadField(b, ["tokenId", "tokenid", "token_id"]) || "");
-  if (tokenA && tokenB) return tokenA === tokenB;
-  const uuidA = String(getDamagePayloadField(a, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
-  const uuidB = String(getDamagePayloadField(b, ["tokenUuid", "tokenuuid", "token_uuid"]) || "");
-  return Boolean(uuidA && uuidB && uuidA === uuidB);
-}
-
-function isDamageRerollContextReady(context) {
-  if (!context || !Array.isArray(context.targets) || context.targets.length === 0) return false;
-  return context.targets.every(target => Number.isFinite(Number(target.hpBefore)));
-}
-
-function buildRerollAllocations(context, totalDamage) {
-  const targets = Array.isArray(context?.targets) ? context.targets : [];
-  if (targets.length === 0) return [];
-  if (targets.length === 1) {
-    const baseShare = Math.max(0, Math.floor(Number(targets[0]?.baseShare ?? targets[0]?.share ?? 0)));
-    return [{ ...targets[0], baseShare, share: Math.max(0, Math.floor(totalDamage)) }];
-  }
-  const originalTotal = Number(context.totalDamage || 0);
-  let remaining = Math.max(0, Math.floor(totalDamage));
-  const allocations = targets.map((target, index) => {
-    let share = 0;
-    if (Number.isFinite(originalTotal) && originalTotal > 0) {
-      if (index === targets.length - 1) {
-        share = remaining;
-      } else {
-        const ratio = Number(target.share || 0) / originalTotal;
-        share = Math.max(0, Math.floor(totalDamage * ratio));
-        remaining = Math.max(0, remaining - share);
-      }
-    } else {
-      share = index === targets.length - 1 ? remaining : 0;
-      remaining = Math.max(0, remaining - share);
-    }
-    const baseShare = Math.max(0, Math.floor(Number(target?.baseShare ?? target?.share ?? 0)));
-    return { ...target, baseShare, share };
-  });
-  return allocations;
-}
-
-function getRollValuesFromRoll(roll) {
-  const values = [];
-  for (const die of roll?.dice || []) {
-    for (const result of die?.results || []) {
-      const value = Number(result?.result);
-      if (Number.isFinite(value)) values.push(value);
-    }
-  }
-  return values;
-}
-
-function buildKeepHighestDamageTag(firstTotal, secondTotal, keptTotal) {
-  if (!Number.isFinite(firstTotal) || !Number.isFinite(secondTotal) || !Number.isFinite(keptTotal)) return "";
-  return `2 jets, garder le plus haut: ${firstTotal} / ${secondTotal} -> ${keptTotal}`;
-}
-
-async function evaluateRerollDamageFormula(formula, rollKeepHighest = false) {
-  const normalizedFormula = normalizeRollDieFormula(formula, "d4");
-  if (!rollKeepHighest) {
-    const roll = await new Roll(normalizedFormula).evaluate();
-    return {
-      roll,
-      rollResults: getRollValuesFromRoll(roll),
-      rawTotal: Number(roll.total) || 0,
-      modeTag: ""
-    };
-  }
-
-  const firstRoll = await new Roll(normalizedFormula).evaluate();
-  const secondRoll = await new Roll(normalizedFormula).evaluate();
-  const firstTotal = Number(firstRoll.total) || 0;
-  const secondTotal = Number(secondRoll.total) || 0;
-  const keepFirst = firstTotal >= secondTotal;
-  const keptRoll = keepFirst ? firstRoll : secondRoll;
-  const keptTotal = keepFirst ? firstTotal : secondTotal;
-  return {
-    roll: keptRoll,
-    rollResults: getRollValuesFromRoll(keptRoll),
-    rawTotal: keptTotal,
-    modeTag: buildKeepHighestDamageTag(firstTotal, secondTotal, keptTotal)
-  };
-}
-
-function emitDamageAppliedMessage(data, result, tokenDoc, share) {
-  const attackerUserId = String(data.attackerUserId || "");
-  if (!game.socket || !result) return;
-  const tokenId = tokenDoc?.id || String(data.tokenId || "");
-  const tokenUuid = tokenDoc?.uuid || String(data.tokenUuid || "");
-  const sceneId = tokenDoc?.parent?.id || tokenDoc?.scene?.id || String(data.sceneId || "");
-  const actorId = tokenDoc?.actorId || String(data.actorId || "");
-  const targetActorLink = tokenDoc ? Boolean(tokenDoc.actorLink) : data.targetActorLink === true;
-  const targetName = resolveCombatTargetName(
-    tokenDoc?.name || data.targetName,
-    tokenDoc?.actor?.name,
-    data.targetName || tokenDoc?.name || ""
-  );
-  game.socket.emit(SYSTEM_SOCKET, {
-    type: "damageApplied",
-    kind: String(data.kind || "item-damage"),
-    rerollUsed: Boolean(data.rerollUsed),
-    attackerUserId,
-    attackerId: String(data.attackerId || data.attaquant_id || ""),
-    rollId: String(data.rollId || ""),
-    itemId: String(data.itemId || ""),
-    itemName: String(data.itemName || ""),
-    itemType: String(data.itemType || ""),
-    damageFormula: String(data.damageFormula || ""),
-    damageLabel: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
-    bonusBrut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
-    rollKeepHighest: data.rollKeepHighest === true,
-    penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration ?? data.penetration_plus, 0))),
-    totalDamage: Number(data.totalDamage),
-    target: {
-      tokenId,
-      tokenUuid,
-      sceneId,
-      actorId,
-      targetActorLink,
-      targetName,
-      share: Math.max(0, Math.floor(Number(share) || 0)),
-      hpBefore: Number(result.hpBefore),
-      hpAfter: Number(result.hpAfter),
-      finalDamage: Number(result.finalDamage)
-    }
-  });
-}
-
-function canCurrentUserReceiveDamageConfigPopup(data) {
-  const localUserId = String(game.user?.id || "").trim();
-  if (!localUserId) return false;
-  const requesterUserId = String(data?.requesterUserId || "").trim();
-  if (requesterUserId && requesterUserId === localUserId) return false;
-
-  const viewerIds = Array.isArray(data?.viewerIds)
-    ? data.viewerIds.map(id => String(id || "").trim()).filter(Boolean)
-    : [];
-  if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
-
-  if (game.user?.isGM) return true;
-  return isAssistantOrHigherRole(game.user?.role);
-}
-
-function showDamageConfigObserverPopup(data) {
-  if (!data || typeof Dialog !== "function") return false;
-  const requestId = String(data.requestId || "").trim();
-  const action = String(data.action || "open").trim().toLowerCase() || "open";
-  if (action === "close") return closeDamageConfigObserverDialog(requestId);
-
-  const state = buildDamageConfigObserverState(data);
-  const existing = requestId ? ACTIVE_DAMAGE_CONFIG_POPUPS.get(requestId) : null;
-  if (existing?.element?.length) {
-    return updateDamageConfigObserverDialog(existing, state);
-  }
-  if (existing) ACTIVE_DAMAGE_CONFIG_POPUPS.delete(requestId);
-
-  const content = getDamageConfigObserverContent(state);
-  const dialog = new Dialog(
-    {
-      title: state.title,
-      content,
-      buttons: {
-        ok: { label: "OK" }
-      },
-      default: "ok",
-      close: () => {
-        if (!requestId) return;
-        const current = ACTIVE_DAMAGE_CONFIG_POPUPS.get(requestId);
-        if (current === dialog) ACTIVE_DAMAGE_CONFIG_POPUPS.delete(requestId);
-      }
-    },
-    {
-      classes: state?.isSimpleAttackVariant
-        ? ["bloodman-damage-dialog", "bloodman-damage-dialog-simple-attack"]
-        : ["bloodman-damage-dialog"],
-      width: 500
-    }
-  );
-  dialog.render(true);
-  if (requestId) ACTIVE_DAMAGE_CONFIG_POPUPS.set(requestId, dialog);
-  return true;
-}
-
-async function handleDamageConfigPopupMessage(data, source = "socket") {
-  if (!data) return false;
-  const eventId = String(data.eventId || "").trim();
-  if (eventId && wasDamageConfigPopupRequestProcessed(eventId)) return false;
-  if (eventId) rememberDamageConfigPopupRequest(eventId);
-  if (!canCurrentUserReceiveDamageConfigPopup(data)) return false;
-  const shown = showDamageConfigObserverPopup(data);
-  if (!shown) bmLog.warn("[bloodman] damage:config popup display failed", { source, eventId, payload: data });
-  return shown;
-}
-
-function getPowerUsePopupViewerIds(requesterUserId = "", options = {}) {
-  const requesterId = String(requesterUserId || "").trim();
-  const includeRequesterUser = options?.includeRequesterUser === true;
-  return getActivePrivilegedOperatorIds()
-    .filter(userId => includeRequesterUser || !requesterId || userId !== requesterId);
-}
-
-function getPopupItemLabel(itemType) {
-  return String(itemType || "").trim().toLowerCase() === "aptitude" ? "Aptitude" : "Pouvoir";
-}
-
-function emitPowerUsePopup(actor, item, options = {}) {
-  if (!game.socket || !actor || !item) return false;
-  const popupItemType = String(item.type || "").trim().toLowerCase();
-  if (popupItemType !== "pouvoir" && popupItemType !== "aptitude") return false;
-  const requesterUserId = String(game.user?.id || "").trim();
-  const includeRequesterUser = options?.includeRequesterUser === true;
-  const viewerIds = getPowerUsePopupViewerIds(requesterUserId, { includeRequesterUser });
-  if (!viewerIds.length) return false;
-  const randomId = () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2));
-  const powerDamageFormula = item.system?.damageEnabled ? normalizeRollDieFormula(item.system?.damageDie, "d4") : "";
-  const popupItemLabel = getPopupItemLabel(popupItemType);
-  const hasPowerCost = popupItemType === "pouvoir" && toBooleanFlag(item.system?.powerCostEnabled);
-  const payload = {
-    type: "powerUsePopup",
-    eventId: randomId(),
-    requestId: String(options.requestId || randomId()),
-    requesterUserId,
-    requesterUserName: String(game.user?.name || "").trim(),
-    viewerIds,
-    actorId: String(actor.id || ""),
-    actorName: String(actor.name || "").trim(),
-    itemId: String(item.id || ""),
-    itemType: popupItemType,
-    itemLabel: popupItemLabel,
-    itemName: String(item.name || "").trim() || popupItemLabel,
-    powerId: String(item.id || ""),
-    powerName: String(item.name || "").trim() || popupItemLabel,
-    powerDescription: String(item.system?.note || item.system?.notes || "").trim(),
-    powerCostEnabled: hasPowerCost,
-    powerCost: hasPowerCost ? Math.max(0, Math.floor(toFiniteNumber(item.system?.powerCost, 0))) : 0,
-    damageEnabled: toBooleanFlag(item.system?.damageEnabled),
-    damageFormula: String(powerDamageFormula || "").trim(),
-    context: {
-      fromUseButton: options.fromUseButton === true
-    }
-  };
-  try {
-    game.socket.emit(SYSTEM_SOCKET, payload);
-  } catch (error) {
-    bmLog.error("[bloodman] power:popup socket emit failed", error);
-  }
-  if (ENABLE_CHAT_TRANSPORT_FALLBACK && typeof ChatMessage?.create === "function") {
-    void ChatMessage.create({
-      content: POWER_USE_POPUP_CHAT_MARKUP,
-      whisper: viewerIds,
-      flags: { bloodman: { powerUsePopup: payload } }
-    }).catch(error => {
-      bmLog.error("[bloodman] power:popup chat fallback failed", error);
-    });
-  }
-  return true;
-}
-
-function canCurrentUserReceivePowerUsePopup(data) {
-  const localUserId = String(game.user?.id || "").trim();
-  if (!localUserId) return false;
-  if (game.user?.isGM) return true;
-  const requesterUserId = String(data?.requesterUserId || "").trim();
-  const isRequester = requesterUserId && requesterUserId === localUserId;
-  const viewerIds = Array.isArray(data?.viewerIds)
-    ? data.viewerIds.map(id => String(id || "").trim()).filter(Boolean)
-    : [];
-  if (isRequester && viewerIds.length && !viewerIds.includes(localUserId)) return false;
-  if (isRequester && !viewerIds.length) return false;
-  if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
-  return isAssistantOrHigherRole(game.user?.role);
-}
-
-function showPowerUsePopup(data) {
-  if (!data || typeof Dialog !== "function") return false;
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
-  const actorName = String(data.actorName || "").trim();
-  const requesterUserName = String(data.requesterUserName || "").trim();
-  const popupItemType = String(data.itemType || "").trim().toLowerCase();
-  const popupItemLabel = getPopupItemLabel(popupItemType);
-  const powerName = String(data.itemName || data.powerName || "").trim() || popupItemLabel;
-  const descriptionHtml = formatMultilineTextToHtml(data.powerDescription);
-  const noDescriptionText = escapeHtml("Aucune description.");
-  const damageEnabled = data.damageEnabled === true;
-  const damageFormula = String(data.damageFormula || "").trim().toUpperCase();
-  const damageText = damageEnabled && damageFormula ? damageFormula : "Aucun";
-  const powerCostEnabled = data.powerCostEnabled === true;
-  const powerCost = Math.max(0, Math.floor(toFiniteNumber(data.powerCost, 0)));
-  const costText = powerCostEnabled ? `${powerCost} PP` : "Aucun";
-  const actorLabel = escapeHtml(actorName || "Joueur");
-  const requesterLabel = escapeHtml(requesterUserName || actorName || "Joueur");
-  const powerLabel = escapeHtml(powerName);
-  const itemLabel = escapeHtml(popupItemLabel);
-  const damageLabel = escapeHtml(damageText);
-  const costLabel = escapeHtml(costText);
-  const title = `${popupItemLabel} utilise - ${actorName || requesterUserName || "Joueur"}`;
-  const content = `<div class="bm-power-use-popup">
-    <p><strong>Joueur :</strong> ${requesterLabel}</p>
-    <p><strong>Personnage :</strong> ${actorLabel}</p>
-    <p><strong>${itemLabel} :</strong> ${powerLabel}</p>
-    <p><strong>Cout :</strong> ${costLabel}</p>
-    <p><strong>Degats :</strong> ${damageLabel}</p>
-    <p><strong>Description :</strong></p>
-    <p>${descriptionHtml || noDescriptionText}</p>
-  </div>`;
-  const dialog = new Dialog(
-    {
-      title,
-      content,
-      buttons: {
-        ok: { label: "OK" }
-      },
-      default: "ok"
-    },
-    {
-      classes: ["bloodman-damage-dialog", "bloodman-power-use-dialog"],
-      width: 480
-    }
-  );
-  dialog.render(true);
-  return true;
-}
-
-async function handlePowerUsePopupMessage(data, source = "socket") {
-  if (!data) return false;
-  const eventId = String(data.eventId || data.requestId || "").trim();
-  if (eventId && wasPowerUsePopupRequestProcessed(eventId)) return false;
-  if (eventId) rememberPowerUsePopupRequest(eventId);
-  if (!canCurrentUserReceivePowerUsePopup(data)) return false;
-  const shown = showPowerUsePopup(data);
-  if (!shown) bmLog.warn("[bloodman] power:popup display failed", { source, eventId, payload: data });
-  return shown;
-}
-
-async function handleDamageAppliedMessage(data) {
-  if (!data) return;
-  const attackerUserId = String(data.attackerUserId || "");
-  const localUserId = String(game.user?.id || "");
-  if (attackerUserId && attackerUserId !== localUserId) return;
-  const attackers = resolveAttackerActorInstancesForDamageApplied(data);
-  if (!attackers.length) return;
-  if (!attackerUserId && !attackers.some(actor => actor.isOwner)) return;
-  const rollId = String(data.rollId || "");
-  const itemId = String(data.itemId || "");
-  const target = normalizeRerollTarget(data.target || {});
-  const key = getRerollTargetKey(target);
-
-  let context = attackers[0]?._lastDamageReroll;
-  if (!context || context.rollId !== rollId) {
-    context = {
-      kind: String(data.kind || "item-damage"),
-      rollId,
-      itemId,
-      itemType: String(data.itemType || ""),
-      itemName: String(data.itemName || ""),
-      attackerId: String(data.attackerId || data.attaquant_id || attackers[0]?.id || ""),
-      attackerUserId: String(data.attackerUserId || ""),
-      formula: String(data.damageFormula || "1d4"),
-      degats: String(data.damageLabel || data.degats || "").trim().toUpperCase(),
-      bonusBrut: Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0))),
-      rollKeepHighest: data.rollKeepHighest === true,
-      penetration: Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0))),
-      totalDamage: Number(data.totalDamage),
-      targets: []
-    };
-  }
-  if (!context.itemId) context.itemId = itemId;
-  if (!context.itemType && data.itemType) context.itemType = String(data.itemType);
-  if (!context.itemType && context.itemId) {
-    for (const attacker of attackers) {
-      const candidateType = attacker?.items?.get(context.itemId)?.type;
-      if (candidateType) {
-        context.itemType = String(candidateType);
-        break;
-      }
-    }
-  }
-  context.itemType = String(context.itemType || "").toLowerCase();
-  context.kind = String(context.kind || "item-damage");
-  if (!context.itemName && data.itemName) context.itemName = String(data.itemName);
-  if (!context.formula && data.damageFormula) context.formula = String(data.damageFormula);
-  if (!context.degats && (data.damageLabel || data.degats)) context.degats = String(data.damageLabel || data.degats).trim().toUpperCase();
-  if (!Number.isFinite(Number(context.bonusBrut)) && Number.isFinite(Number(data.bonusBrut ?? data.bonus_brut))) {
-    context.bonusBrut = Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0)));
-  }
-  if (typeof context.rollKeepHighest !== "boolean") {
-    context.rollKeepHighest = data.rollKeepHighest === true;
-  }
-  if (!Number.isFinite(Number(context.penetration)) && Number.isFinite(Number(data.penetration))) {
-    context.penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
-  }
-  if (!Number.isFinite(Number(context.totalDamage)) && Number.isFinite(Number(data.totalDamage))) {
-    context.totalDamage = Number(data.totalDamage);
-  }
-
-  const existing = context.targets.find(entry => isSameRerollTarget(entry, target));
-  if (existing) {
-    Object.assign(existing, target);
-    if (!Number.isFinite(Number(existing.baseShare))) {
-      existing.baseShare = Math.max(0, Math.floor(Number(existing.share || 0)));
-    }
-  } else if (key || target.actorId || target.tokenId || target.tokenUuid) {
-    context.targets.push({
-      ...target,
-      baseShare: Math.max(0, Math.floor(Number(target.share || 0)))
-    });
-  }
-
-  const itemRerollState = {
-    itemId: context.itemId,
-    rollId: context.rollId,
-    at: Date.now(),
-    damage: context
-  };
-  const actorInstances = [];
-  const seen = new Set();
-  for (const actor of attackers) {
-    for (const instance of getActorInstancesById(actor.id)) {
-      const keyRef = String(instance.uuid || `${instance.id}:${instance.parent?.uuid || instance.parent?.id || "world"}`);
-      if (seen.has(keyRef)) continue;
-      seen.add(keyRef);
-      actorInstances.push(instance);
-    }
-  }
-  if (!actorInstances.length) {
-    for (const actor of attackers) {
-      const keyRef = String(actor.uuid || `${actor.id}:${actor.parent?.uuid || actor.parent?.id || "world"}`);
-      if (seen.has(keyRef)) continue;
-      seen.add(keyRef);
-      actorInstances.push(actor);
-    }
-  }
-  for (const actorInstance of actorInstances) {
-    actorInstance._lastDamageReroll = context;
-    actorInstance._lastItemReroll = itemRerollState;
-    if (actorInstance.sheet?.rendered) actorInstance.sheet.render(false);
-  }
-}
-
-async function handleDamageRerollRequest(data) {
-  if (!data || !game.user.isGM) return;
-  const requestId = String(data.requestId || "");
-  if (requestId && wasRerollRequestProcessed(requestId)) return;
-  if (requestId) rememberRerollRequest(requestId);
-  const kind = String(data.kind || "item-damage");
-  if (kind !== "item-damage") return;
-  let itemType = String(data.itemType || "").toLowerCase();
-  if (!isDamageRerollItemType(itemType)) {
-    const attacker = game.actors?.get(String(data.attackerId || ""));
-    const item = attacker?.items?.get(String(data.itemId || ""));
-    itemType = String(item?.type || itemType).toLowerCase();
-  }
-  if (!isDamageRerollItemType(itemType)) {
-    bmLog.warn("reroll:ignored non-damage item", {
-      rollId: data.rollId,
-      itemId: data.itemId,
-      itemType
-    });
-    return;
-  }
-  const targets = normalizeRerollTargets(data.targets);
-  if (!targets.length) return;
-  const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
-  bmLog.debug("reroll:recv", {
-    attackerUserId: data.attackerUserId,
-    attackerId: data.attackerId,
-    rollId: data.rollId,
-    itemId: data.itemId,
-    totalDamage: data.totalDamage,
-    penetration,
-    targetCount: targets.length
-  });
-
-  for (const target of targets) {
-    const share = Math.max(0, Math.floor(Number(target.share || 0)));
-    const tokenDoc = await resolveDamageTokenDocument(target);
-    if (!tokenDoc) {
-      bmLog.warn("reroll:target unresolved", {
-        rollId: data.rollId,
-        target
-      });
-    }
-    const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : toBooleanFlag(target.targetActorLink);
-    const targetActor = tokenIsLinked
-      ? (tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null))
-      : null;
-    const rawHpBefore = target?.hpBefore;
-    let hpBefore = (rawHpBefore == null || rawHpBefore === "")
-      ? Number.NaN
-      : Number(rawHpBefore);
-    if (!Number.isFinite(hpBefore)) {
-      const referenceShare = Math.max(0, Math.floor(Number(target.baseShare ?? target.share ?? 0)));
-      if (targetActor) {
-        const currentHp = Number(targetActor.system?.resources?.pv?.current);
-        if (Number.isFinite(currentHp)) {
-          const paInitial = getProtectionPA(targetActor);
-          const paEffective = Math.max(0, paInitial - penetration);
-          const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
-          hpBefore = currentHp + estimatedFinalDamage;
-        }
-      } else if (tokenDoc) {
-        const currentHp = Number(getTokenCurrentPv(tokenDoc));
-        if (Number.isFinite(currentHp)) {
-          const paInitial = getProtectionPA(tokenDoc.actor || null);
-          const paEffective = Math.max(0, paInitial - penetration);
-          const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
-          hpBefore = currentHp + estimatedFinalDamage;
-        }
-      }
-    }
-    if (Number.isFinite(hpBefore)) {
-      if (tokenIsLinked && targetActor) {
-        await targetActor.update({ "system.resources.pv.current": hpBefore });
-      } else if (tokenDoc) {
-        await tokenDoc.update({ "delta.system.resources.pv.current": hpBefore });
-      }
-      if (tokenDoc) {
-        const actorType = getTokenActorType(tokenDoc);
-        if (actorType) await syncZeroPvStatusForToken(tokenDoc, actorType, hpBefore);
-      }
-    }
-    const restoredPv = tokenIsLinked && targetActor
-      ? Number(targetActor.system?.resources?.pv?.current)
-      : Number(getTokenCurrentPv(tokenDoc));
-    const okRestored = Number.isFinite(hpBefore)
-      ? validateNumericEquality(restoredPv, hpBefore)
-      : false;
-
-    const targetName = resolveCombatTargetName(
-      target.targetName || tokenDoc?.name,
-      targetActor?.name,
-      "Cible"
-    );
-    let result = null;
-    if (!share && Number.isFinite(hpBefore)) {
-      result = {
-        hpBefore,
-        hpAfter: hpBefore,
-        finalDamage: 0,
-        penetration,
-        paInitial: 0,
-        paEffective: 0,
-        pa: 0
-      };
-    } else if (tokenIsLinked && targetActor) {
-      result = await applyDamageToActor(targetActor, share, { targetName, penetration });
-    } else if (tokenDoc && Number.isFinite(hpBefore)) {
-      const paInitial = getProtectionPA(tokenDoc.actor || null);
-      const paEffective = Math.max(0, paInitial - penetration);
-      const finalDamage = Math.max(0, share - paEffective);
-      const nextValue = Math.max(0, hpBefore - finalDamage);
-      await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
-      await postDamageTakenChatMessage({
-        name: targetName,
-        amount: finalDamage,
-        pa: paEffective,
-        speakerAlias: targetName
-      });
-      result = {
-        hpBefore,
-        hpAfter: nextValue,
-        finalDamage,
-        penetration,
-        paInitial,
-        paEffective,
-        pa: paEffective
-      };
-    }
-    const expectedHpAfter = result
-      ? Math.max(0, Number(hpBefore) - Math.max(0, Number(result.finalDamage || 0)))
-      : Number.NaN;
-    const okReapplied = result
-      ? validateNumericEquality(result.hpAfter, expectedHpAfter)
-      : false;
-    logDamageRerollValidation("gm-socket-target", {
-      rollId: data.rollId,
-      itemId: data.itemId,
-      itemType,
-      targetName,
-      share,
-      hpBefore,
-      restoredPv,
-      okRestored,
-      hpAfter: result?.hpAfter,
-      expectedHpAfter,
-      finalDamage: result?.finalDamage,
-      okReapplied
-    });
-
-    if (result) {
-      if (tokenDoc) {
-        const actorType = getTokenActorType(tokenDoc);
-        if (actorType && Number.isFinite(result.hpAfter)) {
-          await syncZeroPvStatusForToken(tokenDoc, actorType, result.hpAfter);
-        }
-      }
-      emitDamageAppliedMessage({ ...data, ...target }, result, tokenDoc, share);
-    }
-  }
-}
-
-async function handleIncomingDamageRequest(data, source = "socket") {
-  if (!data || !game.user.isGM) return;
-  const requestId = typeof data.requestId === "string" ? data.requestId : "";
-  if (requestId && wasDamageRequestProcessed(requestId)) return;
-  if (requestId) rememberDamageRequest(requestId);
-
-  bmLog.debug("damage:recv", { source, ...data });
-
-  const tokenDoc = await resolveDamageTokenDocument(data);
-  const { tokenActor, uuidActor, worldActor } = await resolveDamageActors(tokenDoc, data);
-  const share = Number(data.damage);
-  if (!Number.isFinite(share) || share <= 0) return;
-  const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration ?? data.penetration_plus, 0)));
-  const tokenIsLinked = data.targetActorLink === true || tokenDoc?.actorLink === true;
-  const fallbackCurrent = Number(data.targetPvCurrent);
-  const fallbackPA = Number(data.targetPA);
-  const fallbackName = resolveCombatTargetName(
-    data.targetName || tokenDoc?.name,
-    tokenActor?.name || uuidActor?.name || worldActor?.name,
-    "Cible"
-  );
-
-  if (tokenDoc && !tokenIsLinked) {
-    const current = resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent);
-    if (!Number.isFinite(current)) return;
-    const paInitial = Number.isFinite(fallbackPA) ? fallbackPA : 0;
-    const paEffective = Math.max(0, paInitial - penetration);
-    const finalDamage = Math.max(0, share - paEffective);
-    const nextValue = Math.max(0, current - finalDamage);
-    bmLog.debug("damage:apply token-unlinked", { current, paInitial, paEffective, penetration, share, finalDamage, nextValue, tokenId: tokenDoc.id });
-    try {
-      await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
-    } catch (error) {
-      bmLog.error("damage:update tokenDoc failed", { error });
-    }
-    await postDamageTakenChatMessage({
-      name: fallbackName,
-      amount: finalDamage,
-      pa: paEffective,
-      speakerAlias: fallbackName
-    });
-    const result = {
-      finalDamage,
-      penetration,
-      paInitial,
-      paEffective,
-      hpBefore: current,
-      hpAfter: nextValue
-    };
-    emitDamageAppliedMessage(data, result, tokenDoc, share);
-    bmLog.debug("damage:output", {
-      degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
-      jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
-      bonus_brut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
-      penetration,
-      armure_initiale: paInitial,
-      armure_effective: paEffective,
-      degats_totaux: finalDamage,
-      points_de_vie_avant: current,
-      points_de_vie_apres: nextValue,
-      icones_a_afficher: nextValue <= 0 ? [(tokenActor?.type === "personnage-non-joueur" ? "mort" : "sang")] : [],
-      erreur: null
-    });
-    return;
-  }
-
-  if (tokenActor) {
-    bmLog.debug("damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
-    const result = await applyDamageToActor(tokenActor, share, { targetName: fallbackName, penetration });
-    if (result) {
-      emitDamageAppliedMessage(data, result, tokenDoc, share);
-      bmLog.debug("damage:output", {
-        degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
-        jet_de: Array.isArray(data.rollResults) ? data.rollResults : [],
-        bonus_brut: Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0))),
-        penetration: result.penetration,
-        armure_initiale: result.paInitial,
-        armure_effective: result.paEffective,
-        degats_totaux: result.finalDamage,
-        points_de_vie_avant: result.hpBefore,
-        points_de_vie_apres: result.hpAfter,
-        icones_a_afficher: result.hpAfter <= 0 ? [(tokenActor.type === "personnage-non-joueur" ? "mort" : "sang")] : [],
-        erreur: null
-      });
-    }
-    return;
-  }
-  if (uuidActor) {
-    bmLog.debug("damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
-    const result = await applyDamageToActor(uuidActor, share, { targetName: fallbackName, penetration });
-    if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
-    return;
-  }
-  if (worldActor) {
-    bmLog.debug("damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
-    const result = await applyDamageToActor(worldActor, share, { targetName: fallbackName, penetration });
-    if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
-    return;
-  }
-  if (Number.isFinite(fallbackCurrent)) {
-    const paInitial = Number.isFinite(fallbackPA) ? fallbackPA : 0;
-    const paEffective = Math.max(0, paInitial - penetration);
-    const finalDamage = Math.max(0, share - paEffective);
-    await postDamageTakenChatMessage({
-      name: fallbackName,
-      amount: finalDamage,
-      pa: paEffective,
-      speakerAlias: fallbackName
-    });
-    return;
-  }
-  safeWarn(t("BLOODMAN.Notifications.DamageTargetResolveFailed"));
-}
-
-async function resolveActorForVitalResourceUpdate(data) {
-  const actorBaseId = String(data?.actorBaseId || "");
-  const actorId = String(data?.actorId || "");
-  const worldActorId = actorBaseId || actorId;
-  const worldActor = worldActorId ? (game.actors?.get(worldActorId) || null) : null;
-  const actorUuid = String(data?.actorUuid || "");
-  if (actorUuid) {
-    const resolved = await fromUuid(actorUuid).catch(() => null);
-    const candidate = resolved?.document || resolved || null;
-    const actor = candidate?.documentName === "Actor"
-      ? candidate
-      : (candidate?.actor?.documentName === "Actor" ? candidate.actor : null);
-    if (actor) {
-      // Linked player tokens must update the world actor, not a synthetic token actor.
-      if (actor.type === "personnage" && worldActor) return worldActor;
-      if (actor.type === "personnage" && actor.isToken && Boolean(actor.token?.actorLink) && worldActor) return worldActor;
-      return actor;
-    }
-  }
-  return worldActor;
-}
-
-async function resolveActorForSheetRequest(data) {
-  const actorBaseId = String(data?.actorBaseId || "");
-  const actorId = String(data?.actorId || "");
-  const worldActorId = actorBaseId || actorId;
-  const worldActor = worldActorId ? (game.actors?.get(worldActorId) || null) : null;
-  const actorUuid = String(data?.actorUuid || "");
-  if (actorUuid) {
-    const resolved = await fromUuid(actorUuid).catch(() => null);
-    const candidate = resolved?.document || resolved || null;
-    const actor = candidate?.documentName === "Actor"
-      ? candidate
-      : (candidate?.actor?.documentName === "Actor" ? candidate.actor : null);
-    if (actor) {
-      // Linked player tokens must route updates/deletes to the world actor.
-      if (actor.type === "personnage" && worldActor) return worldActor;
-      if (actor.type === "personnage" && actor.isToken && Boolean(actor.token?.actorLink) && worldActor) return worldActor;
-      return actor;
-    }
-  }
-  return worldActor;
-}
-
-function sanitizeActorUpdateForRole(updateData, role, options = {}) {
-  const sanitized = foundry.utils.deepClone(updateData || {});
-  const basicPlayer = isBasicPlayerRole(role);
-  const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
-  const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
-  const allowAmmoUpdate = Boolean(options.allowAmmoUpdate);
-  const enforceCharacteristicBaseRange = options.enforceCharacteristicBaseRange !== false;
-  if (basicPlayer && !allowCharacteristicBase) {
-    stripUnauthorizedCharacteristicBaseUpdates(sanitized);
-  }
-  if (basicPlayer && !allowVitalResourceUpdate) {
-    stripUpdatePaths(sanitized, Array.from(VITAL_RESOURCE_PATHS));
-  }
-  if (basicPlayer) {
-    stripUpdatePaths(sanitized, STATE_MODIFIER_PATHS);
-  }
-  if (!isAssistantOrHigherRole(role)) {
-    stripUpdatePaths(sanitized, ACTOR_TOKEN_IMAGE_UPDATE_PATHS);
-    if (!allowAmmoUpdate) stripUpdatePaths(sanitized, AMMO_UPDATE_PATHS);
-  }
-  normalizeActorAmmoUpdateData(options.actor || null, sanitized);
-  normalizeCharacteristicXpUpdates(sanitized, options.actor || null);
-  if (enforceCharacteristicBaseRange) normalizeCharacteristicBaseUpdatesForRole(sanitized, role);
-  return sanitized;
-}
-
-function hasActorUpdatePayload(updateData) {
-  if (!updateData || typeof updateData !== "object") return false;
-  return Object.keys(foundry.utils.flattenObject(updateData)).length > 0;
-}
-
-function normalizeVitalResourceValue(actor, path, value) {
-  const numeric = Math.max(0, Math.floor(toFiniteNumber(value, 0)));
-  if (path === "system.resources.pv.current") {
-    const max = toFiniteNumber(actor.system?.resources?.pv?.max, numeric);
-    return Math.min(numeric, Math.max(0, max));
-  }
-  if (path === "system.resources.pp.current") {
-    const max = toFiniteNumber(actor.system?.resources?.pp?.max, numeric);
-    return Math.min(numeric, Math.max(0, max));
-  }
-  return numeric;
-}
-
-async function handleVitalResourceUpdateRequest(data) {
-  if (!game.user.isGM || !data) return;
-  const requesterId = String(data.requesterId || "");
-  const requester = game.users?.get(requesterId);
-  if (!requester) return;
-  const requesterRole = game.users?.get(requesterId)?.role ?? 0;
-  if (!canUserRoleEditCharacteristics(requesterRole)) return;
-
-  const path = String(data.path || "");
-  if (!VITAL_RESOURCE_PATHS.has(path)) return;
-
-  const actor = await resolveActorForVitalResourceUpdate(data);
-  if (!actor) return;
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-
-  const normalizedValue = normalizeVitalResourceValue(actor, path, data.value);
-  await actor.update({ [path]: normalizedValue });
-}
-
-async function handleActorSheetUpdateRequest(data) {
-  if (!game.user.isGM || !data) return;
-  const requesterId = String(data.requesterId || "");
-  const requester = game.users?.get(requesterId);
-  if (!requester) return;
-  const requesterRole = game.users?.get(requesterId)?.role ?? 0;
-  const actor = await resolveActorForSheetRequest(data);
-  if (!actor) return;
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  const allowCharacteristicBase = Boolean(data?.options?.allowCharacteristicBase);
-  const allowVitalResourceUpdate = Boolean(data?.options?.allowVitalResourceUpdate);
-  const allowAmmoUpdate = Boolean(data?.options?.allowAmmoUpdate);
-  const sanitized = sanitizeActorUpdateForRole(data.updateData || {}, requesterRole, {
-    actor,
-    allowCharacteristicBase,
-    allowVitalResourceUpdate,
-    allowAmmoUpdate,
-    enforceCharacteristicBaseRange: actor.type === "personnage"
-  });
-  if (!hasActorUpdatePayload(sanitized)) return;
-  await actor.update(sanitized, {
-    bloodmanAllowCharacteristicBase: allowCharacteristicBase,
-    bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate,
-    bloodmanAllowAmmoUpdate: allowAmmoUpdate
-  });
-}
-
-async function handleDeleteItemRequest(data) {
-  if (!game.user.isGM || !data) return;
-  const requesterId = String(data.requesterId || "");
-  const requester = game.users?.get(requesterId);
-  if (!requester) return;
-  const initialActor = await resolveActorForSheetRequest(data);
-  if (!initialActor) return;
-
-  const extractItemIdFromUuid = uuid => {
-    const raw = String(uuid || "");
-    const match = raw.match(/Item\.([^\.]+)$/);
-    return match?.[1] || "";
-  };
-
-  const actorCandidates = [];
-  const addActor = candidate => {
-    if (!candidate) return;
-    if (actorCandidates.some(existing => existing?.id === candidate?.id && existing?.uuid === candidate?.uuid)) return;
-    actorCandidates.push(candidate);
-  };
-
-  addActor(initialActor);
-  const worldActorId = String(data.actorBaseId || data.actorId || "");
-  if (worldActorId) addActor(game.actors?.get(worldActorId) || null);
-  if (initialActor?.isToken && initialActor?.token?.actorId) {
-    addActor(game.actors?.get(initialActor.token.actorId) || null);
-  }
-
-  const requestedItemId = String(data.itemId || "") || extractItemIdFromUuid(data.itemUuid);
-  const candidateItemIds = [];
-  if (requestedItemId) candidateItemIds.push(requestedItemId);
-  const uuidItemId = extractItemIdFromUuid(data.itemUuid);
-  if (uuidItemId && !candidateItemIds.includes(uuidItemId)) candidateItemIds.push(uuidItemId);
-
-  const deleteFromActorById = async (actor, itemId) => {
-    if (!actor || !itemId) return false;
-    if (!actor.items?.has(itemId)) return false;
-    try {
-      await actor.deleteEmbeddedDocuments("Item", [itemId], { render: false });
-      return true;
-    } catch (_error) {
-      const item = actor.items?.get(itemId);
-      if (!item) return false;
-      try {
-        await item.delete();
-        return true;
-      } catch (_fallbackError) {
-        return false;
-      }
-    }
-  };
-
-  for (const actor of actorCandidates) {
-    for (const itemId of candidateItemIds) {
-      if (await deleteFromActorById(actor, itemId)) return;
-    }
-  }
-
-  const itemName = String(data.itemName || "").trim().toLowerCase();
-  const itemType = String(data.itemType || "").trim().toLowerCase();
-  if (itemName) {
-    for (const actor of actorCandidates) {
-      const match = actor?.items?.find(item => {
-        if (!item) return false;
-        if (String(item.name || "").trim().toLowerCase() !== itemName) return false;
-        if (itemType && String(item.type || "").trim().toLowerCase() !== itemType) return false;
-        return true;
-      });
-      if (match && await deleteFromActorById(actor, match.id)) return;
-    }
-  }
-}
-
-async function handleReorderActorItemsRequest(data) {
-  if (!game.user.isGM || !data) return;
-  const requesterId = String(data.requesterId || "");
-  const requester = game.users?.get(requesterId);
-  if (!requester) return;
-  const actor = await resolveActorForSheetRequest(data);
-  if (!actor) return;
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  const ownerLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
-  const hasOwnerAccess = typeof actor.testUserPermission === "function"
-    ? actor.testUserPermission(requester, ownerLevel, { exact: false })
-    : false;
-  if (!hasOwnerAccess) return;
-
-  const requestedUpdates = Array.isArray(data.updates) ? data.updates : [];
-  if (!requestedUpdates.length) return;
-
-  const safeUpdates = requestedUpdates
-    .map(entry => {
-      const itemId = String(entry?._id || entry?.id || "").trim();
-      if (!itemId || !actor.items?.has(itemId)) return null;
-      const fallbackSort = toFiniteNumber(actor.items.get(itemId)?.sort, 0);
-      const sortValue = Math.max(0, Math.floor(toFiniteNumber(entry?.sort, fallbackSort)));
-      return { _id: itemId, sort: sortValue };
-    })
-    .filter(Boolean);
-  if (!safeUpdates.length) return;
-
-  await actor.updateEmbeddedDocuments("Item", safeUpdates);
-}
-
-function getSocketActorBaseId(actor) {
-  return String(actor?.token?.actorId || actor?.parent?.actorId || actor?.baseActor?.id || actor?.id || "");
-}
-
-function requestVitalResourceUpdate(actor, path, value) {
-  if (!actor || !game.socket) return;
-  if (!VITAL_RESOURCE_PATHS.has(String(path || ""))) return;
-  game.socket.emit(SYSTEM_SOCKET, {
-    type: "updateVitalResources",
-    requesterId: String(game.user?.id || ""),
-    actorUuid: String(actor.uuid || ""),
-    actorId: String(actor.id || ""),
-    actorBaseId: getSocketActorBaseId(actor),
-    path: String(path),
-    value: Math.max(0, Math.floor(toFiniteNumber(value, 0)))
-  });
-}
-
-function requestActorSheetUpdate(actor, updateData, options = {}) {
-  if (!actor || !game.socket || !hasActorUpdatePayload(updateData)) return false;
-  game.socket.emit(SYSTEM_SOCKET, {
-    type: "updateActorSheetData",
-    requesterId: String(game.user?.id || ""),
-    actorUuid: String(actor.uuid || ""),
-    actorId: String(actor.id || ""),
-    actorBaseId: getSocketActorBaseId(actor),
-    updateData,
-    options: {
-      allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
-      allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate),
-      allowAmmoUpdate: Boolean(options.allowAmmoUpdate)
-    }
-  });
-  return true;
-}
-
-function requestDeleteActorItem(actor, item) {
-  if (!actor || !item || !game.socket) return false;
-  game.socket.emit(SYSTEM_SOCKET, {
-    type: "deleteActorItem",
-    requesterId: String(game.user?.id || ""),
-    actorUuid: String(actor.uuid || ""),
-    actorId: String(actor.id || ""),
-    actorBaseId: getSocketActorBaseId(actor),
-    itemId: String(item.id || ""),
-    itemUuid: String(item.uuid || ""),
-    itemType: String(item.type || ""),
-    itemName: String(item.name || "")
-  });
-  return true;
-}
-
-function requestReorderActorItems(actor, updates = []) {
-  if (!actor || !game.socket || !Array.isArray(updates)) return false;
-  const sanitizedUpdates = updates
-    .map(entry => {
-      const itemId = String(entry?._id || entry?.id || "").trim();
-      if (!itemId) return null;
-      const sortValue = Math.max(0, Math.floor(toFiniteNumber(entry?.sort, 0)));
-      return { _id: itemId, sort: sortValue };
-    })
-    .filter(Boolean);
-  if (!sanitizedUpdates.length) return false;
-
-  game.socket.emit(SYSTEM_SOCKET, {
-    type: "reorderActorItems",
-    requesterId: String(game.user?.id || ""),
-    actorUuid: String(actor.uuid || ""),
-    actorId: String(actor.id || ""),
-    actorBaseId: getSocketActorBaseId(actor),
-    updates: sanitizedUpdates
-  });
-  return true;
-}
-
-
-function registerDamageSocketHandlers() {
-  if (!game.socket) return;
-  const previousHandler = globalThis.__bmDamageSocketHandler;
-  if (previousHandler && typeof game.socket.off === "function") {
-    try {
-      game.socket.off(SYSTEM_SOCKET, previousHandler);
-    } catch (_error) {
-      // non-fatal: continue with fresh registration
-    }
-  }
-  const handler = async data => {
-    if (!data) return;
-    const canHandlePrivilegedRequests = isCurrentUserPrimaryPrivilegedOperator();
-    if (data.type === "damageConfigPopup") {
-      await handleDamageConfigPopupMessage(data, "socket");
-      return;
-    }
-    if (data.type === "powerUsePopup") {
-      await handlePowerUsePopupMessage(data, "socket");
-      return;
-    }
-    if (data.type === "damageApplied") {
-      await handleDamageAppliedMessage(data);
-      return;
-    }
-    if (data.type === "rerollDamage") {
-      if (canHandlePrivilegedRequests) await handleDamageRerollRequest(data);
-      return;
-    }
-    if (data.type === "updateVitalResources") {
-      if (canHandlePrivilegedRequests) await handleVitalResourceUpdateRequest(data);
-      return;
-    }
-    if (data.type === "updateActorSheetData") {
-      if (canHandlePrivilegedRequests) await handleActorSheetUpdateRequest(data);
-      return;
-    }
-    if (data.type === "deleteActorItem") {
-      if (canHandlePrivilegedRequests) await handleDeleteItemRequest(data);
-      return;
-    }
-    if (data.type === "reorderActorItems") {
-      if (canHandlePrivilegedRequests) await handleReorderActorItemsRequest(data);
-      return;
-    }
-    if (data.type === "adjustChaosDice") {
-      if (!canHandlePrivilegedRequests) return;
-      const delta = Number(data.delta);
-      if (!Number.isFinite(delta) || delta === 0) return;
-      const requestId = String(data.requestId || "");
-      if (requestId && wasChaosRequestProcessed(requestId)) return;
-      if (requestId) rememberChaosRequest(requestId);
-      await setChaosValue(getChaosValue() + delta);
-      return;
-    }
-    if (data.type !== "applyDamage") return;
-    if (!canHandlePrivilegedRequests) return;
-    await handleIncomingDamageRequest(data, "socket");
-  };
-  game.socket.on(SYSTEM_SOCKET, handler);
-  globalThis.__bmDamageSocketHandler = handler;
-  globalThis.__bmDamageSocketReady = true;
-}
+const damageRerollUtils = buildDamageRerollUtils({
+  getDamagePayloadField,
+  toBooleanFlag,
+  resolveCombatTargetName,
+  getTokenCurrentPv,
+  getCanvas: () => canvas,
+  toFiniteNumber,
+  normalizeRollDieFormula,
+  evaluateRoll: formula => new Roll(formula).evaluate()
+});
+const {
+  normalizeRerollTarget,
+  normalizeRerollTargets,
+  buildFallbackRerollTargets,
+  getRerollTargetKey,
+  isSameRerollTarget,
+  isDamageRerollContextReady,
+  buildRerollAllocations,
+  estimateRerollHpBefore,
+  buildLocalTokenRerollResult,
+  computeExpectedHpAfter,
+  buildItemDamageRerollPayload,
+  getRollValuesFromRoll,
+  evaluateRerollDamageFormula
+} = damageRerollUtils;
+
+const damageTargetResolution = buildDamageTargetResolution({
+  getDamagePayloadField,
+  compatFromUuid,
+  getGame: () => game,
+  getCanvas: () => canvas
+});
+const { resolveDamageTokenDocument, resolveDamageActors } = damageTargetResolution;
+const itemRerollFlowRules = createItemRerollFlowRules({
+  toFiniteNumber,
+  normalizeRerollTargets,
+  buildFallbackRerollTargets,
+  isDamageRerollItemType
+});
+const {
+  normalizeItemRerollContext,
+  isItemRerollContextValid,
+  shouldBlockByRerollWindow,
+  resolveItemRerollTargets,
+  resolveItemRerollResourcePlan
+} = itemRerollFlowRules;
+const itemRerollExecutionRules = createItemRerollExecutionRules({
+  normalizeRerollTarget,
+  normalizeRerollTargets,
+  resolveDamageTokenDocument,
+  toBooleanFlag,
+  getActorById: actorId => game.actors?.get(actorId) || null,
+  getProtectionPA,
+  getTokenCurrentPv,
+  estimateRerollHpBefore,
+  validateNumericEquality,
+  getTokenActorType,
+  syncZeroPvStatusForToken,
+  resolveCombatTargetName,
+  applyDamageToActor,
+  buildLocalTokenRerollResult,
+  postDamageTakenChatMessage,
+  computeExpectedHpAfter,
+  logDamageRerollValidation,
+  buildItemDamageRerollPayload,
+  hasSocket,
+  socketEmit,
+  systemSocket: SYSTEM_SOCKET,
+  getActiveGMUserIds,
+  enableChatTransportFallback: ENABLE_CHAT_TRANSPORT_FALLBACK,
+  createChatMessage: data => ChatMessage.create(data),
+  rerollRequestChatMarkup: REROLL_REQUEST_CHAT_MARKUP,
+  logDebug: (...args) => bmLog.debug(...args),
+  createRequestId: () => (foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2))
+});
+const {
+  relayItemRerollToGMs,
+  applyLocalItemRerollTargets
+} = itemRerollExecutionRules;
+const damageCurrentHelpers = buildDamageCurrentHelpers({
+  getProperty: foundry.utils.getProperty
+});
+const { resolveDamageCurrent } = damageCurrentHelpers;
+
+const damageAppliedMessageHelpers = buildDamageAppliedMessageHelpers({
+  hasSocket,
+  socketEmit,
+  systemSocket: SYSTEM_SOCKET,
+  toFiniteNumber,
+  resolveCombatTargetName,
+  bmLog
+});
+const { emitDamageAppliedMessage } = damageAppliedMessageHelpers;
+const damageConfigPopupHooks = buildDamageConfigPopupHooks({
+  toFiniteNumber,
+  t,
+  getCurrentUser: () => game.user,
+  getUsersCollection: () => game.users,
+  isAssistantOrHigherRole,
+  escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
+  dialogClass: Dialog,
+  wasDamageConfigPopupRequestProcessed,
+  rememberDamageConfigPopupRequest,
+  logWarn: (...args) => bmLog.warn(...args)
+});
+const { handleDamageConfigPopupMessage } = damageConfigPopupHooks;
+
+const powerUsePopupHooks = buildPowerUsePopupHooks({
+  hasSocket,
+  socketEmit,
+  systemSocket: SYSTEM_SOCKET,
+  getCurrentUser: () => game.user,
+  getActivePrivilegedOperatorIds,
+  normalizeRollDieFormula,
+  toBooleanFlag,
+  toFiniteNumber,
+  enableChatTransportFallback: ENABLE_CHAT_TRANSPORT_FALLBACK,
+  createChatMessage: data => ChatMessage.create(data),
+  powerUsePopupChatMarkup: POWER_USE_POPUP_CHAT_MARKUP,
+  isAssistantOrHigherRole,
+  formatMultilineTextToHtml,
+  escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
+  dialogClass: Dialog,
+  wasPowerUsePopupRequestProcessed,
+  rememberPowerUsePopupRequest,
+  logWarn: (...args) => bmLog.warn(...args),
+  logError: (...args) => bmLog.error(...args)
+});
+const { emitPowerUsePopup, handlePowerUsePopupMessage } = powerUsePopupHooks;
+
+const damageRerollHooks = buildDamageRerollHooks({
+  toFiniteNumber,
+  validateNumericEquality,
+  resolveAttackerActorInstancesForDamageApplied,
+  normalizeRerollTarget,
+  getRerollTargetKey,
+  isSameRerollTarget,
+  getActorInstancesById,
+  wasRerollRequestProcessed,
+  rememberRerollRequest,
+  isDamageRerollItemType,
+  normalizeRerollTargets,
+  resolveDamageTokenDocument,
+  toBooleanFlag,
+  getTokenCurrentPv,
+  getProtectionPA,
+  resolveCombatTargetName,
+  applyDamageToActor,
+  postDamageTakenChatMessage,
+  getTokenActorType,
+  syncZeroPvStatusForToken,
+  logDamageRerollValidation,
+  emitDamageAppliedMessage,
+  bmLog
+});
+const { handleDamageAppliedMessage, handleDamageRerollRequest } = damageRerollHooks;
+
+const damageRequestHooks = buildDamageRequestHooks({
+  toFiniteNumber,
+  wasDamageRequestProcessed,
+  rememberDamageRequest,
+  resolveDamageTokenDocument,
+  resolveDamageActors,
+  resolveDamageCurrent,
+  resolveCombatTargetName,
+  postDamageTakenChatMessage,
+  emitDamageAppliedMessage,
+  applyDamageToActor,
+  safeWarn,
+  t,
+  bmLog
+});
+const { handleIncomingDamageRequest } = damageRequestHooks;
+
+const socketActorResolutionHelpers = buildSocketActorResolutionHelpers({
+  compatFromUuid,
+  getActorById: actorId => game.actors?.get(actorId) || null
+});
+const { resolveActorForVitalResourceUpdate, resolveActorForSheetRequest } = socketActorResolutionHelpers;
+
+const actorUpdateSanitizer = buildActorUpdateSanitizer({
+  deepClone: foundry.utils.deepClone,
+  planActorUpdateRestrictionByRole,
+  isBasicPlayerRole,
+  isAssistantOrHigherRole,
+  stripUnauthorizedCharacteristicBaseUpdates,
+  stripUpdatePaths,
+  vitalResourcePathList: VITAL_RESOURCE_PATH_LIST,
+  stateModifierPaths: STATE_MODIFIER_PATHS,
+  actorTokenImageUpdatePaths: ACTOR_TOKEN_IMAGE_UPDATE_PATHS,
+  ammoUpdatePaths: AMMO_UPDATE_PATHS,
+  normalizeActorAmmoUpdateData,
+  normalizeCharacteristicXpUpdates,
+  normalizeCharacteristicBaseUpdatesForRole
+});
+const { applyActorUpdateRestrictionPlan, sanitizeActorUpdateForRole } = actorUpdateSanitizer;
+const actorSocketRequestHandlers = buildActorSocketRequestHandlers({
+  canUserRoleEditCharacteristics,
+  vitalResourcePaths: VITAL_RESOURCE_PATHS,
+  resolveActorForVitalResourceUpdate,
+  resolveActorForSheetRequest,
+  normalizeVitalResourceValue: normalizeRuleVitalResourceValue,
+  sanitizeActorUpdateForRole,
+  hasActorUpdatePayload,
+  flattenObject: foundry.utils.flattenObject,
+  toFiniteNumber
+});
+const {
+  handleVitalResourceUpdateRequest,
+  handleActorSheetUpdateRequest,
+  handleDeleteItemRequest,
+  handleReorderActorItemsRequest
+} = actorSocketRequestHandlers;
+const actorSocketRequestClient = buildActorSocketRequestClient({
+  systemSocket: SYSTEM_SOCKET,
+  hasSocket,
+  socketEmit,
+  toFiniteNumber,
+  vitalResourcePaths: VITAL_RESOURCE_PATHS,
+  hasActorUpdatePayload,
+  flattenObject: foundry.utils.flattenObject
+});
+const {
+  getSocketActorBaseId,
+  requestVitalResourceUpdate,
+  requestActorSheetUpdate,
+  requestDeleteActorItem,
+  requestReorderActorItems
+} = actorSocketRequestClient;
+const systemSocketHooks = buildSystemSocketHooks({
+  systemSocket: SYSTEM_SOCKET,
+  hasSocket,
+  socketOn,
+  socketOff,
+  isCurrentUserPrimaryPrivilegedOperator,
+  handleDamageConfigPopupMessage,
+  handlePowerUsePopupMessage,
+  handleDamageAppliedMessage,
+  handleDamageRerollRequest,
+  handleVitalResourceUpdateRequest,
+  handleActorSheetUpdateRequest,
+  handleDeleteItemRequest,
+  handleReorderActorItemsRequest,
+  wasChaosRequestProcessed,
+  rememberChaosRequest,
+  setChaosValue,
+  getChaosValue,
+  handleIncomingDamageRequest
+});
+const { registerDamageSocketHandlers } = systemSocketHooks;
 if (globalThis.game?.ready) registerDamageSocketHandlers();
 
 function getCombatantActor(combatant) {
   return combatant?.token?.actor || combatant?.actor || null;
 }
 
-function getActorEffectiveMovementScore(actor, { itemBonuses = null } = {}) {
-  if (!actor) return 0;
-  const bonuses = itemBonuses || getItemBonusTotals(actor);
-  const base = toFiniteNumber(actor.system.characteristics?.MOU?.base, 0);
-  const globalMod = toFiniteNumber(actor.system.modifiers?.all, 0);
-  const keyMod = toFiniteNumber(actor.system.modifiers?.MOU, 0);
-  return base + globalMod + keyMod + toFiniteNumber(bonuses?.MOU, 0) + getActorArchetypeBonus(actor, "MOU");
-}
-
-function getActorMoveSlots(actor, options = {}) {
-  const effective = getActorEffectiveMovementScore(actor, options);
-  return Math.max(0, Math.round(effective / 5));
-}
-
-function normalizeActorMoveGauge(actor, { itemBonuses = null, initializeWhenMissing = false } = {}) {
-  const max = normalizeNonNegativeInteger(getActorMoveSlots(actor, { itemBonuses }), 0);
-  const hasStoredMax = foundry.utils.getProperty(actor, "system.resources.move.max") != null;
-  const storedValue = Number(foundry.utils.getProperty(actor, "system.resources.move.value"));
-  const hasPositiveStoredValue = Number.isFinite(storedValue) && storedValue > 0;
-
-  let value = storedValue;
-  if (!hasStoredMax && initializeWhenMissing && !hasPositiveStoredValue) value = max;
-  else if (!Number.isFinite(value)) value = max;
-  value = Math.max(0, Math.min(toFiniteNumber(value, max), max));
-  value = normalizeNonNegativeInteger(value, max);
-
-  return { max, value, hasStoredMax };
-}
-
-async function setActorMoveGauge(actor, nextValue, maxValue) {
-  if (!actor) return;
-  const max = normalizeNonNegativeInteger(maxValue, 0);
-  const value = normalizeNonNegativeInteger(Math.max(0, Math.min(toFiniteNumber(nextValue, max), max)), max);
-  const currentValue = Number(foundry.utils.getProperty(actor, "system.resources.move.value"));
-  const currentMax = Number(foundry.utils.getProperty(actor, "system.resources.move.max"));
-  const hasCurrentMax = foundry.utils.getProperty(actor, "system.resources.move.max") != null;
-  if (validateNumericEquality(currentValue, value) && hasCurrentMax && validateNumericEquality(currentMax, max)) return;
-
-  const updateData = {
-    "system.resources.move.value": value,
-    "system.resources.move.max": max
-  };
-  if (actor.isOwner || game.user?.isGM) {
-    await actor.update(updateData);
-    return;
-  }
-  const sent = requestActorSheetUpdate(actor, updateData);
-  if (!sent) safeWarn("Mise a jour impossible: aucun GM ou assistant actif.");
-}
-
-function getTokenMoveDistanceInCells(tokenDoc, changes) {
-  if (!tokenDoc || !changes) return Number.NaN;
-  const hasX = foundry.utils.getProperty(changes, "x") != null;
-  const hasY = foundry.utils.getProperty(changes, "y") != null;
-  if (!hasX && !hasY) return 0;
-
-  const currentX = Number(tokenDoc.x);
-  const currentY = Number(tokenDoc.y);
-  if (!Number.isFinite(currentX) || !Number.isFinite(currentY)) return Number.NaN;
-
-  const nextRawX = foundry.utils.getProperty(changes, "x");
-  const nextRawY = foundry.utils.getProperty(changes, "y");
-  const nextX = nextRawX == null ? currentX : Number(nextRawX);
-  const nextY = nextRawY == null ? currentY : Number(nextRawY);
-  if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) return Number.NaN;
-  if (validateNumericEquality(currentX, nextX) && validateNumericEquality(currentY, nextY)) return 0;
-
-  const scene = tokenDoc.parent || tokenDoc.scene || canvas?.scene || null;
-  const gridSize = toFiniteNumber(scene?.grid?.size, toFiniteNumber(canvas?.grid?.size, 0));
-  if (!(gridSize > 0)) return Number.NaN;
-
-  const tokenWidth = Math.max(1, toFiniteNumber(tokenDoc.width, 1));
-  const tokenHeight = Math.max(1, toFiniteNumber(tokenDoc.height, 1));
-  const offsetX = (tokenWidth * gridSize) / 2;
-  const offsetY = (tokenHeight * gridSize) / 2;
-  const origin = { x: currentX + offsetX, y: currentY + offsetY };
-  const destination = { x: nextX + offsetX, y: nextY + offsetY };
-
-  const sceneId = String(scene?.id || "");
-  const activeSceneId = String(canvas?.scene?.id || "");
-  const canMeasureOnCanvas = sceneId && activeSceneId && sceneId === activeSceneId;
-  const gridDistance = toFiniteNumber(scene?.grid?.distance, 1);
-  if (canMeasureOnCanvas && gridDistance > 0 && typeof canvas?.grid?.measurePath === "function") {
-    try {
-      const measurement = canvas.grid.measurePath([origin, destination]);
-      const measuredCost = Number(measurement?.cost);
-      if (Number.isFinite(measuredCost)) return Math.max(0, measuredCost);
-      const measuredDistance = Number(measurement?.distance);
-      if (Number.isFinite(measuredDistance)) return Math.max(0, measuredDistance / gridDistance);
-    } catch (_error) {
-      // Fallback to deterministic grid-cell delta below.
-    }
-  }
-
-  const dxCells = Math.abs(destination.x - origin.x) / gridSize;
-  const dyCells = Math.abs(destination.y - origin.y) / gridSize;
-  return Math.max(dxCells, dyCells);
-}
+const movementCombatRules = buildMovementCombatRules({
+  toFiniteNumber,
+  getItemBonusTotals,
+  getActorArchetypeBonus,
+  computeNormalizedMoveGauge,
+  normalizeNonNegativeInteger,
+  validateNumericEquality,
+  requestActorSheetUpdate,
+  safeWarn,
+  getProperty: foundry.utils.getProperty,
+  getGame: () => game,
+  getCanvas: () => canvas
+});
+const {
+  getActorEffectiveMovementScore,
+  normalizeActorMoveGauge,
+  setActorMoveGauge,
+  getTokenMoveDistanceInCells,
+  getStartedActiveCombat,
+  getCombatantForToken
+} = movementCombatRules;
 
 function getFixedInitiativeScore(actor) {
   if (!actor) return 0;
@@ -5736,20 +3667,6 @@ function getCombatMoveResetKey(combat) {
   const turn = Number(combat?.turn ?? -1);
   if (!combatId || !combatantId || round <= 0 || turn < 0) return "";
   return `${combatId}:${round}:${turn}:${combatantId}`;
-}
-
-function getStartedActiveCombat() {
-  const combat = game.combat || null;
-  if (!combat?.active) return null;
-  const round = Number(combat?.round ?? 0);
-  return round > 0 ? combat : null;
-}
-
-function getCombatantForToken(combat, tokenDoc) {
-  if (!combat || !tokenDoc) return null;
-  const tokenId = String(tokenDoc.id || tokenDoc._id || "");
-  if (!tokenId) return null;
-  return combat.combatants?.find(combatant => String(combatant?.tokenId || "") === tokenId) || null;
 }
 
 function isActorInStartedActiveCombat(actor, combat = null) {
@@ -5968,6 +3885,16 @@ Hooks.on("renderDocumentCreateDialogV2", (_app, element) => {
   injectCreateTypeIconsFromHook(element, "renderDocumentCreateDialogV2");
 });
 
+const canvasReadyHooks = buildCanvasReadyHooks({
+  installTokenEffectBackgroundPatch,
+  installTokenHudRenderPatch,
+  installTokenHudDomObserver,
+  scheduleTokenHudDomEnhancement,
+  applyTransparentTokenEffectBackground,
+  refreshBossSoloNpcPvMax,
+  repairTokenTextureSource
+});
+
 Hooks.on("renderTokenHUD", (hud, html) => {
   try {
     configureTokenHudEnhancements(hud, html);
@@ -5976,14 +3903,8 @@ Hooks.on("renderTokenHUD", (hud, html) => {
   }
 });
 
-Hooks.on("canvasReady", () => {
-  installTokenEffectBackgroundPatch();
-  installTokenHudRenderPatch();
-  installTokenHudDomObserver();
-  scheduleTokenHudDomEnhancement();
-  for (const token of canvas?.tokens?.placeables || []) {
-    applyTransparentTokenEffectBackground(token);
-  }
+Hooks.on("canvasReady", async () => {
+  await canvasReadyHooks.onCanvasReady();
 });
 
 Hooks.on("controlToken", () => {
@@ -6006,8 +3927,13 @@ Hooks.once("ready", () => {
 
 Hooks.once("init", () => {
   registerBloodmanCoreSettings();
+  registerBloodmanMigrationSettings();
   registerPrivilegedUsersCacheHooks();
   initializeBloodmanLoggerFromSettings();
+  bmLog.info("compat:init", {
+    foundryVersion: foundryVersion(),
+    generation: getFoundryGeneration()
+  });
   installTokenEffectBackgroundPatch();
   installTokenHudRenderPatch();
 
@@ -6041,7 +3967,7 @@ Hooks.once("init", () => {
     makeDefault: true
   });
 
-  const combatantDoc = CONFIG?.Combatant?.documentClass;
+  const combatantDoc = compatGetDocumentClass("Combatant") || CONFIG?.Combatant?.documentClass;
   if (combatantDoc?.prototype) {
     const originalGetInitiativeRoll = combatantDoc.prototype.getInitiativeRoll;
     const originalGetFormula = combatantDoc.prototype._getInitiativeFormula || combatantDoc.prototype.getInitiativeFormula;
@@ -6098,6 +4024,11 @@ Hooks.once("ready", async () => {
     registerDamageSocketHandlers();
   } catch (error) {
     bmLog.error("socket handler registration failed", { error });
+  }
+  try {
+    await runBloodmanMigrations();
+  } catch (error) {
+    bmLog.error("migration runner failed", { error });
   }
   if (!game.user?.isGM) return;
 
@@ -6384,9 +4315,7 @@ async function requestChaosDelta(delta) {
     return;
   }
   const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  if (game.socket) {
-    game.socket.emit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric, requestId });
-  }
+  if (hasSocket()) socketEmit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric, requestId });
   const gmIds = getActiveGMUserIds();
   if (!ENABLE_CHAT_TRANSPORT_FALLBACK || !gmIds.length) return;
   await ChatMessage.create({
@@ -6511,15 +4440,18 @@ function ensureChaosDiceUI() {
   container.id = "bm-chaos-dice";
   container.className = "bm-chaos-dice";
   container.title = tl("BLOODMAN.Settings.ChaosDiceName", "Des du chaos");
+  const xpAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage"));
+  const plusAriaLabel = escapeChatMarkup("Augmenter les des du chaos");
+  const minusAriaLabel = escapeChatMarkup("Diminuer les des du chaos");
   container.innerHTML = `
-    <button type="button" class="bm-chaos-xp-btn" aria-label="${tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage")}">XP</button>
+    <button type="button" class="bm-chaos-xp-btn" aria-label="${xpAriaLabel}">XP</button>
     <div class="bm-chaos-row">
-      <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="Augmenter les des du chaos">+</button>
+      <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="${plusAriaLabel}">+</button>
       <div class="bm-chaos-icon" aria-hidden="true">
         <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
         <span class="bm-chaos-value">0</span>
       </div>
-      <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="Diminuer les des du chaos">-</button>
+      <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="${minusAriaLabel}">-</button>
     </div>
   `;
 
@@ -6612,6 +4544,13 @@ async function applyVoyageXPCostOnCreate(actor, item) {
   });
 }
 
+const itemDerivedSyncHooks = buildItemDerivedSyncHooks({
+  applyItemResourceBonuses,
+  syncActorDerivedCharacteristicsResources,
+  characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
+  bmLog
+});
+
 Hooks.on("createItem", async (item, options, userId) => {
   if (!item?.actor) return;
 
@@ -6619,16 +4558,7 @@ Hooks.on("createItem", async (item, options, userId) => {
   if (sourceUserId && sourceUserId !== game.user?.id) return;
 
   await applyVoyageXPCostOnCreate(item.actor, item);
-
-  const type = String(item.type || "").trim().toLowerCase();
-  if (type === "aptitude" || type === "pouvoir") {
-    await applyItemResourceBonuses(item.actor);
-    await syncActorDerivedCharacteristicsResources(item.actor);
-    return;
-  }
-  if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
-    await syncActorDerivedCharacteristicsResources(item.actor);
-  }
+  await itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "createItem");
 });
 
 Hooks.on("preCreateItem", (item, createData) => {
@@ -6698,179 +4628,60 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   foundry.utils.setProperty(updateData, costPath, nextCost);
 });
 
-function isCurrentUserChatMessageAuthor(message) {
-  const localUserId = String(game.user?.id || "").trim();
-  const messageUserId = String(message?.user?.id || message?.user || message?.author?.id || "").trim();
-  if (localUserId && messageUserId) return localUserId === messageUserId;
-  return Boolean(message?.isAuthor);
-}
-
-function scheduleTransientChatMessageDeletion(message, delayMs = 250) {
-  const messageId = String(message?.id || "").trim();
-  if (!messageId) return;
-  if (!isCurrentUserChatMessageAuthor(message)) return;
-  const timeout = Math.max(0, Math.floor(toFiniteNumber(delayMs, 250)));
-  setTimeout(() => {
-    const existing = game.messages?.get(messageId);
-    if (!existing) return;
-    if (!isCurrentUserChatMessageAuthor(existing)) return;
-    existing.delete().catch(() => null);
-  }, timeout);
-}
+const chatMessageRoutingHooks = buildChatMessageRoutingHooks({
+  getProperty: foundry.utils.getProperty,
+  handleDamageConfigPopupMessage,
+  handlePowerUsePopupMessage,
+  isCurrentUserPrimaryPrivilegedOperator,
+  isInitiativeRollMessage,
+  queueInitiativeRollMessage,
+  wasChaosRequestProcessed,
+  rememberChaosRequest,
+  setChaosValue,
+  getChaosValue,
+  handleIncomingDamageRequest,
+  handleDamageRerollRequest,
+  scheduleTransientChatMessageDeletion,
+  isTransportRelayChatMessage,
+  hideTransientRelayChatMessage,
+  decorateBloodmanChatRollMessage,
+  logWarn: (...args) => bmLog.warn(...args)
+});
 
 Hooks.on("createChatMessage", async (message) => {
-  const damageConfigPopupPayload = foundry.utils.getProperty(message, "flags.bloodman.damageConfigPopup");
-  if (damageConfigPopupPayload) {
-    await handleDamageConfigPopupMessage(damageConfigPopupPayload, "chat");
-    scheduleTransientChatMessageDeletion(message, 250);
-    return;
-  }
-
-  const powerUsePopupPayload = foundry.utils.getProperty(message, "flags.bloodman.powerUsePopup");
-  if (powerUsePopupPayload) {
-    await handlePowerUsePopupMessage(powerUsePopupPayload, "chat");
-    scheduleTransientChatMessageDeletion(message, 250);
-    return;
-  }
-
-  const canHandlePrivilegedRequests = isCurrentUserPrimaryPrivilegedOperator();
-  if (!canHandlePrivilegedRequests) return;
-  if (isInitiativeRollMessage(message)) {
-    queueInitiativeRollMessage(message);
-    return;
-  }
-  const chaosPayload = foundry.utils.getProperty(message, "flags.bloodman.chaosDeltaRequest");
-  if (chaosPayload) {
-    const delta = Number(chaosPayload.delta);
-    const requestId = String(chaosPayload.requestId || "");
-    if (Number.isFinite(delta) && delta !== 0) {
-      if (!requestId || !wasChaosRequestProcessed(requestId)) {
-        if (requestId) rememberChaosRequest(requestId);
-        await setChaosValue(getChaosValue() + delta);
-      }
-    }
-    scheduleTransientChatMessageDeletion(message, 250);
-    return;
-  }
-  const payload = foundry.utils.getProperty(message, "flags.bloodman.damageRequest");
-  if (payload) {
-    await handleIncomingDamageRequest(payload, "chat");
-    scheduleTransientChatMessageDeletion(message, 250);
-    return;
-  }
-
-  const rerollPayload = foundry.utils.getProperty(message, "flags.bloodman.rerollDamageRequest");
-  if (!rerollPayload) return;
-  await handleDamageRerollRequest(rerollPayload);
-  scheduleTransientChatMessageDeletion(message, 250);
+  await chatMessageRoutingHooks.onCreateChatMessage(message);
 });
 
-function isTransportRelayChatMessage(message) {
-  const bloodmanFlags = foundry.utils.getProperty(message, "flags.bloodman") || {};
-  if (!bloodmanFlags || typeof bloodmanFlags !== "object") return false;
-  if (bloodmanFlags.damageConfigPopup) return true;
-  if (bloodmanFlags.powerUsePopup) return true;
-  if (bloodmanFlags.damageRequest) return true;
-  if (bloodmanFlags.chaosDeltaRequest) return true;
-  if (bloodmanFlags.rerollDamageRequest) return true;
+Hooks.on("renderChatMessage", chatMessageRoutingHooks.onRenderChatMessage);
 
-  const content = String(message?.content || "").toLowerCase();
-  if (!content) return false;
-  return content.includes("bloodman-damage-config-popup")
-    || content.includes("bloodman-power-use-popup")
-    || content.includes("bloodman-damage-request")
-    || content.includes("bloodman-chaos-request")
-    || content.includes("bloodman-reroll-request");
-}
-
-function hideTransientRelayChatMessage(htmlLike) {
-  const root = htmlLike?.[0] || htmlLike;
-  if (!(root instanceof HTMLElement)) return;
-  root.style.display = "none";
-  root.classList.add("bm-chat-relay-hidden");
-}
-
-Hooks.on("renderChatMessage", (message, html) => {
-  handleChatMessageRenderHook(message, html, "renderChatMessage");
-});
-
-Hooks.on("renderChatMessageHTML", (message, html) => {
-  handleChatMessageRenderHook(message, html, "renderChatMessageHTML");
-});
-
-function handleChatMessageRenderHook(message, htmlLike, sourceHook = "renderChatMessage") {
-  if (isTransportRelayChatMessage(message)) {
-    hideTransientRelayChatMessage(htmlLike);
-    return;
-  }
-  try {
-    decorateBloodmanChatRollMessage(message, htmlLike);
-  } catch (error) {
-    bmLog.warn(`chat:roll decorate skipped (${sourceHook})`, { error });
-  }
-}
+Hooks.on("renderChatMessageHTML", chatMessageRoutingHooks.onRenderChatMessageHTML);
 
 Hooks.on("renderHotbar", () => {
   positionChaosDiceUI();
 });
 
 Hooks.on("updateItem", (item) => {
-  if (!item?.actor) return;
-  const type = String(item.type || "").trim().toLowerCase();
-  if (type === "aptitude" || type === "pouvoir") {
-    applyItemResourceBonuses(item.actor);
-    syncActorDerivedCharacteristicsResources(item.actor);
-    return;
-  }
-  if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
-    syncActorDerivedCharacteristicsResources(item.actor);
-  }
+  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "updateItem");
 });
 
 Hooks.on("deleteItem", (item) => {
-  if (!item?.actor) return;
-  const type = String(item.type || "").trim().toLowerCase();
-  if (type === "aptitude" || type === "pouvoir") {
-    applyItemResourceBonuses(item.actor);
-    syncActorDerivedCharacteristicsResources(item.actor);
-    return;
-  }
-  if (CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) {
-    syncActorDerivedCharacteristicsResources(item.actor);
-  }
+  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "deleteItem");
 });
 
 function getItemBonusTotals(actor) {
-  const totals = {};
-  for (const c of CHARACTERISTICS) totals[c.key] = 0;
-  if (!actor?.items) return totals;
-
-  for (const item of actor.items) {
-    const type = String(item?.type || "").trim().toLowerCase();
-    if (!CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) continue;
-    if (!toCheckboxBoolean(item.system?.characteristicBonusEnabled, false)) continue;
-    for (const characteristic of CHARACTERISTICS) {
-      const key = characteristic.key;
-      const value = Number(item.system?.characteristicBonuses?.[key]);
-      if (Number.isFinite(value)) totals[key] += value;
-    }
-  }
-  return totals;
+  return computeItemCharacteristicBonusTotals({
+    items: actor?.items,
+    characteristics: CHARACTERISTICS,
+    characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
+    isBonusEnabled: value => toCheckboxBoolean(value, false)
+  });
 }
 
 function getItemResourceBonusTotals(actor) {
-  const totals = { pv: 0, pp: 0 };
-  if (!actor?.items) return totals;
-  for (const item of actor.items) {
-    if (item.type !== "aptitude" && item.type !== "pouvoir") continue;
-    if (item.system?.rawBonusEnabled) {
-      const pvBonus = Number(item.system?.rawBonuses?.pv);
-      const ppBonus = Number(item.system?.rawBonuses?.pp);
-      if (Number.isFinite(pvBonus)) totals.pv += pvBonus;
-      if (Number.isFinite(ppBonus)) totals.pp += ppBonus;
-    }
-  }
-  return totals;
+  return computeItemResourceBonusTotals({
+    items: actor?.items,
+    resourceBonusItemTypes: ITEM_RESOURCE_BONUS_ITEM_TYPES
+  });
 }
 
 async function applyItemResourceBonuses(actor) {
@@ -6884,22 +4695,15 @@ async function applyItemResourceBonuses(actor) {
   const currentPpMax = Number(actor.system.resources?.pp?.max || 0);
   const storedPv = Number(actor.system.resources?.pv?.itemBonus || 0);
   const storedPp = Number(actor.system.resources?.pp?.itemBonus || 0);
-  const deltaPv = totals.pv - storedPv;
-  const deltaPp = totals.pp - storedPp;
-
-  const updates = {};
-  const nextPvMax = currentPvMax + deltaPv;
-  const nextPpMax = currentPpMax + deltaPp;
-  if (deltaPv !== 0) {
-    updates["system.resources.pv.max"] = Math.max(0, nextPvMax);
-    updates["system.resources.pv.current"] = Math.min(currentPv, Math.max(0, nextPvMax));
-  }
-  if (deltaPp !== 0) {
-    updates["system.resources.pp.max"] = Math.max(0, nextPpMax);
-    updates["system.resources.pp.current"] = Math.min(currentPp, Math.max(0, nextPpMax));
-  }
-  if (storedPv !== totals.pv) updates["system.resources.pv.itemBonus"] = totals.pv;
-  if (storedPp !== totals.pp) updates["system.resources.pp.itemBonus"] = totals.pp;
+  const updates = computeItemResourceBonusUpdateData({
+    totals,
+    currentPv,
+    currentPp,
+    currentPvMax,
+    currentPpMax,
+    storedPv,
+    storedPp
+  });
 
   if (Object.keys(updates).length) await actor.update(updates, { bloodmanAllowVitalResourceUpdate: true });
 }
@@ -6913,35 +4717,29 @@ async function syncActorDerivedCharacteristicsResources(actor) {
   const profile = actor.system?.profile || {};
   const archetypeBonusValue = normalizeArchetypeBonusValue(profile.archetypeBonusValue, 0);
   const archetypeBonusCharacteristic = normalizeCharacteristicKey(profile.archetypeBonusCharacteristic);
-  const getArchetypeBonus = key => {
-    if (!Number.isFinite(archetypeBonusValue)) return 0;
-    return archetypeBonusCharacteristic === key ? archetypeBonusValue : 0;
-  };
-  const effective = key => {
-    // State modifiers apply to characteristic checks only, not vital resource maxima.
-    return toFiniteNumber(actor.system.characteristics?.[key]?.base, 0)
-      + toFiniteNumber(itemBonuses?.[key], 0)
-      + getArchetypeBonus(key);
-  };
-
-  const phyEffective = effective("PHY");
-  const espEffective = effective("ESP");
+  // State modifiers apply to characteristic checks only, not vital resource maxima.
+  const { phyEffective, espEffective } = computeResourceCharacteristicEffectiveScores({
+    phyBase: actor.system.characteristics?.PHY?.base,
+    espBase: actor.system.characteristics?.ESP?.base,
+    phyItemBonus: itemBonuses?.PHY,
+    espItemBonus: itemBonuses?.ESP,
+    archetypeBonusCharacteristic,
+    archetypeBonusValue
+  });
   const derivedPvMax = getDerivedPvMax(actor, phyEffective);
-  const derivedPpMax = Math.round(espEffective / 5);
   const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
   const storedPpBonus = toFiniteNumber(actor.system.resources?.pp?.itemBonus, 0);
-  const nextPvMax = Math.max(0, derivedPvMax + storedPvBonus);
-  const nextPpMax = Math.max(0, derivedPpMax + storedPpBonus);
-  const currentPvMax = toFiniteNumber(actor.system.resources?.pv?.max, nextPvMax);
-  const currentPpMax = toFiniteNumber(actor.system.resources?.pp?.max, nextPpMax);
-  const currentPv = toFiniteNumber(actor.system.resources?.pv?.current, 0);
-  const currentPp = toFiniteNumber(actor.system.resources?.pp?.current, 0);
-
-  const updates = {};
-  if (!validateNumericEquality(currentPvMax, nextPvMax)) updates["system.resources.pv.max"] = nextPvMax;
-  if (!validateNumericEquality(currentPpMax, nextPpMax)) updates["system.resources.pp.max"] = nextPpMax;
-  if (currentPv > nextPvMax) updates["system.resources.pv.current"] = nextPvMax;
-  if (currentPp > nextPpMax) updates["system.resources.pp.current"] = nextPpMax;
+  const { updates } = computeDerivedResourceSyncUpdateData({
+    derivedPvMax,
+    espEffective,
+    storedPvBonus,
+    storedPpBonus,
+    currentPvMax: actor.system.resources?.pv?.max,
+    currentPpMax: actor.system.resources?.pp?.max,
+    currentPv: actor.system.resources?.pv?.current,
+    currentPp: actor.system.resources?.pp?.current,
+    clampMaxToZero: true
+  });
   if (Object.keys(updates).length) {
     await actor.update(updates, { bloodmanAllowVitalResourceUpdate: true });
   }
@@ -6950,37 +4748,14 @@ async function syncActorDerivedCharacteristicsResources(actor) {
   await setActorMoveGauge(actor, gauge.value, gauge.max);
 }
 
-async function applyPowerCost(actor, item) {
-  if (!actor || !item) return true;
-  if (item.type !== "pouvoir") return true;
-  if (!item.system?.powerCostEnabled) return true;
-  const cost = Number(item.system?.powerCost);
-  if (!Number.isFinite(cost) || cost <= 0) return true;
-  const current = Number(actor.system.resources?.pp?.current || 0);
-  if (current < cost) {
-    ui.notifications?.error("Points de puissance insuffisants pour utiliser ce pouvoir.");
-    return false;
-  }
-  const nextValue = Math.max(0, current - cost);
-  if (actor.isOwner || game.user?.isGM) {
-    await actor.update({ "system.resources.pp.current": nextValue }, { bloodmanAllowVitalResourceUpdate: true });
-  } else {
-    const sent = requestActorSheetUpdate(actor, { "system.resources.pp.current": nextValue }, {
-      allowVitalResourceUpdate: true
-    });
-    if (!sent) return false;
-    try {
-      if (typeof actor?.updateSource === "function") {
-        actor.updateSource(foundry.utils.deepClone({ "system.resources.pp.current": nextValue }));
-      } else {
-        foundry.utils.setProperty(actor, "system.resources.pp.current", nextValue);
-      }
-    } catch (_error) {
-      // Non-fatal optimistic update.
-    }
-  }
-  return true;
-}
+const powerCostRules = buildPowerCostRules({
+  requestActorSheetUpdate,
+  notifyInsufficientPowerPoints: message => ui.notifications?.error(message),
+  canDirectlyUpdateActor: actor => Boolean(actor?.isOwner || game.user?.isGM),
+  deepClone: foundry.utils.deepClone,
+  setProperty: foundry.utils.setProperty
+});
+const { applyPowerCost } = powerCostRules;
 
 function buildItemDisplayData(item) {
   const data = item.toObject();
@@ -7006,7 +4781,7 @@ function getTransportNpcRefs(actor) {
 function resolveTransportNpc(ref) {
   if (!ref || typeof ref !== "string") return null;
   const uuidRef = ref.startsWith("Actor.") ? ref : null;
-  const byUuid = uuidRef && typeof fromUuidSync === "function" ? fromUuidSync(uuidRef) : null;
+  const byUuid = uuidRef ? compatFromUuidSync(uuidRef) : null;
   const actor = byUuid || game.actors?.get(ref) || null;
   if (!actor || actor.type !== "personnage-non-joueur") return null;
   return actor;
@@ -7030,591 +4805,97 @@ function buildTransportNpcDisplayData(actor) {
   return transportNpcs;
 }
 
-Hooks.on("preCreateToken", (doc) => {
-  const sourceUpdates = {};
-  const actorType = getTokenActorType(doc);
-  if (actorType === "personnage") sourceUpdates.actorLink = true;
-  if (actorType === "personnage-non-joueur") sourceUpdates.actorLink = false;
-  const tokenSrc = String(
-    foundry.utils.getProperty(doc, "texture.src")
-    || foundry.utils.getProperty(doc, "img")
-    || ""
-  ).trim();
-  const actorImg = String(
-    doc?.actor?.img
-    || (doc?.actorId ? game.actors?.get(doc.actorId)?.img : "")
-    || ""
-  ).trim();
-  const isCharacterTokenType = actorType === "personnage" || actorType === "personnage-non-joueur";
-
-  if (isCharacterTokenType && actorImg) {
-    if (tokenSrc !== actorImg) {
-      sourceUpdates["texture.src"] = actorImg;
-      sourceUpdates.img = actorImg;
-    }
-  } else if (isMissingTokenImage(tokenSrc)) {
-    const fallbackSrc = getSafeTokenTextureFallback(doc);
-    if (fallbackSrc && fallbackSrc !== tokenSrc) {
-      sourceUpdates["texture.src"] = fallbackSrc;
-      sourceUpdates.img = fallbackSrc;
-    }
-  }
-  if (Object.keys(sourceUpdates).length) doc.updateSource(sourceUpdates);
+const tokenCombatHooks = buildTokenCombatHooks({
+  bmLog,
+  getTokenActorType,
+  isMissingTokenImage,
+  getSafeTokenTextureFallback,
+  repairTokenTextureSource,
+  applyTransparentTokenEffectBackground,
+  refreshBossSoloNpcPvMax,
+  getCombatantDisplayName,
+  focusActiveCombatantToken,
+  resetActiveCombatantMoveGauge,
+  resetCombatMovementHistory,
+  decrementActiveCombatantTokenHudCounters,
+  resetCombatRuntimeKeys,
+  isAssistantOrHigherRole,
+  stripUpdatePaths,
+  tokenImageUpdatePaths: TOKEN_IMAGE_UPDATE_PATHS,
+  getStartedActiveCombat,
+  getCombatantForToken,
+  normalizeActorMoveGauge,
+  getTokenMoveDistanceInCells,
+  tokenMoveLimitEpsilon: TOKEN_MOVE_LIMIT_EPSILON,
+  safeWarn,
+  t,
+  setActorMoveGauge,
+  syncActorAndPrototypeImageFromTokenImage,
+  syncCombatantNameForToken,
+  getTokenPvFromUpdate,
+  getTokenCurrentPv,
+  syncZeroPvStatusForToken
 });
 
-Hooks.on("drawToken", token => {
-  void repairTokenTextureSource(token);
-  applyTransparentTokenEffectBackground(token);
+Hooks.on("preCreateToken", tokenCombatHooks.onPreCreateToken);
+Hooks.on("drawToken", tokenCombatHooks.onDrawToken);
+Hooks.on("refreshToken", tokenCombatHooks.onRefreshToken);
+Hooks.on("createToken", tokenCombatHooks.onCreateToken);
+Hooks.on("deleteToken", tokenCombatHooks.onDeleteToken);
+Hooks.on("preCreateCombatant", tokenCombatHooks.onPreCreateCombatant);
+Hooks.on("updateCombat", tokenCombatHooks.onUpdateCombat);
+Hooks.on("combatTurnChange", tokenCombatHooks.onCombatTurnChange);
+Hooks.on("combatStart", tokenCombatHooks.onCombatStart);
+Hooks.on("deleteCombat", tokenCombatHooks.onDeleteCombat);
+
+const actorPreUpdateHooks = buildActorPreUpdateHooks({
+  toFiniteNumber,
+  isAssistantOrHigherRole,
+  isBasicPlayerRole,
+  planActorUpdateRestrictionByRole,
+  applyActorUpdateRestrictionPlan,
+  stripUpdatePaths,
+  normalizeCharacteristicXpUpdates,
+  normalizeActorAmmoUpdateData,
+  normalizeActorEquipmentCurrencyUpdateData,
+  buildInvalidCurrencyCurrentMessage,
+  normalizeCharacteristicBaseUpdatesForRole,
+  buildInvalidStatePresetMessage,
+  buildStateModifierUpdateFromLabel,
+  applyStateModifierUpdateToData,
+  getItemBonusTotals,
+  normalizeArchetypeBonusValue,
+  normalizeCharacteristicKey,
+  getDerivedPvMax,
+  t
 });
 
-Hooks.on("refreshToken", token => {
-  void repairTokenTextureSource(token);
-  applyTransparentTokenEffectBackground(token);
-});
+Hooks.on("preUpdateActor", actorPreUpdateHooks.onPreUpdateActor);
 
-Hooks.on("createToken", async (tokenDoc) => {
-  await repairTokenTextureSource(tokenDoc);
-  if (!game.user.isGM) return;
-  if (getTokenActorType(tokenDoc) !== "personnage") return;
-  await refreshBossSoloNpcPvMax();
-});
-
-Hooks.on("deleteToken", async (tokenDoc) => {
-  if (!game.user.isGM) return;
-  if (getTokenActorType(tokenDoc) !== "personnage") return;
-  await refreshBossSoloNpcPvMax();
-});
-
-Hooks.on("canvasReady", async () => {
-  if (!game.user.isGM) return;
-  await refreshBossSoloNpcPvMax();
-});
-
-Hooks.on("canvasReady", async () => {
-  for (const token of canvas?.tokens?.placeables || []) {
-    await repairTokenTextureSource(token);
-  }
-});
-
-Hooks.on("preCreateCombatant", (combatant) => {
-  const name = getCombatantDisplayName(combatant);
-  if (name && name !== combatant.name) {
-    combatant.updateSource({ name });
-  }
-});
-
-Hooks.on("updateCombat", (combat, changes) => {
-  if (!changes) return;
-  if (changes.active === false) {
-    LAST_COMBAT_MOVE_RESET_KEY = "";
-    LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
-    LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
-  }
-  if (changes.round != null || changes.turn != null || changes.active != null) {
-    focusActiveCombatantToken(combat);
-    resetActiveCombatantMoveGauge(combat).catch(error => {
-      bmLog.warn("[bloodman] move:gauge reset failed", error);
-    });
-    resetCombatMovementHistory(combat).catch(error => {
-      bmLog.warn("[bloodman] combat move history reset failed", error);
-    });
-    decrementActiveCombatantTokenHudCounters(combat).catch(error => {
-      bmLog.warn("[bloodman] token HUD turn counter update failed", error);
-    });
-  }
-});
-
-Hooks.on("combatTurnChange", (combat) => {
-  focusActiveCombatantToken(combat);
-  resetActiveCombatantMoveGauge(combat).catch(error => {
-    bmLog.warn("[bloodman] move:gauge reset failed", error);
-  });
-  resetCombatMovementHistory(combat).catch(error => {
-    bmLog.warn("[bloodman] combat move history reset failed", error);
-  });
-  decrementActiveCombatantTokenHudCounters(combat).catch(error => {
-    bmLog.warn("[bloodman] token HUD turn counter update failed", error);
-  });
-});
-
-Hooks.on("combatStart", (combat) => {
-  focusActiveCombatantToken(combat);
-  resetActiveCombatantMoveGauge(combat).catch(error => {
-    bmLog.warn("[bloodman] move:gauge reset failed", error);
-  });
-  resetCombatMovementHistory(combat).catch(error => {
-    bmLog.warn("[bloodman] combat move history reset failed", error);
-  });
-  decrementActiveCombatantTokenHudCounters(combat).catch(error => {
-    bmLog.warn("[bloodman] token HUD turn counter update failed", error);
-  });
-});
-
-Hooks.on("deleteCombat", () => {
-  LAST_COMBAT_MOVE_RESET_KEY = "";
-  LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
-  LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
-});
-
-Hooks.on("preUpdateActor", (actor, updateData, options, userId) => {
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  const trackingOptions = options && typeof options === "object" ? options : null;
-
-  if (foundry.utils.getProperty(updateData, "img") != null) {
-    if (trackingOptions) {
-      trackingOptions.bloodmanPreviousActorImage = String(actor.img || "").trim();
-      trackingOptions.bloodmanPreviousPrototypeImage = String(
-        foundry.utils.getProperty(actor, "prototypeToken.texture.src") || ""
-      ).trim();
-    }
-  }
-
-  normalizeCharacteristicXpUpdates(updateData, actor);
-  const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
-
-  const nextActorImageRaw = foundry.utils.getProperty(updateData, "img");
-  if (nextActorImageRaw != null && isAssistantOrHigherRole(updaterRole)) {
-    const nextActorImage = String(nextActorImageRaw || "").trim() || "icons/svg/mystery-man.svg";
-    foundry.utils.setProperty(updateData, "prototypeToken.texture.src", nextActorImage);
-    foundry.utils.setProperty(updateData, "prototypeToken.img", nextActorImage);
-    foundry.utils.setProperty(updateData, "token.img", nextActorImage);
-  }
-
-  let blockedRestrictedFields = false;
-  const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
-  const allowVitalResourceUpdate = Boolean(options?.bloodmanAllowVitalResourceUpdate);
-  const allowAmmoUpdate = Boolean(options?.bloodmanAllowAmmoUpdate);
-
-  if (isBasicPlayerRole(updaterRole)) {
-    if (!allowCharacteristicBase) {
-      blockedRestrictedFields = stripUnauthorizedCharacteristicBaseUpdates(updateData) || blockedRestrictedFields;
-    }
-    if (!allowVitalResourceUpdate) {
-      blockedRestrictedFields = stripUpdatePaths(updateData, Array.from(VITAL_RESOURCE_PATHS)) || blockedRestrictedFields;
-    }
-    blockedRestrictedFields = stripUpdatePaths(updateData, STATE_MODIFIER_PATHS) || blockedRestrictedFields;
-  }
-  if (!isAssistantOrHigherRole(updaterRole)) {
-    blockedRestrictedFields = stripUpdatePaths(updateData, ACTOR_TOKEN_IMAGE_UPDATE_PATHS) || blockedRestrictedFields;
-    if (!allowAmmoUpdate) {
-      blockedRestrictedFields = stripUpdatePaths(updateData, AMMO_UPDATE_PATHS) || blockedRestrictedFields;
-    }
-  }
-  normalizeActorAmmoUpdateData(actor, updateData);
-  const currencyNormalization = normalizeActorEquipmentCurrencyUpdateData(actor, updateData);
-  if (currencyNormalization.invalid) {
-    ui.notifications?.error(currencyNormalization.message || buildInvalidCurrencyCurrentMessage());
-    return false;
-  }
-  if (actor.type === "personnage") {
-    normalizeCharacteristicBaseUpdatesForRole(updateData, updaterRole, actor);
-  }
-
-  // Keep the update silent when restricted fields are stripped so normal
-  // submitOnChange interactions remain fluid for players.
-
-  const getUpdatedNumber = (path, fallback) => {
-    if (Object.prototype.hasOwnProperty.call(updateData, path)) {
-      return toFiniteNumber(updateData[path], fallback);
-    }
-    const value = foundry.utils.getProperty(updateData, path);
-    if (value == null) return toFiniteNumber(fallback, 0);
-    return toFiniteNumber(value, fallback);
-  };
-  const getUpdatedRawValue = (path, fallback) => {
-    if (Object.prototype.hasOwnProperty.call(updateData, path)) return updateData[path];
-    const value = foundry.utils.getProperty(updateData, path);
-    return value == null ? fallback : value;
-  };
-  const hasUpdatePath = (path) => {
-    return Object.prototype.hasOwnProperty.call(updateData, path)
-      || foundry.utils.getProperty(updateData, path) !== undefined;
-  };
-
-  const stateLabelPath = "system.modifiers.label";
-  if (hasUpdatePath(stateLabelPath)) {
-    const rawLabel = getUpdatedRawValue(stateLabelPath, actor.system?.modifiers?.label || "");
-    const currentLabel = String(actor.system?.modifiers?.label || "").trim();
-    const nextLabel = String(rawLabel || "").trim();
-    const labelChanged = nextLabel !== currentLabel;
-    if (labelChanged) {
-      const stateUpdate = buildStateModifierUpdateFromLabel(rawLabel);
-      if (!stateUpdate.ok) {
-        ui.notifications?.error(buildInvalidStatePresetMessage(stateUpdate.invalidTokens));
-        return false;
-      }
-      applyStateModifierUpdateToData(updateData, stateUpdate.label, stateUpdate.totals);
-    }
-  }
-
-  const archetypeBonusValuePath = "system.profile.archetypeBonusValue";
-  const archetypeBonusCharacteristicPath = "system.profile.archetypeBonusCharacteristic";
-  const hasArchetypeBonusValueUpdate = hasUpdatePath(archetypeBonusValuePath);
-  const hasArchetypeBonusCharacteristicUpdate = hasUpdatePath(archetypeBonusCharacteristicPath);
-  if (hasArchetypeBonusValueUpdate || hasArchetypeBonusCharacteristicUpdate) {
-    const currentProfile = actor.system?.profile || {};
-    const rawBonusValue = getUpdatedRawValue(archetypeBonusValuePath, currentProfile.archetypeBonusValue ?? 0);
-    const rawBonusCharacteristic = getUpdatedRawValue(
-      archetypeBonusCharacteristicPath,
-      currentProfile.archetypeBonusCharacteristic || ""
-    );
-    const normalizedBonusValue = normalizeArchetypeBonusValue(rawBonusValue, currentProfile.archetypeBonusValue ?? 0);
-    if (!Number.isFinite(normalizedBonusValue)) {
-      ui.notifications?.error(t("BLOODMAN.Notifications.InvalidArchetypeBonusNumber"));
-      return false;
-    }
-    const normalizedBonusCharacteristic = normalizeCharacteristicKey(rawBonusCharacteristic);
-    const normalizedRawCharacteristic = String(rawBonusCharacteristic || "").trim();
-    if (normalizedRawCharacteristic && !normalizedBonusCharacteristic) {
-      ui.notifications?.error(t("BLOODMAN.Notifications.InvalidArchetypeBonusCharacteristic"));
-      return false;
-    }
-    if (normalizedBonusValue !== 0 && !normalizedBonusCharacteristic) {
-      ui.notifications?.error(t("BLOODMAN.Notifications.ArchetypeBonusCharacteristicRequired"));
-      return false;
-    }
-    foundry.utils.setProperty(updateData, archetypeBonusValuePath, normalizedBonusValue);
-    foundry.utils.setProperty(updateData, archetypeBonusCharacteristicPath, normalizedBonusCharacteristic);
-  }
-
-  const itemBonuses = getItemBonusTotals(actor);
-  const storedPvBonus = getUpdatedNumber("system.resources.pv.itemBonus", actor.system.resources?.pv?.itemBonus || 0);
-  const storedPpBonus = getUpdatedNumber("system.resources.pp.itemBonus", actor.system.resources?.pp?.itemBonus || 0);
-  const currentProfile = actor.system?.profile || {};
-  const archetypeBonusValue = normalizeArchetypeBonusValue(
-    getUpdatedRawValue("system.profile.archetypeBonusValue", currentProfile.archetypeBonusValue ?? 0),
-    currentProfile.archetypeBonusValue ?? 0
-  );
-  const archetypeBonusCharacteristic = normalizeCharacteristicKey(
-    getUpdatedRawValue("system.profile.archetypeBonusCharacteristic", currentProfile.archetypeBonusCharacteristic || "")
-  );
-  const getEffective = key => {
-    const base = getUpdatedNumber(`system.characteristics.${key}.base`, actor.system.characteristics?.[key]?.base || 0);
-    const itemBonus = Number(itemBonuses?.[key] || 0);
-    const profileBonus = archetypeBonusCharacteristic === key && Number.isFinite(archetypeBonusValue)
-      ? archetypeBonusValue
-      : 0;
-    // State modifiers are characteristic-roll penalties and must not alter PV/PP maxima.
-    return Number(base) + itemBonus + profileBonus;
-  };
-
-  const phyEffective = getEffective("PHY");
-  const espEffective = getEffective("ESP");
-  const roleOverride = foundry.utils.getProperty(updateData, "system.npcRole");
-  const pvMax = getDerivedPvMax(actor, phyEffective, roleOverride) + Number(storedPvBonus || 0);
-  const ppMax = Math.round(espEffective / 5) + Number(storedPpBonus || 0);
-
-  const pvMaxPath = "system.resources.pv.max";
-  const ppMaxPath = "system.resources.pp.max";
-  const pvCurrentPath = "system.resources.pv.current";
-  const ppCurrentPath = "system.resources.pp.current";
-  const normalizeVitalPathValue = (path, fallback) => {
-    const raw = getUpdatedRawValue(path, fallback);
-    if (raw == null) return Math.max(0, Math.floor(toFiniteNumber(fallback, 0)));
-    if (typeof raw === "string" && !raw.trim()) {
-      return Math.max(0, Math.floor(toFiniteNumber(fallback, 0)));
-    }
-    return Math.max(0, Math.floor(toFiniteNumber(raw, fallback)));
-  };
-
-  if (hasUpdatePath(pvMaxPath)) {
-    const fallbackPvMax = actor.system.resources?.pv?.max || 0;
-    foundry.utils.setProperty(updateData, pvMaxPath, normalizeVitalPathValue(pvMaxPath, fallbackPvMax));
-  }
-
-  if (hasUpdatePath(ppMaxPath)) {
-    const fallbackPpMax = actor.system.resources?.pp?.max || 0;
-    foundry.utils.setProperty(updateData, ppMaxPath, normalizeVitalPathValue(ppMaxPath, fallbackPpMax));
-  }
-
-  const storedPvMax = getUpdatedNumber(pvMaxPath, actor.system.resources?.pv?.max);
-  const storedPpMax = getUpdatedNumber(ppMaxPath, actor.system.resources?.pp?.max);
-  const finalPvMax = Number.isFinite(storedPvMax) ? storedPvMax : toFiniteNumber(pvMax, 0);
-  const finalPpMax = Number.isFinite(storedPpMax) ? storedPpMax : toFiniteNumber(ppMax, 0);
-  const allowedPvMax = Math.max(0, finalPvMax);
-  const allowedPpMax = Math.max(0, finalPpMax);
-
-  if (foundry.utils.getProperty(updateData, pvCurrentPath) != null) {
-    const fallbackPvCurrent = actor.system.resources?.pv?.current || 0;
-    const requested = normalizeVitalPathValue(pvCurrentPath, fallbackPvCurrent);
-    const nextValue = Math.min(requested, allowedPvMax);
-    foundry.utils.setProperty(updateData, pvCurrentPath, Math.max(0, Math.floor(toFiniteNumber(nextValue, fallbackPvCurrent))));
-  }
-
-  if (foundry.utils.getProperty(updateData, ppCurrentPath) != null) {
-    const fallbackPpCurrent = actor.system.resources?.pp?.current || 0;
-    const requested = normalizeVitalPathValue(ppCurrentPath, fallbackPpCurrent);
-    const nextValue = Math.min(requested, allowedPpMax);
-    foundry.utils.setProperty(updateData, ppCurrentPath, Math.max(0, Math.floor(toFiniteNumber(nextValue, fallbackPpCurrent))));
-  }
-
-  const voyageCurrentPath = "system.resources.voyage.current";
-  const voyageTotalPath = "system.resources.voyage.total";
-  const voyageMaxPath = "system.resources.voyage.max";
-
-  if (actor.type === "personnage") {
-    const hasVoyageUpdate = hasUpdatePath(voyageCurrentPath)
-      || hasUpdatePath(voyageTotalPath)
-      || hasUpdatePath(voyageMaxPath);
-    if (hasVoyageUpdate) {
-      const actorVoyageCurrent = normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0);
-      const actorVoyageTotal = normalizeNonNegativeInteger(
-        actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
-        0
-      );
-      const requestedCurrent = getUpdatedNumber(voyageCurrentPath, actorVoyageCurrent);
-      const requestedTotal = hasUpdatePath(voyageTotalPath)
-        ? getUpdatedNumber(voyageTotalPath, actorVoyageTotal)
-        : getUpdatedNumber(voyageMaxPath, actorVoyageTotal);
-      const normalizedTotal = normalizeNonNegativeInteger(requestedTotal, actorVoyageTotal);
-      const normalizedCurrent = Math.min(
-        normalizeNonNegativeInteger(requestedCurrent, actorVoyageCurrent),
-        normalizedTotal
-      );
-      foundry.utils.setProperty(updateData, voyageCurrentPath, normalizedCurrent);
-      foundry.utils.setProperty(updateData, voyageTotalPath, normalizedTotal);
-      foundry.utils.setProperty(updateData, voyageMaxPath, normalizedTotal);
-    }
-  } else {
-    const hasVoyagePayload = hasUpdatePath("system.resources.voyage")
-      || hasUpdatePath(voyageCurrentPath)
-      || hasUpdatePath(voyageTotalPath)
-      || hasUpdatePath(voyageMaxPath);
-    if (hasVoyagePayload) {
-      stripUpdatePaths(updateData, [
-        "system.resources.voyage",
-        voyageCurrentPath,
-        voyageTotalPath,
-        voyageMaxPath
-      ]);
-      updateData["system.resources.-=voyage"] = null;
-    }
-  }
-});
-
-Hooks.on("updateActor", async (actor, changes, _options, userId) => {
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  const sourceUserId = String(userId || "");
-  const currentUserId = String(game.user?.id || "");
-  if (sourceUserId && currentUserId && sourceUserId !== currentUserId) return;
-  if (!game.user.isGM && !actor.isOwner) return;
-  if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
-  const hasCharBaseChange = CHARACTERISTICS.some(c => {
-    return foundry.utils.getProperty(changes, `system.characteristics.${c.key}.base`) != null;
-  });
-  const hasNpcRoleChange = foundry.utils.getProperty(changes, "system.npcRole") != null;
-  const hasArchetypeBonusChange = foundry.utils.getProperty(changes, "system.profile.archetypeBonusValue") != null
-    || foundry.utils.getProperty(changes, "system.profile.archetypeBonusCharacteristic") != null;
-  if (!hasCharBaseChange && !hasNpcRoleChange && !hasArchetypeBonusChange) return;
-
-  const itemBonuses = getItemBonusTotals(actor);
-  const profile = actor.system?.profile || {};
-  const archetypeBonusValue = normalizeArchetypeBonusValue(profile.archetypeBonusValue, 0);
-  const archetypeBonusCharacteristic = normalizeCharacteristicKey(profile.archetypeBonusCharacteristic);
-  const getArchetypeBonus = key => {
-    if (!Number.isFinite(archetypeBonusValue)) return 0;
-    return archetypeBonusCharacteristic === key ? archetypeBonusValue : 0;
-  };
-  const moveGauge = normalizeActorMoveGauge(actor, { itemBonuses, initializeWhenMissing: true });
-  await setActorMoveGauge(actor, moveGauge.value, moveGauge.max);
-
-  const phyEffective = toFiniteNumber(actor.system.characteristics?.PHY?.base, 0)
-    + toFiniteNumber(itemBonuses.PHY, 0)
-    + getArchetypeBonus("PHY");
-  const espEffective = toFiniteNumber(actor.system.characteristics?.ESP?.base, 0)
-    + toFiniteNumber(itemBonuses.ESP, 0)
-    + getArchetypeBonus("ESP");
-  const derivedPvMax = getDerivedPvMax(actor, phyEffective);
-  const derivedPpMax = Math.round(espEffective / 5);
-  const storedPvBonus = toFiniteNumber(actor.system.resources?.pv?.itemBonus, 0);
-  const storedPpBonus = toFiniteNumber(actor.system.resources?.pp?.itemBonus, 0);
-  const derivedPvTotal = derivedPvMax + storedPvBonus;
-  const derivedPpTotal = derivedPpMax + storedPpBonus;
-  const pvMax = toFiniteNumber(actor.system.resources?.pv?.max, derivedPvTotal);
-  const ppMax = toFiniteNumber(actor.system.resources?.pp?.max, derivedPpTotal);
-  const pvCurrent = toFiniteNumber(actor.system.resources?.pv?.current, 0);
-  const ppCurrent = toFiniteNumber(actor.system.resources?.pp?.current, 0);
-  const allowedPvMax = Math.max(0, pvMax);
-  const allowedPpMax = Math.max(0, ppMax);
-
-  const resourceUpdates = {};
-  const pvMaxChange = foundry.utils.getProperty(changes, "system.resources.pv.max") != null;
-  const ppMaxChange = foundry.utils.getProperty(changes, "system.resources.pp.max") != null;
-  if (!pvMaxChange && derivedPvTotal !== pvMax) resourceUpdates["system.resources.pv.max"] = derivedPvTotal;
-  if (!ppMaxChange && derivedPpTotal !== ppMax) resourceUpdates["system.resources.pp.max"] = derivedPpTotal;
-  if (pvCurrent > allowedPvMax) resourceUpdates["system.resources.pv.current"] = allowedPvMax;
-  if (ppCurrent > allowedPpMax) resourceUpdates["system.resources.pp.current"] = allowedPpMax;
-  if (Object.keys(resourceUpdates).length) await actor.update(resourceUpdates);
-
-});
-
-Hooks.on("updateActor", async (actor, changes) => {
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  if (!game.user.isGM) return;
-  const hasPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
-  if (!hasPvChange) return;
-  const pvCurrent = Number(actor.system?.resources?.pv?.current);
-  if (Number.isFinite(pvCurrent)) {
-    await syncZeroPvBodyStateForActor(actor, actor.type, pvCurrent <= 0);
-  }
-  if (actor.isToken) {
-    const tokenDoc = actor.token || actor.parent || null;
-    if (tokenDoc && Number.isFinite(pvCurrent)) {
-      await syncZeroPvStatusForToken(tokenDoc, actor.type, pvCurrent);
-    }
-    return;
-  }
-  await syncZeroPvStatusForActor(actor);
+const actorUpdateHooks = buildActorUpdateHooks({
+  characteristics: CHARACTERISTICS,
+  normalizeArchetypeBonusValue,
+  normalizeCharacteristicKey,
+  getItemBonusTotals,
+  normalizeActorMoveGauge,
+  setActorMoveGauge,
+  getDerivedPvMax,
+  syncZeroPvBodyStateForActor,
+  syncZeroPvStatusForToken,
+  syncZeroPvStatusForActor,
+  tokenTextureValidityCache: TOKEN_TEXTURE_VALIDITY_CACHE,
+  resolveWorldActorFromTokenDocument,
+  syncSceneTokenImagesFromActorImage,
+  syncPrototypeTokenImageFromActorImage,
+  bmLog
 });
 
 Hooks.on("updateActor", async (actor, changes, options, userId) => {
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return;
-  if (!game.user.isGM) return;
-  if (options?.bloodmanSkipPrototypeImageSync) return;
-  if (options?.bloodmanSkipSceneTokenImageSync) return;
-
-  const hasActorImageChange = foundry.utils.getProperty(changes, "img") != null;
-  if (!hasActorImageChange) return;
-
-  if (actor.isToken) {
-    const tokenDoc = actor.token || actor.parent || null;
-    const nextTokenImage = String(actor.img || "").trim() || "icons/svg/mystery-man.svg";
-    const previousTokenImage = String(options?.bloodmanPreviousActorImage || "").trim();
-    const previousTokenPrototypeImage = String(options?.bloodmanPreviousPrototypeImage || "").trim();
-    if (tokenDoc?.update) {
-      await tokenDoc.update(
-        { "texture.src": nextTokenImage, "img": nextTokenImage },
-        { bloodmanSkipActorImageSync: true }
-      ).catch(() => null);
-    }
-
-    const worldActor = resolveWorldActorFromTokenDocument(tokenDoc);
-    if (!worldActor) return;
-    const previousActorImage = previousTokenImage || String(worldActor.img || "").trim();
-    const previousPrototypeImage = previousTokenPrototypeImage
-      || String(foundry.utils.getProperty(worldActor, "prototypeToken.texture.src") || "").trim();
-    await worldActor.update(
-      {
-        img: nextTokenImage,
-        "prototypeToken.texture.src": nextTokenImage,
-        "prototypeToken.img": nextTokenImage,
-        "token.img": nextTokenImage
-      },
-      { bloodmanSkipPrototypeImageSync: true, bloodmanSkipSceneTokenImageSync: true }
-    ).catch(() => null);
-    await syncSceneTokenImagesFromActorImage(worldActor, { previousActorImage, previousPrototypeImage });
-    return;
-  }
-
-  const actorImageSrc = String(actor.img || "").trim();
-  if (actorImageSrc) TOKEN_TEXTURE_VALIDITY_CACHE.delete(actorImageSrc);
-
-  const previousActorImage = String(options?.bloodmanPreviousActorImage || "").trim();
-  const previousPrototypeImage = String(
-    options?.bloodmanPreviousPrototypeImage
-    ?? foundry.utils.getProperty(actor, "prototypeToken.texture.src")
-    ?? ""
-  ).trim();
-  const requestedPrototypeImage = String(
-    foundry.utils.getProperty(changes, "prototypeToken.texture.src")
-    ?? foundry.utils.getProperty(changes, "prototypeToken.img")
-    ?? foundry.utils.getProperty(changes, "token.img")
-    ?? ""
-  ).trim();
-  if (
-    requestedPrototypeImage
-    && requestedPrototypeImage !== actorImageSrc
-    && requestedPrototypeImage !== previousPrototypeImage
-  ) {
-    return;
-  }
-
-  await syncPrototypeTokenImageFromActorImage(actor);
-  await syncSceneTokenImagesFromActorImage(actor, { previousActorImage, previousPrototypeImage });
+  await actorUpdateHooks.onUpdateActor(actor, changes, options, userId);
 });
 
-Hooks.on("preUpdateToken", (tokenDoc, changes, options, userId) => {
-  const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
-  if (!isAssistantOrHigherRole(updaterRole)) {
-    const blockedTokenImageUpdate = stripUpdatePaths(changes, TOKEN_IMAGE_UPDATE_PATHS);
-    if (blockedTokenImageUpdate) {
-      const hasRemainingChanges = Object.keys(foundry.utils.flattenObject(changes || {})).length > 0;
-      if (!hasRemainingChanges) return false;
-    }
-  }
-
-  if (options?.bloodmanIgnoreMoveLimit) return;
-  const hasX = foundry.utils.getProperty(changes, "x") != null;
-  const hasY = foundry.utils.getProperty(changes, "y") != null;
-  if (!hasX && !hasY) return;
-
-  const combat = getStartedActiveCombat();
-  if (!combat) return;
-  const combatant = getCombatantForToken(combat, tokenDoc);
-  if (!combatant) return;
-
-  const sourceUserId = String(userId || "");
-  const currentUserId = String(game.user?.id || "");
-  if (sourceUserId && currentUserId && sourceUserId !== currentUserId) return;
-
-  const actorType = getTokenActorType(tokenDoc);
-  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
-  const actor = tokenDoc?.actor || (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null);
-  if (!actor) return;
-
-  const gauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
-  const remaining = gauge.value;
-  const movedCells = getTokenMoveDistanceInCells(tokenDoc, changes);
-  if (!Number.isFinite(movedCells)) return;
-  const moveCost = Math.max(0, Math.ceil(Math.max(0, movedCells) - TOKEN_MOVE_LIMIT_EPSILON));
-  if (moveCost <= TOKEN_MOVE_LIMIT_EPSILON) return;
-  if (moveCost > remaining + TOKEN_MOVE_LIMIT_EPSILON) {
-    safeWarn(t("BLOODMAN.Notifications.MoveLimitExceeded", { max: remaining, attempted: moveCost }));
-    return false;
-  }
-
-  options.bloodmanMoveCost = moveCost;
-  options.bloodmanMoveCombatId = String(combat.id || "");
-});
-
-Hooks.on("updateToken", async (tokenDoc, changes, options, userId) => {
-  const hasTokenImageChange = foundry.utils.getProperty(changes, "texture.src") != null
-    || foundry.utils.getProperty(changes, "img") != null;
-  const sourceUserId = String(userId || "");
-  const currentUserId = String(game.user?.id || "");
-  const isSourceUser = sourceUserId ? sourceUserId === currentUserId : Boolean(game.user?.isGM);
-  if (game.user?.isGM && hasTokenImageChange && !options?.bloodmanSkipActorImageSync) {
-    await syncActorAndPrototypeImageFromTokenImage(tokenDoc);
-  }
-  const moveCost = Number(options?.bloodmanMoveCost);
-  const startedCombat = getStartedActiveCombat();
-  const isCombatMove = startedCombat
-    && String(options?.bloodmanMoveCombatId || "") === String(startedCombat.id || "")
-    && Boolean(getCombatantForToken(startedCombat, tokenDoc));
-  if (isCombatMove && Number.isFinite(moveCost) && moveCost > TOKEN_MOVE_LIMIT_EPSILON && isSourceUser) {
-    const actorType = getTokenActorType(tokenDoc);
-    if (actorType === "personnage" || actorType === "personnage-non-joueur") {
-      const actor = tokenDoc?.actor || (tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) : null);
-      if (actor) {
-        const gauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
-        const nextValue = Math.max(0, gauge.value - moveCost);
-        await setActorMoveGauge(actor, nextValue, gauge.max);
-      }
-    }
-  }
-
-  if (!game.user.isGM) return;
-  if (foundry.utils.getProperty(changes, "name") != null) {
-    await syncCombatantNameForToken(tokenDoc);
-  }
-  const actorType = getTokenActorType(tokenDoc);
-  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
-  const pvFromUpdate = getTokenPvFromUpdate(tokenDoc, changes);
-  if (pvFromUpdate == null) return;
-  const pvCurrent = Number.isFinite(pvFromUpdate) ? pvFromUpdate : getTokenCurrentPv(tokenDoc);
-  if (!Number.isFinite(pvCurrent)) return;
-  await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
-});
+Hooks.on("preUpdateToken", tokenCombatHooks.onPreUpdateToken);
+Hooks.on("updateToken", tokenCombatHooks.onUpdateToken);
 
 class BloodmanActorSheet extends BaseActorSheet {
   static get defaultOptions() {
@@ -7685,12 +4966,64 @@ class BloodmanActorSheet extends BaseActorSheet {
   async close(options = {}) {
     this.clearRerollDisplayState();
     this.clearPowerUseState();
+    this.clearDeferredSheetUiTasks();
+    clearUiMicrotask(this._pvGaugePulseTimer);
+    clearUiMicrotask(this._ppGaugePulseTimer);
+    this._pvGaugePulseTimer = null;
+    this._ppGaugePulseTimer = null;
     this._lastAutoResizeKey = "";
     return super.close(options);
   }
 
+  clearDeferredSheetUiTasks() {
+    clearUiMicrotask(this._forceEnableSheetTaskId);
+    clearUiMicrotask(this._autoResizeTaskId);
+    clearUiMicrotask(this._autoGrowRefreshTaskId);
+    clearUiMicrotask(this._resourceGaugeRefreshTaskId);
+    this._forceEnableSheetTaskId = null;
+    this._autoResizeTaskId = null;
+    this._autoGrowRefreshTaskId = null;
+    this._resourceGaugeRefreshTaskId = null;
+    this._queuedAutoResizeForce = false;
+    this._queuedAutoGrowRoot = null;
+    this._queuedResourceGaugeRoot = null;
+  }
+
+  queueAutoResizeToContent(force = false) {
+    this._queuedAutoResizeForce = mergeDeferredForce(this._queuedAutoResizeForce, force);
+    if (this._autoResizeTaskId != null) return;
+    this._autoResizeTaskId = queueUiMicrotask(() => {
+      this._autoResizeTaskId = null;
+      const shouldForce = Boolean(this._queuedAutoResizeForce);
+      this._queuedAutoResizeForce = false;
+      this.autoResizeToContent(shouldForce);
+    });
+  }
+
+  queueAutoGrowTextareaRefresh(rootLike = null) {
+    this._queuedAutoGrowRoot = resolveDeferredRoot(this._queuedAutoGrowRoot, rootLike);
+    if (this._autoGrowRefreshTaskId != null) return;
+    this._autoGrowRefreshTaskId = queueUiMicrotask(() => {
+      this._autoGrowRefreshTaskId = null;
+      const root = this._queuedAutoGrowRoot?.find ? this._queuedAutoGrowRoot : this.element;
+      this._queuedAutoGrowRoot = null;
+      this.refreshAutoGrowTextareas(root);
+    });
+  }
+
+  queueResourceGaugeRefresh(rootLike = null) {
+    this._queuedResourceGaugeRoot = resolveDeferredRoot(this._queuedResourceGaugeRoot, rootLike);
+    if (this._resourceGaugeRefreshTaskId != null) return;
+    this._resourceGaugeRefreshTaskId = queueUiMicrotask(() => {
+      this._resourceGaugeRefreshTaskId = null;
+      const root = this._queuedResourceGaugeRoot?.find ? this._queuedResourceGaugeRoot : this.element;
+      this._queuedResourceGaugeRoot = null;
+      this.refreshResourceVisuals(root);
+    });
+  }
+
   async applyActorUpdate(updateData, options = {}) {
-    if (!hasActorUpdatePayload(updateData)) return false;
+    if (!hasActorUpdatePayload(updateData, foundry.utils.flattenObject)) return false;
     if (this.actor?.isOwner || game.user?.isGM) {
       return this.actor.update(updateData, options);
     }
@@ -7739,15 +5072,15 @@ class BloodmanActorSheet extends BaseActorSheet {
     const rawType = String(li.dataset?.itemType || li.getAttribute?.("data-item-type") || "").trim().toLowerCase();
     const nameText = String(li.querySelector?.(".item-name")?.textContent || "").trim();
     if (!nameText) return null;
-    const candidates = this.actor.items.filter(item => {
-      if (!item) return false;
-      if (rawType && String(item.type || "").trim().toLowerCase() !== rawType) return false;
-      return String(item.name || "").trim() === nameText;
-    });
-    if (!candidates.length) return null;
-    if (candidates.length === 1) return candidates[0];
-    const exactById = rawId ? candidates.find(item => String(item.id || "") === rawId) : null;
-    return exactById || candidates[0];
+    let firstCandidate = null;
+    for (const item of this.actor.items) {
+      if (!item) continue;
+      if (rawType && String(item.type || "").trim().toLowerCase() !== rawType) continue;
+      if (String(item.name || "").trim() !== nameText) continue;
+      if (!firstCandidate) firstCandidate = item;
+      if (rawId && String(item.id || "") === rawId) return item;
+    }
+    return firstCandidate;
   }
 
   getItemListColumnCountFromElement(element) {
@@ -8012,7 +5345,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       allowCharacteristicBase,
       enforceCharacteristicBaseRange: this.actor?.type === "personnage"
     });
-    if (!hasActorUpdatePayload(sanitized)) return;
+    if (!hasActorUpdatePayload(sanitized, foundry.utils.flattenObject)) return;
     await this.applyActorUpdate(sanitized, { bloodmanAllowCharacteristicBase: allowCharacteristicBase });
   }
 
@@ -8306,35 +5639,26 @@ class BloodmanActorSheet extends BaseActorSheet {
     const actorItems = this.actor?.items;
     const itemCounts = getActorItemCounts(actorItems);
     const transportCount = Number(getTransportNpcRefs(this.actor).length || 0);
-    return `${activeTab}|${itemCounts.total}|${itemCounts.aptitudes}|${itemCounts.pouvoirs}|${itemCounts.carried}|${transportCount}`;
+    return resolveActorSheetAutoResizeKey({
+      activeTab,
+      itemCounts,
+      transportCount
+    });
   }
 
   resizeAutoGrowTextarea(textarea) {
     if (!textarea || String(textarea.tagName || "").toUpperCase() !== "TEXTAREA") return;
-    const computed = window.getComputedStyle ? window.getComputedStyle(textarea) : null;
-    const parseMetric = value => {
-      const parsed = Number.parseFloat(value);
-      return Number.isFinite(parsed) ? parsed : 0;
-    };
-    const fontSize = parseMetric(computed?.fontSize) || 14;
-    const computedLineHeight = parseMetric(computed?.lineHeight);
-    const lineHeight = computedLineHeight > 0 ? computedLineHeight : Math.ceil(fontSize * 1.35);
-    const verticalChrome = parseMetric(computed?.paddingTop)
-      + parseMetric(computed?.paddingBottom)
-      + parseMetric(computed?.borderTopWidth)
-      + parseMetric(computed?.borderBottomWidth);
-
-    const defaultRows = Math.max(1, Math.round(toFiniteNumber(textarea.getAttribute("rows"), 2)));
-    const minRows = Math.max(1, Math.round(toFiniteNumber(textarea.dataset?.autogrowMinRows, defaultRows)));
-    const maxRows = Math.max(minRows, Math.round(toFiniteNumber(textarea.dataset?.autogrowMaxRows, Math.max(minRows + 2, 10))));
-    const minHeight = Math.ceil((minRows * lineHeight) + verticalChrome);
-    const maxHeight = Math.ceil((maxRows * lineHeight) + verticalChrome);
-
     textarea.style.height = "auto";
-    const contentHeight = Math.max(minHeight, Math.ceil(Number(textarea.scrollHeight) || 0));
-    const nextHeight = Math.min(contentHeight, maxHeight);
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+    const computedStyle = window.getComputedStyle ? window.getComputedStyle(textarea) : null;
+    const layout = resolveTextareaAutoGrowState({
+      style: computedStyle,
+      rows: textarea.getAttribute("rows"),
+      minRows: textarea.dataset?.autogrowMinRows,
+      maxRows: textarea.dataset?.autogrowMaxRows,
+      scrollHeight: textarea.scrollHeight
+    });
+    textarea.style.height = `${layout.nextHeight}px`;
+    textarea.style.overflowY = layout.overflowY;
   }
 
   refreshAutoGrowTextareas(htmlLike = null) {
@@ -8358,8 +5682,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     const formEl = root.get(0);
     if (!formEl) return;
     const headerEl = app.find(".window-header").get(0);
-    const configuredMinHeight = Number(this.options?.height);
-    const minHeight = Number.isFinite(configuredMinHeight) ? Math.max(420, configuredMinHeight) : 820;
     const previousInlineHeight = formEl.style.height;
     formEl.style.height = "auto";
     const formNaturalHeight = Math.ceil(
@@ -8376,7 +5698,11 @@ class BloodmanActorSheet extends BaseActorSheet {
       || Number(app.find(".window-header").outerHeight(true))
       || 0
     );
-    const targetHeight = Math.max(minHeight, headerHeight + formNaturalHeight + 4);
+    const targetHeight = resolveSheetWindowTargetHeight({
+      configuredMinHeight: this.options?.height,
+      formNaturalHeight,
+      headerHeight
+    });
     const currentHeight = Math.ceil(Number(this.position?.height) || Number(app.outerHeight()) || 0);
     if (Math.abs(targetHeight - currentHeight) < 2) {
       if (resizeKey) this._lastAutoResizeKey = resizeKey;
@@ -8388,8 +5714,6 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
-    const scheduleAutoResize = (force = false) => setTimeout(() => this.autoResizeToContent(force), 0);
-    const scheduleAutoGrowRefresh = () => setTimeout(() => this.refreshAutoGrowTextareas(html), 0);
 
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const basicPlayer = isBasicPlayerRole(game.user?.role);
@@ -8402,7 +5726,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (canToggleCharacteristicsEdit) {
         root.find(".char-edit-toggle").prop("disabled", false);
         root
-          .find("input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']")
+          .find(VITAL_RESOURCE_INPUT_SELECTOR)
           .prop("disabled", false)
           .prop("readonly", false);
       }
@@ -8414,22 +5738,23 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
     };
     forceEnableSheetUi();
-    setTimeout(forceEnableSheetUi, 0);
+    clearUiMicrotask(this._forceEnableSheetTaskId);
+    this._forceEnableSheetTaskId = queueUiMicrotask(forceEnableSheetUi);
     html.find("li.item[data-item-id]").attr("draggable", true);
     this.refreshResourceVisuals(html);
-    setTimeout(() => this.refreshResourceVisuals(html), 0);
+    this.queueResourceGaugeRefresh(html);
     this.refreshAutoGrowTextareas(html);
-    scheduleAutoGrowRefresh();
-    scheduleAutoResize(true);
+    this.queueAutoGrowTextareaRefresh(html);
+    this.queueAutoResizeToContent(true);
 
     html.find(".sheet-tabs .item").on("click", () => {
-      scheduleAutoGrowRefresh();
-      scheduleAutoResize(true);
+      this.queueAutoGrowTextareaRefresh(html);
+      this.queueAutoResizeToContent(true);
     });
 
     html.on("input change", "textarea[data-autogrow='true']", ev => {
       this.resizeAutoGrowTextarea(ev.currentTarget);
-      scheduleAutoResize(true);
+      this.queueAutoResizeToContent(true);
     });
 
     html.on("click", ".char-edit-toggle", ev => {
@@ -8449,7 +5774,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.toggleStatePreset(stateId);
     });
 
-    html.on("change", "input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']", async ev => {
+    html.on("change", VITAL_RESOURCE_INPUT_SELECTOR, async ev => {
       if (!canCurrentUserEditCharacteristics()) return;
       if (this.actor?.isOwner) return;
       ev.preventDefault();
@@ -8461,8 +5786,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       requestVitalResourceUpdate(this.actor, path, nextValue);
     });
 
-    html.on("input change", "input[name='system.resources.pv.current'], input[name='system.resources.pv.max'], input[name='system.resources.pp.current'], input[name='system.resources.pp.max']", () => {
-      this.refreshResourceVisuals(html);
+    html.on("input change", VITAL_RESOURCE_INPUT_SELECTOR, () => {
+      this.queueResourceGaugeRefresh(html);
     });
 
     html.find(".luck-roll").click(ev => {
@@ -8672,7 +5997,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
 
     html.find(".item-icon").on("load", () => {
-      scheduleAutoResize();
+      this.queueAutoResizeToContent();
     });
   }
 
@@ -8733,7 +6058,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async _onDrop(event) {
-    const data = TextEditor.getDragEventData(event);
+    const data = getDragEventData(event);
     if (data?.type === "Actor") {
       const handled = await this._onDropTransportNpc(event, data);
       if (handled) return;
@@ -8746,306 +6071,77 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   getDropItemQuantity(dropData, droppedItem = null) {
-    const candidates = [
-      dropData?.quantity,
-      dropData?.count,
-      dropData?.amount,
-      dropData?.data?.quantity,
-      droppedItem?.system?.quantity
-    ];
-    for (const candidate of candidates) {
-      const quantity = Number(candidate);
-      if (!Number.isFinite(quantity)) continue;
-      if (quantity <= 0) continue;
-      return Math.max(1, Math.floor(quantity));
-    }
-    return 1;
+    return resolveDropItemQuantity(dropData, droppedItem);
   }
 
   getDropEntries(dropData) {
-    return Array.isArray(dropData?.items) && dropData.items.length
-      ? dropData.items
-      : [dropData];
+    return resolveDropEntries(dropData);
   }
 
   async resolveActorTransferEntries(dropData) {
     const entries = this.getDropEntries(dropData);
-    const transfers = [];
-    for (const entry of entries) {
-      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
-      if (!droppedItem) continue;
-      const sourceActor = droppedItem.actor;
-      if (!sourceActor || sourceActor?.id === this.actor?.id) continue;
-      transfers.push({ entry, droppedItem, sourceActor });
-    }
-    return transfers;
+    return resolveActorTransferEntriesFromDrop({
+      entries,
+      targetActorId: String(this.actor?.id || "")
+    });
   }
 
   async applyActorToActorItemTransfer(transferEntries = []) {
-    if (!transferEntries.length) return null;
-    if (!this.actor) return null;
     const ownerLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
-    const canManageTarget = game.user?.isGM
-      || this.actor?.isOwner
-      || (
-        typeof this.actor?.testUserPermission === "function"
-        && this.actor.testUserPermission(game.user, ownerLevel, { exact: false })
-      );
-    if (!canManageTarget) {
-      ui.notifications?.warn(t("BLOODMAN.Notifications.DropRequiresLimitedPermission"));
-      return null;
-    }
-
-    const createdItems = [];
-    for (const transfer of transferEntries) {
-      const droppedItem = transfer?.droppedItem;
-      const sourceActor = transfer?.sourceActor;
-      if (!droppedItem || !sourceActor) continue;
-      if (sourceActor?.id === this.actor?.id) continue;
-
-      const canManageSource = game.user?.isGM
-        || sourceActor?.isOwner
-        || droppedItem?.isOwner
-        || (
-          typeof sourceActor?.testUserPermission === "function"
-          && sourceActor.testUserPermission(game.user, ownerLevel, { exact: false })
-        );
-      if (!canManageSource) {
-        ui.notifications?.warn(t("BLOODMAN.Notifications.DropRequiresLimitedPermission"));
-        continue;
-      }
-
-      const sourceData = foundry.utils.deepClone(droppedItem.toObject());
-      delete sourceData._id;
-
-      let createdItem = null;
-      try {
-        const created = await this.actor.createEmbeddedDocuments("Item", [sourceData]);
-        createdItem = created?.[0] || null;
-      } catch (error) {
-        bmLog.warn("[bloodman] actor transfer:create failed", {
-          sourceActorId: sourceActor?.id,
-          targetActorId: this.actor?.id,
-          itemId: droppedItem?.id,
-          error
-        });
-        continue;
-      }
-      if (!createdItem) continue;
-
-      try {
-        await sourceActor.deleteEmbeddedDocuments("Item", [droppedItem.id]);
-      } catch (error) {
-        bmLog.warn("[bloodman] actor transfer:delete source failed", {
-          sourceActorId: sourceActor?.id,
-          targetActorId: this.actor?.id,
-          itemId: droppedItem?.id,
-          error
-        });
-        try {
-          await this.actor.deleteEmbeddedDocuments("Item", [createdItem.id]);
-        } catch (_rollbackError) {
-          // Best-effort rollback to avoid accidental duplication when source deletion fails.
-        }
-        continue;
-      }
-
-      createdItems.push(createdItem);
-    }
-
-    if (!createdItems.length) return null;
-    this.render(false);
-    return createdItems.length === 1 ? createdItems[0] : createdItems;
+    return applyActorToActorItemTransferRule({
+      targetActor: this.actor,
+      transferEntries,
+      currentUser: game.user,
+      ownerLevel,
+      isGM: Boolean(game.user?.isGM),
+      renderTarget: () => this.render(false)
+    });
   }
 
   async resolveDropPermissionState(dropData) {
-    if (game.user?.isGM) return { allowed: true };
     const entries = this.getDropEntries(dropData);
-    const canDropMenuItems = canCurrentUserDropMenuItems();
-    const limitedLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 1);
-
-    for (const entry of entries) {
-      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
-      if (!droppedItem) continue;
-      const sourceActor = droppedItem.actor;
-      if (sourceActor?.id === this.actor?.id) continue;
-      const isMenuSource = !sourceActor;
-      if (isMenuSource && !canDropMenuItems) return { allowed: false, reason: "role" };
-      // Keep actor-to-actor transfers unchanged.
-      if (sourceActor) continue;
-      // Compendium access rules are handled by Foundry and pack visibility.
-      if (String(droppedItem.pack || "").trim()) continue;
-
-      const hasLimitedAccess = typeof droppedItem.testUserPermission === "function"
-        ? droppedItem.testUserPermission(game.user, limitedLevel, { exact: false })
-        : Number(droppedItem.permission ?? 0) >= limitedLevel;
-      if (!hasLimitedAccess) return { allowed: false, reason: "permission" };
-    }
-
-    return { allowed: true };
+    return resolveDropPermissionStateFromEntries({
+      entries,
+      targetActorId: String(this.actor?.id || ""),
+      currentUser: game.user,
+      isGM: Boolean(game.user?.isGM),
+      canDropMenuItems: canCurrentUserDropMenuItems(),
+      limitedLevel: Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 1)
+    });
   }
 
   getDroppedItemUnitPrice(item) {
-    const rawPrice = String(item?.system?.price ?? "").trim();
-    if (!rawPrice) return { ok: true, value: 0 };
-    const parsed = parseLooseNumericInput(rawPrice);
-    if (!parsed.ok) return { ok: false, value: 0 };
-    const unitPrice = parsed.value;
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) return { ok: false, value: 0 };
-    return { ok: true, value: roundCurrencyValue(unitPrice) };
+    return resolveDroppedItemUnitPrice(item);
   }
 
   async resolveDropPurchaseSummary(dropData) {
     const entries = this.getDropEntries(dropData);
-    let totalCost = 0;
-    let hasInvalidPrice = false;
-
-    for (const entry of entries) {
-      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
-      if (!droppedItem) continue;
-      const sourceActor = droppedItem.actor;
-      if (sourceActor?.id === this.actor?.id) continue;
-      // Actor-to-actor exchange is a free handoff, not a purchase.
-      if (sourceActor) continue;
-      const priceState = this.getDroppedItemUnitPrice(droppedItem);
-      if (!priceState.ok) {
-        hasInvalidPrice = true;
-        continue;
-      }
-      if (!(priceState.value > 0)) continue;
-      const quantity = this.getDropItemQuantity(entry, droppedItem);
-      totalCost += priceState.value * quantity;
-    }
-
-    return {
-      hasInvalidPrice,
-      totalCost: roundCurrencyValue(totalCost)
-    };
+    return resolveDropPurchaseSummaryFromEntries({
+      entries,
+      targetActorId: String(this.actor?.id || "")
+    });
   }
 
   sanitizeDropDialogText(value, maxLength = 160) {
-    const plain = String(value ?? "")
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!plain) return "";
-    const cap = Math.max(20, Math.floor(toFiniteNumber(maxLength, 160)));
-    if (plain.length <= cap) return plain;
-    return `${plain.slice(0, cap - 3).trim()}...`;
+    return dropDecisionRules.sanitizeDropDialogText(value, maxLength);
   }
 
   buildDroppedItemSpecificities(item, options = {}) {
-    const details = [];
-    if (!item) return details;
-
-    const itemType = String(item.type || "").trim().toLowerCase();
-    const quantity = Math.max(1, Math.floor(toFiniteNumber(options.quantity, 1)));
-    const priceState = options.priceState || this.getDroppedItemUnitPrice(item);
-
-    const typeLabel = itemType ? t(`TYPES.Item.${itemType}`) : "";
-    if (typeLabel && typeLabel !== `TYPES.Item.${itemType}`) {
-      details.push(`Type : ${typeLabel}`);
-    }
-    if (quantity > 1) {
-      details.push(`Quantite : ${quantity}`);
-    }
-    if (priceState?.ok && priceState.value > 0) {
-      details.push(`Prix unitaire : ${formatCurrencyValue(priceState.value)}`);
-    }
-    if (itemType === "arme") {
-      const damageDie = normalizeRollDieFormula(item.system?.damageDie, "d4");
-      if (damageDie) details.push(`Degats : ${damageDie}`);
-      const weaponType = getWeaponCategory(item.system?.weaponType);
-      if (weaponType === "distance") details.push("Categorie : Distance");
-      if (weaponType === "corps") details.push("Categorie : Corps a corps");
-      const magazineCapacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
-      if (magazineCapacity > 0) {
-        const loadedAmmo = getWeaponLoadedAmmo(item, { fallback: 0 });
-        details.push(`Chargeur : ${loadedAmmo} / ${magazineCapacity}`);
-      }
-    }
-    if (itemType === "soin") {
-      const healDie = normalizeRollDieFormula(item.system?.healDie, "d4");
-      if (healDie) details.push(`Soin : ${healDie}`);
-    }
-    if (itemType === "protection") {
-      const paValue = Math.max(0, Math.floor(toFiniteNumber(item.system?.pa, 0)));
-      details.push(`PA : ${paValue}`);
-    }
-    const noteText = this.sanitizeDropDialogText(item.system?.note || item.system?.notes || "", 130);
-    if (noteText) details.push(`Note : ${noteText}`);
-
-    return details;
+    return dropDecisionRules.buildDroppedItemSpecificities(item, options);
   }
 
   async buildDropDecisionPreview(dropData, purchase = null) {
     const entries = this.getDropEntries(dropData);
-    const resolvedItems = [];
-    for (const entry of entries) {
-      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
-      if (!droppedItem) continue;
-      const sourceActor = droppedItem.actor;
-      if (sourceActor?.id === this.actor?.id) continue;
-      const quantity = this.getDropItemQuantity(entry, droppedItem);
-      const priceState = this.getDroppedItemUnitPrice(droppedItem);
-      resolvedItems.push({ droppedItem, sourceActor, quantity, priceState });
-    }
-    if (!resolvedItems.length) return null;
-
+    const resolvedItems = await resolveDropPreviewItems({
+      entries,
+      targetActorId: String(this.actor?.id || "")
+    });
     const targetName = String(this.actor?.name || "").trim() || t("BLOODMAN.Common.Name");
-    const firstItemName = String(resolvedItems[0]?.droppedItem?.name || "").trim() || t("BLOODMAN.Common.Name");
-    const intro = tl(
-      "BLOODMAN.Dialogs.DropDecision.Intro",
-      "Vous vous appretez a glisser '{item}' sur la fiche de '{sheet}'.",
-      {
-        item: firstItemName,
-        sheet: targetName
-      }
-    );
-    const question = tl(
-      "BLOODMAN.Dialogs.DropDecision.Question",
-      "Voulez-vous deplacer cet objet gratuitement ?"
-    );
-    const costLabel = tl("BLOODMAN.Dialogs.DropDecision.CostLabel", "Cout");
-    const specificsLabel = tl("BLOODMAN.Dialogs.DropDecision.SpecificitiesLabel", "Specificites");
-
-    const specificities = [];
-    for (const itemContext of resolvedItems.slice(0, 4)) {
-      const itemName = String(itemContext?.droppedItem?.name || "").trim() || t("BLOODMAN.Common.Name");
-      const itemDetails = this.buildDroppedItemSpecificities(itemContext.droppedItem, {
-        quantity: itemContext.quantity,
-        priceState: itemContext.priceState
-      });
-      if (resolvedItems.length > 1) {
-        specificities.push(`${itemName} :`);
-        specificities.push(...itemDetails.map(detail => `- ${detail}`));
-      } else {
-        specificities.push(...itemDetails);
-      }
-    }
-    if (resolvedItems.length > 4) {
-      specificities.push(tl(
-        "BLOODMAN.Dialogs.DropDecision.MoreItems",
-        "+ {count} objet(s) supplementaire(s).",
-        { count: resolvedItems.length - 4 }
-      ));
-    }
-    if (!specificities.length) {
-      specificities.push(tl("BLOODMAN.Dialogs.DropDecision.NoSpecificities", "Aucune specificite disponible."));
-    }
-
-    const totalCost = roundCurrencyValue(Number(purchase?.totalCost || 0));
-    return {
-      intro,
-      question,
-      costLabel,
-      specificsLabel,
-      firstItemName,
+    return buildDropDecisionPreviewData({
+      resolvedItems,
+      purchase,
       targetName,
-      specificities,
-      totalCost,
-      hasInvalidPrice: Boolean(purchase?.hasInvalidPrice)
-    };
+    });
   }
 
   async promptDropDecision(preview) {
@@ -9122,9 +6218,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   async _onDropItem(event, data) {
     const permissionState = await this.resolveDropPermissionState(data);
     if (!permissionState.allowed) {
-      const notificationKey = permissionState.reason === "role"
-        ? "BLOODMAN.Notifications.DropBlockedForPlayerRole"
-        : "BLOODMAN.Notifications.DropRequiresLimitedPermission";
+      const notificationKey = resolveDropPermissionNotificationKey(permissionState);
       ui.notifications?.warn(t(notificationKey));
       return null;
     }
@@ -9138,34 +6232,37 @@ class BloodmanActorSheet extends BaseActorSheet {
       return super._onDropItem(event, data);
     }
     const selectedAction = await this.promptDropDecision(preview);
-    if (selectedAction === "fermer") return null;
+    if (isDropDecisionClosed(selectedAction)) return null;
 
     let previousCurrency = null;
     let deductedBeforeDrop = false;
-    const shouldBuy = selectedAction === "achat";
+    const shouldBuy = isDropDecisionBuy(selectedAction);
     if (shouldBuy) {
-      if (purchase.hasInvalidPrice) {
+      previousCurrency = this.getActorCurrencyCurrentValue();
+      const purchaseState = resolveDropPurchaseState({
+        purchase,
+        currentCurrency: previousCurrency
+      });
+      if (purchaseState.reason === "invalid-price") {
         ui.notifications?.warn(t("BLOODMAN.Notifications.InvalidPurchasePrice"));
         return null;
       }
-      previousCurrency = this.getActorCurrencyCurrentValue();
-      if (previousCurrency + 0.000001 < purchase.totalCost) {
+      if (purchaseState.reason === "insufficient-funds") {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughCurrency", {
-          cost: formatCurrencyValue(purchase.totalCost),
-          current: formatCurrencyValue(previousCurrency)
+          cost: formatCurrencyValue(purchaseState.totalCost),
+          current: formatCurrencyValue(purchaseState.currentCurrency)
         }));
         return null;
       }
-      if (purchase.totalCost > 0) {
-        const nextCurrency = roundCurrencyValue(previousCurrency - purchase.totalCost);
-        await this.applyActorUpdate({ "system.equipment.monnaiesActuel": nextCurrency });
+      if (purchaseState.shouldDeduct) {
+        await this.applyActorUpdate({ "system.equipment.monnaiesActuel": purchaseState.nextCurrency });
         deductedBeforeDrop = true;
       }
     }
 
     const dropEntries = this.getDropEntries(data);
     const actorTransferEntries = await this.resolveActorTransferEntries(data);
-    const hasOnlyActorTransfers = actorTransferEntries.length > 0 && actorTransferEntries.length === dropEntries.length;
+    const hasOnlyActorTransfers = shouldUseActorTransferPath(dropEntries, actorTransferEntries);
 
     try {
       const dropped = hasOnlyActorTransfers
@@ -9186,19 +6283,19 @@ class BloodmanActorSheet extends BaseActorSheet {
   async _reachedCarriedItemsLimit(data) {
     if (!isCarriedItemLimitedActorType(this.actor?.type)) return false;
     const entries = this.getDropEntries(data);
-    let incomingCarriedItemCount = 0;
-    for (const entry of entries) {
-      const droppedItem = await Item.implementation.fromDropData(entry).catch(() => null);
-      if (!droppedItem || !CARRIED_ITEM_TYPES.has(droppedItem.type)) continue;
-      const sourceActor = droppedItem.actor;
-      if (sourceActor?.id === this.actor.id) continue;
-      incomingCarriedItemCount += 1;
-    }
+    const incomingCarriedItemCount = await computeIncomingCarriedItemCount({
+      entries,
+      targetActorId: String(this.actor?.id || "")
+    });
     if (incomingCarriedItemCount <= 0) return false;
 
     const carriedCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
     const carriedItemsLimit = getActorCarriedItemsLimit(this.actor);
-    if ((carriedCount + incomingCarriedItemCount) <= carriedItemsLimit) return false;
+    if (!isCarriedItemsLimitExceeded({
+      currentCarriedCount: carriedCount,
+      incomingCarriedCount: incomingCarriedItemCount,
+      carriedItemsLimit
+    })) return false;
 
     ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: carriedItemsLimit }));
     return true;
@@ -9267,17 +6364,31 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async rerollCharacteristic(key) {
-    if (!key) return;
+    const plan = resolveCharacteristicRerollPlan({
+      actorType: this.actor?.type,
+      requestedKey: key,
+      lastRollKey: this._lastCharacteristicRollKey,
+      isRerollWindowActive: this.isRerollWindowActive(this._lastCharacteristicRollAt),
+      isGM: Boolean(game.user?.isGM),
+      currentPP: toFiniteNumber(this.actor?.system?.resources?.pp?.current, 0),
+      currentChaos: this.actor?.type === "personnage-non-joueur" ? getChaosValue() : 0,
+      ppCost: CHARACTERISTIC_REROLL_PP_COST,
+      npcChaosCost: CHAOS_COST_NPC_REROLL
+    });
+    if (!plan.mode) return;
 
-    if (this.actor.type === "personnage") {
-      if (this._lastCharacteristicRollKey !== key) return;
-      const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
-      if (!Number.isFinite(currentPP) || currentPP < CHARACTERISTIC_REROLL_PP_COST) {
+    if (!plan.allowed) {
+      if (plan.reason === "not-enough-pp") {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
-        return;
+      } else if (plan.reason === "not-enough-chaos") {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
+        this.render(false);
       }
+      return;
+    }
 
-      const resourceUpdated = await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
+    if (plan.mode === "player") {
+      const resourceUpdated = await this.applyActorUpdate({ "system.resources.pp.current": plan.nextPP }, {
         bloodmanAllowVitalResourceUpdate: true
       });
       if (!resourceUpdated) return;
@@ -9288,16 +6399,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       return;
     }
 
-    if (this.actor.type !== "personnage-non-joueur" || !game.user.isGM) return;
-    if (this._lastCharacteristicRollKey !== key || !this.isRerollWindowActive(this._lastCharacteristicRollAt)) return;
-    const currentChaos = getChaosValue();
-    if (currentChaos < CHAOS_COST_NPC_REROLL) {
-      ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
-      this.render(false);
-      return;
-    }
-
-    await setChaosValue(currentChaos - CHAOS_COST_NPC_REROLL);
+    await setChaosValue(plan.nextChaos);
     await doCharacteristicRoll(this.actor, key);
     this.markCharacteristicReroll(key);
     this.render(false);
@@ -9311,15 +6413,14 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async markXpProgress(key) {
     if (this.actor.type !== "personnage") return;
-    const xp = Array.isArray(this.actor.system.characteristics?.[key]?.xp)
-      ? [...this.actor.system.characteristics[key].xp]
-      : [false, false, false];
-    const index = xp.findIndex(value => !value);
-    if (index === -1) return;
-    xp[index] = true;
-    await this.applyActorUpdate({ [`system.characteristics.${key}.xp`]: xp });
-    foundry.utils.setProperty(this.actor, `system.characteristics.${key}.xp`, xp);
-    if (xp.length === 3 && xp.every(Boolean)) this.promptGrowthRoll(key);
+    const progress = resolveCharacteristicXpProgress({
+      xpValue: this.actor?.system?.characteristics?.[key]?.xp,
+      defaultSlots: 3
+    });
+    if (!progress.updated) return;
+    await this.applyActorUpdate({ [`system.characteristics.${key}.xp`]: progress.xp });
+    foundry.utils.setProperty(this.actor, `system.characteristics.${key}.xp`, progress.xp);
+    if (progress.shouldPromptGrowth) this.promptGrowthRoll(key);
   }
 
   async rollDamage(item) {
@@ -9336,48 +6437,32 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async reloadWeapon(item) {
-    if (!item || String(item.type || "").trim().toLowerCase() !== "arme") return;
-    const weaponType = getWeaponCategory(item.system?.weaponType);
-    if (weaponType !== "distance") return;
-    if (toCheckboxBoolean(item.system?.infiniteAmmo, false)) return;
-
-    const capacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
-    if (capacity <= 0) return;
-    const ammoState = normalizeAmmoState(this.actor?.system?.ammo, {
-      fallback: buildDefaultAmmo(),
-      capacity
+    const reloadPlan = resolveWeaponReloadPlan({
+      item,
+      actorAmmoData: this.actor?.system?.ammo
     });
-    const ammoStock = Math.max(0, ammoState.stock);
-    const currentMagazine = getWeaponLoadedAmmo(item, { fallback: ammoState.magazine });
-    const targetCapacity = capacity > 0 ? capacity : (currentMagazine + ammoStock);
-    const needed = Math.max(0, targetCapacity - currentMagazine);
-    if (needed <= 0) return;
-    if (ammoStock <= 0) {
-      ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
+    if (!reloadPlan.ok) {
+      if (reloadPlan.reason === "no-ammo") {
+        ui.notifications?.warn(t("BLOODMAN.Notifications.NoAmmo"));
+      }
       return;
     }
-
-    const transferred = Math.min(needed, ammoStock);
-    const nextStock = Math.max(0, ammoStock - transferred);
-    const nextMagazine = capacity > 0
-      ? Math.min(capacity, currentMagazine + transferred)
-      : Math.max(0, currentMagazine + transferred);
 
     try {
       await this.applyActorUpdate(
         {
-          "system.ammo.stock": nextStock,
-          "system.ammo.value": nextStock
+          "system.ammo.stock": reloadPlan.nextStock,
+          "system.ammo.value": reloadPlan.nextStock
         },
         { bloodmanAllowAmmoUpdate: true }
       );
-      await item.update({ "system.loadedAmmo": nextMagazine });
+      await item.update({ "system.loadedAmmo": reloadPlan.nextMagazine });
     } catch (error) {
       bmLog.warn("[bloodman] weapon reload: loaded ammo update failed", {
         actorId: this.actor?.id,
         itemId: item?.id,
-        nextStock,
-        nextMagazine,
+        nextStock: reloadPlan.nextStock,
+        nextMagazine: reloadPlan.nextMagazine,
         error
       });
       safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
@@ -9406,15 +6491,17 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async rollAbilityDamage(item) {
-    if (!item) return;
-    const isUsablePower = item.type === "pouvoir" && isPowerUsableEnabled(item.system?.usableEnabled);
-    if (isUsablePower && !this.isPowerActivated(item.id)) return;
-    const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
+    const plan = resolveAbilityDamageRollPlan({
+      item,
+      powerUsableEnabled: isPowerUsableEnabled(item?.system?.usableEnabled),
+      powerActivated: this.isPowerActivated(item?.id)
+    });
+    if (!plan.allowed || !item) return;
     const beforeRoll = async () => {
-      if (isUsablePower) return true;
+      if (plan.isUsablePower) return true;
       return applyPowerCost(this.actor, item);
     };
-    const result = await doDirectDamageRoll(this.actor, formula, item.name, {
+    const result = await doDirectDamageRoll(this.actor, plan.formula, item.name, {
       beforeRoll,
       itemId: item.id,
       itemType: item.type
@@ -9453,29 +6540,35 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async useItem(item) {
-    if (!item) return;
-    if (item.type === "pouvoir") {
+    const usePlan = resolveItemUsePlan({
+      item,
+      objectUseEnabled: isObjectUseEnabled(toBooleanFlag(item?.system?.useEnabled))
+    });
+    if (usePlan.kind === "none" || !item) return;
+
+    if (usePlan.kind === "power") {
       await this.usePower(item);
       return;
     }
-    if (item.type === "soin") {
-      const healAudioRef = {
-        id: item.id,
-        type: item.type,
-        name: item.name,
-        system: { audioFile: item.system?.audioFile }
-      };
-      if (this.actor?.isOwner || game.user?.isGM) {
+    if (usePlan.kind === "heal") {
+      const healAudioRef = buildHealAudioReference(item);
+      const healMode = resolveHealUseMode({
+        actorIsOwner: Boolean(this.actor?.isOwner),
+        isGM: Boolean(game.user?.isGM)
+      });
+      if (healMode === "owner-roll") {
         const result = await doHealRoll(this.actor, item);
         if (result) await playItemAudio(healAudioRef);
         if (result && this.actor.items.get(item.id)) this.render(false);
       } else {
         const formula = normalizeRollDieFormula(item.system?.healDie, "d4");
         const roll = await new Roll(formula).evaluate();
-        const current = toFiniteNumber(this.actor.system?.resources?.pv?.current, 0);
-        const max = toFiniteNumber(this.actor.system?.resources?.pv?.max, current);
-        const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
-        await this.applyActorUpdate({ "system.resources.pv.current": nextValue }, {
+        const healState = resolveManualHealNextValue({
+          current: this.actor?.system?.resources?.pv?.current,
+          max: this.actor?.system?.resources?.pv?.max,
+          rollTotal: roll.total
+        });
+        await this.applyActorUpdate({ "system.resources.pv.current": healState.next }, {
           bloodmanAllowVitalResourceUpdate: true
         });
         roll.toMessage({
@@ -9489,13 +6582,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       return;
     }
-    if (item.type === "ration") {
+    if (usePlan.kind === "ration") {
       await this.deleteActorItem(item);
       this.render(false);
       return;
     }
-    if (item.type === "objet") {
-      if (!toBooleanFlag(item.system?.useEnabled)) return;
+    if (usePlan.kind === "object") {
       await playItemAudio(item, { delayMs: 0 });
       await this.deleteActorItem(item);
       this.render(false);
@@ -9508,21 +6600,17 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!item) return;
     if (!isDamageRerollItemType(item.type)) return;
     const state = this.getItemRerollState();
-    const context = state?.damage;
+    const context = normalizeItemRerollContext(state?.damage, item.type);
     if (!context || state?.itemId !== itemId) return;
-    context.kind = String(context.kind || "item-damage");
-    context.itemType = String(context.itemType || item.type || "").toLowerCase();
-    if (context.kind !== "item-damage" || !isDamageRerollItemType(context.itemType)) return;
-    if (this.actor.type !== "personnage" && !this.isRerollWindowActive(state?.at)) return;
-    let targets = normalizeRerollTargets(context.targets).filter(Boolean);
-    if (!targets.length) {
-      const selected = Array.from(game.user.targets || []);
-      if (selected.length) {
-        const requestedTotal = Math.max(0, Math.floor(Number(context.totalDamage || 0)));
-        targets = buildFallbackRerollTargets(selected, requestedTotal);
-        context.targets = targets;
-      }
-    }
+    if (!isItemRerollContextValid(context)) return;
+    if (shouldBlockByRerollWindow(this.actor?.type, this.isRerollWindowActive(state?.at))) return;
+    const targetResolution = resolveItemRerollTargets({
+      contextTargets: context.targets,
+      selectedTargets: Array.from(game.user.targets || []),
+      requestedTotalDamage: Number(context.totalDamage || 0)
+    });
+    let targets = targetResolution.targets;
+    if (targetResolution.fallbackUsed) context.targets = targets;
     if (!targets.length) {
       ui.notifications?.warn(t("BLOODMAN.Notifications.NoTargetSelected"));
       return;
@@ -9533,30 +6621,36 @@ class BloodmanActorSheet extends BaseActorSheet {
       return;
     }
 
-    const isPlayerActor = this.actor.type === "personnage";
-    const isNpcActor = this.actor.type === "personnage-non-joueur";
-    if (!isPlayerActor && !isNpcActor) return;
     const validationMeta = {
       rollId: context.rollId,
       itemId,
       itemType: context.itemType
     };
 
-    if (isPlayerActor) {
-      const currentPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
-      if (currentPP < CHARACTERISTIC_REROLL_PP_COST) {
+    const resourcePlan = resolveItemRerollResourcePlan({
+      actorType: this.actor?.type,
+      isGM: Boolean(game.user?.isGM),
+      currentPP: toFiniteNumber(this.actor?.system?.resources?.pp?.current, 0),
+      currentChaos: this.actor?.type === "personnage-non-joueur" ? getChaosValue() : 0,
+      ppCost: CHARACTERISTIC_REROLL_PP_COST,
+      npcChaosCost: CHAOS_COST_NPC_REROLL
+    });
+    if (!resourcePlan.mode) return;
+
+    if (resourcePlan.mode === "player") {
+      if (!resourcePlan.allowed) {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughPPReroll", { cost: CHARACTERISTIC_REROLL_PP_COST }));
         return;
       }
-      const resourceUpdated = await this.applyActorUpdate({ "system.resources.pp.current": Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST) }, {
+      const resourceUpdated = await this.applyActorUpdate({ "system.resources.pp.current": resourcePlan.nextPP }, {
         bloodmanAllowVitalResourceUpdate: true
       });
       if (!resourceUpdated) return;
       const nextPP = toFiniteNumber(this.actor.system.resources?.pp?.current, 0);
-      const expectedPP = Math.max(0, currentPP - CHARACTERISTIC_REROLL_PP_COST);
+      const expectedPP = resourcePlan.nextPP;
       logDamageRerollValidation("resource-player-pp", {
         ...validationMeta,
-        before: currentPP,
+        before: resourcePlan.currentPP,
         after: nextPP,
         expected: expectedPP,
         cost: CHARACTERISTIC_REROLL_PP_COST,
@@ -9564,19 +6658,17 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
     } else {
-      if (!game.user.isGM) return;
-      const currentChaos = getChaosValue();
-      if (currentChaos < CHAOS_COST_NPC_REROLL) {
+      if (!resourcePlan.allowed) {
         ui.notifications?.warn(t("BLOODMAN.Notifications.NotEnoughChaosReroll"));
         this.render(false);
         return;
       }
-      await setChaosValue(currentChaos - CHAOS_COST_NPC_REROLL);
+      await setChaosValue(resourcePlan.nextChaos);
       const nextChaos = getChaosValue();
-      const expectedChaos = Math.max(0, currentChaos - CHAOS_COST_NPC_REROLL);
+      const expectedChaos = resourcePlan.nextChaos;
       logDamageRerollValidation("resource-gm-chaos", {
         ...validationMeta,
-        before: currentChaos,
+        before: resourcePlan.currentChaos,
         after: nextChaos,
         expected: expectedChaos,
         cost: CHAOS_COST_NPC_REROLL,
@@ -9605,171 +6697,28 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
 
     if (!game.user.isGM && hasActiveGM) {
-      const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-      const socketTargets = normalizeRerollTargets(allocations, { includeAliases: true });
-      const rerollPayload = {
-        type: "rerollDamage",
-        requestId,
-        kind: "item-damage",
-        rerollUsed: false,
+      await relayItemRerollToGMs({
+        context,
+        itemId,
+        itemType: item.type,
+        itemName: item.name,
+        actorId: this.actor.id,
         attackerUserId: game.user?.id || "",
-        attackerId: context.attackerId || this.actor.id,
-        rollId: context.rollId,
-        itemId: context.itemId || itemId,
-        itemType: context.itemType || item.type,
-        itemName: context.itemName || item.name,
-        damageFormula: context.formula,
-        damageLabel: context.degats,
-        bonusBrut: context.bonusBrut,
-        rollKeepHighest: context.rollKeepHighest === true,
-        penetration: context.penetration,
         totalDamage,
         rollResults,
-        targets: socketTargets
-      };
-      if (game.socket) game.socket.emit(SYSTEM_SOCKET, rerollPayload);
-      const gmIds = getActiveGMUserIds();
-      if (ENABLE_CHAT_TRANSPORT_FALLBACK && gmIds.length) {
-        await ChatMessage.create({
-          content: REROLL_REQUEST_CHAT_MARKUP,
-          whisper: gmIds,
-          flags: { bloodman: { rerollDamageRequest: rerollPayload } }
-        }).catch(() => null);
-      }
-      bmLog.debug("reroll:send", {
-        requestId,
-        attackerUserId: game.user?.id || "",
-        attackerId: context.attackerId || this.actor.id,
-        rollId: context.rollId,
-        itemId: context.itemId || itemId,
-        itemType: context.itemType || item.type,
-        totalDamage,
-        penetration: context.penetration,
-        targets: socketTargets
+        allocations
       });
       this.markItemReroll(itemId, context);
       this.render(false);
       return;
     }
 
-    for (const rawTarget of allocations) {
-      const target = normalizeRerollTarget(rawTarget);
-      const tokenDoc = await resolveDamageTokenDocument(target);
-      const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : toBooleanFlag(target.targetActorLink);
-      const targetActor = tokenIsLinked
-        ? (tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null))
-        : null;
-      const rawHpBefore = target?.hpBefore;
-      let hpBefore = (rawHpBefore == null || rawHpBefore === "")
-        ? Number.NaN
-        : Number(rawHpBefore);
-      if (!Number.isFinite(hpBefore)) {
-        const referenceShare = Math.max(0, Math.floor(Number(target.baseShare ?? target.share ?? 0)));
-        if (tokenIsLinked && targetActor) {
-          const currentHp = Number(targetActor.system?.resources?.pv?.current);
-          if (Number.isFinite(currentHp)) {
-            const paInitial = getProtectionPA(targetActor);
-            const paEffective = Math.max(0, paInitial - penetrationValue);
-            const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
-            hpBefore = currentHp + estimatedFinalDamage;
-          }
-        } else if (tokenDoc) {
-          const currentHp = Number(getTokenCurrentPv(tokenDoc));
-          if (Number.isFinite(currentHp)) {
-            const paInitial = getProtectionPA(tokenDoc.actor || null);
-            const paEffective = Math.max(0, paInitial - penetrationValue);
-            const estimatedFinalDamage = Math.max(0, referenceShare - paEffective);
-            hpBefore = currentHp + estimatedFinalDamage;
-          }
-        }
-      }
-      if (Number.isFinite(hpBefore)) {
-        if (tokenIsLinked && targetActor) {
-          await targetActor.update({ "system.resources.pv.current": hpBefore });
-        } else if (tokenDoc) {
-          await tokenDoc.update({ "delta.system.resources.pv.current": hpBefore });
-        }
-        if (tokenDoc) {
-          const actorType = getTokenActorType(tokenDoc);
-          if (actorType) await syncZeroPvStatusForToken(tokenDoc, actorType, hpBefore);
-        }
-      }
-      const restoredPv = tokenIsLinked && targetActor
-        ? Number(targetActor.system?.resources?.pv?.current)
-        : Number(getTokenCurrentPv(tokenDoc));
-      const okRestored = Number.isFinite(hpBefore)
-        ? validateNumericEquality(restoredPv, hpBefore)
-        : false;
-
-      const share = Math.max(0, Math.floor(Number(target.share || 0)));
-      if (!share) {
-        logDamageRerollValidation("local-target-zero-share", {
-          ...validationMeta,
-          targetName: target.targetName || tokenDoc?.name || "Cible",
-          share,
-          hpBefore,
-          restoredPv,
-          okRestored,
-          okReapplied: okRestored
-        });
-        continue;
-      }
-      const targetName = resolveCombatTargetName(
-        target.targetName || tokenDoc?.name,
-        targetActor?.name,
-        "Cible"
-      );
-      let result = null;
-      if (tokenIsLinked && targetActor) {
-        result = await applyDamageToActor(targetActor, share, { targetName, penetration: penetrationValue });
-      } else if (tokenDoc && Number.isFinite(hpBefore)) {
-        const paInitial = getProtectionPA(tokenDoc.actor || null);
-        const paEffective = Math.max(0, paInitial - penetrationValue);
-        const finalDamage = Math.max(0, share - paEffective);
-        const nextValue = Math.max(0, hpBefore - finalDamage);
-        await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
-        await postDamageTakenChatMessage({
-          name: targetName,
-          amount: finalDamage,
-          pa: paEffective,
-          speakerAlias: targetName
-        });
-        result = {
-          hpBefore,
-          hpAfter: nextValue,
-          finalDamage,
-          penetration: penetrationValue,
-          paInitial,
-          paEffective,
-          pa: paEffective
-        };
-      }
-      const expectedHpAfter = result
-        ? Math.max(0, Number(hpBefore) - Math.max(0, Number(result.finalDamage || 0)))
-        : Number.NaN;
-      const okReapplied = result
-        ? validateNumericEquality(result.hpAfter, expectedHpAfter)
-        : false;
-      logDamageRerollValidation("local-target", {
-        ...validationMeta,
-        targetName,
-        share,
-        hpBefore,
-        restoredPv,
-        okRestored,
-        hpAfter: result?.hpAfter,
-        expectedHpAfter,
-        finalDamage: result?.finalDamage,
-        okReapplied
-      });
-
-      if (result && tokenDoc) {
-        const actorType = getTokenActorType(tokenDoc);
-        if (actorType && Number.isFinite(result.hpAfter)) {
-          await syncZeroPvStatusForToken(tokenDoc, actorType, result.hpAfter);
-        }
-      }
-    }
+    await applyLocalItemRerollTargets({
+      allocations,
+      penetrationValue,
+      validationMeta,
+      defaultTargetName: "Cible"
+    });
 
     this.markItemReroll(itemId, context);
     this.render(false);
@@ -9864,27 +6813,19 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async performItemRerollRoll(item) {
     if (!item) return false;
-
-    if (item.type === "arme") {
-      const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
-      const result = await doDirectDamageRoll(this.actor, formula, item.name, { itemId: item.id, itemType: item.type });
+    const plan = resolveItemRerollRollPlan({ item });
+    if (plan.mode === "damage") {
+      const result = await doDirectDamageRoll(this.actor, plan.formula, item.name, { itemId: item.id, itemType: item.type });
       return Boolean(result);
     }
-
-    if (item.type === "aptitude" || item.type === "pouvoir") {
-      if (!item.system?.damageEnabled || !item.system?.damageDie) return false;
-      const formula = normalizeRollDieFormula(item.system.damageDie, "d4");
-      const result = await doDirectDamageRoll(this.actor, formula, item.name, { itemId: item.id, itemType: item.type });
-      return Boolean(result);
-    }
-
-    if (item.type === "soin") {
-      const formula = normalizeRollDieFormula(item.system?.healDie, "d4");
-      const roll = await new Roll(formula).evaluate();
-      const current = toFiniteNumber(this.actor.system.resources?.pv?.current, 0);
-      const max = toFiniteNumber(this.actor.system.resources?.pv?.max, current);
-      const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
-      await this.applyActorUpdate({ "system.resources.pv.current": nextValue }, {
+    if (plan.mode === "heal") {
+      const roll = await new Roll(plan.formula).evaluate();
+      const healState = resolveManualHealNextValue({
+        current: this.actor?.system?.resources?.pv?.current,
+        max: this.actor?.system?.resources?.pv?.max,
+        rollTotal: roll.total
+      });
+      await this.applyActorUpdate({ "system.resources.pv.current": healState.next }, {
         bloodmanAllowVitalResourceUpdate: true
       });
       roll.toMessage({
@@ -9894,7 +6835,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       return true;
     }
-
     return false;
   }
 
@@ -9909,28 +6849,39 @@ class BloodmanActorSheet extends BaseActorSheet {
     const itemBonuses = getItemBonusTotals(this.actor);
     const base = toFiniteNumber(this.actor.system.characteristics?.[key]?.base, 0);
     const archetypeBonus = getActorArchetypeBonus(this.actor, key);
-    const effective = base
-      + toFiniteNumber(this.actor.system.modifiers?.all, 0)
-      + toFiniteNumber(this.actor.system.modifiers?.[key], 0)
-      + toFiniteNumber(itemBonuses?.[key], 0)
-      + toFiniteNumber(archetypeBonus, 0);
+    const effective = computeGrowthEffectiveScore({
+      base,
+      modifierAll: this.actor?.system?.modifiers?.all,
+      modifierKey: this.actor?.system?.modifiers?.[key],
+      itemBonus: itemBonuses?.[key],
+      archetypeBonus
+    });
 
     const roll = await new Roll("1d100").evaluate();
-    const rollTotal = Number(roll.total || 0);
-    const success = rollTotal > effective;
+    const outcomeState = resolveGrowthOutcome({
+      rollTotal: Number(roll.total || 0),
+      effectiveScore: effective
+    });
+    const rollTotal = outcomeState.rollTotal;
+    const success = outcomeState.success;
     const characteristicLabelKey = CHARACTERISTICS.find(c => c.key === key)?.labelKey || "";
     const characteristicLabel = characteristicLabelKey ? t(characteristicLabelKey) : key;
     const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
     const xpPath = `system.characteristics.${key}.xp`;
     const basePath = `system.characteristics.${key}.base`;
+    const growthUpdate = buildGrowthUpdateData({
+      base,
+      success,
+      xpSlots: 3
+    });
     await this.applyActorUpdate({
-      [basePath]: base + (success ? 1 : 0),
-      [xpPath]: [false, false, false]
+      [basePath]: growthUpdate.nextBase,
+      [xpPath]: growthUpdate.nextXp
     }, {
       bloodmanAllowCharacteristicBase: true
     });
-    foundry.utils.setProperty(this.actor, basePath, base + (success ? 1 : 0));
-    foundry.utils.setProperty(this.actor, xpPath, [false, false, false]);
+    foundry.utils.setProperty(this.actor, basePath, growthUpdate.nextBase);
+    foundry.utils.setProperty(this.actor, xpPath, growthUpdate.nextXp);
 
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -10091,6 +7042,40 @@ class BloodmanItemSheet extends BaseItemSheet {
     });
   }
 
+  async close(options = {}) {
+    this.clearQueuedPricePreviewRefresh();
+    return super.close(options);
+  }
+
+  clearQueuedPricePreviewRefresh() {
+    clearUiMicrotask(this._pricePreviewRefreshTaskId);
+    this._pricePreviewRefreshTaskId = null;
+    this._queuedPricePreviewRoot = null;
+  }
+
+  queuePricePreviewRefresh(rootLike = null) {
+    this._queuedPricePreviewRoot = resolveDeferredRoot(this._queuedPricePreviewRoot, rootLike);
+    if (this._pricePreviewRefreshTaskId != null) return;
+    this._pricePreviewRefreshTaskId = queueUiMicrotask(() => {
+      this._pricePreviewRefreshTaskId = null;
+      const root = this._queuedPricePreviewRoot?.find ? this._queuedPricePreviewRoot : this.element;
+      this._queuedPricePreviewRoot = null;
+      this.refreshPricePreview(root);
+    });
+  }
+
+  syncPricePreviewSaleManualState(htmlLike = null) {
+    if (!isPriceManagedItemType(this.item?.type)) return false;
+    const root = htmlLike?.find ? htmlLike : this.element;
+    if (!root?.length) return false;
+    const priceInput = root.find("input[name='system.price']").first();
+    const saleInput = root.find("input[name='system.salePrice']").first();
+    if (!priceInput.length || !saleInput.length) return false;
+    const manual = resolveItemSaleManualFlag(priceInput.val(), saleInput.val());
+    saleInput.attr("data-sale-manual", manual ? "true" : "false");
+    return manual;
+  }
+
   activateListeners(html) {
     super.activateListeners(html);
     this.activatePricePreviewListeners(html);
@@ -10111,37 +7096,31 @@ class BloodmanItemSheet extends BaseItemSheet {
     const errorNode = root.find("[data-price-error]").first();
     if (!priceInput.length || !saleInput.length || !errorNode.length) return;
     const saleManual = saleInput.attr("data-sale-manual") === "true";
-    const pricePreview = resolveItemPricePreviewState(priceInput.val());
-    if (!saleManual) {
-      saleInput.val(pricePreview.errorMessage ? "" : pricePreview.salePrice);
+    const uiState = resolveItemPricePreviewUiState({
+      priceValue: priceInput.val(),
+      saleValue: saleInput.val(),
+      saleManual
+    });
+    if (!saleManual && String(saleInput.val() ?? "") !== uiState.nextSaleValue) {
+      saleInput.val(uiState.nextSaleValue);
     }
-    errorNode.text(pricePreview.errorMessage || "");
-    priceInput.toggleClass("is-invalid", Boolean(pricePreview.errorMessage));
-    priceInput.attr("aria-invalid", pricePreview.errorMessage ? "true" : "false");
+    errorNode.text(uiState.errorMessage || "");
+    priceInput.toggleClass("is-invalid", uiState.invalid);
+    priceInput.attr("aria-invalid", uiState.ariaInvalid);
   }
 
   activatePricePreviewListeners(html) {
     if (!isPriceManagedItemType(this.item?.type)) return;
-    const setSaleManualState = () => {
-      const root = html?.find ? html : this.element;
-      if (!root?.length) return false;
-      const priceInput = root.find("input[name='system.price']").first();
-      const saleInput = root.find("input[name='system.salePrice']").first();
-      if (!priceInput.length || !saleInput.length) return false;
-      const manual = isItemSalePriceManual(priceInput.val(), saleInput.val());
-      saleInput.attr("data-sale-manual", manual ? "true" : "false");
-      return manual;
-    };
-    const refresh = () => this.refreshPricePreview(html);
+    const refresh = () => this.queuePricePreviewRefresh(html);
     html.on("input change blur", "input[name='system.price']", () => {
       refresh();
     });
     html.on("input change blur", "input[name='system.salePrice']", () => {
-      setSaleManualState();
+      this.syncPricePreviewSaleManualState(html);
       refresh();
     });
-    setSaleManualState();
-    refresh();
+    this.syncPricePreviewSaleManualState(html);
+    this.refreshPricePreview(html);
   }
 
   async rollAbilityDamage() {

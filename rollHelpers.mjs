@@ -5,6 +5,11 @@ import {
   isAssistantOrHigherRole,
   isCurrentUserPrimaryPrivilegedOperator
 } from "./utils/privileged-users.mjs";
+import {
+  hasSocket,
+  socketEmit,
+  updateDocument
+} from "./src/compat/index.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
@@ -223,7 +228,7 @@ function getDamageConfigPopupViewerIds(requesterUserId = "") {
 }
 
 function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
-  if (!game.socket) return false;
+  if (!hasSocket()) return false;
   const requesterUserId = String(game.user?.id || "").trim();
   const viewerIds = getDamageConfigPopupViewerIds(requesterUserId);
   if (!viewerIds.length) return false;
@@ -253,10 +258,9 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
       rollKeepHighest: config?.rollKeepHighest === true
     }
   };
-  try {
-    game.socket.emit(SYSTEM_SOCKET, payload);
-  } catch (error) {
-    bmLog.error("damage:config popup socket emit failed", { error });
+  if (!socketEmit(SYSTEM_SOCKET, payload)) {
+    bmLog.error("damage:config popup socket emit failed", { payloadType: payload?.type });
+    return false;
   }
   const observerIds = viewerIds.filter(id => id && id !== requesterUserId);
   if (ENABLE_CHAT_TRANSPORT_FALLBACK && useChatFallback && observerIds.length && typeof ChatMessage?.create === "function") {
@@ -277,23 +281,22 @@ function hasActorUpdatePayload(updateData) {
 }
 
 function requestActorSheetUpdate(actor, updateData, options = {}) {
-  if (!actor || !game.socket || !hasActorUpdatePayload(updateData)) return false;
-  try {
-    game.socket.emit(SYSTEM_SOCKET, {
-      type: "updateActorSheetData",
-      requesterId: String(game.user?.id || ""),
-      actorUuid: String(actor.uuid || ""),
-      actorId: String(actor.id || ""),
-      actorBaseId: getSocketActorBaseId(actor),
-      updateData,
-      options: {
-        allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
-        allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate),
-        allowAmmoUpdate: Boolean(options.allowAmmoUpdate)
-      }
-    });
-  } catch (error) {
-    bmLog.error("actor:update socket emit failed", { error });
+  if (!actor || !hasSocket() || !hasActorUpdatePayload(updateData)) return false;
+  const ok = socketEmit(SYSTEM_SOCKET, {
+    type: "updateActorSheetData",
+    requesterId: String(game.user?.id || ""),
+    actorUuid: String(actor.uuid || ""),
+    actorId: String(actor.id || ""),
+    actorBaseId: getSocketActorBaseId(actor),
+    updateData,
+    options: {
+      allowCharacteristicBase: Boolean(options.allowCharacteristicBase),
+      allowVitalResourceUpdate: Boolean(options.allowVitalResourceUpdate),
+      allowAmmoUpdate: Boolean(options.allowAmmoUpdate)
+    }
+  });
+  if (!ok) {
+    bmLog.error("actor:update socket emit failed", { actorId: actor?.id });
     return false;
   }
   return true;
@@ -304,21 +307,20 @@ function getSocketActorBaseId(actor) {
 }
 
 function requestDeleteActorItem(actor, item) {
-  if (!actor || !item || !game.socket) return false;
-  try {
-    game.socket.emit(SYSTEM_SOCKET, {
-      type: "deleteActorItem",
-      requesterId: String(game.user?.id || ""),
-      actorUuid: String(actor.uuid || ""),
-      actorId: String(actor.id || ""),
-      actorBaseId: getSocketActorBaseId(actor),
-      itemId: String(item.id || ""),
-      itemUuid: String(item.uuid || ""),
-      itemType: String(item.type || ""),
-      itemName: String(item.name || "")
-    });
-  } catch (error) {
-    bmLog.error("item:delete socket emit failed", { error });
+  if (!actor || !item || !hasSocket()) return false;
+  const ok = socketEmit(SYSTEM_SOCKET, {
+    type: "deleteActorItem",
+    requesterId: String(game.user?.id || ""),
+    actorUuid: String(actor.uuid || ""),
+    actorId: String(actor.id || ""),
+    actorBaseId: getSocketActorBaseId(actor),
+    itemId: String(item.id || ""),
+    itemUuid: String(item.uuid || ""),
+    itemType: String(item.type || ""),
+    itemName: String(item.name || "")
+  });
+  if (!ok) {
+    bmLog.error("item:delete socket emit failed", { actorId: actor?.id, itemId: item?.id });
     return false;
   }
   return true;
@@ -330,7 +332,7 @@ async function updateActorWithFallback(actor, updateData, options = {}) {
   const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
   const allowAmmoUpdate = Boolean(options.allowAmmoUpdate);
   if (actor.isOwner || game.user?.isGM) {
-    return actor.update(updateData, {
+    return updateDocument(actor, updateData, {
       bloodmanAllowCharacteristicBase: allowCharacteristicBase,
       bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate,
       bloodmanAllowAmmoUpdate: allowAmmoUpdate
@@ -960,13 +962,11 @@ export async function doCharacteristicRoll(actor, key) {
 }
 
 async function requestDamageFromGM(token, damage, options = {}) {
-  if (!game.socket) return false;
+  if (!hasSocket()) return false;
   const payload = buildDamageRequestPayload(token, damage, options);
   bmLog.debug("damage:send", payload);
-  try {
-    game.socket.emit(SYSTEM_SOCKET, payload);
-  } catch (error) {
-    bmLog.error("damage:socket emit failed", { error });
+  if (!socketEmit(SYSTEM_SOCKET, payload)) {
+    bmLog.error("damage:socket emit failed", { payloadType: payload?.type });
     return false;
   }
 
@@ -1300,7 +1300,7 @@ export async function doDamageRoll(actor, item) {
     } else {
       const nextMagazine = Math.max(0, currentMagazine - 1);
       try {
-        await item.update({ "system.loadedAmmo": nextMagazine });
+        await updateDocument(item, { "system.loadedAmmo": nextMagazine });
       } catch (error) {
         bmLog.warn("damage:weapon loaded ammo update failed", {
           actorId: actor?.id,

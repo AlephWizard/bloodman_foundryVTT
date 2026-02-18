@@ -1009,6 +1009,10 @@
   line-height: 1.35;
 }
 
+.npc-quick-notes[data-autogrow="true"] {
+  max-height: 360px;
+}
+
 .identity-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

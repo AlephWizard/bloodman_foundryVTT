@@ -1,0 +1,10 @@
+{
+  "_id": "legacy-note-item",
+  "name": "Objet ancien",
+  "type": "objet",
+  "system": {
+    "note": "",
+    "notes": "Texte historique a migrer vers system.note"
+  }
+}
+

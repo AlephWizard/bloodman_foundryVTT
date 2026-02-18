@@ -1,0 +1,31 @@
+{
+  "_id": "legacy-actor-structure",
+  "name": "PNJ Legacy",
+  "type": "personnage-non-joueur",
+  "system": {
+    "npcRole": "boss-invalide",
+    "profile": {
+      "quickNotes": null
+    },
+    "equipment": {
+      "monnaies": "  Couronnes ",
+      "monnaiesActuel": "abc",
+      "bagSlotsEnabled": "yes",
+      "transportNpcs": [
+        " Actor.abc ",
+        "",
+        "Actor.abc",
+        null,
+        "Actor.xyz"
+      ]
+    },
+    "characteristics": {
+      "PHY": {
+        "xp": [1, 0, ""]
+      },
+      "ESP": {
+        "xp": null
+      }
+    }
+  }
+}
