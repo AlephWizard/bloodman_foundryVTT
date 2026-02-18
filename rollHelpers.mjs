@@ -588,13 +588,10 @@ async function promptDamageConfiguration({
     ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackHint", "Configuration de l'attaque simple")
     : titleLabel;
   const rollHighestLabel = tl("BLOODMAN.Dialogs.DamageConfig.RollHighestLabel", "2 jets, garder le plus haut");
-  const rollHighestHint = tl(
-    "BLOODMAN.Dialogs.DamageConfig.RollHighestHint",
-    "Lance la formule deux fois puis conserve le meilleur resultat."
-  );
   // Prevent the trailing "+" from wrapping to a new line in narrow layouts.
   const rawBonusLabel = tl("BLOODMAN.Dialogs.DamageConfig.RawBonusLabel", "Degats bruts +").replace(/\s\+$/, "&nbsp;+");
   const penetrationLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationLabel", "Penetration +").replace(/\s\+$/, "&nbsp;+");
+  const highlightedNumberClass = "bm-damage-config-value-active";
 
   const availableDamageOptions = lockFormulaSelection ? [selectedDefault] : DAMAGE_CONFIG_OPTIONS;
   const options = availableDamageOptions
@@ -623,11 +620,11 @@ async function promptDamageConfiguration({
         </div>
         <div class="bm-damage-config-row bm-damage-config-inline">
           <label>${rawBonusLabel}</label>
-          <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" />
+          <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} />
         </div>
         <div class="bm-damage-config-row bm-damage-config-inline">
           <label>${penetrationLabel}</label>
-          <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" />
+          <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} />
         </div>
       </div>
       <label class="bm-damage-config-toggle">
@@ -635,7 +632,6 @@ async function promptDamageConfiguration({
         <span class="bm-damage-config-toggle-indicator" aria-hidden="true">2x</span>
         <span class="bm-damage-config-toggle-copy">
           <span class="bm-damage-config-toggle-title">${rollHighestLabel}</span>
-          <span class="bm-damage-config-toggle-hint">${rollHighestHint}</span>
         </span>
       </label>
     </div>
@@ -711,6 +707,14 @@ async function promptDamageConfiguration({
         title: `${titleLabel}${titleSource}`,
         content,
         render: html => {
+          const syncDamageInputHighlights = () => {
+            const bonusInput = html.find("input[name='bonus_brut']");
+            const penetrationInput = html.find("input[name='penetration']");
+            const bonusValue = toNonNegativeInt(bonusInput.val(), initialBonus);
+            const penetrationValue = toNonNegativeInt(penetrationInput.val(), initialPenetration);
+            bonusInput.toggleClass(highlightedNumberClass, bonusValue > 0);
+            penetrationInput.toggleClass(highlightedNumberClass, penetrationValue > 0);
+          };
           const readCurrentConfig = () => {
             const selectedFormula = lockFormulaSelection
               ? selectedDefault.formula
@@ -724,7 +728,9 @@ async function promptDamageConfiguration({
               rollKeepHighest: Boolean(html.find("input[name='roll_keep_highest']").is(":checked"))
             };
           };
+          syncDamageInputHighlights();
           html.on("input change", "select[name='degats'], input[name='bonus_brut'], input[name='penetration'], input[name='roll_keep_highest']", () => {
+            syncDamageInputHighlights();
             schedulePopupUpdate(readCurrentConfig());
           });
         },

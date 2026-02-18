@@ -444,6 +444,8 @@
   --bm-damage-muted: #cbc5d7;
   --bm-damage-border: #494154;
   --bm-damage-border-strong: #f8f7fb;
+  --bm-damage-pulse: rgba(255, 74, 74, 0.34);
+  --bm-damage-pulse-border: #ff5c5c;
 }
 
 body.theme-light .window-app.bloodman-damage-dialog,
@@ -455,6 +457,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   --bm-damage-muted: #5f556f;
   --bm-damage-border: #a49ab8;
   --bm-damage-border-strong: #1b1723;
+  --bm-damage-pulse: rgba(232, 49, 49, 0.28);
+  --bm-damage-pulse-border: #d62d2d;
 }
 
 .window-app.bloodman-damage-dialog-simple-attack,
@@ -466,6 +470,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
   --bm-damage-muted: #bfd0b8;
   --bm-damage-border: #4f6246;
   --bm-damage-border-strong: #e2eedc;
+  --bm-damage-pulse: rgba(255, 70, 70, 0.34);
+  --bm-damage-pulse-border: #ff5959;
 }
 
 body.theme-light .window-app.bloodman-damage-dialog-simple-attack,
@@ -477,6 +483,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
   --bm-damage-muted: #53674b;
   --bm-damage-border: #9fb198;
   --bm-damage-border-strong: #1e291a;
+  --bm-damage-pulse: rgba(224, 44, 44, 0.28);
+  --bm-damage-pulse-border: #cf2525;
 }
 
 .bm-damage-config .bm-damage-config-shell {
@@ -619,6 +627,29 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 
 .bm-damage-config input[type="number"] {
   text-align: center;
+}
+
+.bm-damage-config input[type="number"].bm-damage-config-value-active {
+  border-color: var(--bm-damage-pulse-border, var(--bm-damage-border-strong));
+  animation: bm-damage-config-input-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes bm-damage-config-input-pulse {
+  0% {
+    box-shadow: 0 0 0 1px var(--bm-damage-pulse-border, var(--bm-damage-border-strong)), 0 0 0 0 var(--bm-damage-pulse);
+  }
+  50% {
+    box-shadow: 0 0 0 1px var(--bm-damage-pulse-border, var(--bm-damage-border-strong)), 0 0 0 4px var(--bm-damage-pulse);
+  }
+  100% {
+    box-shadow: 0 0 0 1px var(--bm-damage-pulse-border, var(--bm-damage-border-strong)), 0 0 0 0 var(--bm-damage-pulse);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bm-damage-config input[type="number"].bm-damage-config-value-active {
+    animation: none;
+  }
 }
 
 .bm-damage-config .bm-damage-config-toggle {

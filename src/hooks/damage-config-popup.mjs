@@ -38,6 +38,7 @@ export function buildDamageConfigPopupHooks({
     ? rememberDamageConfigPopupRequest
     : () => {};
   const warn = typeof logWarn === "function" ? logWarn : () => {};
+  const highlightedNumberClass = "bm-damage-config-value-active";
 
   function buildDamageConfigObserverState(data) {
     const actorName = String(data?.actorName || "").trim();
@@ -73,6 +74,8 @@ export function buildDamageConfigPopupHooks({
 
   function getDamageConfigObserverContent(state) {
     const formVariantClass = state?.isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
+    const bonusInputClass = state?.bonusBrut > 0 ? ` class="${highlightedNumberClass}"` : "";
+    const penetrationInputClass = state?.penetration > 0 ? ` class="${highlightedNumberClass}"` : "";
     return `<form class="bm-damage-config${formVariantClass}">
     <div class="bm-damage-config-shell">
       <div class="bm-damage-config-head">
@@ -91,11 +94,11 @@ export function buildDamageConfigPopupHooks({
         </div>
         <div class="bm-damage-config-row bm-damage-config-inline">
           <label>Degats bruts +</label>
-          <input type="number" data-bm-popup-field="bonus" value="${state.bonusBrut}" disabled />
+          <input type="number" data-bm-popup-field="bonus" value="${state.bonusBrut}"${bonusInputClass} disabled />
         </div>
         <div class="bm-damage-config-row bm-damage-config-inline">
           <label>Penetration +</label>
-          <input type="number" data-bm-popup-field="penetration" value="${state.penetration}" disabled />
+          <input type="number" data-bm-popup-field="penetration" value="${state.penetration}"${penetrationInputClass} disabled />
         </div>
       </div>
       <label class="bm-damage-config-toggle">
@@ -116,8 +119,12 @@ export function buildDamageConfigPopupHooks({
     root.closest(".window-app").toggleClass("bloodman-damage-dialog-simple-attack", state?.isSimpleAttackVariant === true);
     root.find("[data-bm-popup-field='hint']").text(`${state.actorDisplay} - ${state.sourceDisplay}`);
     root.find("[data-bm-popup-field='damage']").val(`${state.damageLabel} (${state.formula})`);
-    root.find("[data-bm-popup-field='bonus']").val(String(state.bonusBrut));
-    root.find("[data-bm-popup-field='penetration']").val(String(state.penetration));
+    const bonusInput = root.find("[data-bm-popup-field='bonus']");
+    const penetrationInput = root.find("[data-bm-popup-field='penetration']");
+    bonusInput.val(String(state.bonusBrut));
+    penetrationInput.val(String(state.penetration));
+    bonusInput.toggleClass(highlightedNumberClass, Number(state?.bonusBrut) > 0);
+    penetrationInput.toggleClass(highlightedNumberClass, Number(state?.penetration) > 0);
     root.find("[data-bm-popup-field='roll-keep-highest']").prop("checked", state.keepHighest);
     root.find("[data-bm-popup-field='keep-highest-text']").text(state.keepHighestText);
     return true;
