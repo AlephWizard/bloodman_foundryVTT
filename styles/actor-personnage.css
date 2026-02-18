@@ -1102,7 +1102,7 @@
 }
 
 .identity-right textarea[name="system.profile.historique"][data-autogrow="true"] {
-  max-height: 260px;
+  max-height: 900px;
 }
 
 .notes-card textarea[name="system.profile.notes"][data-autogrow="true"] {
