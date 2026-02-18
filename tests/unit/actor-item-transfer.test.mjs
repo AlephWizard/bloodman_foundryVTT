@@ -64,14 +64,16 @@ async function run() {
   const mixedWarnings = [];
   const mixedLogs = [];
   const createdPayloads = [];
+  const createdOptions = [];
   const sourceDeletes = [];
   let renderCount = 0;
   const mixedRules = buildRules({ warnings: mixedWarnings, logs: mixedLogs });
   const mixedTarget = {
     id: "target",
     isOwner: true,
-    createEmbeddedDocuments: async (_type, docs) => {
+    createEmbeddedDocuments: async (_type, docs, options) => {
       createdPayloads.push(docs[0]);
+      createdOptions.push(options);
       return [{ id: `created-${createdPayloads.length}` }];
     },
     deleteEmbeddedDocuments: async () => {}
@@ -111,6 +113,7 @@ async function run() {
   assert.deepEqual(sourceDeletes, ["i3"]);
   assert.equal(createdPayloads.length, 1);
   assert.equal(createdPayloads[0]._id, undefined);
+  assert.equal(createdOptions[0], undefined);
   assert.equal(renderCount, 1);
 
   const createFailLogs = [];
@@ -194,6 +197,29 @@ async function run() {
   assert.equal(Array.isArray(multiResult), true);
   assert.equal(multiResult.length, 2);
   assert.equal(multiRenderCount, 1);
+
+  const optionsRules = buildRules();
+  const transferCreateOptions = [];
+  await optionsRules.applyActorToActorItemTransfer({
+    targetActor: {
+      id: "target",
+      isOwner: true,
+      createEmbeddedDocuments: async (_type, _docs, options) => {
+        transferCreateOptions.push(options);
+        return [{ id: "created-options" }];
+      },
+      deleteEmbeddedDocuments: async () => {}
+    },
+    transferEntries: [
+      {
+        droppedItem: createDroppedItem("i8"),
+        sourceActor: { id: "source-options", isOwner: true, deleteEmbeddedDocuments: async () => {} }
+      }
+    ],
+    isGM: false,
+    createItemOptions: { bloodmanSkipVoyageXPCost: true }
+  });
+  assert.deepEqual(transferCreateOptions, [{ bloodmanSkipVoyageXPCost: true }]);
 }
 
 run()

@@ -2487,6 +2487,7 @@ const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitud
 const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
+const VOYAGE_XP_SKIP_CREATE_OPTION = "bloodmanSkipVoyageXPCost";
 const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
@@ -4519,8 +4520,9 @@ function ensureChaosDiceUI() {
   }
 }
 
-async function applyVoyageXPCostOnCreate(actor, item) {
+async function applyVoyageXPCostOnCreate(actor, item, options = null) {
   if (!actor || !item) return;
+  if (Boolean(options?.[VOYAGE_XP_SKIP_CREATE_OPTION])) return;
   if (actor.type !== "personnage" || !isVoyageXPCostItemType(item.type)) return;
 
   const cost = normalizeNonNegativeInteger(item.system?.xpVoyageCost, 0);
@@ -4557,11 +4559,11 @@ Hooks.on("createItem", async (item, options, userId) => {
   const sourceUserId = String(userId || options?.userId || "");
   if (sourceUserId && sourceUserId !== game.user?.id) return;
 
-  await applyVoyageXPCostOnCreate(item.actor, item);
+  await applyVoyageXPCostOnCreate(item.actor, item, options);
   await itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "createItem");
 });
 
-Hooks.on("preCreateItem", (item, createData) => {
+Hooks.on("preCreateItem", (item, createData, options) => {
   const normalizedAudio = normalizeItemAudioUpdate(item, createData);
   if (normalizedAudio.invalid) {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
@@ -4580,6 +4582,7 @@ Hooks.on("preCreateItem", (item, createData) => {
     0
   );
   item.updateSource({ "system.xpVoyageCost": normalizedCost });
+  if (Boolean(options?.[VOYAGE_XP_SKIP_CREATE_OPTION])) return;
 
   const actor = item.actor || item.parent;
   if (!actor || actor.type !== "personnage") return;
@@ -6086,7 +6089,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
   }
 
-  async applyActorToActorItemTransfer(transferEntries = []) {
+  async applyActorToActorItemTransfer(transferEntries = [], options = {}) {
     const ownerLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
     return applyActorToActorItemTransferRule({
       targetActor: this.actor,
@@ -6094,7 +6097,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       currentUser: game.user,
       ownerLevel,
       isGM: Boolean(game.user?.isGM),
-      renderTarget: () => this.render(false)
+      renderTarget: () => this.render(false),
+      createItemOptions: options?.createItemOptions
     });
   }
 
@@ -6263,10 +6267,13 @@ class BloodmanActorSheet extends BaseActorSheet {
     const dropEntries = this.getDropEntries(data);
     const actorTransferEntries = await this.resolveActorTransferEntries(data);
     const hasOnlyActorTransfers = shouldUseActorTransferPath(dropEntries, actorTransferEntries);
+    const createItemOptions = shouldBuy
+      ? undefined
+      : { [VOYAGE_XP_SKIP_CREATE_OPTION]: true };
 
     try {
       const dropped = hasOnlyActorTransfers
-        ? await this.applyActorToActorItemTransfer(actorTransferEntries)
+        ? await this.applyActorToActorItemTransfer(actorTransferEntries, { createItemOptions })
         : await super._onDropItem(event, data);
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });

@@ -23,7 +23,8 @@ export function createActorItemTransferRules({
     currentUser,
     ownerLevel = 3,
     isGM = false,
-    renderTarget
+    renderTarget,
+    createItemOptions
   } = {}) {
     if (!Array.isArray(transferEntries) || !transferEntries.length) return null;
     if (!targetActor) return null;
@@ -40,6 +41,9 @@ export function createActorItemTransferRules({
     }
 
     const createdItems = [];
+    const itemCreateOptions = createItemOptions && typeof createItemOptions === "object"
+      ? createItemOptions
+      : undefined;
     for (const transfer of transferEntries) {
       const droppedItem = transfer?.droppedItem;
       const sourceActor = transfer?.sourceActor;
@@ -63,7 +67,7 @@ export function createActorItemTransferRules({
 
       let createdItem = null;
       try {
-        const created = await targetActor.createEmbeddedDocuments("Item", [sourceData]);
+        const created = await targetActor.createEmbeddedDocuments("Item", [sourceData], itemCreateOptions);
         createdItem = created?.[0] || null;
       } catch (error) {
         warnLog("[bloodman] actor transfer:create failed", {
