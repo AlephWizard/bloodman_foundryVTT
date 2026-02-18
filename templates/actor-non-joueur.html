@@ -322,7 +322,10 @@
 
         <div class="equip-block">
           <div class="equip-title equip-title-row">
-            <span class="equip-title-label"><i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}</span>
+            <span class="equip-title-label">
+              <i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}
+              <span class="carry-slots-indicator">{{carriedItemsCount}} / {{carriedItemsLimit}}</span>
+            </span>
             {{#if showBagSlotsToggle}}
               <span class="carry-bag-toggle">
                 <i class="fa-solid fa-bag-shopping"></i>

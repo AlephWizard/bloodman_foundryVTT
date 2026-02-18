@@ -663,6 +663,21 @@
 .equip-title-label {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
+}
+
+.carry-slots-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 1px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  line-height: 1.2;
 }
 
 .carry-bag-toggle {

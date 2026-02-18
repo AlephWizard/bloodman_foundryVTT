@@ -5582,8 +5582,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       heal.showItemReroll = false;
       return heal;
     });
-    const carriedItemsCount = itemBuckets.objet.length + itemBuckets.soin.length + itemBuckets.ration.length;
-    const equipmentThreeColumns = carriedItemsCount >= 2;
+    const objectSectionItemsCount = itemBuckets.objet.length + itemBuckets.soin.length + itemBuckets.ration.length;
+    const carriedItemsCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
+    const equipmentThreeColumns = objectSectionItemsCount >= 2;
 
     return {
       ...data,
@@ -5616,6 +5617,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       showBagSlotsToggle: isCarriedItemLimitedActorType(this.actor?.type),
       bagSlotsEnabled,
       bagSlotsDisabled: !bagSlotsEnabled,
+      carriedItemsCount,
       carriedItemsLimit,
       weapons,
       objects: itemBuckets.objet,
@@ -6274,7 +6276,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     try {
       const dropped = hasOnlyActorTransfers
         ? await this.applyActorToActorItemTransfer(actorTransferEntries, { createItemOptions })
-        : await super._onDropItem(event, data);
+        : await this.withDropItemCreateOptions(createItemOptions, () => super._onDropItem(event, data));
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
       }
@@ -6285,6 +6287,33 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       throw error;
     }
+  }
+
+  async withDropItemCreateOptions(createItemOptions, callback) {
+    if (typeof callback !== "function") return null;
+    const nextOptions = createItemOptions && typeof createItemOptions === "object"
+      ? createItemOptions
+      : null;
+    const previousOptions = this._dropItemCreateOptions || null;
+    this._dropItemCreateOptions = nextOptions;
+    try {
+      return await callback();
+    } finally {
+      this._dropItemCreateOptions = previousOptions;
+    }
+  }
+
+  async _onDropItemCreate(itemData) {
+    const createItemOptions = this._dropItemCreateOptions && typeof this._dropItemCreateOptions === "object"
+      ? this._dropItemCreateOptions
+      : null;
+    if (!createItemOptions) {
+      return super._onDropItemCreate(itemData);
+    }
+    const payload = Array.isArray(itemData)
+      ? itemData
+      : [itemData];
+    return this.actor?.createEmbeddedDocuments?.("Item", payload, createItemOptions);
   }
 
   async _reachedCarriedItemsLimit(data) {
