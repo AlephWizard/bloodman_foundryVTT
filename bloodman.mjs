@@ -2007,8 +2007,8 @@ function getTokenActorType(tokenDoc) {
 
 function shouldResetTokenScale(scaleValue) {
   const numeric = Number(scaleValue);
-  if (!Number.isFinite(numeric) || numeric === 0) return true;
-  return Math.abs(numeric) !== 1;
+  if (!Number.isFinite(numeric)) return true;
+  return Math.abs(numeric) < 0.0001;
 }
 
 function shouldResetTokenOffset(offsetValue) {
