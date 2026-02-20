@@ -79,20 +79,52 @@ async function run() {
   assert.equal(getProperty(autoUpdateData, "system.price"), "20");
   assert.equal(getProperty(autoUpdateData, "system.salePrice"), "4");
 
-  const manualKeepUpdateData = { system: { price: "15" } };
+  const manualPriceOverrideUpdateData = { system: { price: "15" } };
   rules.normalizeItemPriceUpdate(
     { type: "arme", system: { price: "10", salePrice: "7" } },
-    manualKeepUpdateData
+    manualPriceOverrideUpdateData
   );
-  assert.equal(getProperty(manualKeepUpdateData, "system.salePrice"), "7");
+  assert.equal(getProperty(manualPriceOverrideUpdateData, "system.salePrice"), "3");
 
   const explicitSaleUpdateData = { system: { salePrice: " 6 " } };
   rules.normalizeItemPriceUpdate(
     { type: "arme", system: { price: "10", salePrice: "2" } },
     explicitSaleUpdateData
   );
-  assert.equal(getProperty(explicitSaleUpdateData, "system.price"), "10");
+  assert.equal(getProperty(explicitSaleUpdateData, "system.price"), "30");
   assert.equal(getProperty(explicitSaleUpdateData, "system.salePrice"), "6");
+
+  const explicitSaleWithPricePayload = { system: { price: "10", salePrice: "6" } };
+  rules.normalizeItemPriceUpdate(
+    { type: "arme", system: { price: "10", salePrice: "2" } },
+    explicitSaleWithPricePayload
+  );
+  assert.equal(getProperty(explicitSaleWithPricePayload, "system.price"), "30");
+  assert.equal(getProperty(explicitSaleWithPricePayload, "system.salePrice"), "6");
+
+  const explicitPriceWithSalePayload = { system: { price: "20", salePrice: "4" } };
+  rules.normalizeItemPriceUpdate(
+    { type: "arme", system: { price: "10", salePrice: "2" } },
+    explicitPriceWithSalePayload
+  );
+  assert.equal(getProperty(explicitPriceWithSalePayload, "system.price"), "20");
+  assert.equal(getProperty(explicitPriceWithSalePayload, "system.salePrice"), "4");
+
+  const clearSaleUpdateData = { system: { salePrice: "" } };
+  rules.normalizeItemPriceUpdate(
+    { type: "arme", system: { price: "10", salePrice: "7" } },
+    clearSaleUpdateData
+  );
+  assert.equal(getProperty(clearSaleUpdateData, "system.price"), "10");
+  assert.equal(getProperty(clearSaleUpdateData, "system.salePrice"), "2");
+
+  const invalidSaleUpdateData = { system: { salePrice: "abc" } };
+  rules.normalizeItemPriceUpdate(
+    { type: "arme", system: { price: "10", salePrice: "2" } },
+    invalidSaleUpdateData
+  );
+  assert.equal(getProperty(invalidSaleUpdateData, "system.price"), "10");
+  assert.equal(getProperty(invalidSaleUpdateData, "system.salePrice"), "abc");
 
   const sourceCalls = [];
   const sourceItem = {
