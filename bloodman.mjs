@@ -857,6 +857,14 @@ function getDeadStatusEffect() {
     || ensureStatusEffectDefinition(buildDeadFallbackStatusEffect());
 }
 
+function getNpcDeadStatusFamilyIds(deadEffect = null) {
+  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
+  const deadCandidates = defeatedRaw
+    ? [defeatedRaw, ...NPC_ZERO_PV_STATUS_CANDIDATES]
+    : [...NPC_ZERO_PV_STATUS_CANDIDATES];
+  return buildStatusFamilyIds(deadEffect || getDeadStatusEffect(), deadCandidates);
+}
+
 function getTokenStatusesList(tokenDoc, { normalized = true } = {}) {
   const statuses = tokenDoc?.statuses;
   const list = Array.isArray(statuses)
@@ -2081,13 +2089,9 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
   await syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess);
   const bleeding = getBleedingStatusEffect();
   const dead = getDeadStatusEffect();
-  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
 
   const bleedingFamily = buildStatusFamilyIds(bleeding, PLAYER_ZERO_PV_STATUS_CANDIDATES);
-  const deadCandidates = defeatedRaw
-    ? [defeatedRaw, ...NPC_ZERO_PV_STATUS_CANDIDATES]
-    : [...NPC_ZERO_PV_STATUS_CANDIDATES];
-  const deadFamily = buildStatusFamilyIds(dead, deadCandidates);
+  const deadFamily = getNpcDeadStatusFamilyIds(dead);
 
   if (tokenDoc.actorLink === true) {
     await removeTokenStatusOverrides(tokenDoc, [...bleedingFamily, ...deadFamily]);
@@ -2117,6 +2121,59 @@ async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
     tokenDoc.object.drawEffects();
     applyTransparentTokenEffectBackground(tokenDoc.object);
   }
+}
+
+async function syncNpcDeadStatusToZeroPvForToken(tokenDoc, actorType = "") {
+  if (!tokenDoc) return false;
+  const resolvedActorType = String(actorType || getTokenActorType(tokenDoc) || "").trim();
+  if (resolvedActorType !== "personnage-non-joueur") return false;
+
+  const deadFamily = getNpcDeadStatusFamilyIds();
+  if (!deadFamily.length || !tokenHasStatusInFamily(tokenDoc, deadFamily)) return false;
+  const pvCurrent = getTokenCurrentPv(tokenDoc);
+  if (!Number.isFinite(pvCurrent) || pvCurrent <= 0) return false;
+
+  try {
+    if (tokenDoc.actorLink === true) {
+      const actor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
+      if (!actor?.update) return false;
+      await actor.update({ "system.resources.pv.current": 0 });
+    } else {
+      await tokenDoc.update({ "delta.system.resources.pv.current": 0 });
+    }
+  } catch (error) {
+    bmLog.warn("[bloodman] npc dead status HP sync failed", {
+      tokenId: tokenDoc.id,
+      actorType: resolvedActorType,
+      error
+    });
+    return false;
+  }
+
+  await syncZeroPvStatusForToken(tokenDoc, resolvedActorType, 0);
+  return true;
+}
+
+async function syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc) {
+  if (!game.user?.isGM || !effectDoc) return false;
+  const actor = effectDoc.parent && String(effectDoc.parent.documentName || "") === "Actor"
+    ? effectDoc.parent
+    : null;
+  if (!actor || actor.type !== "personnage-non-joueur") return false;
+
+  if (actor.isToken) {
+    const tokenDoc = actor.token || actor.parent || null;
+    if (!tokenDoc) return false;
+    return syncNpcDeadStatusToZeroPvForToken(tokenDoc, actor.type);
+  }
+
+  const deadFamily = getNpcDeadStatusFamilyIds();
+  if (!deadFamily.length || !actorHasStatusInFamily(actor, deadFamily)) return false;
+  const pvCurrent = Number(actor.system?.resources?.pv?.current);
+  if (!Number.isFinite(pvCurrent) || pvCurrent <= 0) return false;
+  await actor.update({ "system.resources.pv.current": 0 });
+  await syncZeroPvStatusForActor(actor);
+  return true;
 }
 if (!globalThis.__bmSyncZeroPvStatusForToken) {
   globalThis.__bmSyncZeroPvStatusForToken = syncZeroPvStatusForToken;
@@ -4837,7 +4894,8 @@ const tokenCombatHooks = buildTokenCombatHooks({
   syncCombatantNameForToken,
   getTokenPvFromUpdate,
   getTokenCurrentPv,
-  syncZeroPvStatusForToken
+  syncZeroPvStatusForToken,
+  syncNpcDeadStatusToZeroPvForToken
 });
 
 Hooks.on("preCreateToken", tokenCombatHooks.onPreCreateToken);
@@ -4899,6 +4957,12 @@ Hooks.on("updateActor", async (actor, changes, options, userId) => {
 
 Hooks.on("preUpdateToken", tokenCombatHooks.onPreUpdateToken);
 Hooks.on("updateToken", tokenCombatHooks.onUpdateToken);
+Hooks.on("createActiveEffect", async effectDoc => {
+  await syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc);
+});
+Hooks.on("updateActiveEffect", async effectDoc => {
+  await syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc);
+});
 
 class BloodmanActorSheet extends BaseActorSheet {
   static get defaultOptions() {

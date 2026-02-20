@@ -31,8 +31,13 @@ export function buildTokenCombatHooks({
   syncCombatantNameForToken,
   getTokenPvFromUpdate,
   getTokenCurrentPv,
-  syncZeroPvStatusForToken
+  syncZeroPvStatusForToken,
+  syncNpcDeadStatusToZeroPvForToken
 } = {}) {
+  const syncNpcDeadStatusToZeroPv = typeof syncNpcDeadStatusToZeroPvForToken === "function"
+    ? syncNpcDeadStatusToZeroPvForToken
+    : async () => false;
+
   function runCombatLifecycleRefresh(combat) {
     focusActiveCombatantToken(combat);
     resetActiveCombatantMoveGauge(combat).catch(error => {
@@ -206,11 +211,18 @@ export function buildTokenCombatHooks({
     }
     const actorType = getTokenActorType(tokenDoc);
     if (!isCharacterLikeActorType(actorType)) return;
+    const hasStatusUpdate = Object.prototype.hasOwnProperty.call(changes || {}, "statuses")
+      || foundry.utils.getProperty(changes, "statuses") != null;
     const pvFromUpdate = getTokenPvFromUpdate(tokenDoc, changes);
-    if (pvFromUpdate == null) return;
-    const pvCurrent = Number.isFinite(pvFromUpdate) ? pvFromUpdate : getTokenCurrentPv(tokenDoc);
-    if (!Number.isFinite(pvCurrent)) return;
-    await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
+    if (pvFromUpdate != null) {
+      const pvCurrent = Number.isFinite(pvFromUpdate) ? pvFromUpdate : getTokenCurrentPv(tokenDoc);
+      if (Number.isFinite(pvCurrent)) {
+        await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
+      }
+    }
+    if (actorType === "personnage-non-joueur" && hasStatusUpdate) {
+      await syncNpcDeadStatusToZeroPv(tokenDoc, actorType);
+    }
   }
 
   return {
@@ -228,4 +240,3 @@ export function buildTokenCombatHooks({
     onUpdateToken
   };
 }
-
