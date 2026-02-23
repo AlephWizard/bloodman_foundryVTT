@@ -959,14 +959,30 @@ export async function doCharacteristicRoll(actor, key, options = {}) {
   const isCritSuccess = rollTotal >= 1 && rollTotal <= 5;
   const isCritFailure = rollTotal >= 96 && rollTotal <= 100;
   const success = isCritSuccess ? true : isCritFailure ? false : rollTotal <= effective;
-  const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
+  const critical = isCritSuccess ? "success" : isCritFailure ? "failure" : "";
+  const outcome = t(
+    critical === "success"
+      ? "BLOODMAN.Rolls.CriticalSuccess"
+      : critical === "failure"
+        ? "BLOODMAN.Rolls.CriticalFailure"
+        : success
+          ? "BLOODMAN.Rolls.Success"
+          : "BLOODMAN.Rolls.Failure"
+  );
+  const flavor = critical
+    ? `<div class="bm-char-roll-result bm-char-roll-result--critical">
+      <div class="bm-char-roll-title bm-char-roll-title--critical bm-char-roll-title--crit-${critical}">${outcome}</div>
+      <div class="bm-char-roll-meta">${characteristicLabel}</div>
+      <div class="bm-char-roll-total">${rollTotal}</div>
+    </div>`
+    : `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`;
   const shouldHideForGm = options?.hidden === true
     && actor?.type === "personnage-non-joueur"
     && game.user?.isGM === true;
   const gmIds = shouldHideForGm ? getActiveGMUserIds() : [];
   const messageData = {
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
+    flavor,
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.CHARACTERISTIC)
   };
   if (shouldHideForGm && gmIds.length && typeof ChatMessage?.create === "function") {
@@ -986,7 +1002,7 @@ export async function doCharacteristicRoll(actor, key, options = {}) {
   } else {
     r.toMessage(messageData);
   }
-  return { roll: r, success, effective, critical: isCritSuccess ? "success" : isCritFailure ? "failure" : "" };
+  return { roll: r, success, effective, critical };
 }
 
 async function requestDamageFromGM(token, damage, options = {}) {

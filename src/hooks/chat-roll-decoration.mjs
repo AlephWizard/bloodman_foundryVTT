@@ -178,6 +178,22 @@ export function buildChatRollDecorationHooks({
     </div>
     <div class="bm-chat-roll-inner bm-chat-roll-native">${originalContent}</div>
   </div>`;
+    const frameEl = contentEl.querySelector(".bm-chat-roll-frame");
+    if (chatRollType === types.CHARACTERISTIC && frameEl) {
+      const pseudoWrapEl = frameEl.querySelector(".bm-chat-roll-pseudo-wrap");
+      const typeBadgeEl = pseudoWrapEl?.querySelector(".bm-chat-roll-type");
+      const criticalResultEl = frameEl.querySelector(".bm-char-roll-result--critical");
+      const criticalTitleEl = criticalResultEl?.querySelector(".bm-char-roll-title--critical");
+      if (pseudoWrapEl && typeBadgeEl && criticalTitleEl) {
+        criticalTitleEl.classList.add("bm-char-roll-title--head-inline");
+        typeBadgeEl.insertAdjacentElement("afterend", criticalTitleEl);
+        if (criticalTitleEl.classList.contains("bm-char-roll-title--crit-success")) {
+          root.classList.add("bm-chat-roll--crit-success");
+        } else if (criticalTitleEl.classList.contains("bm-char-roll-title--crit-failure")) {
+          root.classList.add("bm-chat-roll--crit-failure");
+        }
+      }
+    }
     root.classList.add("bm-chat-roll", `bm-chat-roll--${chatRollTypeClass}`);
     root.dataset.bmChatRollType = chatRollTypeClass;
   }

@@ -1425,6 +1425,86 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   font-family: var(--font-primary, "Signika", sans-serif);
 }
 
+.chat-message .bm-char-roll-result {
+  display: grid;
+  gap: 4px;
+}
+
+.chat-message .bm-char-roll-result--critical {
+  gap: 6px;
+}
+
+.chat-message .bm-char-roll-title--critical {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 1px 0 rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: normal;
+}
+
+.chat-message.bm-chat-roll .bm-chat-roll-pseudo-wrap .bm-char-roll-title--critical.bm-char-roll-title--head-inline {
+  justify-content: flex-start;
+  min-height: 18px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.2px;
+  text-align: left;
+  white-space: nowrap;
+  width: fit-content;
+  max-width: 100%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.chat-message .bm-char-roll-result--critical .bm-char-roll-title--head-inline {
+  margin-bottom: 2px;
+}
+
+.chat-message .bm-char-roll-title--crit-success {
+  background: linear-gradient(180deg, #2f9a4d 0%, #1e6b35 100%);
+}
+
+.chat-message .bm-char-roll-title--crit-failure {
+  background: linear-gradient(180deg, #ba3434 0%, #7d1919 100%);
+}
+
+.chat-message .bm-char-roll-meta {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.chat-message .bm-char-roll-total {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--crit-success .bm-chat-roll-type {
+  border-color: rgba(71, 208, 110, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(71, 208, 110, 0.25);
+}
+
+.chat-message.bm-chat-roll.bm-chat-roll--crit-failure .bm-chat-roll-type {
+  border-color: rgba(255, 99, 99, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(255, 99, 99, 0.22);
+}
+
 .chat-message.bm-chat-roll.bm-chat-roll--characteristic {
   --bm-chat-roll-type-accent: #1d4e89;
   --bm-chat-roll-surface-top: #182338;
