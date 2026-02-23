@@ -176,6 +176,12 @@
         "Prompt": "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.",
         "ValueLabel": "XP voyage"
       },
+      "FullPPRestore": {
+        "Title": "Restauration PP",
+        "Prompt": "Restaurer integralement les points de puissance (PP) des tokens joueurs selectionnes ?",
+        "SelectionHint": "{selected} token(s) selectionne(s), {eligible} token(s) joueur(s) concerne(s).",
+        "Confirm": "Restaurer"
+      },
       "InsufficientFundsTransfer": {
         "Title": "Fonds insuffisants",
         "Eyebrow": "Verification MJ",
@@ -216,6 +222,12 @@
       "VoyageXPGrantNoRecipients": "Aucun token joueur selectionne pour recevoir de l'XP voyage.",
       "VoyageXPGrantAllFailed": "Aucune attribution d'XP voyage n'a pu etre appliquee.",
       "VoyageXPGrantPartialFailure": "{count} attribution(s) d'XP voyage n'ont pas pu etre appliquees.",
+      "FullPPRestoreLine": "{actor} : PP {before} -> {after}.",
+      "FullPPRestoreAlreadyFullLine": "{actor} a deja tous ses PP ({max}/{max}).",
+      "FullPPRestoreNoSelection": "Selectionnez au moins un token joueur pour restaurer les PP.",
+      "FullPPRestoreNoRecipients": "Aucun token joueur selectionne pour restaurer les PP.",
+      "FullPPRestoreAllFailed": "Aucune restauration de PP n'a pu etre appliquee.",
+      "FullPPRestorePartialFailure": "{count} restauration(s) de PP n'ont pas pu etre appliquees.",
       "ItemAudioMissing": "Aucun fichier audio selectionne pour {item}.",
       "ItemAudioInvalid": "Le fichier audio de {item} est invalide ou introuvable.",
       "ItemAudioInvalidSelection": "Fichier audio invalide pour {item}. Le champ a ete vide.",

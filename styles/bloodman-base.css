@@ -346,8 +346,8 @@
   gap: 6px;
 }
 
-#bm-chaos-dice .bm-chaos-xp-btn {
-  min-width: 34px;
+#bm-chaos-dice .bm-chaos-xp-btn,
+#bm-chaos-dice .bm-chaos-full-pp-btn {
   height: 20px;
   border-radius: 6px;
   border: 2px solid #000000;
@@ -359,6 +359,19 @@
   padding: 0 6px;
   cursor: pointer;
   text-transform: uppercase;
+}
+
+#bm-chaos-dice .bm-chaos-xp-btn {
+  min-width: 34px;
+}
+
+#bm-chaos-dice .bm-chaos-full-pp-btn {
+  min-width: 58px;
+}
+
+#bm-chaos-dice .bm-chaos-xp-btn:focus-visible,
+#bm-chaos-dice .bm-chaos-full-pp-btn:focus-visible {
+  outline: none;
 }
 
 #bm-chaos-dice .bm-chaos-btn {
