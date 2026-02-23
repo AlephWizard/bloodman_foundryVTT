@@ -118,6 +118,17 @@
               {{#each characteristics}}
                 <div class="char-row {{#if this.showMoveValue}}move-row{{/if}}" data-key="{{this.key}}">
                   <div class="char-icon"><i class="fa-solid {{this.icon}}"></i></div>
+                  <div class="char-hidden-roll-cell">
+                    <label class="char-hidden-roll-toggle">
+                      <input
+                        type="checkbox"
+                        name="system.characteristics.{{this.key}}.hiddenRoll"
+                        data-dtype="Boolean"
+                        {{checked this.hiddenRoll}}
+                      />
+                      <span>{{localize "BLOODMAN.Characteristics.HiddenRoll"}}</span>
+                    </label>
+                  </div>
                   <div class="char-base">
                     <input type="number" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" {{#if ../characteristicBaseHasBounds}}min="{{../characteristicBaseMin}}" max="{{../characteristicBaseMax}}"{{/if}} />
                     <span class="char-max">/100</span>

@@ -1796,11 +1796,46 @@
 }
 
 .npc-sheet .char-row {
-  grid-template-columns: 24px 64px 1fr 92px;
+  grid-template-columns: 24px 98px 64px 1fr 92px;
 }
 
 .npc-sheet .char-row.move-row {
-  grid-template-columns: 24px 64px 1fr 92px;
+  grid-template-columns: 24px 98px 64px 1fr 92px;
+}
+
+.npc-sheet .char-hidden-roll-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 2px;
+}
+
+.npc-sheet .char-name {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.npc-sheet .char-hidden-roll-toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-left: 0;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.1px;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.npc-sheet .char-hidden-roll-toggle input {
+  margin: 0;
+  width: 11px;
+  height: 11px;
 }
 
 @keyframes bm-pv-critical {

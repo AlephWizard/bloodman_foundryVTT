@@ -1,6 +1,7 @@
 import { bmLog } from "./utils/logger.mjs";
 import {
   canUserProcessPrivilegedRequests,
+  getActiveGMUserIds,
   getActivePrivilegedOperatorIds,
   isAssistantOrHigherRole,
   isCurrentUserPrimaryPrivilegedOperator
@@ -949,7 +950,7 @@ function buildDamageContext(actor, config, {
   };
 }
 
-export async function doCharacteristicRoll(actor, key) {
+export async function doCharacteristicRoll(actor, key, options = {}) {
   const effective = getEffectiveCharacteristic(actor, key);
   const characteristicLabel = getCharacteristicDisplayLabel(key);
 
@@ -959,11 +960,32 @@ export async function doCharacteristicRoll(actor, key) {
   const isCritFailure = rollTotal >= 96 && rollTotal <= 100;
   const success = isCritSuccess ? true : isCritFailure ? false : rollTotal <= effective;
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
-  r.toMessage({
+  const shouldHideForGm = options?.hidden === true
+    && actor?.type === "personnage-non-joueur"
+    && game.user?.isGM === true;
+  const gmIds = shouldHideForGm ? getActiveGMUserIds() : [];
+  const messageData = {
     speaker: ChatMessage.getSpeaker({ actor }),
     flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.CHARACTERISTIC)
-  });
+  };
+  if (shouldHideForGm && gmIds.length && typeof ChatMessage?.create === "function") {
+    const privateChatData = {
+      speaker: messageData.speaker,
+      content: messageData.flavor,
+      whisper: gmIds,
+      blind: false,
+      flags: messageData.flags
+    };
+    try {
+      await ChatMessage.create(privateChatData);
+    } catch (error) {
+      bmLog.error("characteristic:hidden chat create failed", { error });
+      // Do not fallback to Roll.toMessage here: leaking a placeholder to non-GM users is worse than no chat message.
+    }
+  } else {
+    r.toMessage(messageData);
+  }
   return { roll: r, success, effective, critical: isCritSuccess ? "success" : isCritFailure ? "failure" : "" };
 }
 

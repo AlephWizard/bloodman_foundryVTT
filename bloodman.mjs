@@ -5469,6 +5469,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       const xp = Array.isArray(data.actor.system.characteristics?.[c.key]?.xp)
         ? data.actor.system.characteristics[c.key].xp
         : [false, false, false];
+      const hiddenRoll = toCheckboxBoolean(data.actor.system.characteristics?.[c.key]?.hiddenRoll, false);
       const flat = Number(modifiers.all || 0) + Number(modifiers[c.key] || 0);
       const itemBonus = Number(itemBonuses[c.key] || 0);
       const profileBonus = profileBonusCharacteristic === c.key && Number.isFinite(profileBonusValue)
@@ -5490,6 +5491,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         modifierTotal,
         xp,
         xpReady,
+        hiddenRoll,
         showReroll,
         showRerollClear
       };
@@ -5868,12 +5870,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     html.find(".char-icon").click(ev => {
       const row = ev.currentTarget.closest(".char-row");
       const key = row?.dataset?.key;
-      this.handleCharacteristicRoll(key);
+      this.handleCharacteristicRoll(key, { hidden: this.isCharacteristicRollHidden(key) });
     });
 
     html.find(".char-roll").click(ev => {
       const key = ev.currentTarget.dataset.key;
-      this.handleCharacteristicRoll(key);
+      this.handleCharacteristicRoll(key, { hidden: this.isCharacteristicRollHidden(key) });
     });
 
     html.find(".char-reroll").click(ev => {
@@ -6453,10 +6455,20 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
   }
 
-  async handleCharacteristicRoll(key) {
+  isCharacteristicRollHidden(key) {
+    if (this.actor?.type !== "personnage-non-joueur") return false;
+    const characteristicKey = String(key || "").trim();
+    if (!characteristicKey) return false;
+    const selector = `input[name='system.characteristics.${characteristicKey}.hiddenRoll']`;
+    const checkbox = this.element?.find ? this.element.find(selector) : null;
+    if (checkbox?.length) return checkbox.first().is(":checked");
+    return toCheckboxBoolean(this.actor?.system?.characteristics?.[characteristicKey]?.hiddenRoll, false);
+  }
+
+  async handleCharacteristicRoll(key, options = {}) {
     if (!key) return;
     this.markCharacteristicReroll(key);
-    await doCharacteristicRoll(this.actor, key);
+    await doCharacteristicRoll(this.actor, key, { hidden: options?.hidden === true });
     if (this.actor.type === "personnage") {
       await this.markXpProgress(key);
     }
@@ -6476,6 +6488,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       npcChaosCost: CHAOS_COST_NPC_REROLL
     });
     if (!plan.mode) return;
+    const hiddenRoll = this.isCharacteristicRollHidden(key);
 
     if (!plan.allowed) {
       if (plan.reason === "not-enough-pp") {
@@ -6492,7 +6505,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         bloodmanAllowVitalResourceUpdate: true
       });
       if (!resourceUpdated) return;
-      await doCharacteristicRoll(this.actor, key);
+      await doCharacteristicRoll(this.actor, key, { hidden: hiddenRoll });
       await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
       this.markCharacteristicReroll(key);
       this.render(false);
@@ -6500,7 +6513,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
 
     await setChaosValue(plan.nextChaos);
-    await doCharacteristicRoll(this.actor, key);
+    await doCharacteristicRoll(this.actor, key, { hidden: hiddenRoll });
     this.markCharacteristicReroll(key);
     this.render(false);
   }
