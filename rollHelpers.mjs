@@ -1284,6 +1284,13 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
   return { outputs, contextTargets };
 }
 
+function ensureDamageTargetsSelectedBeforeRoll() {
+  const targets = Array.from(game.user?.targets || []);
+  if (targets.length > 0) return true;
+  safeWarn(t("BLOODMAN.Notifications.NoTargetSelected"));
+  return false;
+}
+
 export async function doDamageRoll(actor, item) {
   if (item?.system?.damageEnabled === false) {
     ui.notifications?.warn(tl("BLOODMAN.Notifications.WeaponDamageDisabled", "Cette arme n'a pas de dé de dégâts."));
@@ -1308,6 +1315,7 @@ export async function doDamageRoll(actor, item) {
       return null;
     }
   }
+  if (!ensureDamageTargetsSelectedBeforeRoll()) return null;
 
   const rawDie = die.toString();
   const defaultFormula = normalizeDamageFormula(rawDie) || "1d4";
@@ -1418,6 +1426,7 @@ export async function doHealRoll(actor, item) {
 
 export async function doDirectDamageRoll(actor, formula, sourceName = "", options = {}) {
   if (!actor) return null;
+  if (!ensureDamageTargetsSelectedBeforeRoll()) return null;
   const defaultFormula = normalizeDamageFormula(formula) || "1d4";
   const defaultBonus = getRawDamageBonus(actor);
   const damageDialogOptions = options?.damageDialog && typeof options.damageDialog === "object"
