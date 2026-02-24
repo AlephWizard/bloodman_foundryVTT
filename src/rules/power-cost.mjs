@@ -77,8 +77,13 @@ export function buildPowerCostRules({
 
     const updateData = { [POWER_PP_CURRENT_PATH]: plan.nextValue };
     if (canDirectlyUpdate(actor)) {
-      await actor.update(updateData, POWER_COST_UPDATE_OPTIONS);
-      return true;
+      try {
+        await actor.update(updateData, POWER_COST_UPDATE_OPTIONS);
+        return true;
+      } catch (_error) {
+        // Some actor contexts (notably synthetic/token actors) can reject direct updates.
+        // Fall back to the privileged relay path when available.
+      }
     }
 
     const sent = requestSheetUpdate(actor, updateData, POWER_COST_REQUEST_OPTIONS);

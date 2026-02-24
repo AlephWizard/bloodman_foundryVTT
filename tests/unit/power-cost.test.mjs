@@ -86,6 +86,39 @@ async function run() {
     options: POWER_COST_UPDATE_OPTIONS
   });
 
+  const directFailureRelayCalls = [];
+  const directFailureRelayHooks = buildPowerCostRules({
+    requestActorSheetUpdate: (actor, updateData, options) => {
+      directFailureRelayCalls.push({ actor, updateData, options });
+      return true;
+    },
+    canDirectlyUpdateActor: () => true,
+    deepClone: updateData => ({ ...updateData })
+  });
+  const directFailureActor = {
+    system: { resources: { pp: { current: 11 } } },
+    update: async () => {
+      throw new Error("synthetic update rejected");
+    },
+    updateSourceCalls: [],
+    updateSource(updateData) {
+      this.updateSourceCalls.push(updateData);
+    }
+  };
+  const directFailureRelayResult = await directFailureRelayHooks.applyPowerCost(directFailureActor, {
+    type: "pouvoir",
+    system: {
+      powerCostEnabled: true,
+      powerCost: 4
+    }
+  });
+  assert.equal(directFailureRelayResult, true);
+  assert.equal(directFailureRelayCalls.length, 1);
+  assert.deepEqual(directFailureRelayCalls[0].updateData, { [POWER_PP_CURRENT_PATH]: 7 });
+  assert.deepEqual(directFailureRelayCalls[0].options, POWER_COST_REQUEST_OPTIONS);
+  assert.equal(directFailureActor.updateSourceCalls.length, 1);
+  assert.deepEqual(directFailureActor.updateSourceCalls[0], { [POWER_PP_CURRENT_PATH]: 7 });
+
   const insufficientNotifications = [];
   const insufficientHooks = buildPowerCostRules({
     requestActorSheetUpdate: () => true,
