@@ -159,8 +159,8 @@ export function buildActorPreUpdateHooks({
     const hasPpMaxUpdate = hasUpdatePath(ppMaxPath);
     const storedPvMax = getUpdatedNumber(pvMaxPath, actor.system.resources?.pv?.max);
     const storedPpMax = getUpdatedNumber(ppMaxPath, actor.system.resources?.pp?.max);
-    const hasPvCurrentUpdate = foundry.utils.getProperty(updateData, pvCurrentPath) != null;
-    const hasPpCurrentUpdate = foundry.utils.getProperty(updateData, ppCurrentPath) != null;
+    const hasPvCurrentUpdate = hasUpdatePath(pvCurrentPath);
+    const hasPpCurrentUpdate = hasUpdatePath(ppCurrentPath);
     const { normalizedVitalMaxValues, normalizedVitalCurrentValues } = planPreUpdateActorDerivedVitalPatch({
       phyBase: getUpdatedNumber("system.characteristics.PHY.base", actor.system.characteristics?.PHY?.base || 0),
       espBase: getUpdatedNumber("system.characteristics.ESP.base", actor.system.characteristics?.ESP?.base || 0),

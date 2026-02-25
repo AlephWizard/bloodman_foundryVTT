@@ -592,7 +592,7 @@
   accent-color: var(--bm-black);
 }
 
-.xp-roll {
+.bloodman-sheet button.xp-roll {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1669,9 +1669,10 @@
   font-weight: 700;
 }
 
-.xp-roll {
+.bloodman-sheet button.xp-roll {
   background: #000000;
   border: 2px solid #000000;
+  color: #ffffff;
   padding: 2px 6px;
 }
 

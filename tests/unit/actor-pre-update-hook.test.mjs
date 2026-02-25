@@ -167,6 +167,16 @@ function run() {
     assert.equal(getProperty(updateData, "token.img"), "new-actor.webp");
     assert.deepEqual(notificationErrors, []);
   });
+
+  withGlobals(({ notificationErrors }) => {
+    const hooks = buildHooks();
+    const updateData = {
+      "system.resources.pv.current": "99"
+    };
+    hooks.onPreUpdateActor(buildActor("personnage"), updateData, {}, "u2");
+    assert.equal(getProperty(updateData, "system.resources.pv.current"), 5);
+    assert.deepEqual(notificationErrors, []);
+  });
 }
 
 run();
