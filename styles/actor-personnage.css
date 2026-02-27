@@ -1054,21 +1054,56 @@
 
 .identity-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 5px;
 }
 
-.field {
+.identity-grid > .field {
+  margin-bottom: 0;
+}
+
+.identity-grid .field {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
-.field-row {
+.identity-grid .field.field-inline {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  grid-template-columns: 106px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 0;
+}
+
+.identity-grid .field.field-inline.name-inline {
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 5px;
+}
+
+.identity-grid .field.field-inline.name-inline > label {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.identity-grid .field.field-inline label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.identity-grid .field-row {
+  display: grid;
+  gap: 6px;
+}
+
+.identity-main-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.identity-stats-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .field.wide {
@@ -1079,35 +1114,67 @@
   width: 100%;
 }
 
-.origin-field input,
-.origin-field textarea {
-  min-height: 26px;
-  line-height: 1.35;
-}
-
 .field label {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
-.archetype-row {
+.identity-grid .origin-field input,
+.identity-grid .origin-field textarea {
+  min-height: 26px;
+  line-height: 1.35;
+}
+
+.identity-grid .field > label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.identity-grid input[type="text"],
+.identity-grid input[type="number"],
+.identity-grid select,
+.identity-grid textarea {
+  border: 1.5px solid #111111;
+  border-radius: 11px;
+  background: #f5f5f5;
+  min-height: 30px;
+  padding: 3px 9px;
+}
+
+.identity-grid .origin-field textarea {
+  min-height: 30px;
+}
+
+.identity-grid .archetype-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px 150px;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) 78px 92px;
+  gap: 6px;
   align-items: center;
 }
 
-.archetype-row .archetype-text {
+.identity-grid .archetype-row .archetype-text {
   min-width: 0;
 }
 
-.archetype-row .archetype-bonus-value {
+.identity-grid .archetype-row .archetype-bonus-value {
   text-align: center;
 }
 
-.archetype-row .archetype-bonus-key {
+.identity-grid .archetype-row .archetype-bonus-key {
   width: 100%;
+}
+
+.identity-grid textarea[name="system.profile.historique"] {
+  min-height: 124px;
+}
+
+.identity-main-row > .field input[type="text"],
+.identity-main-row > .field input[type="number"],
+.identity-main-row > .field select {
+  min-height: 30px;
 }
 
 .notes-card textarea,
@@ -1125,7 +1192,7 @@
   max-height: 150px;
 }
 
-.identity-right textarea[name="system.profile.historique"][data-autogrow="true"] {
+.identity-grid textarea[name="system.profile.historique"][data-autogrow="true"] {
   max-height: 900px;
 }
 
@@ -1158,11 +1225,17 @@
     grid-template-columns: 1fr;
   }
 
-  .field-row {
-    grid-template-columns: repeat(2, 1fr);
+  .identity-main-row,
+  .identity-stats-row {
+    grid-template-columns: 1fr;
   }
 
-  .archetype-row {
+  .identity-grid .field.field-inline {
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+  }
+
+  .identity-grid .archetype-row {
     grid-template-columns: minmax(0, 1fr) 72px 130px;
   }
 }
@@ -1611,6 +1684,13 @@
   box-shadow: none;
 }
 
+.identity-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .column.center {
   height: 100%;
 }
@@ -1626,6 +1706,11 @@
   border-bottom: 2px solid #000000;
   padding-bottom: 4px;
   margin-bottom: 6px;
+}
+
+.identity-card .card-header {
+  padding-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .card-title {

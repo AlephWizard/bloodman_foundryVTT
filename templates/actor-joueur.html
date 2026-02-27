@@ -186,12 +186,27 @@
           <span class="card-title"><i class="fa-solid fa-id-card"></i> {{localize "BLOODMAN.Identity.Title"}}</span>
         </div>
         <div class="identity-grid">
-          <div class="identity-left">
-            <div class="field">
-              <label>{{localize "BLOODMAN.Identity.Fields.Name"}}</label>
-              <input type="text" name="name" value="{{actor.name}}" />
+          <div class="field field-inline name-inline">
+            <label>{{localize "BLOODMAN.Identity.Fields.Name"}}</label>
+            <input type="text" name="name" value="{{actor.name}}" />
+          </div>
+          <div class="field-row identity-main-row">
+            <div class="field origin-field">
+              <label>{{localize "BLOODMAN.Identity.Fields.Origin"}}</label>
+              <textarea
+                class="bm-autogrow-field bm-autogrow-origin"
+                name="system.profile.origine"
+                rows="1"
+                data-autogrow="true"
+                data-autogrow-min-rows="1"
+                data-autogrow-max-rows="6"
+              >{{profile.origine}}</textarea>
             </div>
             <div class="field">
+              <label>{{localize "BLOODMAN.Identity.Fields.Vice"}}</label>
+              <input type="text" name="system.profile.vice" value="{{profile.vice}}" />
+            </div>
+            <div class="field archetype-field">
               <label>{{localize "BLOODMAN.Identity.Fields.Archetype"}}</label>
               <div class="archetype-row">
                 <input type="text" class="archetype-text" name="system.profile.archetype" value="{{profile.archetype}}" />
@@ -216,48 +231,31 @@
                 </select>
               </div>
             </div>
-            <div class="field">
-              <label>{{localize "BLOODMAN.Identity.Fields.Vice"}}</label>
-              <input type="text" name="system.profile.vice" value="{{profile.vice}}" />
+          </div>
+          <div class="field-row identity-stats-row">
+            <div class="field small">
+              <label>{{localize "BLOODMAN.Identity.Fields.Weight"}}</label>
+              <input type="text" name="system.profile.poids" value="{{profile.poids}}" />
             </div>
-            <div class="field-row">
-              <div class="field small">
-                <label>{{localize "BLOODMAN.Identity.Fields.Weight"}}</label>
-                <input type="text" name="system.profile.poids" value="{{profile.poids}}" />
-              </div>
-              <div class="field small">
-                <label>{{localize "BLOODMAN.Identity.Fields.Height"}}</label>
-                <input type="text" name="system.profile.taille" value="{{profile.taille}}" />
-              </div>
-              <div class="field small">
-                <label>{{localize "BLOODMAN.Identity.Fields.Age"}}</label>
-                <input type="text" name="system.profile.age" value="{{profile.age}}" />
-              </div>
+            <div class="field small">
+              <label>{{localize "BLOODMAN.Identity.Fields.Height"}}</label>
+              <input type="text" name="system.profile.taille" value="{{profile.taille}}" />
+            </div>
+            <div class="field small">
+              <label>{{localize "BLOODMAN.Identity.Fields.Age"}}</label>
+              <input type="text" name="system.profile.age" value="{{profile.age}}" />
             </div>
           </div>
-          <div class="identity-right">
-            <div class="field origin-field">
-              <label>{{localize "BLOODMAN.Identity.Fields.Origin"}}</label>
-              <textarea
-                class="bm-autogrow-field bm-autogrow-origin"
-                name="system.profile.origine"
-                rows="2"
-                data-autogrow="true"
-                data-autogrow-min-rows="2"
-                data-autogrow-max-rows="5"
-              >{{profile.origine}}</textarea>
-            </div>
-            <div class="field">
-              <label>{{localize "BLOODMAN.Identity.Fields.History"}}</label>
-              <textarea
-                class="bm-autogrow-field bm-autogrow-history"
-                name="system.profile.historique"
-                rows="4"
-                data-autogrow="true"
-                data-autogrow-min-rows="4"
-                data-autogrow-max-rows="32"
-              >{{profile.historique}}</textarea>
-            </div>
+          <div class="field">
+            <label>{{localize "BLOODMAN.Identity.Fields.History"}}</label>
+            <textarea
+              class="bm-autogrow-field bm-autogrow-history"
+              name="system.profile.historique"
+              rows="4"
+              data-autogrow="true"
+              data-autogrow-min-rows="4"
+              data-autogrow-max-rows="32"
+            >{{profile.historique}}</textarea>
           </div>
         </div>
       </section>
