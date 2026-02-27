@@ -848,6 +848,100 @@
   padding: 3px 2px;
 }
 
+.item.item--stacked {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 3px 8px;
+  align-items: start;
+  padding: 4px 2px 4px 11px;
+}
+
+.item--stacked .item-delete,
+.item--stacked .transport-npc-delete {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  line-height: 1;
+}
+
+.item--stacked .item-icon {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
+.item--stacked .item-body {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.item--stacked .item-name {
+  display: block;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.item--stacked .item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+
+.item--stacked .item-actions:empty {
+  display: none;
+  min-height: 0;
+}
+
+.item--stacked .item-notes {
+  margin: 0;
+  width: 100%;
+}
+
+.item-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: #f1f1f1;
+  color: #1a1a1a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.item--stacked .item-actions .item-use,
+.item--stacked .item-actions .ability-show-gm,
+.item--stacked .item-actions .power-use,
+.item--stacked .item-actions .weapon-reload,
+.item--stacked .item-actions .weapon-ammo,
+.item--stacked .item-actions .weapon-roll,
+.item--stacked .item-actions .ability-roll,
+.item--stacked .item-actions .item-reroll,
+.item--stacked .item-actions .item-reroll-clear {
+  min-height: 18px;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.item--stacked .item-actions .item-reroll-clear {
+  min-width: 18px;
+  justify-content: center;
+}
+
 .aptitudes-card .item-list.item-list-three-columns,
 .powers-card .item-list.item-list-three-columns {
   align-items: start;
