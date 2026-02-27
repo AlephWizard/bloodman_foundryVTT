@@ -73,7 +73,7 @@
 
       <div class="tab-grid">
         <aside class="sidebar">
-          <div class="portrait-frame">
+          <div class="portrait-frame {{#if hasPortraitImage}}has-image{{else}}is-empty{{/if}}">
             <img src="{{actor.img}}" {{#if canEditTokenImage}}data-edit="img"{{/if}} class="portrait" />
           </div>
         </aside>

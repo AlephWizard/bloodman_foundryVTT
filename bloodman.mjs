@@ -5640,6 +5640,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!canUseItemReroll) return false;
       return itemId === lastItemRerollId;
     };
+    const hasPortraitImage = !isMissingTokenImage(String(data.actor?.img || "").trim());
 
     const itemBonuses = getItemBonusTotals(this.actor);
     const characteristics = CHARACTERISTICS.map(c => {
@@ -5851,6 +5852,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       canEditStatePresets: canEditRestrictedFields,
       statePresetPsychic: statePresetData.psychic,
       statePresetBody: statePresetData.body,
+      hasPortraitImage,
       resources,
       profile,
       archetypeCharacteristicOptions,
