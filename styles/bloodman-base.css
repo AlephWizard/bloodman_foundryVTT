@@ -347,6 +347,7 @@
 }
 
 #bm-chaos-dice .bm-chaos-xp-btn,
+#bm-chaos-dice .bm-chaos-full-pv-btn,
 #bm-chaos-dice .bm-chaos-full-pp-btn {
   height: 20px;
   border-radius: 6px;
@@ -369,7 +370,18 @@
   min-width: 58px;
 }
 
+#bm-chaos-dice .bm-chaos-full-pv-btn {
+  min-width: 58px;
+}
+
+#bm-chaos-dice .bm-chaos-full-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 #bm-chaos-dice .bm-chaos-xp-btn:focus-visible,
+#bm-chaos-dice .bm-chaos-full-pv-btn:focus-visible,
 #bm-chaos-dice .bm-chaos-full-pp-btn:focus-visible {
   outline: none;
 }

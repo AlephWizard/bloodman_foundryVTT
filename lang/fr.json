@@ -182,6 +182,12 @@
         "SelectionHint": "{selected} token(s) selectionne(s), {eligible} token(s) joueur(s) concerne(s).",
         "Confirm": "Restaurer"
       },
+      "FullPVRestore": {
+        "Title": "Restauration PV",
+        "Prompt": "Restaurer integralement les points de vie (PV) des tokens joueurs selectionnes ?",
+        "SelectionHint": "{selected} token(s) selectionne(s), {eligible} token(s) joueur(s) concerne(s).",
+        "Confirm": "Restaurer"
+      },
       "InsufficientFundsTransfer": {
         "Title": "Fonds insuffisants",
         "Eyebrow": "Verification MJ",
@@ -228,6 +234,12 @@
       "FullPPRestoreNoRecipients": "Aucun token joueur selectionne pour restaurer les PP.",
       "FullPPRestoreAllFailed": "Aucune restauration de PP n'a pu etre appliquee.",
       "FullPPRestorePartialFailure": "{count} restauration(s) de PP n'ont pas pu etre appliquees.",
+      "FullPVRestoreLine": "{actor} : PV {before} -> {after}.",
+      "FullPVRestoreAlreadyFullLine": "{actor} a deja tous ses PV ({max}/{max}).",
+      "FullPVRestoreNoSelection": "Selectionnez au moins un token joueur pour restaurer les PV.",
+      "FullPVRestoreNoRecipients": "Aucun token joueur selectionne pour restaurer les PV.",
+      "FullPVRestoreAllFailed": "Aucune restauration de PV n'a pu etre appliquee.",
+      "FullPVRestorePartialFailure": "{count} restauration(s) de PV n'ont pas pu etre appliquees.",
       "ItemAudioMissing": "Aucun fichier audio selectionne pour {item}.",
       "ItemAudioInvalid": "Le fichier audio de {item} est invalide ou introuvable.",
       "ItemAudioInvalidSelection": "Fichier audio invalide pour {item}. Le champ a ete vide.",

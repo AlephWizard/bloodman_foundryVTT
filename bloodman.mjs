@@ -3357,6 +3357,23 @@ function formatFullPpRestoreLine(actorName, restore = {}) {
   });
 }
 
+function formatFullPvRestoreLine(actorName, restore = {}) {
+  const name = String(actorName || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
+  const maxPv = normalizeNonNegativeInteger(restore?.maxPv, 0);
+  const previousPv = normalizeNonNegativeInteger(restore?.previousPv, 0);
+  if (restore?.changed === false) {
+    const fallback = `${name} a deja tous ses PV (${maxPv}/${maxPv}).`;
+    return tl("BLOODMAN.Notifications.FullPVRestoreAlreadyFullLine", fallback, { actor: name, max: maxPv });
+  }
+  const fallback = `${name} : PV ${previousPv} -> ${maxPv}.`;
+  return tl("BLOODMAN.Notifications.FullPVRestoreLine", fallback, {
+    actor: name,
+    before: previousPv,
+    after: maxPv,
+    max: maxPv
+  });
+}
+
 async function restoreFullPpToSelectedPlayers(options = {}) {
   const selectedTokens = Array.isArray(options.selectedTokens)
     ? options.selectedTokens
@@ -3422,6 +3439,71 @@ async function restoreFullPpToSelectedPlayers(options = {}) {
   };
 }
 
+async function restoreFullPvToSelectedPlayers(options = {}) {
+  const selectedTokens = Array.isArray(options.selectedTokens)
+    ? options.selectedTokens
+    : (globalThis.canvas?.tokens?.controlled || []);
+  if (!selectedTokens.length) {
+    return {
+      selectedTokens,
+      restores: [],
+      failures: [],
+      reason: "no-selection"
+    };
+  }
+
+  const recipients = getSelectedVoyageXpRecipientActors(selectedTokens);
+  if (!recipients.length) {
+    return {
+      selectedTokens,
+      restores: [],
+      failures: [],
+      reason: "no-recipients"
+    };
+  }
+
+  const restores = [];
+  const failures = [];
+  for (const actor of recipients) {
+    const actorName = String(actor?.name || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
+    if (!actor?.update) {
+      failures.push({ actorName });
+      continue;
+    }
+    const maxPv = normalizeNonNegativeInteger(actor.system?.resources?.pv?.max, 0);
+    const previousPv = normalizeNonNegativeInteger(actor.system?.resources?.pv?.current, 0);
+    const nextPv = maxPv;
+    if (previousPv === nextPv) {
+      restores.push({ actorName, previousPv, maxPv, changed: false });
+      continue;
+    }
+
+    try {
+      await actor.update(
+        { "system.resources.pv.current": nextPv },
+        { bloodmanAllowVitalResourceUpdate: true }
+      );
+      restores.push({ actorName, previousPv, maxPv, changed: true });
+    } catch (error) {
+      bmLog.warn("[bloodman] full PV restore failed", {
+        actorId: actor?.id,
+        actorName,
+        previousPv,
+        maxPv,
+        error
+      });
+      failures.push({ actorName });
+    }
+  }
+
+  return {
+    selectedTokens,
+    restores,
+    failures,
+    reason: restores.length ? "ok" : "all-failed"
+  };
+}
+
 async function postFullPpRestoreSummary(result) {
   if (!result) return false;
   const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
@@ -3452,6 +3534,40 @@ async function postFullPpRestoreSummary(result) {
 
   const contentLines = lines.map(line => `<p>${escapeHtml(line)}</p>`).join("");
   const content = `<div class="bm-full-pp-restore-log"><p><strong>${escapeHtml(titleText)}</strong></p>${contentLines}</div>`;
+  await ChatMessage.create({ content }).catch(() => null);
+  return true;
+}
+
+async function postFullPvRestoreSummary(result) {
+  if (!result) return false;
+  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const titleText = tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV");
+  const lines = [];
+
+  if (result.reason === "no-selection") {
+    lines.push(tl("BLOODMAN.Notifications.FullPVRestoreNoSelection", "Selectionnez au moins un token joueur pour restaurer les PV."));
+  } else if (result.reason === "no-recipients") {
+    lines.push(tl("BLOODMAN.Notifications.FullPVRestoreNoRecipients", "Aucun token joueur selectionne pour restaurer les PV."));
+  } else if (result.reason === "all-failed") {
+    lines.push(tl("BLOODMAN.Notifications.FullPVRestoreAllFailed", "Aucune restauration de PV n'a pu etre appliquee."));
+  } else {
+    for (const restore of result.restores || []) {
+      lines.push(formatFullPvRestoreLine(restore.actorName, restore));
+    }
+    const failureCount = Number(result.failures?.length || 0);
+    if (failureCount > 0) {
+      lines.push(
+        tl(
+          "BLOODMAN.Notifications.FullPVRestorePartialFailure",
+          "{count} restauration(s) de PV n'ont pas pu etre appliquees.",
+          { count: failureCount }
+        )
+      );
+    }
+  }
+
+  const contentLines = lines.map(line => `<p>${escapeHtml(line)}</p>`).join("");
+  const content = `<div class="bm-full-pv-restore-log"><p><strong>${escapeHtml(titleText)}</strong></p>${contentLines}</div>`;
   await ChatMessage.create({ content }).catch(() => null);
   return true;
 }
@@ -4700,6 +4816,62 @@ function showSelectedFullPpRestoreConfirmDialog() {
   dialog.render(true);
 }
 
+function showSelectedFullPvRestoreConfirmDialog() {
+  if (!game.user?.isGM) return;
+  if (typeof Dialog !== "function") return;
+
+  const selectedTokens = [...(globalThis.canvas?.tokens?.controlled || [])];
+  const selectedCount = Array.isArray(selectedTokens) ? selectedTokens.length : 0;
+  const recipients = getSelectedVoyageXpRecipientActors(selectedTokens);
+  if (!selectedCount || !recipients.length) {
+    void restoreFullPvToSelectedPlayers({ selectedTokens }).then(postFullPvRestoreSummary);
+    return;
+  }
+
+  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const titleText = tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV");
+  const promptText = tl(
+    "BLOODMAN.Dialogs.FullPVRestore.Prompt",
+    "Restaurer integralement les points de vie (PV) des tokens joueurs selectionnes ?"
+  );
+  const selectionHint = tl(
+    "BLOODMAN.Dialogs.FullPVRestore.SelectionHint",
+    "{selected} token(s) selectionne(s), {eligible} token(s) joueur(s) concerne(s).",
+    { selected: selectedCount, eligible: recipients.length }
+  );
+  const confirmLabel = tl("BLOODMAN.Dialogs.FullPVRestore.Confirm", "Restaurer");
+  const cancelLabel = tl("BLOODMAN.Common.Cancel", "Annuler");
+  const content = `<form class="bm-full-pv-dialog">
+    <p>${escapeHtml(promptText)}</p>
+    <p><small>${escapeHtml(selectionHint)}</small></p>
+  </form>`;
+
+  const dialog = new Dialog(
+    {
+      title: titleText,
+      content,
+      buttons: {
+        confirm: {
+          label: confirmLabel,
+          callback: async () => {
+            const result = await restoreFullPvToSelectedPlayers({ selectedTokens });
+            await postFullPvRestoreSummary(result);
+          }
+        },
+        cancel: {
+          label: cancelLabel
+        }
+      },
+      default: "cancel"
+    },
+    {
+      classes: ["bloodman-damage-dialog", "bloodman-full-pv-dialog"],
+      width: 460
+    }
+  );
+  dialog.render(true);
+}
+
 function ensureChaosDiceUI() {
   if (!game.user.isGM) return;
   if (document.getElementById("bm-chaos-dice")) return;
@@ -4711,6 +4883,7 @@ function ensureChaosDiceUI() {
   container.className = "bm-chaos-dice";
   container.title = tl("BLOODMAN.Settings.ChaosDiceName", "Des du chaos");
   const xpAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage"));
+  const fullPvAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV"));
   const fullPpAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.FullPPRestore.Title", "Restauration PP"));
   const plusAriaLabel = escapeChatMarkup("Augmenter les des du chaos");
   const minusAriaLabel = escapeChatMarkup("Diminuer les des du chaos");
@@ -4724,12 +4897,16 @@ function ensureChaosDiceUI() {
       </div>
       <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="${minusAriaLabel}">-</button>
     </div>
-    <button type="button" class="bm-chaos-full-pp-btn" aria-label="${fullPpAriaLabel}">FULL PP</button>
+    <div class="bm-chaos-full-row">
+      <button type="button" class="bm-chaos-full-pv-btn" aria-label="${fullPvAriaLabel}">FULL PV</button>
+      <button type="button" class="bm-chaos-full-pp-btn" aria-label="${fullPpAriaLabel}">FULL PP</button>
+    </div>
   `;
 
   target.appendChild(container);
 
   const xp = container.querySelector(".bm-chaos-xp-btn");
+  const fullPv = container.querySelector(".bm-chaos-full-pv-btn");
   const fullPp = container.querySelector(".bm-chaos-full-pp-btn");
   const minus = container.querySelector(".bm-chaos-minus");
   const plus = container.querySelector(".bm-chaos-plus");
@@ -4755,6 +4932,10 @@ function ensureChaosDiceUI() {
 
   xp?.addEventListener("click", () => {
     showSelectedVoyageXpGrantDialog();
+  });
+
+  fullPv?.addEventListener("click", () => {
+    showSelectedFullPvRestoreConfirmDialog();
   });
 
   fullPp?.addEventListener("click", () => {
