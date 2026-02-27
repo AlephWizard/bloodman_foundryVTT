@@ -670,14 +670,77 @@
 
 .equipment-card .item-list {
   margin: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.equipment-column-primary ol.item-list[data-carry-column="equipment"] {
+  min-height: 84px;
+}
+
+.equip-block-main-equipment .equip-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.equip-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.equip-subtitle i {
+  width: 12px;
+  text-align: center;
+}
+
+.equip-block-main-equipment .equipment-main-list {
+  max-height: 300px;
+  min-height: 300px;
+  padding-right: 2px;
+}
+
+.equip-block-objects .objects-bag-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(200px, 0.92fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.equip-block-objects .objects-column-list {
+  max-height: none;
+  min-height: 0;
+  padding: 2px 4px 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.equip-block-objects .objects-column-list-one,
+.equip-block-objects .objects-column-list-two {
+  padding-left: 2px;
+  padding-right: 6px;
+}
+
+.equip-block-objects .objects-bag-list {
+  min-height: 220px;
+  padding: 8px 8px 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.equip-block-objects .objects-column-list.is-disabled {
+  opacity: 0.48;
 }
 
 .equipment-card .item {
   border-bottom-color: transparent;
-}
-
-.equipment-column-primary .item-list.item-list-three-columns {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .weapon-header-row {
@@ -686,6 +749,18 @@
   gap: 8px;
   margin-top: 4px;
   align-items: center;
+}
+
+.equipment-card textarea.equip-autogrow-field[data-autogrow="true"] {
+  width: 100%;
+  min-height: 26px;
+  line-height: 1.25;
+}
+
+.equipment-card .equip-block > textarea.equip-autogrow-field,
+.weapon-header-row > textarea.equip-autogrow-field,
+.currency-row > textarea.equip-autogrow-field {
+  width: 100%;
 }
 
 .bloodman-sheet button.weapon-simple-attack {
@@ -854,14 +929,14 @@
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 3px 8px;
   align-items: start;
-  padding: 4px 2px 4px 11px;
+  padding: 4px 2px 4px 18px;
 }
 
 .item--stacked .item-delete,
 .item--stacked .transport-npc-delete {
   position: absolute;
-  top: 4px;
-  left: 0;
+  top: 5px;
+  left: 5px;
   line-height: 1;
 }
 
@@ -1176,7 +1251,8 @@
   padding-right: 2px;
 }
 
-.ammo-row input {
+.ammo-row input,
+.ammo-row textarea {
   width: 100%;
   position: relative;
   z-index: 1;
@@ -1406,6 +1482,15 @@
   .equipment-column-secondary {
     border-left: 0;
     padding-left: 0;
+  }
+
+  .equip-block-objects .objects-bag-layout {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .equip-block-objects .objects-column-list {
+    min-height: 180px;
   }
 }
 

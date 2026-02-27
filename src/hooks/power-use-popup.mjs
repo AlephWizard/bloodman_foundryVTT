@@ -4,6 +4,7 @@ export function buildPowerUsePopupHooks({
   systemSocket,
   getCurrentUser,
   getActivePrivilegedOperatorIds,
+  getActorPlayerViewerIds,
   normalizeRollDieFormula,
   toBooleanFlag,
   toFiniteNumber,
@@ -26,6 +27,9 @@ export function buildPowerUsePopupHooks({
     : () => globalThis.game?.user;
   const getPrivilegedIds = typeof getActivePrivilegedOperatorIds === "function"
     ? getActivePrivilegedOperatorIds
+    : () => [];
+  const getActorPlayers = typeof getActorPlayerViewerIds === "function"
+    ? getActorPlayerViewerIds
     : () => [];
   const normalizeFormula = typeof normalizeRollDieFormula === "function"
     ? normalizeRollDieFormula
@@ -69,8 +73,19 @@ export function buildPowerUsePopupHooks({
   function getPowerUsePopupViewerIds(requesterUserId = "", options = {}) {
     const requesterId = String(requesterUserId || "").trim();
     const includeRequesterUser = options?.includeRequesterUser === true;
-    return getPrivilegedIds()
-      .filter(userId => includeRequesterUser || !requesterId || userId !== requesterId);
+    const actor = options?.actor || null;
+    const ids = new Set(
+      getPrivilegedIds()
+        .map(userId => String(userId || "").trim())
+        .filter(Boolean)
+    );
+    for (const userId of getActorPlayers(actor)) {
+      const normalized = String(userId || "").trim();
+      if (normalized) ids.add(normalized);
+    }
+    if (includeRequesterUser && requesterId) ids.add(requesterId);
+    if (!includeRequesterUser && requesterId) ids.delete(requesterId);
+    return [...ids];
   }
 
   function emitPowerUsePopup(actor, item, options = {}) {
@@ -80,7 +95,10 @@ export function buildPowerUsePopupHooks({
     const currentUser = resolveCurrentUser();
     const requesterUserId = String(currentUser?.id || "").trim();
     const includeRequesterUser = options?.includeRequesterUser === true;
-    const viewerIds = getPowerUsePopupViewerIds(requesterUserId, { includeRequesterUser });
+    const viewerIds = getPowerUsePopupViewerIds(requesterUserId, {
+      includeRequesterUser,
+      actor
+    });
     if (!viewerIds.length) return false;
     const randomId = () => (globalThis.foundry?.utils?.randomID ? globalThis.foundry.utils.randomID() : Math.random().toString(36).slice(2));
     const powerDamageFormula = item.system?.damageEnabled ? normalizeFormula(item.system?.damageDie, "d4") : "";
@@ -135,9 +153,8 @@ export function buildPowerUsePopupHooks({
     const viewerIds = Array.isArray(data?.viewerIds)
       ? data.viewerIds.map(id => String(id || "").trim()).filter(Boolean)
       : [];
-    if (isRequester && viewerIds.length && !viewerIds.includes(localUserId)) return false;
-    if (isRequester && !viewerIds.length) return false;
-    if (viewerIds.length && !viewerIds.includes(localUserId)) return false;
+    if (viewerIds.length) return viewerIds.includes(localUserId);
+    if (isRequester) return true;
     return canAssistantRole(localUser?.role);
   }
 

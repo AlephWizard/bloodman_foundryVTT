@@ -277,71 +277,93 @@
         </div>
         <div class="equipment-layout">
           <div class="equipment-column equipment-column-primary">
+            <div class="equip-block">
+              <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
+              <div class="weapon-header-row">
+                <textarea
+                  class="bm-autogrow-field equip-autogrow-field"
+                  name="system.equipment.armes"
+                  rows="1"
+                  data-autogrow="true"
+                  data-autogrow-min-rows="1"
+                  data-autogrow-max-rows="6"
+                >{{equipment.armes}}</textarea>
+                <button type="button" class="weapon-simple-attack">{{localize "BLOODMAN.Common.SimpleAttack"}}</button>
+              </div>
+              <ol class="item-list weapon-list" data-carry-column="equipment" data-reorder-scope="carry-column" data-accepted-types="arme">
+                {{#each weapons}}
+                  <li class="item item--stacked weapon-item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
+                    <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
+                    <img class="item-icon" src="{{this.img}}" />
+                    <div class="item-body">
+                      <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
+                      <div class="item-actions">
+                        <span class="weapon-roll">1{{this.system.damageDie}}</span>
+                        {{#if this.showAmmoState}}<span class="weapon-ammo">{{this.ammoMagazine}} / {{this.ammoCapacityDisplay}}</span>{{/if}}
+                        {{#if this.showReloadButton}}<button type="button" class="weapon-reload {{#if this.reloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                        {{#if this.showItemReroll}}
+                          <button type="button" class="item-reroll">
+                            <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                          </button>
+                          <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                        {{/if}}
+                      </div>
+                      {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    </div>
+                  </li>
+                {{/each}}
+              </ol>
+            </div>
 
-        <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-gun"></i> {{localize "BLOODMAN.Equipment.Weapons"}}</div>
-          <div class="weapon-header-row">
-            <input type="text" name="system.equipment.armes" value="{{equipment.armes}}" />
-            <button type="button" class="weapon-simple-attack">{{localize "BLOODMAN.Common.SimpleAttack"}}</button>
-          </div>
-          <ol class="item-list weapon-list item-list-three-columns">
-            {{#each weapons}}
-              <li class="item item--stacked weapon-item" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                <img class="item-icon" src="{{this.img}}" />
-                <div class="item-body">
-                  <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
-                  <div class="item-actions">
-                    <span class="weapon-roll">1{{this.system.damageDie}}</span>
-                    {{#if this.showAmmoState}}<span class="weapon-ammo">{{this.ammoMagazine}} / {{this.ammoCapacityDisplay}}</span>{{/if}}
-                    {{#if this.showReloadButton}}<button type="button" class="weapon-reload {{#if this.reloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
-                    {{#if this.showItemReroll}}
-                      <button type="button" class="item-reroll">
-                        <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
-                      </button>
-                      <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
-                    {{/if}}
-                  </div>
-                  {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
-                </div>
-              </li>
-            {{/each}}
-          </ol>
-        </div>
+            <div class="equip-block">
+              <div class="equip-title"><i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}</div>
+              <div class="ammo-row">
+                <textarea
+                  class="bm-autogrow-field equip-autogrow-field"
+                  name="system.ammo.type"
+                  rows="1"
+                  data-autogrow="true"
+                  data-autogrow-min-rows="1"
+                  data-autogrow-max-rows="6"
+                  placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}"
+                  {{#unless canEditAmmoFields}}readonly{{/unless}}
+                >{{ammo.type}}</textarea>
+                <span class="ammo-inline-label">{{localize "BLOODMAN.Equipment.AmmoStockLabel"}}</span>
+                <input type="number" name="system.ammo.stock" min="0" step="1" value="{{ammo.stock}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoStockPlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
+              </div>
+            </div>
 
-        <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}</div>
-          <div class="ammo-row">
-            <input type="text" name="system.ammo.type" value="{{ammo.type}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
-            <span class="ammo-inline-label">{{localize "BLOODMAN.Equipment.AmmoStockLabel"}}</span>
-            <input type="number" name="system.ammo.stock" min="0" step="1" value="{{ammo.stock}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoStockPlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
-          </div>
-        </div>
-
-        <div class="equip-block">
-          <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> {{localize "BLOODMAN.Equipment.Protections"}}</div>
-          <input type="text" name="system.equipment.protections" value="{{equipment.protections}}" />
-          <ol class="item-list">
-            {{#each protections}}
-              <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                <img class="item-icon" src="{{this.img}}" />
-                <div class="item-body">
-                  <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
-                  <div class="item-actions">
-                    <span class="item-chip item-meta">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
-                  </div>
-                  {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
-                </div>
-              </li>
-            {{/each}}
-          </ol>
-        </div>
+            <div class="equip-block">
+              <div class="equip-title"><i class="fa-solid fa-shield-halved"></i> {{localize "BLOODMAN.Equipment.Protections"}}</div>
+              <textarea
+                class="bm-autogrow-field equip-autogrow-field"
+                name="system.equipment.protections"
+                rows="1"
+                data-autogrow="true"
+                data-autogrow-min-rows="1"
+                data-autogrow-max-rows="6"
+              >{{equipment.protections}}</textarea>
+              <ol class="item-list" data-carry-column="equipment" data-reorder-scope="carry-column" data-accepted-types="protection">
+                {{#each protections}}
+                  <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
+                    <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
+                    <img class="item-icon" src="{{this.img}}" />
+                    <div class="item-body">
+                      <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
+                      <div class="item-actions">
+                        <span class="item-chip item-meta">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
+                      </div>
+                      {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    </div>
+                  </li>
+                {{/each}}
+              </ol>
+            </div>
 
           </div>
           <div class="equipment-column equipment-column-secondary">
 
-        <div class="equip-block">
+        <div class="equip-block equip-block-objects">
           <div class="equip-title equip-title-row">
             <span class="equip-title-label">
               <i class="fa-solid fa-box-open"></i> {{localize "BLOODMAN.Equipment.Objects"}}
@@ -361,62 +383,109 @@
               </span>
             {{/if}}
           </div>
-          <input type="text" name="system.equipment.objets" value="{{equipment.objets}}" />
-          <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
-            {{#each objects}}
-              <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                <img class="item-icon" src="{{this.img}}" />
-                <div class="item-body">
-                  <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
-                  <div class="item-actions">
-                    {{#if this.system.mark}}<span class="item-chip item-mark">{{this.system.mark}}</span>{{/if}}
-                    {{#if this.system.noteSmall}}<span class="item-chip item-meta">{{this.system.noteSmall}}</span>{{/if}}
-                    {{#if this.system.useEnabled}}<span class="item-use">{{localize "BLOODMAN.Common.Use"}}</span>{{/if}}
+          <textarea
+            class="bm-autogrow-field equip-autogrow-field"
+            name="system.equipment.objets"
+            rows="1"
+            data-autogrow="true"
+            data-autogrow-min-rows="1"
+            data-autogrow-max-rows="6"
+          >{{equipment.objets}}</textarea>
+          <div class="objects-bag-layout">
+            <ol class="item-list objects-column-list objects-column-list-one" data-carry-column="objects-1" data-column-capacity="5" data-reorder-scope="carry-column" data-accepted-types="arme,objet,protection,ration,soin">
+              {{#each objectColumnOneItems}}
+                <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
+                  <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
+                  <img class="item-icon" src="{{this.img}}" />
+                  <div class="item-body">
+                    <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
+                    <div class="item-actions">
+                      {{#if this.system.mark}}<span class="item-chip item-mark">{{this.system.mark}}</span>{{/if}}
+                      {{#if this.system.noteSmall}}<span class="item-chip item-meta">{{this.system.noteSmall}}</span>{{/if}}
+                      {{#if this.bagProtectionLabel}}<span class="item-chip item-meta">{{this.bagProtectionLabel}}</span>{{/if}}
+                      {{#if this.bagActionLabel}}<span class="{{this.bagActionClass}}">{{this.bagActionLabel}}</span>{{/if}}
+                      {{#if this.bagShowAmmoState}}<span class="weapon-ammo">{{this.bagAmmoMagazine}} / {{this.bagAmmoCapacityDisplay}}</span>{{/if}}
+                      {{#if this.bagShowReloadButton}}<button type="button" class="weapon-reload {{#if this.bagReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                      {{#if this.showItemReroll}}
+                        <button type="button" class="item-reroll">
+                          <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                        </button>
+                        <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                      {{/if}}
+                    </div>
+                    {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
                   </div>
-                  {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
-                </div>
-              </li>
-            {{/each}}
-          </ol>
+                </li>
+              {{/each}}
+            </ol>
 
-          <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
-            {{#each soins}}
-              <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                <img class="item-icon" src="{{this.img}}" />
-                <div class="item-body">
-                  <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
-                  <div class="item-actions">
-                    <span class="item-use">{{#if this.system.healDie}}1{{this.system.healDie}}{{else}}1d4{{/if}}</span>
+            <ol class="item-list objects-column-list objects-column-list-two" data-carry-column="objects-2" data-column-capacity="5" data-reorder-scope="carry-column" data-accepted-types="arme,objet,protection,ration,soin">
+              {{#each objectColumnTwoItems}}
+                <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
+                  <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
+                  <img class="item-icon" src="{{this.img}}" />
+                  <div class="item-body">
+                    <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
+                    <div class="item-actions">
+                      {{#if this.system.mark}}<span class="item-chip item-mark">{{this.system.mark}}</span>{{/if}}
+                      {{#if this.system.noteSmall}}<span class="item-chip item-meta">{{this.system.noteSmall}}</span>{{/if}}
+                      {{#if this.bagProtectionLabel}}<span class="item-chip item-meta">{{this.bagProtectionLabel}}</span>{{/if}}
+                      {{#if this.bagActionLabel}}<span class="{{this.bagActionClass}}">{{this.bagActionLabel}}</span>{{/if}}
+                      {{#if this.bagShowAmmoState}}<span class="weapon-ammo">{{this.bagAmmoMagazine}} / {{this.bagAmmoCapacityDisplay}}</span>{{/if}}
+                      {{#if this.bagShowReloadButton}}<button type="button" class="weapon-reload {{#if this.bagReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                      {{#if this.showItemReroll}}
+                        <button type="button" class="item-reroll">
+                          <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                        </button>
+                        <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                      {{/if}}
+                    </div>
+                    {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
                   </div>
-                  {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
-                </div>
-              </li>
-            {{/each}}
-          </ol>
+                </li>
+              {{/each}}
+            </ol>
 
-          <ol class="item-list {{#if equipmentThreeColumns}}item-list-three-columns{{/if}}">
-            {{#each rations}}
-              <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
-                <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
-                <img class="item-icon" src="{{this.img}}" />
-                <div class="item-body">
-                  <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
-                  <div class="item-actions">
-                    <span class="item-use">{{localize "BLOODMAN.Common.Eat"}}</span>
+            <ol class="item-list objects-bag-list objects-column-list {{#unless bagSlotsEnabled}}is-disabled{{/unless}}" data-carry-column="bag" data-column-capacity="5" data-reorder-scope="carry-column" data-accepted-types="arme,objet,protection,ration,soin">
+              {{#each bagItems}}
+                <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
+                  <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
+                  <img class="item-icon" src="{{this.img}}" />
+                  <div class="item-body">
+                    <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
+                    <div class="item-actions">
+                      {{#if this.system.mark}}<span class="item-chip item-mark">{{this.system.mark}}</span>{{/if}}
+                      {{#if this.system.noteSmall}}<span class="item-chip item-meta">{{this.system.noteSmall}}</span>{{/if}}
+                      {{#if this.bagProtectionLabel}}<span class="item-chip item-meta">{{this.bagProtectionLabel}}</span>{{/if}}
+                      {{#if this.bagActionLabel}}<span class="{{this.bagActionClass}}">{{this.bagActionLabel}}</span>{{/if}}
+                      {{#if this.bagShowAmmoState}}<span class="weapon-ammo">{{this.bagAmmoMagazine}} / {{this.bagAmmoCapacityDisplay}}</span>{{/if}}
+                      {{#if this.bagShowReloadButton}}<button type="button" class="weapon-reload {{#if this.bagReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                      {{#if this.showItemReroll}}
+                        <button type="button" class="item-reroll">
+                          <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                        </button>
+                        <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                      {{/if}}
+                    </div>
+                    {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
                   </div>
-                  {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
-                </div>
-              </li>
-            {{/each}}
-          </ol>
+                </li>
+              {{/each}}
+            </ol>
+          </div>
         </div>
 
         <div class="equip-block">
           <div class="equip-title"><i class="fa-solid fa-coins"></i> {{localize "BLOODMAN.Equipment.Currencies"}}</div>
           <div class="currency-row">
-            <input type="text" name="system.equipment.monnaies" value="{{equipment.monnaies}}" />
+            <textarea
+              class="bm-autogrow-field equip-autogrow-field"
+              name="system.equipment.monnaies"
+              rows="1"
+              data-autogrow="true"
+              data-autogrow-min-rows="1"
+              data-autogrow-max-rows="6"
+            >{{equipment.monnaies}}</textarea>
             <span class="currency-current-label">{{localize "BLOODMAN.Equipment.CurrencyCurrentLabel"}}</span>
             <input type="text" name="system.equipment.monnaiesActuel" value="{{equipment.monnaiesActuel}}" />
           </div>
@@ -424,7 +493,14 @@
 
         <div class="equip-block" data-transport-drop>
           <div class="equip-title"><i class="fa-solid fa-truck"></i> {{localize "BLOODMAN.Equipment.Transports"}}</div>
-          <input type="text" name="system.equipment.transports" value="{{equipment.transports}}" />
+          <textarea
+            class="bm-autogrow-field equip-autogrow-field"
+            name="system.equipment.transports"
+            rows="1"
+            data-autogrow="true"
+            data-autogrow-min-rows="1"
+            data-autogrow-max-rows="6"
+          >{{equipment.transports}}</textarea>
           <ol class="item-list weapon-list">
             {{#each transportNpcs}}
               <li class="item weapon-item" data-transport-npc-ref="{{this.ref}}">

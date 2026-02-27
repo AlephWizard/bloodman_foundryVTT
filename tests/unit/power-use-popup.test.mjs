@@ -73,7 +73,7 @@ async function run() {
     requesterUserId: "u1",
     viewerIds: []
   });
-  assert.equal(cannotReceive, false);
+  assert.equal(cannotReceive, true);
 
   const shown = hooks.showPowerUsePopup({
     actorName: "Hero",

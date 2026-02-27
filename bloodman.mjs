@@ -149,6 +149,19 @@ function safeWarn(message) {
   }
 }
 
+function getActorPlayerViewerIds(actor) {
+  if (!actor) return [];
+  const ownerLevel = Number(CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
+  return Array.from(game?.users || [])
+    .filter(user => {
+      if (!user?.active || user?.isGM) return false;
+      if (typeof actor?.testUserPermission !== "function") return false;
+      return actor.testUserPermission(user, ownerLevel);
+    })
+    .map(user => String(user?.id || "").trim())
+    .filter(Boolean);
+}
+
 function formatMultilineTextToHtml(value) {
   const raw = String(value || "");
   if (!raw.trim()) return "";
@@ -2536,10 +2549,36 @@ const SYSTEM_ROOT_PATH = `systems/${SYSTEM_ID}`;
 const SYSTEM_SOCKET = `system.${SYSTEM_ID}`;
 const CHAOS_DICE_ICON_SRC = `${SYSTEM_ROOT_PATH}/images/d20_destin.svg`;
 const CHAOS_DICE_ICON_FALLBACK_SRC = "icons/svg/d20.svg";
-const CARRIED_ITEM_LIMIT_BASE = 10;
-const CARRIED_ITEM_LIMIT_WITH_BAG = 15;
+const CARRIED_ITEMS_PER_MAIN_COLUMN = 5;
+const CARRIED_MAIN_COLUMN_COUNT = 2;
+const CARRIED_BAG_COLUMN_COUNT = 1;
+const CARRIED_ITEM_LIMIT_BASE = CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_MAIN_COLUMN_COUNT;
+const CARRIED_ITEM_LIMIT_WITH_BAG = CARRIED_ITEM_LIMIT_BASE + (CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_BAG_COLUMN_COUNT);
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
-const CARRIED_ITEM_TYPES = new Set(["arme", "objet", "ration", "soin"]);
+const CARRIED_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
+const BAG_ZONE_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
+const BAG_ZONE_FLAG_KEY = "inBag";
+const CARRY_COLUMN_FLAG_KEY = "carryColumn";
+const CARRY_COLUMN_EQUIPMENT = "equipment";
+const CARRY_COLUMN_OBJECTS_ONE = "objects-1";
+const CARRY_COLUMN_OBJECTS_TWO = "objects-2";
+const CARRY_COLUMN_BAG = "bag";
+const CARRY_COLUMN_SET = new Set([
+  CARRY_COLUMN_EQUIPMENT,
+  CARRY_COLUMN_OBJECTS_ONE,
+  CARRY_COLUMN_OBJECTS_TWO,
+  CARRY_COLUMN_BAG
+]);
+const CARRY_OBJECT_COLUMNS = [
+  CARRY_COLUMN_OBJECTS_ONE,
+  CARRY_COLUMN_OBJECTS_TWO
+];
+const CARRY_COLUMN_CAPACITY = Object.freeze({
+  [CARRY_COLUMN_OBJECTS_ONE]: CARRIED_ITEMS_PER_MAIN_COLUMN,
+  [CARRY_COLUMN_OBJECTS_TWO]: CARRIED_ITEMS_PER_MAIN_COLUMN,
+  [CARRY_COLUMN_BAG]: CARRIED_ITEMS_PER_MAIN_COLUMN
+});
+const CARRY_COLUMN_FULL_REASON = "colonne pleine";
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
 const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
@@ -3651,6 +3690,7 @@ const powerUsePopupHooks = buildPowerUsePopupHooks({
   systemSocket: SYSTEM_SOCKET,
   getCurrentUser: () => game.user,
   getActivePrivilegedOperatorIds,
+  getActorPlayerViewerIds,
   normalizeRollDieFormula,
   toBooleanFlag,
   toFiniteNumber,
@@ -5341,26 +5381,579 @@ class BloodmanActorSheet extends BaseActorSheet {
     return Math.max(1, Math.floor(rawColumns));
   }
 
+  getItemListBagZoneFromElement(element) {
+    const list = element?.matches?.(".item-list")
+      ? element
+      : element?.closest?.(".item-list");
+    if (!list) return "";
+    const bagZone = String(list.dataset?.bagZone || list.getAttribute?.("data-bag-zone") || "").trim().toLowerCase();
+    return bagZone === "yes" || bagZone === "no" ? bagZone : "";
+  }
+
+  getItemListReorderScopeFromElement(element) {
+    const list = element?.matches?.(".item-list")
+      ? element
+      : element?.closest?.(".item-list");
+    if (!list) return "";
+    return String(list.dataset?.reorderScope || list.getAttribute?.("data-reorder-scope") || "").trim().toLowerCase();
+  }
+
+  getItemListAcceptedTypesFromElement(element) {
+    const list = element?.matches?.(".item-list")
+      ? element
+      : element?.closest?.(".item-list");
+    if (!list) return null;
+    const raw = String(list.dataset?.acceptedTypes || list.getAttribute?.("data-accepted-types") || "").trim().toLowerCase();
+    if (!raw) return null;
+    const types = raw
+      .split(",")
+      .map(entry => String(entry || "").trim().toLowerCase())
+      .filter(Boolean);
+    return types.length ? new Set(types) : null;
+  }
+
+  normalizeCarryColumn(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return CARRY_COLUMN_SET.has(normalized) ? normalized : "";
+  }
+
+  isCarryColumnAllowedForItemType(column, itemType, options = {}) {
+    const normalizedColumn = this.normalizeCarryColumn(column);
+    const normalizedType = String(itemType || "").trim().toLowerCase();
+    if (!normalizedColumn || !normalizedType || !CARRIED_ITEM_TYPES.has(normalizedType)) return false;
+    if (normalizedColumn === CARRY_COLUMN_EQUIPMENT) {
+      return normalizedType === "arme" || normalizedType === "protection";
+    }
+    if (normalizedColumn === CARRY_COLUMN_BAG) {
+      const bagEnabled = options?.bagEnabledOverride == null
+        ? this.isActorBagSlotsEnabled()
+        : Boolean(options.bagEnabledOverride);
+      return bagEnabled;
+    }
+    return normalizedColumn === CARRY_COLUMN_OBJECTS_ONE || normalizedColumn === CARRY_COLUMN_OBJECTS_TWO;
+  }
+
+  getItemListCarryColumnFromElement(element) {
+    const list = element?.matches?.(".item-list")
+      ? element
+      : element?.closest?.(".item-list");
+    if (!list) return "";
+    return this.normalizeCarryColumn(
+      list.dataset?.carryColumn || list.getAttribute?.("data-carry-column") || ""
+    );
+  }
+
+  getItemListColumnCapacityFromElement(element) {
+    const list = element?.matches?.(".item-list")
+      ? element
+      : element?.closest?.(".item-list");
+    const carryColumn = this.getItemListCarryColumnFromElement(list);
+    const raw = Number(list?.dataset?.columnCapacity || list?.getAttribute?.("data-column-capacity"));
+    if (Number.isFinite(raw) && raw > 0) return Math.max(1, Math.floor(raw));
+    if (!carryColumn) return Number.POSITIVE_INFINITY;
+    return this.getCarryColumnCapacity(carryColumn);
+  }
+
+  getCarryColumnCapacity(column, options = {}) {
+    const normalizedColumn = this.normalizeCarryColumn(column);
+    if (!normalizedColumn) return Number.POSITIVE_INFINITY;
+    if (normalizedColumn === CARRY_COLUMN_BAG) {
+      const bagEnabled = options?.bagEnabledOverride == null
+        ? this.isActorBagSlotsEnabled()
+        : Boolean(options.bagEnabledOverride);
+      return bagEnabled
+        ? CARRY_COLUMN_CAPACITY[CARRY_COLUMN_BAG]
+        : 0;
+    }
+    if (Object.prototype.hasOwnProperty.call(CARRY_COLUMN_CAPACITY, normalizedColumn)) {
+      return CARRY_COLUMN_CAPACITY[normalizedColumn];
+    }
+    return Number.POSITIVE_INFINITY;
+  }
+
+  getLegacyItemBagState(item) {
+    const flaggedValue = item?.getFlag?.(SYSTEM_ID, BAG_ZONE_FLAG_KEY);
+    if (flaggedValue !== undefined) return toCheckboxBoolean(flaggedValue, false);
+    return toCheckboxBoolean(item?.system?.inBag, false);
+  }
+
+  getExplicitItemCarryColumn(item) {
+    if (!item) return "";
+    const flaggedValue = item?.getFlag?.(SYSTEM_ID, CARRY_COLUMN_FLAG_KEY);
+    return this.normalizeCarryColumn(flaggedValue);
+  }
+
+  getItemCarryColumn(item, options = {}) {
+    if (!item) return "";
+    const bagEnabled = options?.bagEnabledOverride == null
+      ? this.isActorBagSlotsEnabled()
+      : Boolean(options.bagEnabledOverride);
+    const explicitColumn = this.getExplicitItemCarryColumn(item);
+    if (
+      explicitColumn
+      && this.isCarryColumnAllowedForItemType(explicitColumn, item?.type, { bagEnabledOverride: bagEnabled })
+    ) {
+      return explicitColumn;
+    }
+
+    const fallbackById = options?.fallbackById && typeof options.fallbackById === "object"
+      ? options.fallbackById
+      : null;
+    const itemId = String(item.id || "").trim();
+    if (fallbackById && itemId && typeof fallbackById[itemId] === "string") {
+      const fallbackColumn = this.normalizeCarryColumn(fallbackById[itemId]);
+      if (fallbackColumn) return fallbackColumn;
+    }
+
+    if (this.getLegacyItemBagState(item) && bagEnabled) return CARRY_COLUMN_BAG;
+    const itemType = String(item?.type || "").trim().toLowerCase();
+    if (itemType === "arme" || itemType === "protection") return CARRY_COLUMN_EQUIPMENT;
+    if (itemType === "objet" || itemType === "ration" || itemType === "soin") return CARRY_COLUMN_OBJECTS_ONE;
+    return CARRY_COLUMN_EQUIPMENT;
+  }
+
+  isBagZoneSupportedItemType(itemType) {
+    const normalizedType = String(itemType || "").trim().toLowerCase();
+    return BAG_ZONE_ITEM_TYPES.has(normalizedType);
+  }
+
+  isItemInBag(item) {
+    const explicitColumn = this.getExplicitItemCarryColumn(item);
+    if (explicitColumn) return explicitColumn === CARRY_COLUMN_BAG;
+    return this.getLegacyItemBagState(item);
+  }
+
+  async setItemCarryColumn(item, column, options = {}) {
+    if (!item || !this.isBagZoneSupportedItemType(item.type)) return false;
+    const nextColumn = this.normalizeCarryColumn(column);
+    if (!nextColumn) return false;
+    const bagEnabled = options?.bagEnabledOverride == null
+      ? this.isActorBagSlotsEnabled()
+      : Boolean(options.bagEnabledOverride);
+    if (!this.isCarryColumnAllowedForItemType(nextColumn, item.type, { bagEnabledOverride: bagEnabled })) return false;
+
+    const itemId = String(item.id || "").trim();
+    if (!itemId) return false;
+    const nextInBag = nextColumn === CARRY_COLUMN_BAG;
+    const currentColumn = this.getItemCarryColumn(item);
+    const currentInBag = this.isItemInBag(item);
+    if (currentColumn === nextColumn && currentInBag === nextInBag) return true;
+
+    const carryFlagPath = `flags.${SYSTEM_ID}.${CARRY_COLUMN_FLAG_KEY}`;
+    const bagFlagPath = `flags.${SYSTEM_ID}.${BAG_ZONE_FLAG_KEY}`;
+    const payload = {
+      _id: itemId,
+      [carryFlagPath]: nextColumn,
+      [bagFlagPath]: nextInBag
+    };
+
+    if (item.isOwner || this.actor?.isOwner || game.user?.isGM) {
+      try {
+        await item.setFlag(SYSTEM_ID, CARRY_COLUMN_FLAG_KEY, nextColumn);
+        await item.setFlag(SYSTEM_ID, BAG_ZONE_FLAG_KEY, nextInBag);
+        return true;
+      } catch (_error) {
+        // Falls through to embedded update fallback.
+      }
+    }
+
+    if (this.actor?.isOwner || game.user?.isGM) {
+      try {
+        await this.actor.updateEmbeddedDocuments("Item", [payload]);
+        return true;
+      } catch (_error) {
+        // Falls through to warning below when fallback update is not permitted.
+      }
+    }
+
+    safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
+    return false;
+  }
+
+  async setItemBagState(item, inBag) {
+    if (!item || !this.isBagZoneSupportedItemType(item.type)) return false;
+    const nextInBag = Boolean(inBag);
+    const targetColumn = nextInBag ? CARRY_COLUMN_BAG : CARRY_COLUMN_EQUIPMENT;
+    return this.setItemCarryColumn(item, targetColumn);
+  }
+
+  isActorBagSlotsEnabled(actorLike = null) {
+    const actor = actorLike || this.actor;
+    return Boolean(actor?.system?.equipment?.bagSlotsEnabled);
+  }
+
+  getCarriedOutsideBagItems(options = {}) {
+    const excludeItemId = String(options?.excludeItemId || "").trim();
+    const carriedItems = this.actor?.items
+      ?.filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()))
+      || [];
+    return carriedItems.filter(item => {
+      if (!item) return false;
+      const itemId = String(item.id || "").trim();
+      if (excludeItemId && itemId === excludeItemId) return false;
+      if (!this.isBagZoneSupportedItemType(item.type)) return true;
+      return !this.isItemInBag(item);
+    });
+  }
+
+  getCarriedColumnState(options = {}) {
+    const bagEnabled = options?.bagEnabledOverride == null
+      ? this.isActorBagSlotsEnabled()
+      : Boolean(options.bagEnabledOverride);
+    const sourceItems = Array.isArray(options?.items)
+      ? options.items
+      : (this.actor?.items || []).filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()));
+
+    const carriedItems = sourceItems
+      .filter(item => item && CARRIED_ITEM_TYPES.has(String(item.type || "").trim().toLowerCase()))
+      .sort((left, right) => {
+        const leftSort = toFiniteNumber(left?.sort, 0);
+        const rightSort = toFiniteNumber(right?.sort, 0);
+        if (leftSort !== rightSort) return leftSort - rightSort;
+        return String(left?.id || "").localeCompare(String(right?.id || ""));
+      });
+
+    const columns = {
+      [CARRY_COLUMN_EQUIPMENT]: [],
+      [CARRY_COLUMN_OBJECTS_ONE]: [],
+      [CARRY_COLUMN_OBJECTS_TWO]: [],
+      [CARRY_COLUMN_BAG]: []
+    };
+    const byId = {};
+    const deferredItems = [];
+    const placeInColumn = (item, requestedColumn) => {
+      const itemId = String(item?.id || "").trim();
+      if (!itemId) return false;
+      const column = this.normalizeCarryColumn(requestedColumn) || CARRY_COLUMN_EQUIPMENT;
+      const itemType = String(item?.type || "").trim().toLowerCase();
+      if (!this.isCarryColumnAllowedForItemType(column, itemType, { bagEnabledOverride: bagEnabled })) return false;
+      const capacity = this.getCarryColumnCapacity(column, { bagEnabledOverride: bagEnabled });
+      if (Number.isFinite(capacity) && columns[column].length >= capacity) return false;
+      columns[column].push(item);
+      byId[itemId] = column;
+      return true;
+    };
+
+    for (const item of carriedItems) {
+      const explicitColumn = this.getExplicitItemCarryColumn(item);
+      if (!explicitColumn) {
+        deferredItems.push(item);
+        continue;
+      }
+      if (!this.isCarryColumnAllowedForItemType(explicitColumn, item?.type, { bagEnabledOverride: bagEnabled })) {
+        deferredItems.push(item);
+        continue;
+      }
+      if (!placeInColumn(item, explicitColumn)) deferredItems.push(item);
+    }
+
+    for (const item of deferredItems) {
+      const itemType = String(item?.type || "").trim().toLowerCase();
+      const preferBag = this.getLegacyItemBagState(item);
+      if (preferBag && bagEnabled && placeInColumn(item, CARRY_COLUMN_BAG)) continue;
+
+      if (itemType === "arme" || itemType === "protection") {
+        placeInColumn(item, CARRY_COLUMN_EQUIPMENT);
+        continue;
+      }
+
+      const orderedObjectColumns = [...CARRY_OBJECT_COLUMNS].sort((left, right) => columns[left].length - columns[right].length);
+      let placed = false;
+      for (const column of orderedObjectColumns) {
+        if (placeInColumn(item, column)) {
+          placed = true;
+          break;
+        }
+      }
+      if (placed) continue;
+      if (bagEnabled && placeInColumn(item, CARRY_COLUMN_BAG)) continue;
+      placeInColumn(item, CARRY_COLUMN_EQUIPMENT);
+    }
+
+    return {
+      bagEnabled,
+      columns,
+      byId
+    };
+  }
+
+  async normalizeCarryColumnsAfterBagToggle(options = {}) {
+    const bagEnabled = options?.bagEnabledOverride == null
+      ? this.isActorBagSlotsEnabled()
+      : Boolean(options.bagEnabledOverride);
+    if (bagEnabled) return false;
+
+    let movedAny = false;
+    const state = this.getCarriedColumnState({ bagEnabledOverride: true });
+    const bagItems = [...(state.columns[CARRY_COLUMN_BAG] || [])];
+    for (const item of bagItems) {
+      const refreshed = this.getCarriedColumnState({ bagEnabledOverride: false });
+      let targetColumn = CARRY_COLUMN_OBJECTS_ONE;
+      if ((refreshed.columns[CARRY_COLUMN_OBJECTS_ONE] || []).length >= this.getCarryColumnCapacity(CARRY_COLUMN_OBJECTS_ONE)) {
+        targetColumn = CARRY_COLUMN_OBJECTS_TWO;
+      }
+      if ((refreshed.columns[targetColumn] || []).length >= this.getCarryColumnCapacity(targetColumn)) {
+        targetColumn = CARRY_COLUMN_EQUIPMENT;
+      }
+      const moved = await this.setItemCarryColumn(item, targetColumn, { bagEnabledOverride: false });
+      movedAny = movedAny || moved;
+    }
+    return movedAny;
+  }
+
+  getDropResultItemIds(dropResult) {
+    const asArray = Array.isArray(dropResult)
+      ? dropResult
+      : (dropResult ? [dropResult] : []);
+    return asArray
+      .map(entry => String(entry?.id || entry?._id || "").trim())
+      .filter(Boolean);
+  }
+
+  buildEquipmentStateItemPayload(item) {
+    if (!item) return null;
+    const itemData = item?.toObject?.() || {};
+    const itemType = String(item.type || itemData.type || "").trim().toLowerCase();
+    const itemSystem = itemData?.system && typeof itemData.system === "object"
+      ? itemData.system
+      : {};
+    return {
+      id: String(item.id || itemData._id || "").trim(),
+      type: itemType || "objet",
+      nom: String(item.name || itemData.name || "").trim(),
+      description: String(itemSystem.note || itemSystem.notes || "").trim(),
+      "caractéristiques": itemSystem,
+      PP: Math.max(0, Math.floor(toFiniteNumber(itemSystem.pp, 0)))
+    };
+  }
+
+  buildEquipmentStatePayload(options = {}) {
+    const bagEnabled = options?.bagEnabledOverride == null
+      ? this.isActorBagSlotsEnabled()
+      : Boolean(options.bagEnabledOverride);
+    const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    const equipementItems = (state.columns[CARRY_COLUMN_EQUIPMENT] || [])
+      .map(item => this.buildEquipmentStateItemPayload(item))
+      .filter(Boolean);
+    const objectsColumnOne = (state.columns[CARRY_COLUMN_OBJECTS_ONE] || [])
+      .map(item => this.buildEquipmentStateItemPayload(item))
+      .filter(Boolean);
+    const objectsColumnTwo = (state.columns[CARRY_COLUMN_OBJECTS_TWO] || [])
+      .map(item => this.buildEquipmentStateItemPayload(item))
+      .filter(Boolean);
+    const bagColumn = bagEnabled
+      ? (state.columns[CARRY_COLUMN_BAG] || [])
+        .map(item => this.buildEquipmentStateItemPayload(item))
+        .filter(Boolean)
+      : [];
+
+    const ammoState = normalizeAmmoState(
+      foundry.utils.mergeObject(buildDefaultAmmo(), this.actor?.system?.ammo || {}, { inplace: false }),
+      {
+        fallback: buildDefaultAmmo(),
+        capacity: getActorAmmoCapacityLimit(this.actor)
+      }
+    );
+    equipementItems.unshift({
+      id: "ammo",
+      type: "munition",
+      nom: String(ammoState.type || "Munitions"),
+      description: "",
+      "caractéristiques": {
+        type: String(ammoState.type || ""),
+        stock: Math.max(0, Math.floor(toFiniteNumber(ammoState.stock, 0)))
+      },
+      PP: 0
+    });
+
+    return {
+      colonnes: {
+        equipement: equipementItems,
+        objets: [
+          objectsColumnOne,
+          objectsColumnTwo,
+          bagColumn
+        ]
+      }
+    };
+  }
+
+  buildCarryDropErrorResult(reason) {
+    return {
+      status: "error",
+      reason: String(reason || "").trim() || CARRY_COLUMN_FULL_REASON
+    };
+  }
+
+  buildCarryDropSuccessResult(options = {}) {
+    return {
+      status: "success",
+      updated_state: this.buildEquipmentStatePayload(options)
+    };
+  }
+
+  async enforceMainCarryOverflowToBag(options = {}) {
+    if (!this.actor || !isCarriedItemLimitedActorType(this.actor?.type)) return false;
+    const bagEnabled = options?.bagEnabledOverride == null
+      ? this.isActorBagSlotsEnabled()
+      : Boolean(options.bagEnabledOverride);
+    if (!bagEnabled) return false;
+    const mainSlotLimit = Math.max(0, Math.floor(toFiniteNumber(CARRIED_ITEM_LIMIT_BASE, 0)));
+    if (mainSlotLimit <= 0) return false;
+
+    const outsideItems = this.getCarriedOutsideBagItems();
+    const overflowCount = outsideItems.length - mainSlotLimit;
+    if (overflowCount <= 0) return false;
+
+    const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    const movableOverflowCandidates = outsideItems.filter(item => {
+      const itemId = String(item?.id || "").trim();
+      if (!itemId) return false;
+      const column = this.normalizeCarryColumn(state?.byId?.[itemId] || this.getItemCarryColumn(item, { fallbackById: state.byId }));
+      return column === CARRY_COLUMN_OBJECTS_ONE || column === CARRY_COLUMN_OBJECTS_TWO;
+    });
+    if (!movableOverflowCandidates.length) return false;
+
+    const preferredIds = new Set(
+      (Array.isArray(options?.preferredItemIds) ? options.preferredItemIds : [])
+        .map(entry => String(entry || "").trim())
+        .filter(Boolean)
+    );
+    const preferredItems = movableOverflowCandidates.filter(item => preferredIds.has(String(item.id || "").trim()));
+    const remainingItems = movableOverflowCandidates
+      .filter(item => !preferredIds.has(String(item.id || "").trim()))
+      .sort((left, right) => {
+        const leftSort = toFiniteNumber(left?.sort, 0);
+        const rightSort = toFiniteNumber(right?.sort, 0);
+        if (leftSort !== rightSort) return rightSort - leftSort;
+        return String(right?.id || "").localeCompare(String(left?.id || ""));
+      });
+    const overflowItems = [...preferredItems, ...remainingItems].slice(0, overflowCount);
+    if (!overflowItems.length) return false;
+
+    let movedAny = false;
+    for (const item of overflowItems) {
+      const moved = await this.setItemCarryColumn(item, CARRY_COLUMN_BAG, { bagEnabledOverride: bagEnabled });
+      movedAny = movedAny || moved;
+    }
+    return movedAny;
+  }
+
+  normalizeItemReorderPayload(payloadLike) {
+    const actorId = String(payloadLike?.actorId || "").trim();
+    const actorUuid = String(payloadLike?.actorUuid || "").trim();
+    const itemId = String(payloadLike?.itemId || "").trim();
+    const itemType = String(payloadLike?.itemType || "").trim().toLowerCase();
+    if (!actorId || !itemId || !itemType) return null;
+    return { actorId, actorUuid, itemId, itemType };
+  }
+
+  buildItemReorderPayloadFromDocumentDragData(dataLike) {
+    const rawData = dataLike && typeof dataLike === "object" ? dataLike : null;
+    if (!rawData) return null;
+
+    const rawUuid = String(rawData.uuid || rawData.documentUuid || "").trim();
+    let itemId = String(rawData.itemId || rawData._id || "").trim();
+    if (!itemId && rawUuid) {
+      const itemMatch = rawUuid.match(/Item\.([^\.]+)/);
+      itemId = String(itemMatch?.[1] || "").trim();
+    }
+    if (!itemId) return null;
+
+    const actorItem = this.actor?.items?.get(itemId) || null;
+    let actorId = String(rawData.actorId || "").trim();
+    if (!actorId && rawUuid) {
+      const tokenActorMatch = rawUuid.match(/Token\.[^\.]+\.Actor\.([^\.]+)/);
+      if (tokenActorMatch?.[1]) actorId = String(tokenActorMatch[1]).trim();
+      if (!actorId) {
+        const actorMatch = rawUuid.match(/Actor\.([^\.]+)/);
+        if (actorMatch?.[1]) actorId = String(actorMatch[1]).trim();
+      }
+    }
+    if (!actorId && actorItem) actorId = String(this.actor?.id || "").trim();
+
+    let itemType = String(rawData.itemType || rawData.type || "").trim().toLowerCase();
+    if (itemType === "item" || !itemType) itemType = String(actorItem?.type || "").trim().toLowerCase();
+    if (!itemType) return null;
+    if (String(this.actor?.id || "").trim() && actorId && actorId !== String(this.actor?.id || "").trim() && !actorItem) {
+      return null;
+    }
+    return this.normalizeItemReorderPayload({
+      actorId,
+      actorUuid: String(rawData.actorUuid || "").trim(),
+      itemId,
+      itemType
+    });
+  }
+
+  isItemReorderPayloadForCurrentActor(payloadLike) {
+    const payload = payloadLike && typeof payloadLike === "object" ? payloadLike : null;
+    if (!payload || !this.actor) return false;
+    const actorId = String(this.actor?.id || "").trim();
+    const payloadActorId = String(payload.actorId || "").trim();
+    const payloadItemId = String(payload.itemId || "").trim();
+    if (payloadActorId && actorId && payloadActorId === actorId) return true;
+    if (payloadItemId && this.actor.items?.has(payloadItemId)) return true;
+    return false;
+  }
+
+  getActiveItemReorderPayloadFromDom() {
+    const root = this.element;
+    if (!root?.length) return null;
+    const draggingNode = root.find("li.item[data-item-id].is-reorder-dragging").first();
+    if (!draggingNode.length) return null;
+    const li = draggingNode.get(0);
+    const item = this.getItemFromListElement(li);
+    if (!item) return null;
+    return this.normalizeItemReorderPayload({
+      actorId: String(this.actor?.id || "").trim(),
+      actorUuid: String(this.actor?.uuid || "").trim(),
+      itemId: String(item.id || "").trim(),
+      itemType: String(item.type || "").trim().toLowerCase()
+    });
+  }
+
   getItemReorderPayloadFromEvent(eventLike) {
     const event = eventLike?.originalEvent || eventLike;
     const transfer = event?.dataTransfer;
-    if (!transfer) return null;
-    const types = Array.from(transfer.types || []);
-    if (!types.includes("application/x-bloodman-item-reorder")) return null;
-    const rawPayload = transfer.getData("application/x-bloodman-item-reorder");
-    if (!rawPayload) return null;
-    let parsed = null;
-    try {
-      parsed = JSON.parse(rawPayload);
-    } catch (_error) {
-      return null;
+    if (transfer) {
+      let rawPayload = "";
+      try {
+        rawPayload = transfer.getData("application/x-bloodman-item-reorder");
+      } catch (_error) {
+        rawPayload = "";
+      }
+      if (rawPayload) {
+        try {
+          const parsed = JSON.parse(rawPayload);
+          const normalized = this.normalizeItemReorderPayload(parsed);
+          if (normalized) return normalized;
+        } catch (_error) {
+          // Falls back to in-memory payload when browser strips custom drag MIME types.
+        }
+      }
+
+      const plainTypes = ["text/plain", "text"];
+      for (const type of plainTypes) {
+        let rawText = "";
+        try {
+          rawText = transfer.getData(type);
+        } catch (_error) {
+          rawText = "";
+        }
+        if (!rawText) continue;
+        try {
+          const parsed = JSON.parse(rawText);
+          const normalized = this.buildItemReorderPayloadFromDocumentDragData(parsed);
+          if (normalized) return normalized;
+        } catch (_error) {
+          // Not JSON or not our drag payload.
+        }
+      }
     }
-    const actorId = String(parsed?.actorId || "").trim();
-    const actorUuid = String(parsed?.actorUuid || "").trim();
-    const itemId = String(parsed?.itemId || "").trim();
-    const itemType = String(parsed?.itemType || "").trim().toLowerCase();
-    if (!actorId || !itemId || !itemType) return null;
-    return { actorId, actorUuid, itemId, itemType };
+    const inMemoryPayload = this.normalizeItemReorderPayload(this._activeItemReorderPayload);
+    if (inMemoryPayload) return inMemoryPayload;
+    return this.getActiveItemReorderPayloadFromDom();
   }
 
   clearItemReorderVisualState(rootLike = null) {
@@ -5397,18 +5990,28 @@ class BloodmanActorSheet extends BaseActorSheet {
     const targetId = String(targetItem.id || "");
     if (!sourceId || !targetId || sourceId === targetId) return [];
     const sortBefore = options.sortBefore !== false;
-    const itemType = String(sourceItem.type || "").trim().toLowerCase();
-    if (!itemType || itemType !== String(targetItem.type || "").trim().toLowerCase()) return [];
+    const sourceType = String(sourceItem.type || "").trim().toLowerCase();
+    const targetType = String(targetItem.type || "").trim().toLowerCase();
+    const restrictToItemType = options.restrictToItemType !== false;
+    const scopeFilter = typeof options.scopeFilter === "function"
+      ? options.scopeFilter
+      : null;
+    if (!sourceType || !targetType) return [];
+    if (restrictToItemType && sourceType !== targetType) return [];
+    if (scopeFilter && (!scopeFilter(sourceItem) || !scopeFilter(targetItem))) return [];
+
+    const scopedSiblings = this.actor.items
+      .filter(entry => {
+        if (!entry) return false;
+        if (String(entry.id || "") === sourceId) return false;
+        if (restrictToItemType && String(entry.type || "").trim().toLowerCase() !== sourceType) return false;
+        if (scopeFilter && !scopeFilter(entry)) return false;
+        return true;
+      });
 
     if (globalThis.SortingHelpers?.performIntegerSort) {
       try {
-        const siblings = this.actor.items
-          .filter(entry => (
-            entry
-            && String(entry.type || "").trim().toLowerCase() === itemType
-            && String(entry.id || "") !== sourceId
-          ))
-          .map(entry => entry.toObject());
+        const siblings = scopedSiblings.map(entry => entry.toObject());
         return globalThis.SortingHelpers.performIntegerSort(sourceItem, {
           target: targetItem,
           siblings,
@@ -5420,8 +6023,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
     }
 
-    const ordered = this.actor.items
-      .filter(entry => String(entry?.type || "").trim().toLowerCase() === itemType && String(entry?.id || "") !== sourceId)
+    const ordered = [...scopedSiblings]
       .sort((left, right) => {
         const leftSort = toFiniteNumber(left?.sort, 0);
         const rightSort = toFiniteNumber(right?.sort, 0);
@@ -5468,11 +6070,139 @@ class BloodmanActorSheet extends BaseActorSheet {
     return sent;
   }
 
+  async handleCarryColumnDrop({
+    eventLike,
+    nativeEvent,
+    sourceItem,
+    list,
+    targetColumn
+  } = {}) {
+    if (!sourceItem || !(list instanceof HTMLElement)) return this.buildCarryDropErrorResult("operation invalide");
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
+    else nativeEvent?.stopPropagation?.();
+
+    const itemType = String(sourceItem.type || "").trim().toLowerCase();
+    if (!CARRIED_ITEM_TYPES.has(itemType)) return this.buildCarryDropErrorResult("operation invalide");
+    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
+    if (acceptedTypes && !acceptedTypes.has(itemType)) {
+      this.clearItemReorderVisualState();
+      return this.buildCarryDropErrorResult("type non autorise");
+    }
+
+    const bagEnabled = this.isActorBagSlotsEnabled();
+    const destinationColumn = this.normalizeCarryColumn(targetColumn);
+    if (!destinationColumn) return this.buildCarryDropErrorResult("operation invalide");
+    if (!this.isCarryColumnAllowedForItemType(destinationColumn, itemType, { bagEnabledOverride: bagEnabled })) {
+      this.clearItemReorderVisualState();
+      return this.buildCarryDropErrorResult("type non autorise");
+    }
+    if (destinationColumn === CARRY_COLUMN_BAG && !bagEnabled) {
+      ui.notifications?.warn("Le sac n'est pas actif.");
+      this.clearItemReorderVisualState();
+      return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
+    }
+
+    const stateBefore = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    const sourceId = String(sourceItem.id || "").trim();
+    const sourceColumn = this.getItemCarryColumn(sourceItem, { fallbackById: stateBefore.byId });
+    const destinationCapacity = this.getItemListColumnCapacityFromElement(list);
+    if (
+      destinationColumn !== sourceColumn
+      && Number.isFinite(destinationCapacity)
+      && destinationCapacity > 0
+    ) {
+      const destinationCount = (stateBefore.columns[destinationColumn] || [])
+        .filter(entry => String(entry?.id || "").trim() !== sourceId)
+        .length;
+      if (destinationCount >= destinationCapacity) {
+        ui.notifications?.warn("Colonne pleine.");
+        this.clearItemReorderVisualState();
+        return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
+      }
+    }
+
+    let movedAcrossColumns = false;
+    if (destinationColumn !== sourceColumn) {
+      const moved = await this.setItemCarryColumn(sourceItem, destinationColumn, {
+        bagEnabledOverride: bagEnabled
+      });
+      if (!moved) {
+        this.clearItemReorderVisualState();
+        return this.buildCarryDropErrorResult("deplacement impossible");
+      }
+      movedAcrossColumns = true;
+    }
+
+    const latestSourceItem = this.actor?.items?.get(sourceId) || sourceItem;
+    const stateAfterMove = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    let targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
+    if (!targetLi || !list.contains(targetLi)) targetLi = null;
+    let targetItem = targetLi ? this.getItemFromListElement(targetLi) : null;
+    const targetType = String(targetItem?.type || "").trim().toLowerCase();
+    if (targetItem && !CARRIED_ITEM_TYPES.has(targetType)) targetItem = null;
+
+    let sortBefore = false;
+    if (!targetItem || String(targetItem.id || "") === sourceId) {
+      targetItem = this.actor?.items
+        ?.filter(entry => (
+          entry
+          && CARRIED_ITEM_TYPES.has(String(entry.type || "").trim().toLowerCase())
+          && String(entry.id || "") !== sourceId
+          && (!acceptedTypes || acceptedTypes.has(String(entry.type || "").trim().toLowerCase()))
+          && this.getItemCarryColumn(entry, { fallbackById: stateAfterMove.byId }) === destinationColumn
+        ))
+        .sort((left, right) => {
+          const leftSort = toFiniteNumber(left?.sort, 0);
+          const rightSort = toFiniteNumber(right?.sort, 0);
+          if (leftSort !== rightSort) return leftSort - rightSort;
+          return String(left?.id || "").localeCompare(String(right?.id || ""));
+        })
+        .at(-1) || null;
+      sortBefore = false;
+    } else {
+      const columns = this.getItemListColumnCountFromElement(list);
+      sortBefore = this.getItemReorderSortBefore(nativeEvent, targetLi, columns);
+    }
+
+    if (!targetItem || String(targetItem.id || "") === sourceId) {
+      this.clearItemReorderVisualState();
+      if (movedAcrossColumns) this.render(false);
+      return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
+    }
+
+    const scopeFilter = entry => {
+      if (!entry) return false;
+      const entryType = String(entry.type || "").trim().toLowerCase();
+      if (!CARRIED_ITEM_TYPES.has(entryType)) return false;
+      if (acceptedTypes && !acceptedTypes.has(entryType)) return false;
+      return this.getItemCarryColumn(entry, { fallbackById: stateAfterMove.byId }) === destinationColumn;
+    };
+    const updates = this.buildItemReorderUpdates(latestSourceItem, targetItem, {
+      sortBefore,
+      restrictToItemType: false,
+      scopeFilter
+    });
+    if (!updates.length) {
+      this.clearItemReorderVisualState();
+      if (movedAcrossColumns) this.render(false);
+      return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
+    }
+
+    const applied = await this.applyActorItemOrderUpdates(updates);
+    this.clearItemReorderVisualState();
+    if (applied || movedAcrossColumns) this.render(false);
+    return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
+  }
+
   onItemReorderDragStart(eventLike) {
-    const event = eventLike?.originalEvent || eventLike;
-    const li = event?.currentTarget?.closest?.("li.item[data-item-id]");
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const delegatedTarget = eventLike?.currentTarget;
+    const li = delegatedTarget?.closest?.("li.item[data-item-id]")
+      || nativeEvent?.target?.closest?.("li.item[data-item-id]");
     const item = this.getItemFromListElement(li);
-    if (!li || !item || !event?.dataTransfer) return;
+    if (!li || !item || !nativeEvent?.dataTransfer) return;
 
     const payload = {
       actorId: String(this.actor?.id || ""),
@@ -5482,47 +6212,113 @@ class BloodmanActorSheet extends BaseActorSheet {
     };
     if (!payload.actorId || !payload.itemId || !payload.itemType) return;
 
+    if (this._itemReorderPayloadClearTimer) {
+      clearTimeout(this._itemReorderPayloadClearTimer);
+      this._itemReorderPayloadClearTimer = null;
+    }
+    this._activeItemReorderPayload = payload;
     try {
-      event.dataTransfer.setData("application/x-bloodman-item-reorder", JSON.stringify(payload));
-      event.dataTransfer.effectAllowed = "move";
+      nativeEvent.dataTransfer.setData("application/x-bloodman-item-reorder", JSON.stringify(payload));
+      nativeEvent.dataTransfer.effectAllowed = "move";
     } catch (_error) {
-      return;
+      // Keep in-memory payload fallback for browsers that refuse custom MIME types.
     }
     li.classList.add("is-reorder-dragging");
   }
 
   onItemReorderDragOver(eventLike) {
-    const event = eventLike?.originalEvent || eventLike;
-    const payload = this.getItemReorderPayloadFromEvent(event);
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const payload = this.getItemReorderPayloadFromEvent(eventLike);
     if (!payload) return;
-    if (payload.actorId !== String(this.actor?.id || "")) return;
+    if (!this.isItemReorderPayloadForCurrentActor(payload)) return;
 
-    const list = event?.currentTarget;
+    const list = eventLike?.currentTarget instanceof HTMLElement
+      ? eventLike.currentTarget
+      : nativeEvent?.target?.closest?.("ol.item-list");
     if (!(list instanceof HTMLElement)) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    const bagZone = this.getItemListBagZoneFromElement(list);
+    const carryColumn = this.getItemListCarryColumnFromElement(list);
+    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
+    const reorderScope = this.getItemListReorderScopeFromElement(list);
+    const isCarryMixedScope = reorderScope === "carry-mixed";
+    if (carryColumn) {
+      if (!CARRIED_ITEM_TYPES.has(payload.itemType)) {
+        this.clearItemReorderVisualState();
+        return;
+      }
+      if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
+        this.clearItemReorderVisualState();
+        return;
+      }
+      const sourceItem = this.actor?.items?.get(String(payload.itemId || "").trim()) || null;
+      const state = this.getCarriedColumnState();
+      const sourceColumn = sourceItem
+        ? this.getItemCarryColumn(sourceItem, { fallbackById: state.byId })
+        : "";
+      const capacity = this.getItemListColumnCapacityFromElement(list);
+      if (
+        sourceColumn !== carryColumn
+        && Number.isFinite(capacity)
+        && capacity > 0
+      ) {
+        const currentCount = (state.columns[carryColumn] || [])
+          .filter(entry => String(entry?.id || "").trim() !== String(payload.itemId || "").trim())
+          .length;
+        if (currentCount >= capacity) {
+          this.clearItemReorderVisualState();
+          return;
+        }
+      }
+    }
+    if (acceptedTypes && !acceptedTypes.has(payload.itemType)) {
+      this.clearItemReorderVisualState();
+      return;
+    }
+    if (bagZone && !this.isBagZoneSupportedItemType(payload.itemType)) {
+      this.clearItemReorderVisualState();
+      return;
+    }
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "move";
 
     this.clearItemReorderVisualState();
     list.classList.add("is-reorder-target");
-    const targetLi = event?.target?.closest?.("li.item[data-item-id]");
+    const targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
     if (!targetLi || !list.contains(targetLi)) return;
     const targetItem = this.getItemFromListElement(targetLi);
-    if (!targetItem || String(targetItem.type || "").trim().toLowerCase() !== payload.itemType) return;
+    const targetType = String(targetItem?.type || "").trim().toLowerCase();
+    if (!targetItem) return;
+    if (acceptedTypes && !acceptedTypes.has(targetType)) return;
+    if (carryColumn) {
+      if (!CARRIED_ITEM_TYPES.has(targetType)) return;
+    } else if (isCarryMixedScope) {
+      if (!this.isBagZoneSupportedItemType(targetType)) return;
+    } else if (targetType !== payload.itemType) {
+      return;
+    }
 
     const columns = this.getItemListColumnCountFromElement(list);
-    const sortBefore = this.getItemReorderSortBefore(event, targetLi, columns);
+    const sortBefore = this.getItemReorderSortBefore(nativeEvent, targetLi, columns);
     targetLi.classList.add(sortBefore ? "is-reorder-drop-before" : "is-reorder-drop-after");
   }
 
   onItemReorderDragEnd() {
+    if (this._itemReorderPayloadClearTimer) clearTimeout(this._itemReorderPayloadClearTimer);
+    this._itemReorderPayloadClearTimer = setTimeout(() => {
+      this._activeItemReorderPayload = null;
+      this._itemReorderPayloadClearTimer = null;
+    }, 200);
     this.clearItemReorderVisualState();
   }
 
   onItemReorderDragLeave(eventLike) {
-    const event = eventLike?.originalEvent || eventLike;
-    const list = event?.currentTarget;
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const list = eventLike?.currentTarget instanceof HTMLElement
+      ? eventLike.currentTarget
+      : nativeEvent?.target?.closest?.("ol.item-list");
     if (!(list instanceof HTMLElement)) return;
-    const relatedTarget = event?.relatedTarget;
+    const relatedTarget = nativeEvent?.relatedTarget;
     if (relatedTarget instanceof HTMLElement && list.contains(relatedTarget)) return;
     list.classList.remove("is-reorder-target");
     list.querySelectorAll(".is-reorder-drop-before").forEach(node => node.classList.remove("is-reorder-drop-before"));
@@ -5530,69 +6326,177 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async onItemReorderDrop(eventLike) {
-    const event = eventLike?.originalEvent || eventLike;
-    const payload = this.getItemReorderPayloadFromEvent(event);
-    if (!payload) return;
-    if (payload.actorId !== String(this.actor?.id || "")) return;
-
-    const sourceItem = this.actor?.items?.get(payload.itemId) || null;
-    if (!sourceItem) return;
-
-    const list = event?.currentTarget;
-    if (!(list instanceof HTMLElement)) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    let targetLi = event?.target?.closest?.("li.item[data-item-id]");
-    if (!targetLi || !list.contains(targetLi)) targetLi = null;
-    let targetItem = targetLi ? this.getItemFromListElement(targetLi) : null;
-    let sortBefore = false;
-
-    const sourceType = String(sourceItem.type || "").trim().toLowerCase();
-    if (!targetItem || String(targetItem.type || "").trim().toLowerCase() !== sourceType) {
-      const fallbackTarget = this.actor.items
-        .filter(entry => String(entry?.type || "").trim().toLowerCase() === sourceType && String(entry?.id || "") !== String(sourceItem.id || ""))
-        .sort((left, right) => {
-          const leftSort = toFiniteNumber(left?.sort, 0);
-          const rightSort = toFiniteNumber(right?.sort, 0);
-          if (leftSort !== rightSort) return leftSort - rightSort;
-          return String(left?.id || "").localeCompare(String(right?.id || ""));
-        })
-        .at(-1);
-      targetItem = fallbackTarget || null;
-      sortBefore = false;
-    } else {
-      const columns = this.getItemListColumnCountFromElement(list);
-      sortBefore = this.getItemReorderSortBefore(event, targetLi, columns);
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const payload = this.getItemReorderPayloadFromEvent(eventLike);
+    if (!payload) return this.buildCarryDropErrorResult("operation invalide");
+    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.buildCarryDropErrorResult("operation invalide");
+    if (this._itemReorderPayloadClearTimer) {
+      clearTimeout(this._itemReorderPayloadClearTimer);
+      this._itemReorderPayloadClearTimer = null;
     }
-    if (!targetItem || String(targetItem.id || "") === String(sourceItem.id || "")) {
+
+    try {
+      const sourceItem = this.actor?.items?.get(payload.itemId) || null;
+      if (!sourceItem) return this.buildCarryDropErrorResult("operation invalide");
+      const sourceType = String(sourceItem.type || "").trim().toLowerCase();
+
+      const list = eventLike?.currentTarget instanceof HTMLElement
+        ? eventLike.currentTarget
+        : nativeEvent?.target?.closest?.("ol.item-list");
+      if (!(list instanceof HTMLElement)) return this.buildCarryDropErrorResult("operation invalide");
+      const carryColumn = this.getItemListCarryColumnFromElement(list);
+      if (carryColumn) {
+        return this.handleCarryColumnDrop({
+          eventLike,
+          nativeEvent,
+          sourceItem,
+          list,
+          targetColumn: carryColumn
+        });
+      }
+      const bagZone = this.getItemListBagZoneFromElement(list);
+      const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
+      const reorderScope = this.getItemListReorderScopeFromElement(list);
+      const isCarryMixedScope = reorderScope === "carry-mixed";
+      const useMixedTypeOrdering = isCarryMixedScope && Boolean(bagZone);
+      if (acceptedTypes && !acceptedTypes.has(sourceType)) {
+        this.clearItemReorderVisualState();
+        return this.buildCarryDropErrorResult("type non autorise");
+      }
+      if (bagZone && !this.isBagZoneSupportedItemType(sourceType)) {
+        this.clearItemReorderVisualState();
+        return this.buildCarryDropErrorResult("type non autorise");
+      }
+      if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+      else nativeEvent?.preventDefault?.();
+      if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
+      else nativeEvent?.stopPropagation?.();
+
+      if (
+        bagZone === "no"
+        && this.isBagZoneSupportedItemType(sourceType)
+        && this.isItemInBag(sourceItem)
+        && this.getCarriedOutsideBagItems().length >= CARRIED_ITEM_LIMIT_BASE
+      ) {
+        this.clearItemReorderVisualState();
+        ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: CARRIED_ITEM_LIMIT_BASE }));
+        return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
+      }
+
+      let bagStateChanged = false;
+      if (bagZone) {
+        const shouldBeInBag = bagZone === "yes";
+        bagStateChanged = this.isItemInBag(sourceItem) !== shouldBeInBag;
+        const bagUpdated = await this.setItemBagState(sourceItem, shouldBeInBag);
+        if (!bagUpdated) {
+          this.clearItemReorderVisualState();
+          return this.buildCarryDropErrorResult("deplacement impossible");
+        }
+      }
+      const latestSourceItem = this.actor?.items?.get(String(sourceItem.id || "")) || sourceItem;
+      const sourceInBag = bagZone && this.isBagZoneSupportedItemType(sourceType)
+        ? bagZone === "yes"
+        : this.isItemInBag(latestSourceItem);
+
+      let targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
+      if (!targetLi || !list.contains(targetLi)) targetLi = null;
+      let targetItem = targetLi ? this.getItemFromListElement(targetLi) : null;
+      let sortBefore = false;
+
+      const targetType = String(targetItem?.type || "").trim().toLowerCase();
+      const targetIsCompatible = Boolean(targetItem) && (
+        useMixedTypeOrdering
+          ? this.isBagZoneSupportedItemType(targetType)
+          : targetType === sourceType
+      );
+      const targetAccepted = !acceptedTypes || acceptedTypes.has(targetType);
+
+      if (!targetIsCompatible || !targetAccepted) {
+        const fallbackTarget = this.actor.items
+          .filter(entry => {
+            const entryType = String(entry?.type || "").trim().toLowerCase();
+            if (String(entry?.id || "") === String(latestSourceItem.id || "")) return false;
+            if (acceptedTypes && !acceptedTypes.has(entryType)) return false;
+            if (useMixedTypeOrdering) {
+              if (!this.isBagZoneSupportedItemType(entryType)) return false;
+              return this.isItemInBag(entry) === sourceInBag;
+            }
+            if (entryType !== sourceType) return false;
+            if (bagZone && this.isBagZoneSupportedItemType(sourceType)) {
+              return this.isItemInBag(entry) === sourceInBag;
+            }
+            return true;
+          })
+          .sort((left, right) => {
+            const leftSort = toFiniteNumber(left?.sort, 0);
+            const rightSort = toFiniteNumber(right?.sort, 0);
+            if (leftSort !== rightSort) return leftSort - rightSort;
+            return String(left?.id || "").localeCompare(String(right?.id || ""));
+          })
+          .at(-1);
+        targetItem = fallbackTarget || null;
+        sortBefore = false;
+      } else {
+        const columns = this.getItemListColumnCountFromElement(list);
+        sortBefore = this.getItemReorderSortBefore(nativeEvent, targetLi, columns);
+      }
+      if (!targetItem || String(targetItem.id || "") === String(latestSourceItem.id || "")) {
+        this.clearItemReorderVisualState();
+        if (bagStateChanged) this.render(false);
+        return this.buildCarryDropSuccessResult();
+      }
+
+      const scopeFilter = useMixedTypeOrdering
+        ? entry => {
+          const entryType = String(entry?.type || "").trim().toLowerCase();
+          if (acceptedTypes && !acceptedTypes.has(entryType)) return false;
+          return this.isBagZoneSupportedItemType(entryType) && this.isItemInBag(entry) === sourceInBag;
+        }
+        : null;
+      const updates = this.buildItemReorderUpdates(latestSourceItem, targetItem, {
+        sortBefore,
+        restrictToItemType: !useMixedTypeOrdering,
+        scopeFilter
+      });
+      if (!updates.length) {
+        this.clearItemReorderVisualState();
+        if (bagStateChanged) this.render(false);
+        return this.buildCarryDropSuccessResult();
+      }
+      const applied = await this.applyActorItemOrderUpdates(updates);
       this.clearItemReorderVisualState();
-      return;
+      if (applied) this.render(false);
+      return this.buildCarryDropSuccessResult();
+    } finally {
+      this._activeItemReorderPayload = null;
     }
-
-    const updates = this.buildItemReorderUpdates(sourceItem, targetItem, { sortBefore });
-    if (!updates.length) {
-      this.clearItemReorderVisualState();
-      return;
-    }
-    const applied = await this.applyActorItemOrderUpdates(updates);
-    this.clearItemReorderVisualState();
-    if (applied) this.render(false);
   }
 
   async _updateObject(_event, formData) {
+    const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
+    const allowVitalResourceUpdate = VITAL_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
+    const allowAmmoUpdate = AMMO_UPDATE_PATHS.some(path => hasUpdatePath(formData, path));
     if (this.actor?.isOwner || game.user?.isGM) {
-      return super._updateObject(_event, formData);
+      return this.actor.update(formData, {
+        bloodmanAllowCharacteristicBase: allowCharacteristicBase,
+        bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate,
+        bloodmanAllowAmmoUpdate: allowAmmoUpdate
+      });
     }
 
-    const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
     const sanitized = sanitizeActorUpdateForRole(formData, game.user?.role, {
       actor: this.actor,
       allowCharacteristicBase,
+      allowVitalResourceUpdate,
+      allowAmmoUpdate,
       enforceCharacteristicBaseRange: this.actor?.type === "personnage"
     });
     if (!hasActorUpdatePayload(sanitized, foundry.utils.flattenObject)) return;
-    await this.applyActorUpdate(sanitized, { bloodmanAllowCharacteristicBase: allowCharacteristicBase });
+    await this.applyActorUpdate(sanitized, {
+      bloodmanAllowCharacteristicBase: allowCharacteristicBase,
+      bloodmanAllowVitalResourceUpdate: allowVitalResourceUpdate,
+      bloodmanAllowAmmoUpdate: allowAmmoUpdate
+    });
   }
 
   getData() {
@@ -5787,50 +6691,119 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const npcRole = data.actor.system.npcRole || "";
 
+    const sortItemsBySortKey = (left, right) => {
+      const leftSort = toFiniteNumber(left?.sort, 0);
+      const rightSort = toFiniteNumber(right?.sort, 0);
+      if (leftSort !== rightSort) return leftSort - rightSort;
+      return String(left?.id || "").localeCompare(String(right?.id || ""));
+    };
+    const carriedItems = this.actor.items
+      .filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()))
+      .sort(sortItemsBySortKey);
+    const carriedColumnState = this.getCarriedColumnState({
+      bagEnabledOverride: bagSlotsEnabled,
+      items: carriedItems
+    });
+    const buildCarryDisplayItem = item => {
+      const displayItem = item.toObject();
+      displayItem._id = displayItem._id ?? item.id;
+      displayItem.type = String(item.type || displayItem.type || "").trim().toLowerCase();
+      displayItem.bagActionLabel = "";
+      displayItem.bagActionClass = "";
+      displayItem.bagProtectionLabel = "";
+      displayItem.bagShowAmmoState = false;
+      displayItem.bagAmmoMagazine = 0;
+      displayItem.bagAmmoCapacityDisplay = 0;
+      displayItem.bagShowReloadButton = false;
+      displayItem.bagReloadBlocked = false;
+      displayItem.showItemReroll = shouldShowItemReroll(item.id);
+
+      if (displayItem.type === "arme") {
+        const damageDie = String(displayItem.system?.damageDie || "").trim();
+        if (damageDie) {
+          displayItem.bagActionLabel = `1${damageDie}`;
+          displayItem.bagActionClass = "weapon-roll";
+        }
+        const weaponCategory = getWeaponCategory(displayItem.system?.weaponType);
+        const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(displayItem.system?.infiniteAmmo, false);
+        const magazineCapacity = normalizeNonNegativeInteger(displayItem.system?.magazineCapacity, 0);
+        const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
+        const ammoStock = consumesAmmo ? Math.max(0, ammo.stock) : 0;
+        const loadedAmmo = usesDirectStock
+          ? ammoStock
+          : getWeaponLoadedAmmo(item, { fallback: ammo.magazine });
+        const magazineMissingAmmo = !usesDirectStock && loadedAmmo < magazineCapacity;
+        displayItem.bagShowAmmoState = consumesAmmo;
+        displayItem.bagAmmoMagazine = loadedAmmo;
+        displayItem.bagAmmoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
+        displayItem.bagShowReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
+        displayItem.bagReloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
+      } else if (displayItem.type === "soin") {
+        const healDie = String(displayItem.system?.healDie || "").trim();
+        displayItem.bagActionLabel = `1${healDie || "d4"}`;
+        displayItem.bagActionClass = "item-use";
+      } else if (displayItem.type === "ration") {
+        displayItem.bagActionLabel = t("BLOODMAN.Common.Eat");
+        displayItem.bagActionClass = "item-use";
+      } else if (displayItem.type === "objet" && toCheckboxBoolean(displayItem.system?.useEnabled, false)) {
+        displayItem.bagActionLabel = t("BLOODMAN.Common.Use");
+        displayItem.bagActionClass = "item-use";
+      }
+
+      if (displayItem.type === "protection") {
+        const paValue = Math.max(0, Math.floor(toFiniteNumber(displayItem.system?.pa, 0)));
+        displayItem.bagProtectionLabel = `PA ${paValue}`;
+      }
+      return displayItem;
+    };
+    const equipmentItems = carriedColumnState.columns[CARRY_COLUMN_EQUIPMENT] || [];
     const weaponTypeDistance = t("BLOODMAN.Equipment.WeaponType.Distance");
     const weaponTypeMelee = t("BLOODMAN.Equipment.WeaponType.Melee");
-    const weapons = itemBuckets.arme.map(item => {
-      const weapon = item.toObject();
-      weapon._id = weapon._id ?? item.id;
-      const normalized = normalizeWeaponType(weapon.system?.weaponType);
-      const weaponCategory = getWeaponCategory(weapon.system?.weaponType);
-      if (normalized === "corps") weapon.displayWeaponType = weaponTypeMelee;
-      else if (normalized === "distance") weapon.displayWeaponType = weaponTypeDistance;
-      else if (weapon.system?.weaponType) weapon.displayWeaponType = weapon.system.weaponType;
-      else weapon.displayWeaponType = weaponTypeDistance;
-      const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(weapon.system?.infiniteAmmo, false);
-      const magazineCapacity = normalizeNonNegativeInteger(weapon.system?.magazineCapacity, 0);
-      const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
-      const ammoStock = consumesAmmo
-        ? Math.max(0, ammo.stock)
-        : 0;
-      const ammoType = consumesAmmo ? normalizeAmmoType(ammo.type) : "";
-      const loadedAmmo = usesDirectStock
-        ? ammoStock
-        : getWeaponLoadedAmmo(item, { fallback: ammo.magazine });
-      const magazineMissingAmmo = !usesDirectStock && loadedAmmo < magazineCapacity;
-      weapon.magazineCapacity = magazineCapacity;
-      weapon.ammoType = ammoType;
-      weapon.ammoStock = ammoStock;
-      weapon.usesDirectStock = usesDirectStock;
-      weapon.ammoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
-      weapon.showAmmoState = consumesAmmo;
-      weapon.ammoMagazine = loadedAmmo;
-      weapon.showReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
-      weapon.reloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
-      weapon.showItemReroll = shouldShowItemReroll(item.id);
-      return weapon;
-    });
-
-    const soins = itemBuckets.soin.map(item => {
-      const heal = item.toObject();
-      heal._id = heal._id ?? item.id;
-      heal.showItemReroll = false;
-      return heal;
-    });
-    const objectSectionItemsCount = itemBuckets.objet.length + itemBuckets.soin.length + itemBuckets.ration.length;
-    const carriedItemsCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
-    const equipmentThreeColumns = objectSectionItemsCount >= 2;
+    const weapons = equipmentItems
+      .filter(item => String(item?.type || "").trim().toLowerCase() === "arme")
+      .map(item => {
+        const weapon = item.toObject();
+        weapon._id = weapon._id ?? item.id;
+        const normalized = normalizeWeaponType(weapon.system?.weaponType);
+        const weaponCategory = getWeaponCategory(weapon.system?.weaponType);
+        if (normalized === "corps") weapon.displayWeaponType = weaponTypeMelee;
+        else if (normalized === "distance") weapon.displayWeaponType = weaponTypeDistance;
+        else if (weapon.system?.weaponType) weapon.displayWeaponType = weapon.system.weaponType;
+        else weapon.displayWeaponType = weaponTypeDistance;
+        const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(weapon.system?.infiniteAmmo, false);
+        const magazineCapacity = normalizeNonNegativeInteger(weapon.system?.magazineCapacity, 0);
+        const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
+        const ammoStock = consumesAmmo
+          ? Math.max(0, ammo.stock)
+          : 0;
+        const ammoType = consumesAmmo ? normalizeAmmoType(ammo.type) : "";
+        const loadedAmmo = usesDirectStock
+          ? ammoStock
+          : getWeaponLoadedAmmo(item, { fallback: ammo.magazine });
+        const magazineMissingAmmo = !usesDirectStock && loadedAmmo < magazineCapacity;
+        weapon.magazineCapacity = magazineCapacity;
+        weapon.ammoType = ammoType;
+        weapon.ammoStock = ammoStock;
+        weapon.usesDirectStock = usesDirectStock;
+        weapon.ammoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
+        weapon.showAmmoState = consumesAmmo;
+        weapon.ammoMagazine = loadedAmmo;
+        weapon.showReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
+        weapon.reloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
+        weapon.showItemReroll = shouldShowItemReroll(item.id);
+        return weapon;
+      });
+    const protections = equipmentItems
+      .filter(item => String(item?.type || "").trim().toLowerCase() === "protection")
+      .map(item => {
+        const protection = item.toObject();
+        protection._id = protection._id ?? item.id;
+        return protection;
+      });
+    const objectColumnOneItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_ONE] || []).map(buildCarryDisplayItem);
+    const objectColumnTwoItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_TWO] || []).map(buildCarryDisplayItem);
+    const bagItems = (carriedColumnState.columns[CARRY_COLUMN_BAG] || []).map(buildCarryDisplayItem);
+    const carriedItemsCount = carriedItems.length;
 
     return {
       ...data,
@@ -5867,15 +6840,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       carriedItemsCount,
       carriedItemsLimit,
       weapons,
-      objects: itemBuckets.objet,
-      rations: itemBuckets.ration,
-      soins,
-      protections: itemBuckets.protection,
+      protections,
+      objectColumnOneItems,
+      objectColumnTwoItems,
+      bagItems,
       aptitudes,
       pouvoirs,
       ammo,
       transportNpcs,
-      equipmentThreeColumns,
       aptitudesThreeColumns,
       pouvoirsThreeColumns
     };
@@ -6219,6 +7191,13 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
 
       await this.applyActorUpdate({ "system.equipment.bagSlotsEnabled": bagSlotsEnabled });
+      if (bagSlotsEnabled) {
+        const overflowMoved = await this.enforceMainCarryOverflowToBag({ bagEnabledOverride: true });
+        if (overflowMoved) this.render(false);
+      } else {
+        const normalized = await this.normalizeCarryColumnsAfterBagToggle({ bagEnabledOverride: false });
+        if (normalized) this.render(false);
+      }
     });
 
     html.find(".xp-check input").change(async ev => {
@@ -6527,6 +7506,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
       }
+      if (dropped) {
+        const overflowMoved = await this.enforceMainCarryOverflowToBag({
+          preferredItemIds: this.getDropResultItemIds(dropped)
+        });
+        if (overflowMoved) this.render(false);
+      }
       return dropped;
     } catch (error) {
       if (deductedBeforeDrop && previousCurrency != null) {
@@ -6816,21 +7801,27 @@ class BloodmanActorSheet extends BaseActorSheet {
     const used = await applyPowerCost(this.actor, item);
     if (!used) return;
     this.markPowerActivated(item.id, true);
-    const includeRequesterUser = game.user?.isGM;
     emitPowerUsePopup(this.actor, item, {
       fromUseButton: true,
-      includeRequesterUser
+      includeRequesterUser: true
     });
     this.render(false);
+    return [
+      { popup: true, action: "utilisation_aptitude", cote: "joueur" },
+      { popup: true, action: "utilisation_aptitude", cote: "GM" }
+    ];
   }
 
   async useAptitude(item) {
     if (!item || item.type !== "aptitude") return;
-    const includeRequesterUser = game.user?.isGM;
     emitPowerUsePopup(this.actor, item, {
       fromUseButton: true,
-      includeRequesterUser
+      includeRequesterUser: true
     });
+    return [
+      { popup: true, action: "montrer_GM", cote: "joueur" },
+      { popup: true, action: "montrer_GM", cote: "GM" }
+    ];
   }
 
   async useItem(item) {
