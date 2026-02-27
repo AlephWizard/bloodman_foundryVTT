@@ -6711,6 +6711,13 @@ class BloodmanActorSheet extends BaseActorSheet {
       displayItem.bagActionLabel = "";
       displayItem.bagActionClass = "";
       displayItem.bagProtectionLabel = "";
+      displayItem.bagProtectionClass = "item-chip item-meta bm-btn-armor";
+      const markValue = String(displayItem.system?.mark || "").trim();
+      const noteSmallValue = String(displayItem.system?.noteSmall || "").trim();
+      const markIsPa = /^PA\b/i.test(markValue);
+      const noteSmallIsPa = /^PA\b/i.test(noteSmallValue);
+      displayItem.bagMarkClass = `item-chip item-mark${markIsPa ? " bm-btn-pa" : ""}`;
+      displayItem.bagNoteSmallClass = `item-chip item-meta${noteSmallIsPa ? " bm-btn-pa" : ""}`;
       displayItem.bagShowAmmoState = false;
       displayItem.bagAmmoMagazine = 0;
       displayItem.bagAmmoCapacityDisplay = 0;
@@ -6722,7 +6729,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         const damageDie = String(displayItem.system?.damageDie || "").trim();
         if (damageDie) {
           displayItem.bagActionLabel = `1${damageDie}`;
-          displayItem.bagActionClass = "weapon-roll";
+          displayItem.bagActionClass = "weapon-roll bm-btn-damage";
         }
         const weaponCategory = getWeaponCategory(displayItem.system?.weaponType);
         const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(displayItem.system?.infiniteAmmo, false);
@@ -6741,13 +6748,13 @@ class BloodmanActorSheet extends BaseActorSheet {
       } else if (displayItem.type === "soin") {
         const healDie = String(displayItem.system?.healDie || "").trim();
         displayItem.bagActionLabel = `1${healDie || "d4"}`;
-        displayItem.bagActionClass = "item-use";
+        displayItem.bagActionClass = "item-use bm-btn-heal";
       } else if (displayItem.type === "ration") {
         displayItem.bagActionLabel = t("BLOODMAN.Common.Eat");
-        displayItem.bagActionClass = "item-use";
+        displayItem.bagActionClass = "item-use bm-btn-heal";
       } else if (displayItem.type === "objet" && toCheckboxBoolean(displayItem.system?.useEnabled, false)) {
         displayItem.bagActionLabel = t("BLOODMAN.Common.Use");
-        displayItem.bagActionClass = "item-use";
+        displayItem.bagActionClass = "item-use bm-btn-magic";
       }
 
       if (displayItem.type === "protection") {

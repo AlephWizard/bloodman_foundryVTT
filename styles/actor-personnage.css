@@ -1195,6 +1195,47 @@
   color: #333333;
 }
 
+.bloodman-sheet .bm-btn-damage {
+  background: linear-gradient(180deg, #d45151 0%, #af2222 100%) !important;
+  border-color: #741616 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-heal {
+  background: linear-gradient(180deg, #4ab774 0%, #1f8a44 100%) !important;
+  border-color: #1d6a36 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-magic {
+  background: linear-gradient(180deg, #4f8fe5 0%, #2364c7 100%) !important;
+  border-color: #1f4f99 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .item-chip.bm-btn-armor,
+.bloodman-sheet .bm-btn-armor {
+  background: linear-gradient(180deg, #d9dee4 0%, #afb7c0 100%) !important;
+  border-color: #7c8793 !important;
+  color: #1a1f24 !important;
+}
+
+.bloodman-sheet .item-chip.bm-btn-pa,
+.bloodman-sheet .bm-btn-pa {
+  background: linear-gradient(180deg, #f0b25b 0%, #d37a0f 100%) !important;
+  border-color: #9b5608 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet button.bm-btn-damage:hover,
+.bloodman-sheet button.bm-btn-heal:hover,
+.bloodman-sheet button.bm-btn-magic:hover,
+.bloodman-sheet button.bm-btn-pa:hover,
+.bloodman-sheet .weapon-roll.bm-btn-damage:hover,
+.bloodman-sheet .ability-roll.bm-btn-damage:hover {
+  filter: brightness(1.08);
+}
+
 .bloodman-sheet .item-reroll {
   display: inline-flex;
   align-items: center;
