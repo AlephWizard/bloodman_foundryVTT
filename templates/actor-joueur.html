@@ -28,12 +28,12 @@
         <span class="state-label">{{localize "BLOODMAN.StateBar.States"}}</span>
         <i class="fa-solid fa-ankh state-ankh" aria-hidden="true"></i>
         <div class="state-inputs">
-          <div class="state-field">
+          <div class="state-field{{#if (lt modifiers.all 0)}} is-negative{{else}}{{#if (gt modifiers.all 0)}} is-positive{{/if}}{{/if}}">
             <span>{{localize "BLOODMAN.StateBar.All"}}</span>
             <input type="number" name="system.modifiers.all" value="{{modifiers.all}}" {{#unless canEditRestrictedFields}}readonly{{/unless}} />
           </div>
           {{#each characteristics}}
-            <div class="state-field">
+            <div class="state-field{{#if (lt (lookup ../modifiers this.key) 0)}} is-negative{{else}}{{#if (gt (lookup ../modifiers this.key) 0)}} is-positive{{/if}}{{/if}}">
               <span>{{this.key}}</span>
               <input type="number" name="system.modifiers.{{this.key}}" value="{{lookup ../modifiers this.key}}" {{#unless ../canEditRestrictedFields}}readonly{{/unless}} />
             </div>

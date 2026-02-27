@@ -5148,8 +5148,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
       template: "systems/bloodman/templates/actor-joueur.html",
-      width: 1050,
-      height: 820,
+      width: 1070,
+      height: 630,
       minimizable: true,
       resizable: true,
       submitOnChange: true,

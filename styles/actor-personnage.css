@@ -1322,11 +1322,25 @@
   border: 2px solid #000000;
   border-radius: 8px;
   padding: 2px 4px;
-  background: #ffffff;
+  background: #efefef;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.bloodman-sheet .state-field.is-negative {
+  border-color: #b83228;
+  background: #fbe4e2;
+  box-shadow: none;
+}
+
+.bloodman-sheet .state-field.is-positive {
+  border-color: #1b8f3c;
+  background: #e6f5ea;
+  box-shadow: none;
 }
 
 .state-field input {
   font-weight: 700;
+  background: transparent;
 }
 
 .state-name {
