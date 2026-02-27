@@ -619,6 +619,67 @@
   margin-top: 6px;
 }
 
+.card.equipment-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 14px 10px;
+}
+
+.equipment-card .card-header {
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.equipment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.equipment-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.equipment-column-primary {
+  padding-right: 10px;
+}
+
+.equipment-column-secondary {
+  border-left: 1px solid rgba(0, 0, 0, 0.4);
+  padding-left: 14px;
+}
+
+.equipment-card .equip-block {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.equipment-card .weapon-header-row,
+.equipment-card .ammo-row,
+.equipment-card .currency-row {
+  margin-top: 0;
+}
+
+.equipment-card .item-list {
+  margin: 0;
+}
+
+.equipment-card .item {
+  border-bottom-color: transparent;
+}
+
+.equipment-column-primary .item-list.item-list-three-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .weapon-header-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
@@ -1237,6 +1298,20 @@
 
   .identity-grid .archetype-row {
     grid-template-columns: minmax(0, 1fr) 72px 130px;
+  }
+
+  .equipment-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .equipment-column-primary {
+    padding-right: 0;
+  }
+
+  .equipment-column-secondary {
+    border-left: 0;
+    padding-left: 0;
   }
 }
 
