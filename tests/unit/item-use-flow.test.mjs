@@ -64,6 +64,76 @@ async function run() {
   );
 
   assert.deepEqual(
+    rules.resolvePowerRollPlan({ item: null }),
+    { allowed: false, reason: "missing-item", mode: "none", formula: "" }
+  );
+  assert.deepEqual(
+    rules.resolvePowerRollPlan({
+      item: { type: "aptitude", system: { damageEnabled: true, damageDie: "d6" } }
+    }),
+    { allowed: false, reason: "unsupported-item-type", mode: "none", formula: "" }
+  );
+  assert.deepEqual(
+    rules.resolvePowerRollPlan({
+      item: {
+        type: "pouvoir",
+        system: { healEnabled: true, healDie: "d10", damageEnabled: true, damageDie: "d6" }
+      },
+      powerUsableEnabled: false,
+      powerActivated: false
+    }),
+    {
+      allowed: true,
+      reason: "",
+      isUsablePower: false,
+      mode: "heal",
+      formula: "1d10"
+    }
+  );
+  assert.deepEqual(
+    rules.resolvePowerRollPlan({
+      item: { type: "pouvoir", system: { damageDie: "d8" } },
+      powerUsableEnabled: false,
+      powerActivated: false
+    }),
+    {
+      allowed: true,
+      reason: "",
+      isUsablePower: false,
+      mode: "damage",
+      formula: "1d8"
+    }
+  );
+  assert.deepEqual(
+    rules.resolvePowerRollPlan({
+      item: { type: "pouvoir", system: { healEnabled: true, healDie: "d8" } },
+      powerUsableEnabled: true,
+      powerActivated: false
+    }),
+    {
+      allowed: false,
+      reason: "power-not-activated",
+      isUsablePower: true,
+      mode: "heal",
+      formula: "1d8"
+    }
+  );
+  assert.deepEqual(
+    rules.resolvePowerRollPlan({
+      item: { type: "pouvoir", system: { healEnabled: false, damageEnabled: false, healDie: "d8", damageDie: "d6" } },
+      powerUsableEnabled: false,
+      powerActivated: false
+    }),
+    {
+      allowed: false,
+      reason: "roll-disabled",
+      isUsablePower: false,
+      mode: "none",
+      formula: ""
+    }
+  );
+
+  assert.deepEqual(
     rules.resolveItemRerollRollPlan({ item: null }),
     { mode: "none", formula: "", reason: "missing-item" }
   );

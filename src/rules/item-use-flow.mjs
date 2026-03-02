@@ -10,9 +10,21 @@ function defaultNormalizeRollDieFormula(value, fallback = "d4") {
   return `1${raw}`;
 }
 
+function defaultToBooleanFlag(value, fallback = false) {
+  if (value === true || value === false) return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes") return true;
+    if (normalized === "false" || normalized === "0" || normalized === "off" || normalized === "no" || normalized === "") return false;
+  }
+  return Boolean(fallback);
+}
+
 export function createItemUseFlowRules({
   toFiniteNumber,
-  normalizeRollDieFormula
+  normalizeRollDieFormula,
+  toBooleanFlag
 } = {}) {
   const toFinite = typeof toFiniteNumber === "function"
     ? toFiniteNumber
@@ -20,6 +32,9 @@ export function createItemUseFlowRules({
   const normalizeFormula = typeof normalizeRollDieFormula === "function"
     ? normalizeRollDieFormula
     : defaultNormalizeRollDieFormula;
+  const parseBooleanFlag = typeof toBooleanFlag === "function"
+    ? toBooleanFlag
+    : defaultToBooleanFlag;
 
   function resolveAbilityDamageRollPlan({
     item = null,
@@ -42,6 +57,49 @@ export function createItemUseFlowRules({
       reason: "",
       isUsablePower,
       formula: normalizeFormula(item.system?.damageDie, "d4")
+    };
+  }
+
+  function resolvePowerRollPlan({
+    item = null,
+    powerUsableEnabled = false,
+    powerActivated = false
+  } = {}) {
+    if (!item) return { allowed: false, reason: "missing-item", mode: "none", formula: "" };
+    const itemType = String(item.type || "").trim().toLowerCase();
+    if (itemType !== "pouvoir") return { allowed: false, reason: "unsupported-item-type", mode: "none", formula: "" };
+    const isUsablePower = Boolean(powerUsableEnabled);
+    const healEnabled = parseBooleanFlag(item.system?.healEnabled, false) && Boolean(item.system?.healDie);
+    // Legacy powers can have a die set without explicit damageEnabled.
+    const damageEnabled = (parseBooleanFlag(item.system?.damageEnabled, item.system?.damageDie != null) && Boolean(item.system?.damageDie));
+    const mode = healEnabled ? "heal" : (damageEnabled ? "damage" : "none");
+    const formula = mode === "heal"
+      ? normalizeFormula(item.system?.healDie, "d4")
+      : (mode === "damage" ? normalizeFormula(item.system?.damageDie, "d4") : "");
+    if (isUsablePower && !powerActivated) {
+      return {
+        allowed: false,
+        reason: "power-not-activated",
+        isUsablePower,
+        mode,
+        formula
+      };
+    }
+    if (mode === "none") {
+      return {
+        allowed: false,
+        reason: "roll-disabled",
+        isUsablePower,
+        mode,
+        formula: ""
+      };
+    }
+    return {
+      allowed: true,
+      reason: "",
+      isUsablePower,
+      mode,
+      formula
     };
   }
 
@@ -135,6 +193,7 @@ export function createItemUseFlowRules({
 
   return {
     resolveAbilityDamageRollPlan,
+    resolvePowerRollPlan,
     resolveItemRerollRollPlan,
     resolveItemUsePlan,
     resolveHealUseMode,

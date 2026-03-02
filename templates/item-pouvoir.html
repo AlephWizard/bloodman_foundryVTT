@@ -88,6 +88,34 @@
           <option value="1d10+1d8">1d10+1d8</option>
         {{/select}}
       </select>
+
+      <label class="inline-label">{{localize "BLOODMAN.Items.HealDieLabel"}}</label>
+      <div class="toggle-group">
+        <label class="toggle-option">
+          <input type="radio" name="system.healEnabled" value="true" data-dtype="Boolean" {{#if item.system.healEnabled}}checked{{/if}} />
+          {{localize "BLOODMAN.Common.Yes"}}
+        </label>
+        <label class="toggle-option">
+          <input type="radio" name="system.healEnabled" value="false" data-dtype="Boolean" {{#unless item.system.healEnabled}}checked{{/unless}} />
+          {{localize "BLOODMAN.Common.No"}}
+        </label>
+      </div>
+      <select class="heal-die-select" name="system.healDie" {{#unless item.system.healEnabled}}disabled{{/unless}}>
+        {{#select item.system.healDie}}
+          <option value="d4">d4</option>
+          <option value="d6">d6</option>
+          <option value="d8">d8</option>
+          <option value="d10">d10</option>
+          <option value="d12">d12</option>
+          <option value="2d4">2d4</option>
+          <option value="2d6">2d6</option>
+          <option value="2d8">2d8</option>
+          <option value="2d10">2d10</option>
+          <option value="2d12">2d12</option>
+          <option value="1d10+1d4">1d10+1d4</option>
+          <option value="1d10+1d8">1d10+1d8</option>
+        {{/select}}
+      </select>
     </div>
 
     <div class="ability-section">

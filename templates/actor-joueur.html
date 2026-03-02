@@ -551,7 +551,7 @@
                   <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                   <div class="item-actions">
                     {{#if this.showPowerUseButton}}<button type="button" class="power-use bm-btn-magic">Utiliser</button>{{/if}}
-                    {{#if this.showPowerDamage}}<span class="ability-roll bm-btn-damage">{{this.displayDamageDie}}</span>{{/if}}
+                    {{#if this.showPowerRoll}}<span class="{{this.powerRollClass}}" data-roll-mode="{{this.powerRollMode}}">{{this.displayPowerDie}}</span>{{/if}}
                     {{#if this.showItemReroll}}
                       <button type="button" class="item-reroll">
                         <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}

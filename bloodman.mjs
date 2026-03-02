@@ -2899,9 +2899,9 @@ const itemUseFlowRules = createItemUseFlowRules({
 });
 const {
   resolveAbilityDamageRollPlan,
+  resolvePowerRollPlan,
   resolveItemRerollRollPlan,
   resolveItemUsePlan,
-  resolveHealUseMode,
   resolveManualHealNextValue,
   isObjectUseEnabled,
   buildHealAudioReference
@@ -5227,6 +5227,10 @@ function buildItemDisplayData(item) {
     const rawDie = item.system.damageDie.toString();
     data.displayDamageDie = normalizeRollDieFormula(rawDie, "d4");
   }
+  if (toCheckboxBoolean(item.system?.healEnabled, false) && item.system?.healDie) {
+    const rawHealDie = item.system.healDie.toString();
+    data.displayHealDie = normalizeRollDieFormula(rawHealDie, "d4");
+  }
   return data;
 }
 
@@ -6858,9 +6862,16 @@ class BloodmanActorSheet extends BaseActorSheet {
       const usableEnabled = isPowerUsableEnabled(item.system?.usableEnabled);
       const isActivated = usableEnabled && itemId ? powerUseState.has(itemId) : false;
       if (!usableEnabled && itemId) powerUseState.delete(itemId);
+      const hasPowerHeal = Boolean(dataItem.displayHealDie);
+      const hasPowerDamage = !hasPowerHeal && Boolean(dataItem.displayDamageDie);
+      dataItem.powerRollMode = hasPowerHeal ? "heal" : (hasPowerDamage ? "damage" : "none");
+      dataItem.displayPowerDie = hasPowerHeal ? dataItem.displayHealDie : (hasPowerDamage ? dataItem.displayDamageDie : "");
+      dataItem.powerRollClass = hasPowerHeal ? "ability-roll bm-btn-heal" : "ability-roll bm-btn-damage";
       dataItem.showPowerUseButton = usableEnabled;
-      dataItem.showPowerDamage = Boolean(dataItem.displayDamageDie) && (!usableEnabled || isActivated);
-      dataItem.showItemReroll = dataItem.showPowerDamage && shouldShowItemReroll(item.id);
+      dataItem.showPowerRoll = Boolean(dataItem.displayPowerDie) && (!usableEnabled || isActivated);
+      dataItem.showItemReroll = dataItem.showPowerRoll
+        && dataItem.powerRollMode === "damage"
+        && shouldShowItemReroll(item.id);
       return dataItem;
     });
     const activePowerIds = new Set(itemBuckets.pouvoir.map(item => String(item.id || "").trim()).filter(Boolean));
@@ -7958,12 +7969,58 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async rollAbilityDamage(item) {
+    if (!item) return;
+    if (item.type === "pouvoir") {
+      const powerPlan = resolvePowerRollPlan({
+        item,
+        powerUsableEnabled: isPowerUsableEnabled(item?.system?.usableEnabled),
+        powerActivated: this.isPowerActivated(item?.id)
+      });
+      if (!powerPlan.allowed) return;
+      if (powerPlan.mode === "heal") {
+        if (!powerPlan.isUsablePower) {
+          const used = await applyPowerCost(this.actor, item);
+          if (!used) return;
+        }
+        const targetActor = this.resolveHealTargetActor(this.actor);
+        if (!targetActor) return;
+        const healResult = await doHealRoll(this.actor, item, {
+          formula: powerPlan.formula,
+          targetActor,
+          consumeItem: false
+        });
+        if (!healResult) return;
+        await playItemAudio(item);
+        if (powerPlan.isUsablePower) this.markPowerActivated(item.id, false);
+        this.render(false);
+        return;
+      }
+      const beforeRoll = async () => {
+        if (powerPlan.isUsablePower) return true;
+        return applyPowerCost(this.actor, item);
+      };
+      const result = await doDirectDamageRoll(this.actor, powerPlan.formula, item.name, {
+        beforeRoll,
+        itemId: item.id,
+        itemType: item.type
+      });
+      if (!result) return;
+      await playItemAudio(item);
+      if (result?.context) {
+        result.context.kind = "item-damage";
+        result.context.itemType = String(item.type || "");
+        this.markItemReroll(item.id, result.context);
+      }
+      this.render(false);
+      return;
+    }
+
     const plan = resolveAbilityDamageRollPlan({
       item,
       powerUsableEnabled: isPowerUsableEnabled(item?.system?.usableEnabled),
       powerActivated: this.isPowerActivated(item?.id)
     });
-    if (!plan.allowed || !item) return;
+    if (!plan.allowed) return;
     const beforeRoll = async () => {
       if (plan.isUsablePower) return true;
       return applyPowerCost(this.actor, item);
@@ -8012,6 +8069,23 @@ class BloodmanActorSheet extends BaseActorSheet {
     ];
   }
 
+  resolveHealTargetActor(defaultActor = this.actor) {
+    const fallbackActor = defaultActor || this.actor || null;
+    const targets = Array.from(game.user?.targets || []);
+    if (!targets.length) return fallbackActor;
+    if (targets.length > 1) {
+      ui.notifications?.warn(tl("BLOODMAN.Notifications.HealSingleTargetOnly", "Selectionnez une seule cible pour le soin."));
+      return null;
+    }
+    const token = targets[0];
+    const targetActor = token?.actor || token?.document?.actor || token?.object?.actor || null;
+    if (!targetActor) {
+      ui.notifications?.warn(tl("BLOODMAN.Notifications.HealTargetResolveFailed", "Impossible de resoudre la cible de soin."));
+      return null;
+    }
+    return targetActor;
+  }
+
   async useItem(item) {
     const usePlan = resolveItemUsePlan({
       item,
@@ -8025,34 +8099,14 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     if (usePlan.kind === "heal") {
       const healAudioRef = buildHealAudioReference(item);
-      const healMode = resolveHealUseMode({
-        actorIsOwner: Boolean(this.actor?.isOwner),
-        isGM: Boolean(game.user?.isGM)
+      const targetActor = this.resolveHealTargetActor(this.actor);
+      if (!targetActor) return;
+      const result = await doHealRoll(this.actor, item, {
+        targetActor,
+        consumeItem: true
       });
-      if (healMode === "owner-roll") {
-        const result = await doHealRoll(this.actor, item);
-        if (result) await playItemAudio(healAudioRef);
-        if (result && this.actor.items.get(item.id)) this.render(false);
-      } else {
-        const formula = normalizeRollDieFormula(item.system?.healDie, "d4");
-        const roll = await new Roll(formula).evaluate();
-        const healState = resolveManualHealNextValue({
-          current: this.actor?.system?.resources?.pv?.current,
-          max: this.actor?.system?.resources?.pv?.max,
-          rollTotal: roll.total
-        });
-        await this.applyActorUpdate({ "system.resources.pv.current": healState.next }, {
-          bloodmanAllowVitalResourceUpdate: true
-        });
-        roll.toMessage({
-          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-          flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total }),
-          flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
-        });
-        await playItemAudio(healAudioRef);
-        await this.deleteActorItem(item);
-        this.render(false);
-      }
+      if (result) await playItemAudio(healAudioRef);
+      if (result) this.render(false);
       return;
     }
     if (usePlan.kind === "ration") {
@@ -8467,6 +8521,7 @@ class BloodmanItemSheet extends BaseItemSheet {
     if (this.item.type === "pouvoir") {
       if (!data.item.system) data.item.system = {};
       data.item.system.usableEnabled = isPowerUsableEnabled(this.item.system?.usableEnabled);
+      data.item.system.healEnabled = toCheckboxBoolean(this.item.system?.healEnabled, false);
     }
     const supportsCharacteristicBonuses = CHARACTERISTIC_BONUS_ITEM_TYPES.has(this.item.type);
     const supportsPaBonus = PA_BONUS_ITEM_TYPES.has(this.item.type);

@@ -1399,28 +1399,33 @@ export async function doDamageRoll(actor, item) {
   };
 }
 
-export async function doHealRoll(actor, item) {
-  const die = item.system.healDie || "d4";
-  const formula = normalizeDamageFormula(die) || "1d4";
+export async function doHealRoll(actor, item, options = {}) {
+  if (!actor || !item) return null;
+  const resolvedTargetActor = options?.targetActor || actor;
+  if (!resolvedTargetActor) return null;
+  const rawFormula = String(options?.formula || item.system?.healDie || "d4");
+  const formula = normalizeDamageFormula(rawFormula) || "1d4";
   const roll = await new Roll(formula).evaluate();
 
-  const current = Number(actor.system.resources?.pv?.current || 0);
-  const max = Number(actor.system.resources?.pv?.max || 0);
+  const current = Number(resolvedTargetActor.system.resources?.pv?.current || 0);
+  const max = Number(resolvedTargetActor.system.resources?.pv?.max || 0);
   const nextValue = max > 0 ? Math.min(current + roll.total, max) : current + roll.total;
 
   await updateActorWithFallback(
-    actor,
+    resolvedTargetActor,
     { "system.resources.pv.current": nextValue },
     { allowVitalResourceUpdate: true }
   );
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: actor.name, amount: roll.total }),
+    flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: resolvedTargetActor.name, amount: roll.total }),
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
   });
 
-  await deleteItemWithFallback(item, actor);
+  if (options?.consumeItem !== false) {
+    await deleteItemWithFallback(item, actor);
+  }
   return roll;
 }
 
