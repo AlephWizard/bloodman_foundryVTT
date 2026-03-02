@@ -52,15 +52,14 @@
           {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
-      <select name="system.damageDie" {{#unless weaponDamageEnabled}}disabled{{/unless}}>
-        {{#select item.system.damageDie}}
-          <option value="d4">d4</option>
-          <option value="d6">d6</option>
-          <option value="d8">d8</option>
-          <option value="d10">d10</option>
-          <option value="d12">d12</option>
-        {{/select}}
-      </select>
+      <input
+        class="bm-item-input damage-die-input"
+        type="text"
+        name="system.damageDie"
+        value="{{item.system.damageDie}}"
+        placeholder="/r 1d6+2"
+        {{#unless weaponDamageEnabled}}disabled{{/unless}}
+      />
     </div>
 
     <div class="weapon-divider"></div>

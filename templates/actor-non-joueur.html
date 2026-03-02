@@ -298,7 +298,7 @@
                     <div class="item-body">
                       <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                       <div class="item-actions">
-                        <span class="weapon-roll bm-btn-damage">1{{this.system.damageDie}}</span>
+                        <span class="weapon-roll bm-btn-damage">{{this.displayDamageFormula}}</span>
                         {{#if this.showAmmoState}}<span class="weapon-ammo">{{this.ammoMagazine}} / {{this.ammoCapacityDisplay}}</span>{{/if}}
                         {{#if this.showReloadButton}}<button type="button" class="weapon-reload {{#if this.reloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                         {{#if this.showItemReroll}}

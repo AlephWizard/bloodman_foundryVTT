@@ -72,22 +72,14 @@
           {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
-      <select class="damage-die-select" name="system.damageDie" {{#unless item.system.damageEnabled}}disabled{{/unless}}>
-        {{#select item.system.damageDie}}
-          <option value="d4">d4</option>
-          <option value="d6">d6</option>
-          <option value="d8">d8</option>
-          <option value="d10">d10</option>
-          <option value="d12">d12</option>
-          <option value="2d4">2d4</option>
-          <option value="2d6">2d6</option>
-          <option value="2d8">2d8</option>
-          <option value="2d10">2d10</option>
-          <option value="2d12">2d12</option>
-          <option value="1d10+1d4">1d10+1d4</option>
-          <option value="1d10+1d8">1d10+1d8</option>
-        {{/select}}
-      </select>
+      <input
+        class="bm-item-input damage-die-input"
+        type="text"
+        name="system.damageDie"
+        value="{{item.system.damageDie}}"
+        placeholder="/r 1d6+2"
+        {{#unless item.system.damageEnabled}}disabled{{/unless}}
+      />
 
       <label class="inline-label">{{localize "BLOODMAN.Items.HealDieLabel"}}</label>
       <div class="toggle-group">
@@ -100,22 +92,14 @@
           {{localize "BLOODMAN.Common.No"}}
         </label>
       </div>
-      <select class="heal-die-select" name="system.healDie" {{#unless item.system.healEnabled}}disabled{{/unless}}>
-        {{#select item.system.healDie}}
-          <option value="d4">d4</option>
-          <option value="d6">d6</option>
-          <option value="d8">d8</option>
-          <option value="d10">d10</option>
-          <option value="d12">d12</option>
-          <option value="2d4">2d4</option>
-          <option value="2d6">2d6</option>
-          <option value="2d8">2d8</option>
-          <option value="2d10">2d10</option>
-          <option value="2d12">2d12</option>
-          <option value="1d10+1d4">1d10+1d4</option>
-          <option value="1d10+1d8">1d10+1d8</option>
-        {{/select}}
-      </select>
+      <input
+        class="bm-item-input heal-die-input"
+        type="text"
+        name="system.healDie"
+        value="{{item.system.healDie}}"
+        placeholder="/r 1d8+2"
+        {{#unless item.system.healEnabled}}disabled{{/unless}}
+      />
     </div>
 
     <div class="ability-section">

@@ -407,15 +407,30 @@ async function setChaosValue(nextValue) {
 }
 
 function normalizeDamageFormula(formula) {
-  const raw = String(formula || "").trim().toLowerCase().replace(/\s+/g, "");
+  const commandStripped = String(formula || "").trim().replace(/^\/(?:r|roll)\b\s*/i, "");
+  const raw = commandStripped.toLowerCase().replace(/\s+/g, "");
   if (!raw) return "";
-  return raw.replace(/^d(\d+)$/, "1d$1");
+  return raw.replace(/(^|[+\-*/(])d(\d+)/g, "$11d$2");
 }
 
 function getDamageOptionByFormula(formula) {
   const normalized = normalizeDamageFormula(formula);
   if (!normalized) return null;
   return DAMAGE_CONFIG_OPTIONS.find(option => option.formula === normalized) || null;
+}
+
+function createCustomDamageOption(formula, fallbackFormula = "1d4") {
+  const normalized = normalizeDamageFormula(formula) || normalizeDamageFormula(fallbackFormula) || "1d4";
+  return {
+    label: normalized.toUpperCase(),
+    formula: normalized
+  };
+}
+
+function isValidSimpleDamageFormula(formula) {
+  const normalized = normalizeDamageFormula(formula);
+  if (!normalized) return false;
+  return /^(?:\d*d\d+|\d+)(?:[+\-*/](?:\d*d\d+|\d+))*$/i.test(normalized);
 }
 
 function getDefaultDamageOption(formula) {
@@ -425,9 +440,10 @@ function getDefaultDamageOption(formula) {
 function getRememberedDamageDialogConfig() {
   const raw = game.user?.getFlag?.("bloodman", DAMAGE_DIALOG_CONFIG_USER_FLAG);
   if (!raw || typeof raw !== "object") return null;
-  const option = getDamageOptionByFormula(raw.formula);
+  const normalizedFormula = normalizeDamageFormula(raw.formula);
+  const option = getDamageOptionByFormula(normalizedFormula);
   return {
-    formula: option?.formula || "",
+    formula: option?.formula || normalizedFormula || "",
     bonusBrut: toNonNegativeInt(raw.bonusBrut, 0),
     penetration: toNonNegativeInt(raw.penetration, 0),
     rollKeepHighest: raw.rollKeepHighest === true
@@ -436,9 +452,10 @@ function getRememberedDamageDialogConfig() {
 
 async function rememberDamageDialogConfig(config = {}) {
   if (!game.user?.setFlag) return;
-  const option = getDamageOptionByFormula(config.formula);
+  const normalizedFormula = normalizeDamageFormula(config.formula);
+  const option = getDamageOptionByFormula(normalizedFormula);
   const payload = {
-    formula: option?.formula || "",
+    formula: option?.formula || normalizedFormula || "",
     bonusBrut: toNonNegativeInt(config.bonusBrut, 0),
     penetration: toNonNegativeInt(config.penetration, 0),
     rollKeepHighest: config.rollKeepHighest === true,
@@ -564,11 +581,11 @@ async function promptDamageConfiguration({
   const lockFormulaSelection = Boolean(lockFormula);
   const restrictedFormula = normalizedFixedFormula || normalizedDefaultFormula;
   const rememberedConfig = getRememberedDamageDialogConfig();
-  const selectedDefault = getDamageOptionByFormula(
-    lockFormulaSelection
-      ? restrictedFormula
-      : (rememberedConfig?.formula || normalizedDefaultFormula)
-  ) || getDefaultDamageOption(normalizedDefaultFormula);
+  const selectedFormula = lockFormulaSelection
+    ? restrictedFormula
+    : (rememberedConfig?.formula || normalizedDefaultFormula);
+  const selectedDefault = getDamageOptionByFormula(selectedFormula)
+    || createCustomDamageOption(selectedFormula, normalizedDefaultFormula);
   const initialBonus = rememberedConfig
     ? toNonNegativeInt(rememberedConfig.bonusBrut, toNonNegativeInt(defaultBonus, 0))
     : toNonNegativeInt(defaultBonus, 0);
@@ -594,11 +611,7 @@ async function promptDamageConfiguration({
   const penetrationLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationLabel", "Penetration +").replace(/\s\+$/, "&nbsp;+");
   const highlightedNumberClass = "bm-damage-config-value-active";
 
-  const availableDamageOptions = lockFormulaSelection ? [selectedDefault] : DAMAGE_CONFIG_OPTIONS;
-  const options = availableDamageOptions
-    .map(option => `<option value="${option.formula}" ${option.formula === selectedDefault.formula ? "selected" : ""}>${option.label}</option>`)
-    .join("");
-  const selectDisabledAttr = lockFormulaSelection ? " disabled" : "";
+  const inputDisabledAttr = lockFormulaSelection ? " disabled" : "";
   const formVariantClass = isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
 
   const content = `<form class="bm-damage-config${formVariantClass}">
@@ -617,7 +630,7 @@ async function promptDamageConfiguration({
       <div class="bm-damage-config-grid">
         <div class="bm-damage-config-row bm-damage-config-row-wide">
           <label>${damageDieLabel}</label>
-          <select name="degats"${selectDisabledAttr}>${options}</select>
+          <input type="text" name="degats" value="${selectedDefault.formula}" placeholder="/r 1d6+2"${inputDisabledAttr} />
         </div>
         <div class="bm-damage-config-row bm-damage-config-inline">
           <label>${rawBonusLabel}</label>
@@ -719,8 +732,9 @@ async function promptDamageConfiguration({
           const readCurrentConfig = () => {
             const selectedFormula = lockFormulaSelection
               ? selectedDefault.formula
-              : normalizeDamageFormula(html.find("select[name='degats']").val());
-            const option = getDamageOptionByFormula(selectedFormula) || selectedDefault;
+              : normalizeDamageFormula(html.find("input[name='degats']").val());
+            const option = getDamageOptionByFormula(selectedFormula)
+              || createCustomDamageOption(selectedFormula, selectedDefault.formula);
             return {
               degats: option?.label || selectedFormula.toUpperCase(),
               formula: option?.formula || selectedFormula,
@@ -730,7 +744,7 @@ async function promptDamageConfiguration({
             };
           };
           syncDamageInputHighlights();
-          html.on("input change", "select[name='degats'], input[name='bonus_brut'], input[name='penetration'], input[name='roll_keep_highest']", () => {
+          html.on("input change", "input[name='degats'], input[name='bonus_brut'], input[name='penetration'], input[name='roll_keep_highest']", () => {
             syncDamageInputHighlights();
             schedulePopupUpdate(readCurrentConfig());
           });
@@ -741,12 +755,13 @@ async function promptDamageConfiguration({
             callback: html => {
               const selectedFormula = lockFormulaSelection
                 ? selectedDefault.formula
-                : normalizeDamageFormula(html.find("select[name='degats']").val());
-              const option = getDamageOptionByFormula(selectedFormula) || (lockFormulaSelection ? selectedDefault : null);
-              if (!option) {
+                : normalizeDamageFormula(html.find("input[name='degats']").val());
+              if (!isValidSimpleDamageFormula(selectedFormula)) {
                 safeWarn(tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide."));
                 return false;
               }
+              const option = getDamageOptionByFormula(selectedFormula)
+                || createCustomDamageOption(selectedFormula, selectedDefault.formula);
 
               const bonusRaw = html.find("input[name='bonus_brut']").val();
               const penetrationRaw = html.find("input[name='penetration']").val();

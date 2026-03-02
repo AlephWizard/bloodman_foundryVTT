@@ -23,7 +23,7 @@
   background: var(--bm-item-surface-soft);
 }
 
-.item-arme.bm-item-sheet .weapon-section select {
+.item-arme.bm-item-sheet .weapon-section .damage-die-input {
   width: 100%;
   max-width: none;
 }
@@ -64,7 +64,7 @@
 .item-arme.bm-item-sheet .weapon-type-option input:checked {
   background: var(--bm-item-accent);
   border-color: var(--bm-item-accent);
-  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.2);
+  box-shadow: 0 0 0 2px var(--bm-item-accent-glow);
 }
 
 .item-arme.bm-item-sheet .toggle-group {

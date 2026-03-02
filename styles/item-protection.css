@@ -71,7 +71,7 @@
 }
 
 .item-protection.bm-item-sheet .bonus-grid-characteristics.is-disabled label {
-  background: rgba(58, 48, 37, 0.6);
+  background: var(--bm-item-surface-alt);
 }
 
 @media (max-width: 860px) {

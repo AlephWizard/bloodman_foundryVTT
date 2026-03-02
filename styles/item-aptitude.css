@@ -25,7 +25,7 @@
   padding: 10px;
   border: 1px solid var(--bm-item-line);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(51, 42, 32, 0.86), rgba(31, 25, 20, 0.86));
+  background: linear-gradient(180deg, var(--bm-item-surface), var(--bm-item-surface-soft));
 }
 
 .item-aptitude.bm-item-sheet .bm-ability-damage .inline-label {
@@ -37,21 +37,11 @@
   justify-self: end;
 }
 
-.item-aptitude.bm-item-sheet .bm-ability-damage select {
+.item-aptitude.bm-item-sheet .bm-ability-damage .damage-die-input {
   grid-column: 1 / -1;
   width: 100%;
   min-width: 120px;
   max-width: none;
-}
-
-.item-aptitude.bm-item-sheet .bm-ability-damage .damage-die-select {
-  background: #000000;
-  color: #ffffff;
-}
-
-.item-aptitude.bm-item-sheet .bm-ability-damage .damage-die-select option {
-  background: #000000;
-  color: #ffffff;
 }
 
 .item-aptitude.bm-item-sheet .ability-section,
@@ -124,7 +114,7 @@
 }
 
 .item-aptitude.bm-item-sheet .bonus-grid.is-disabled label {
-  background: rgba(58, 48, 37, 0.6);
+  background: var(--bm-item-surface-alt);
 }
 
 .item-aptitude.bm-item-sheet .bm-pa-modifier-row {
@@ -173,7 +163,7 @@
     justify-self: start;
   }
 
-  .item-aptitude.bm-item-sheet .bm-ability-damage select {
+  .item-aptitude.bm-item-sheet .bm-ability-damage .damage-die-input {
     max-width: 100%;
   }
 

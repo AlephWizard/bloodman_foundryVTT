@@ -41,14 +41,12 @@
 
   <div class="bm-item-heal">
     <label class="inline-label">{{localize "BLOODMAN.Items.HealDieLabel"}}</label>
-    <select name="system.healDie">
-      {{#select item.system.healDie}}
-        <option value="d4">d4</option>
-        <option value="d6">d6</option>
-        <option value="d8">d8</option>
-        <option value="d10">d10</option>
-        <option value="d12">d12</option>
-      {{/select}}
-    </select>
+    <input
+      class="bm-item-input heal-die-input"
+      type="text"
+      name="system.healDie"
+      value="{{item.system.healDie}}"
+      placeholder="/r 1d8+2"
+    />
   </div>
 </form>

@@ -66,7 +66,7 @@ import { buildDamageTargetResolution } from "./src/rules/damage-target-resolutio
 import { buildDamageRerollUtils } from "./src/rules/damage-reroll-utils.mjs";
 import { buildDamageCurrentHelpers } from "./src/rules/damage-current.mjs";
 import { getDamagePayloadField, toBooleanFlag } from "./src/rules/damage-payload-fields.mjs";
-import { normalizeRollDieFormula } from "./src/rules/roll-formula.mjs";
+import { normalizeRollDieFormula, isValidSimpleRollFormula } from "./src/rules/roll-formula.mjs";
 import { buildPowerCostRules } from "./src/rules/power-cost.mjs";
 import { createItemPriceRules } from "./src/rules/item-price.mjs";
 import { createWeaponAmmoRules } from "./src/rules/weapon-ammo.mjs";
@@ -5003,6 +5003,85 @@ async function applyVoyageXPCostOnCreate(actor, item, options = null) {
   });
 }
 
+const ITEM_ROLL_FORMULA_FIELDS = Object.freeze({
+  arme: ["damageDie"],
+  aptitude: ["damageDie"],
+  pouvoir: ["damageDie", "healDie"],
+  soin: ["healDie"]
+});
+
+function getItemRollFormulaFieldLabels(fields = []) {
+  return fields.map(field => {
+    if (field === "damageDie") return tl("BLOODMAN.Items.DamageDieLabel", "de de degat");
+    if (field === "healDie") return tl("BLOODMAN.Items.HealDieLabel", "de de soin");
+    return String(field || "").trim();
+  });
+}
+
+function notifyInvalidItemRollFormula(item, invalidFields = []) {
+  const itemName = String(item?.name || "").trim()
+    || t(`TYPES.Item.${String(item?.type || "").trim().toLowerCase()}`)
+    || tl("BLOODMAN.Common.Name", "Item");
+  const labels = getItemRollFormulaFieldLabels(invalidFields)
+    .map(label => String(label || "").replace(/\s*:\s*$/, "").trim())
+    .filter(Boolean);
+  const details = labels.length ? ` (${labels.join(", ")})` : "";
+  ui.notifications?.error(
+    tl("BLOODMAN.Notifications.ItemRollFormulaInvalid", `Formule de des invalide pour ${itemName}${details}.`)
+  );
+}
+
+function normalizeItemRollFormulaFields(item, updateData = null, options = {}) {
+  const type = String(item?.type || "").trim().toLowerCase();
+  const fields = ITEM_ROLL_FORMULA_FIELDS[type] || [];
+  if (!fields.length) return { invalid: false, changed: false, invalidFields: [] };
+  const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
+  const invalidFields = [];
+  let changed = false;
+
+  for (const field of fields) {
+    const path = `system.${field}`;
+    const hasPathUpdate = updateData ? hasUpdatePath(updateData, path) : false;
+    if (!hasPathUpdate && !includeSourceWhenMissing) continue;
+
+    const rawValue = hasPathUpdate
+      ? getUpdatedPathValue(updateData, path, undefined)
+      : item?.system?.[field];
+    if (rawValue == null) continue;
+
+    const textValue = String(rawValue).trim();
+    if (!textValue) {
+      if (hasPathUpdate && rawValue !== "") {
+        foundry.utils.setProperty(updateData, path, "");
+        changed = true;
+      }
+      continue;
+    }
+
+    if (!isValidSimpleRollFormula(textValue, "d4")) {
+      invalidFields.push(field);
+      continue;
+    }
+
+    const normalized = normalizeRollDieFormula(textValue, "d4");
+    if (hasPathUpdate) {
+      if (String(rawValue) !== normalized) {
+        foundry.utils.setProperty(updateData, path, normalized);
+        changed = true;
+      }
+    } else if (String(rawValue) !== normalized) {
+      item.updateSource({ [path]: normalized });
+      changed = true;
+    }
+  }
+
+  return {
+    invalid: invalidFields.length > 0,
+    changed,
+    invalidFields
+  };
+}
+
 const itemDerivedSyncHooks = buildItemDerivedSyncHooks({
   applyItemResourceBonuses,
   syncActorDerivedCharacteristicsResources,
@@ -5030,6 +5109,11 @@ Hooks.on("preCreateItem", (item, createData, options) => {
   const normalizedWeaponAmmo = normalizeWeaponMagazineCapacityUpdate(item, createData);
   if (!normalizedWeaponAmmo) normalizeWeaponMagazineCapacityUpdate(item);
   normalizeCharacteristicBonusItemUpdate(item, createData);
+  const normalizedRollFormula = normalizeItemRollFormulaFields(item, createData, { includeSourceWhenMissing: true });
+  if (normalizedRollFormula.invalid) {
+    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields);
+    return false;
+  }
 
   if (!isVoyageXPCostItemType(item?.type)) return;
 
@@ -5077,6 +5161,11 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   normalizeItemPriceUpdate(item, updateData);
   normalizeWeaponMagazineCapacityUpdate(item, updateData);
   normalizeCharacteristicBonusItemUpdate(item, updateData);
+  const normalizedRollFormula = normalizeItemRollFormulaFields(item, updateData, { includeSourceWhenMissing: false });
+  if (normalizedRollFormula.invalid) {
+    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields);
+    return false;
+  }
 
   if (!isVoyageXPCostItemType(item?.type)) return;
   const costPath = "system.xpVoyageCost";
@@ -6920,7 +7009,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (displayItem.type === "arme") {
         const damageDie = String(displayItem.system?.damageDie || "").trim();
         if (damageDie) {
-          displayItem.bagActionLabel = `1${damageDie}`;
+          displayItem.bagActionLabel = normalizeRollDieFormula(damageDie, "d4");
           displayItem.bagActionClass = "weapon-roll bm-btn-damage";
         }
         const weaponCategory = getWeaponCategory(displayItem.system?.weaponType);
@@ -6939,7 +7028,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         displayItem.bagReloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
       } else if (displayItem.type === "soin") {
         const healDie = String(displayItem.system?.healDie || "").trim();
-        displayItem.bagActionLabel = `1${healDie || "d4"}`;
+        displayItem.bagActionLabel = normalizeRollDieFormula(healDie || "d4", "d4");
         displayItem.bagActionClass = "item-use bm-btn-heal";
       } else if (displayItem.type === "ration") {
         displayItem.bagActionLabel = t("BLOODMAN.Common.Eat");
@@ -6963,6 +7052,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       .map(item => {
         const weapon = item.toObject();
         weapon._id = weapon._id ?? item.id;
+        weapon.displayDamageFormula = normalizeRollDieFormula(weapon.system?.damageDie, "d4");
         const normalized = normalizeWeaponType(weapon.system?.weaponType);
         const weaponCategory = getWeaponCategory(weapon.system?.weaponType);
         if (normalized === "corps") weapon.displayWeaponType = weaponTypeMelee;

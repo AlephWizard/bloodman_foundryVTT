@@ -4,10 +4,11 @@ function defaultToFiniteNumber(value, fallback = 0) {
 }
 
 function defaultNormalizeRollDieFormula(value, fallback = "d4") {
-  const raw = String(value || fallback).trim();
-  if (!raw) return "1d4";
-  if (/^\d/.test(raw)) return raw;
-  return `1${raw}`;
+  const source = value ?? fallback ?? "d4";
+  const stripped = String(source).trim().replace(/^\/(?:r|roll)\b\s*/i, "").trim();
+  if (!stripped) return "1d4";
+  const explicitDiceCount = stripped.replace(/(^|[+\-*/(])\s*d(\d+)/ig, "$11d$2");
+  return explicitDiceCount.replace(/\s+/g, "");
 }
 
 function defaultToBooleanFlag(value, fallback = false) {

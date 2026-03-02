@@ -31,6 +31,7 @@
   --bm-item-line: #4f4032;
   --bm-item-border: #6d5a47;
   --bm-item-accent: #d08b46;
+  --bm-item-accent-glow: rgba(208, 139, 70, 0.24);
   --bm-item-surface: rgba(38, 31, 24, 0.88);
   --bm-item-surface-soft: rgba(29, 24, 19, 0.86);
   --bm-item-surface-alt: rgba(46, 38, 29, 0.78);
@@ -38,13 +39,125 @@
   --bm-item-dash: rgba(208, 139, 70, 0.34);
   font-family: "Oswald", sans-serif;
   color: var(--bm-item-text);
-  background: linear-gradient(165deg, #1a1612 0%, #120f0d 100%);
-  border: 1px solid rgba(139, 114, 88, 0.34);
+  background: linear-gradient(165deg, var(--bm-item-surface) 0%, var(--bm-item-surface-soft) 100%);
+  border: 1px solid var(--bm-item-border);
   border-radius: 12px;
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.42);
   padding: 12px;
   display: grid;
   gap: 10px;
+}
+
+.item-arme.bm-item-sheet {
+  --bm-item-text: #ffe7e2;
+  --bm-item-muted: #e7a39b;
+  --bm-item-panel: #241312;
+  --bm-item-panel-alt: #1a0d0d;
+  --bm-item-line: #7a3a37;
+  --bm-item-border: #974945;
+  --bm-item-accent: #d74d46;
+  --bm-item-accent-glow: rgba(215, 77, 70, 0.26);
+  --bm-item-surface: rgba(56, 21, 20, 0.9);
+  --bm-item-surface-soft: rgba(37, 14, 14, 0.9);
+  --bm-item-surface-alt: rgba(72, 26, 24, 0.82);
+  --bm-item-chip: rgba(44, 17, 17, 0.9);
+  --bm-item-dash: rgba(215, 77, 70, 0.36);
+}
+
+.item-aptitude.bm-item-sheet {
+  --bm-item-text: #fff0dc;
+  --bm-item-muted: #e7b782;
+  --bm-item-panel: #241810;
+  --bm-item-panel-alt: #1a120b;
+  --bm-item-line: #7c5130;
+  --bm-item-border: #99673f;
+  --bm-item-accent: #e08a32;
+  --bm-item-accent-glow: rgba(224, 138, 50, 0.26);
+  --bm-item-surface: rgba(58, 36, 20, 0.9);
+  --bm-item-surface-soft: rgba(40, 24, 14, 0.88);
+  --bm-item-surface-alt: rgba(74, 47, 27, 0.82);
+  --bm-item-chip: rgba(48, 30, 18, 0.9);
+  --bm-item-dash: rgba(224, 138, 50, 0.34);
+}
+
+.item-objet.bm-item-sheet {
+  --bm-item-text: #e8edf3;
+  --bm-item-muted: #b4bfcc;
+  --bm-item-panel: #171b21;
+  --bm-item-panel-alt: #12161b;
+  --bm-item-line: #495464;
+  --bm-item-border: #607184;
+  --bm-item-accent: #8fa2b9;
+  --bm-item-accent-glow: rgba(143, 162, 185, 0.24);
+  --bm-item-surface: rgba(33, 39, 47, 0.9);
+  --bm-item-surface-soft: rgba(24, 29, 35, 0.88);
+  --bm-item-surface-alt: rgba(44, 52, 62, 0.82);
+  --bm-item-chip: rgba(27, 33, 40, 0.9);
+  --bm-item-dash: rgba(143, 162, 185, 0.34);
+}
+
+.item-pouvoir.bm-item-sheet {
+  --bm-item-text: #f1e8ff;
+  --bm-item-muted: #c7b2ea;
+  --bm-item-panel: #21142e;
+  --bm-item-panel-alt: #180f23;
+  --bm-item-line: #65438d;
+  --bm-item-border: #7b55a9;
+  --bm-item-accent: #a06cf0;
+  --bm-item-accent-glow: rgba(160, 108, 240, 0.25);
+  --bm-item-surface: rgba(52, 31, 76, 0.9);
+  --bm-item-surface-soft: rgba(36, 22, 54, 0.88);
+  --bm-item-surface-alt: rgba(65, 40, 96, 0.82);
+  --bm-item-chip: rgba(40, 24, 60, 0.9);
+  --bm-item-dash: rgba(160, 108, 240, 0.34);
+}
+
+.item-protection.bm-item-sheet {
+  --bm-item-text: #f0e6d7;
+  --bm-item-muted: #c5ac8b;
+  --bm-item-panel: #21180f;
+  --bm-item-panel-alt: #181108;
+  --bm-item-line: #6e5135;
+  --bm-item-border: #8a6541;
+  --bm-item-accent: #c28b52;
+  --bm-item-accent-glow: rgba(194, 139, 82, 0.24);
+  --bm-item-surface: rgba(52, 37, 24, 0.9);
+  --bm-item-surface-soft: rgba(35, 25, 16, 0.88);
+  --bm-item-surface-alt: rgba(66, 48, 31, 0.82);
+  --bm-item-chip: rgba(40, 29, 19, 0.9);
+  --bm-item-dash: rgba(194, 139, 82, 0.34);
+}
+
+.item-ration.bm-item-sheet {
+  --bm-item-text: #f5efd8;
+  --bm-item-muted: #d7c48e;
+  --bm-item-panel: #222014;
+  --bm-item-panel-alt: #19170e;
+  --bm-item-line: #7a7040;
+  --bm-item-border: #988a50;
+  --bm-item-accent: #c8b04f;
+  --bm-item-accent-glow: rgba(200, 176, 79, 0.24);
+  --bm-item-surface: rgba(58, 53, 28, 0.9);
+  --bm-item-surface-soft: rgba(39, 35, 19, 0.88);
+  --bm-item-surface-alt: rgba(72, 66, 34, 0.82);
+  --bm-item-chip: rgba(44, 40, 22, 0.9);
+  --bm-item-dash: rgba(200, 176, 79, 0.34);
+}
+
+.item-soin.bm-item-sheet {
+  --bm-item-text: #e7f8ea;
+  --bm-item-muted: #abd7b3;
+  --bm-item-panel: #132117;
+  --bm-item-panel-alt: #0f1a12;
+  --bm-item-line: #3d7a4c;
+  --bm-item-border: #539660;
+  --bm-item-accent: #5cc777;
+  --bm-item-accent-glow: rgba(92, 199, 119, 0.25);
+  --bm-item-surface: rgba(26, 52, 33, 0.9);
+  --bm-item-surface-soft: rgba(18, 36, 23, 0.88);
+  --bm-item-surface-alt: rgba(33, 64, 40, 0.82);
+  --bm-item-chip: rgba(21, 43, 27, 0.9);
+  --bm-item-dash: rgba(92, 199, 119, 0.34);
 }
 
 .bloodman-item.bm-item-sheet .bm-item-top {
@@ -79,7 +192,7 @@
   padding: 8px;
   border: 1px solid rgba(109, 90, 71, 0.42);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(36, 30, 23, 0.9), rgba(24, 20, 16, 0.9));
+  background: linear-gradient(180deg, var(--bm-item-surface), var(--bm-item-surface-soft));
 }
 
 .bloodman-item.bm-item-sheet .bm-item-row {
@@ -111,8 +224,8 @@
   padding: 0 8px;
   border-radius: 8px;
   border: 1px solid var(--bm-item-border);
-  background: #0f0d0a;
-  color: #f7e6ca;
+  background: var(--bm-item-panel-alt);
+  color: var(--bm-item-text);
   font-weight: 700;
   font-size: 10.5px;
   letter-spacing: 0.6px;
@@ -199,7 +312,7 @@
 .bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker:hover,
 .bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker:focus {
   border-color: var(--bm-item-accent);
-  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.24);
+  box-shadow: 0 0 0 2px var(--bm-item-accent-glow);
   outline: none;
 }
 
@@ -280,7 +393,7 @@
 .bloodman-item.bm-item-sheet .toggle-option input:checked {
   background: var(--bm-item-accent);
   border-color: var(--bm-item-accent);
-  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.2);
+  box-shadow: 0 0 0 2px var(--bm-item-accent-glow);
 }
 
 .bloodman-item.bm-item-sheet select:disabled,
@@ -308,7 +421,7 @@
 .bloodman-item.bm-item-sheet select:focus {
   outline: none;
   border-color: var(--bm-item-accent);
-  box-shadow: 0 0 0 2px rgba(208, 139, 70, 0.24);
+  box-shadow: 0 0 0 2px var(--bm-item-accent-glow);
 }
 
 @media (max-width: 860px) {
@@ -644,6 +757,13 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 }
 
 .bm-damage-config.bm-damage-config--simple-attack select:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  border-style: dashed;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config.bm-damage-config--simple-attack input[name="degats"]:disabled {
   opacity: 1;
   cursor: not-allowed;
   border-style: dashed;

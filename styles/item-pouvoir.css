@@ -19,7 +19,7 @@
   padding: 10px;
   border: 1px solid var(--bm-item-line);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(51, 42, 32, 0.86), rgba(31, 25, 20, 0.86));
+  background: linear-gradient(180deg, var(--bm-item-surface), var(--bm-item-surface-soft));
 }
 
 .item-pouvoir.bm-item-sheet .power-cost-input {
@@ -51,7 +51,8 @@
   grid-column: 1 / -1;
 }
 
-.item-pouvoir.bm-item-sheet .ability-section select {
+.item-pouvoir.bm-item-sheet .ability-section .damage-die-input,
+.item-pouvoir.bm-item-sheet .ability-section .heal-die-input {
   width: 100%;
   min-width: 120px;
   max-width: none;
@@ -72,18 +73,9 @@
   justify-self: end;
 }
 
-.item-pouvoir.bm-item-sheet .power-usable-damage-section > .damage-die-select {
+.item-pouvoir.bm-item-sheet .power-usable-damage-section > .damage-die-input,
+.item-pouvoir.bm-item-sheet .power-usable-damage-section > .heal-die-input {
   grid-column: 1 / -1;
-}
-
-.item-pouvoir.bm-item-sheet .power-usable-damage-section .damage-die-select {
-  background: #000000;
-  color: #ffffff;
-}
-
-.item-pouvoir.bm-item-sheet .power-usable-damage-section .damage-die-select option {
-  background: #000000;
-  color: #ffffff;
 }
 
 .item-pouvoir.bm-item-sheet .bonus-controls {

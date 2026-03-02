@@ -65,11 +65,11 @@
 }
 
 .item-objet.bm-item-sheet .bonus-grid-characteristics.is-disabled label {
-  background: rgba(58, 48, 37, 0.6);
+  background: var(--bm-item-surface-alt);
 }
 
 .item-ration.bm-item-sheet .bm-item-fields {
-  background: linear-gradient(180deg, rgba(42, 35, 27, 0.92), rgba(27, 22, 17, 0.9));
+  background: linear-gradient(180deg, var(--bm-item-surface), var(--bm-item-surface-soft));
 }
 
 @media (max-width: 860px) {
