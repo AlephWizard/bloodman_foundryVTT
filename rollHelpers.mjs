@@ -11,6 +11,10 @@ import {
   socketEmit,
   updateDocument
 } from "./src/compat/index.mjs";
+import {
+  normalizeOptionalRollFormula,
+  validateRollFormula
+} from "./src/rules/roll-formula.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
@@ -255,8 +259,7 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
       degats: String(config?.degats || "").trim().toUpperCase(),
       formula: normalizeDamageFormula(config?.formula),
       bonusBrut: toNonNegativeInt(config?.bonusBrut, 0),
-      penetration: toNonNegativeInt(config?.penetration, 0),
-      rollKeepHighest: config?.rollKeepHighest === true
+      penetration: toNonNegativeInt(config?.penetration, 0)
     }
   };
   if (!socketEmit(SYSTEM_SOCKET, payload)) {
@@ -407,10 +410,7 @@ async function setChaosValue(nextValue) {
 }
 
 function normalizeDamageFormula(formula) {
-  const commandStripped = String(formula || "").trim().replace(/^\/(?:r|roll)\b\s*/i, "");
-  const raw = commandStripped.toLowerCase().replace(/\s+/g, "");
-  if (!raw) return "";
-  return raw.replace(/(^|[+\-*/(])d(\d+)/g, "$11d$2");
+  return normalizeOptionalRollFormula(formula);
 }
 
 function getDamageOptionByFormula(formula) {
@@ -427,10 +427,8 @@ function createCustomDamageOption(formula, fallbackFormula = "1d4") {
   };
 }
 
-function isValidSimpleDamageFormula(formula) {
-  const normalized = normalizeDamageFormula(formula);
-  if (!normalized) return false;
-  return /^(?:\d*d\d+|\d+)(?:[+\-*/](?:\d*d\d+|\d+))*$/i.test(normalized);
+function validateDamageFormula(formula) {
+  return validateRollFormula(formula, "d4", { useFallbackOnEmpty: false });
 }
 
 function getDefaultDamageOption(formula) {
@@ -445,8 +443,7 @@ function getRememberedDamageDialogConfig() {
   return {
     formula: option?.formula || normalizedFormula || "",
     bonusBrut: toNonNegativeInt(raw.bonusBrut, 0),
-    penetration: toNonNegativeInt(raw.penetration, 0),
-    rollKeepHighest: raw.rollKeepHighest === true
+    penetration: toNonNegativeInt(raw.penetration, 0)
   };
 }
 
@@ -458,7 +455,6 @@ async function rememberDamageDialogConfig(config = {}) {
     formula: option?.formula || normalizedFormula || "",
     bonusBrut: toNonNegativeInt(config.bonusBrut, 0),
     penetration: toNonNegativeInt(config.penetration, 0),
-    rollKeepHighest: config.rollKeepHighest === true,
     updatedAt: Date.now()
   };
   try {
@@ -479,41 +475,14 @@ function getRollValues(roll) {
   return values;
 }
 
-function buildKeepHighestRollTag(firstTotal, secondTotal, keptTotal) {
-  if (!Number.isFinite(firstTotal) || !Number.isFinite(secondTotal) || !Number.isFinite(keptTotal)) return "";
-  const label = tl("BLOODMAN.Dialogs.DamageConfig.RollHighestLabel", "2 jets, garder le plus haut");
-  return `${label}: ${firstTotal} / ${secondTotal} -> ${keptTotal}`;
-}
-
 async function evaluateDamageRoll(config = {}) {
   const formula = normalizeDamageFormula(config?.formula) || "1d4";
-  const rollKeepHighest = Boolean(config?.rollKeepHighest);
-  if (!rollKeepHighest) {
-    const roll = await new Roll(formula).evaluate();
-    return {
-      roll,
-      rollResults: getRollValues(roll),
-      rawTotal: Number(roll.total) || 0,
-      rollKeepHighest: false,
-      modeTag: ""
-    };
-  }
-
-  const firstRoll = await new Roll(formula).evaluate();
-  const secondRoll = await new Roll(formula).evaluate();
-  const firstTotal = Number(firstRoll.total) || 0;
-  const secondTotal = Number(secondRoll.total) || 0;
-  const keepFirst = firstTotal >= secondTotal;
-  const keptRoll = keepFirst ? firstRoll : secondRoll;
-  const keptTotal = keepFirst ? firstTotal : secondTotal;
+  const roll = await new Roll(formula).evaluate();
   return {
-    roll: keptRoll,
-    rollResults: getRollValues(keptRoll),
-    rawTotal: keptTotal,
-    rollKeepHighest: true,
-    modeTag: buildKeepHighestRollTag(firstTotal, secondTotal, keptTotal),
-    firstTotal,
-    secondTotal
+    roll,
+    rollResults: getRollValues(roll),
+    rawTotal: Number(roll.total) || 0,
+    modeTag: ""
   };
 }
 
@@ -568,7 +537,6 @@ async function promptDamageConfiguration({
   defaultFormula = "1d4",
   defaultBonus = 0,
   defaultPenetration = 0,
-  defaultRollKeepHighest = false,
   dialogVariant = "",
   fixedFormula = "",
   lockFormula = false,
@@ -581,9 +549,13 @@ async function promptDamageConfiguration({
   const lockFormulaSelection = Boolean(lockFormula);
   const restrictedFormula = normalizedFixedFormula || normalizedDefaultFormula;
   const rememberedConfig = getRememberedDamageDialogConfig();
+  const rememberedFormula = normalizeDamageFormula(rememberedConfig?.formula);
+  const hasStoredFormulaDivergence = !lockFormulaSelection
+    && Boolean(rememberedFormula)
+    && rememberedFormula !== normalizedDefaultFormula;
   const selectedFormula = lockFormulaSelection
     ? restrictedFormula
-    : (rememberedConfig?.formula || normalizedDefaultFormula);
+    : normalizedDefaultFormula;
   const selectedDefault = getDamageOptionByFormula(selectedFormula)
     || createCustomDamageOption(selectedFormula, normalizedDefaultFormula);
   const initialBonus = rememberedConfig
@@ -592,9 +564,6 @@ async function promptDamageConfiguration({
   const initialPenetration = rememberedConfig
     ? toNonNegativeInt(rememberedConfig.penetration, toNonNegativeInt(defaultPenetration, 0))
     : toNonNegativeInt(defaultPenetration, 0);
-  const initialRollKeepHighest = rememberedConfig
-    ? rememberedConfig.rollKeepHighest === true
-    : Boolean(defaultRollKeepHighest);
   const titleSource = sourceName ? ` (${sourceName})` : "";
   const damageDieLabel = tl("BLOODMAN.Items.DamageDieLabel", "De de degat");
   const settingsLabel = tl("BLOODMAN.Dialogs.DamageConfig.SettingsLabel", "Reglages du jet");
@@ -605,10 +574,47 @@ async function promptDamageConfiguration({
   const hintLabel = isSimpleAttackVariant
     ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackHint", "Configuration de l'attaque simple")
     : titleLabel;
-  const rollHighestLabel = tl("BLOODMAN.Dialogs.DamageConfig.RollHighestLabel", "2 jets, garder le plus haut");
-  // Prevent the trailing "+" from wrapping to a new line in narrow layouts.
-  const rawBonusLabel = tl("BLOODMAN.Dialogs.DamageConfig.RawBonusLabel", "Degats bruts +").replace(/\s\+$/, "&nbsp;+");
-  const penetrationLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationLabel", "Penetration +").replace(/\s\+$/, "&nbsp;+");
+  const formulaHintLabel = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHint",
+    "Formule libre: 1d8, 4d6kh3, 10d6cs>=4"
+  );
+  const formulaHelpSummaryLabel = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHelpSummary",
+    "Aide rapide des formules"
+  );
+  const formulaHelpItemStandard = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHelpItemStandard",
+    "<code>NdF</code> : <code>1d20</code>, <code>2d6</code>, <code>4d10+3</code>"
+  );
+  const formulaHelpItemMath = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHelpItemMath",
+    "Operations : <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, parenthese <code>()</code>"
+  );
+  const formulaHelpItemKeepDrop = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHelpItemKeepDrop",
+    "Conserver/retirer : <code>kh</code>, <code>kl</code>, <code>dh</code>, <code>dl</code>"
+  );
+  const formulaHelpItemRerollExplode = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHelpItemRerollExplode",
+    "Relance/explosion : <code>r</code>, <code>rr</code>, <code>x</code>, <code>xo</code>"
+  );
+  const formulaHelpItemCount = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaHelpItemCount",
+    "Succes/echec : <code>cs</code>, <code>cf</code> (ex: <code>10d6cs>=4</code>)"
+  );
+  const rawBonusCardLabel = tl("BLOODMAN.Dialogs.DamageConfig.RawBonusCardLabel", "Degats bruts");
+  const penetrationCardLabel = tl("BLOODMAN.Dialogs.DamageConfig.PenetrationCardLabel", "Penetration");
+  const stepperDecreaseLabel = tl("BLOODMAN.Dialogs.DamageConfig.StepperDecrease", "Diminuer");
+  const stepperIncreaseLabel = tl("BLOODMAN.Dialogs.DamageConfig.StepperIncrease", "Augmenter");
+  const formulaPriorityNotice = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaPriorityNotice",
+    "Formule de la fiche objet appliquee automatiquement."
+  );
+  const formulaDivergenceNotice = tl(
+    "BLOODMAN.Dialogs.DamageConfig.FormulaDivergenceNotice",
+    `Derniere formule memorisee (${(rememberedFormula || "").toUpperCase()}) differente.`
+  );
+  const shouldShowFormulaNotice = !lockFormulaSelection && hasStoredFormulaDivergence;
   const highlightedNumberClass = "bm-damage-config-value-active";
 
   const inputDisabledAttr = lockFormulaSelection ? " disabled" : "";
@@ -624,30 +630,48 @@ async function promptDamageConfiguration({
         </div>
         <div class="bm-damage-config-head-copy">
           <p class="bm-damage-config-eyebrow">${eyebrowLabel}</p>
-          <p class="bm-damage-config-hint">${hintLabel}</p>
+          <p class="bm-damage-config-title">${hintLabel}</p>
+          ${shouldShowFormulaNotice ? `<p class="bm-damage-config-hint bm-damage-config-hint-sync">${formulaPriorityNotice} ${formulaDivergenceNotice}</p>` : ""}
         </div>
       </div>
       <div class="bm-damage-config-grid">
-        <div class="bm-damage-config-row bm-damage-config-row-wide">
+        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-row-formula">
           <label>${damageDieLabel}</label>
           <input type="text" name="degats" value="${selectedDefault.formula}" placeholder="/r 1d6+2"${inputDisabledAttr} />
+          <p class="bm-damage-config-field-hint">${formulaHintLabel}</p>
+          <details class="bm-damage-config-help">
+            <summary>
+              <i class="fa-solid fa-scroll" aria-hidden="true"></i>
+              <span>${formulaHelpSummaryLabel}</span>
+            </summary>
+            <ul>
+              <li>${formulaHelpItemStandard}</li>
+              <li>${formulaHelpItemMath}</li>
+              <li>${formulaHelpItemKeepDrop}</li>
+              <li>${formulaHelpItemRerollExplode}</li>
+              <li>${formulaHelpItemCount}</li>
+            </ul>
+          </details>
         </div>
-        <div class="bm-damage-config-row bm-damage-config-inline">
-          <label>${rawBonusLabel}</label>
-          <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} />
-        </div>
-        <div class="bm-damage-config-row bm-damage-config-inline">
-          <label>${penetrationLabel}</label>
-          <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} />
+        <div class="bm-damage-config-stats">
+          <div class="bm-damage-config-stat bm-damage-config-stat--bonus">
+            <label>${rawBonusCardLabel}</label>
+            <div class="bm-damage-config-stepper">
+              <button type="button" class="bm-damage-config-stepper-btn" data-action="decrement" data-target="bonus_brut" aria-label="${stepperDecreaseLabel}">-</button>
+              <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} />
+              <button type="button" class="bm-damage-config-stepper-btn" data-action="increment" data-target="bonus_brut" aria-label="${stepperIncreaseLabel}">+</button>
+            </div>
+          </div>
+          <div class="bm-damage-config-stat bm-damage-config-stat--penetration">
+            <label>${penetrationCardLabel}</label>
+            <div class="bm-damage-config-stepper">
+              <button type="button" class="bm-damage-config-stepper-btn" data-action="decrement" data-target="penetration" aria-label="${stepperDecreaseLabel}">-</button>
+              <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} />
+              <button type="button" class="bm-damage-config-stepper-btn" data-action="increment" data-target="penetration" aria-label="${stepperIncreaseLabel}">+</button>
+            </div>
+          </div>
         </div>
       </div>
-      <label class="bm-damage-config-toggle">
-        <input type="checkbox" name="roll_keep_highest" ${initialRollKeepHighest ? "checked" : ""} />
-        <span class="bm-damage-config-toggle-indicator" aria-hidden="true">2x</span>
-        <span class="bm-damage-config-toggle-copy">
-          <span class="bm-damage-config-toggle-title">${rollHighestLabel}</span>
-        </span>
-      </label>
     </div>
   </form>`;
 
@@ -656,8 +680,7 @@ async function promptDamageConfiguration({
     degats: selectedDefault.label,
     formula: selectedDefault.formula,
     bonusBrut: initialBonus,
-    penetration: initialPenetration,
-    rollKeepHighest: initialRollKeepHighest
+    penetration: initialPenetration
   };
   let lastPopupConfig = { ...initialPopupConfig };
   let popupUpdateTimer = null;
@@ -667,8 +690,7 @@ async function promptDamageConfiguration({
       degats: String(nextConfig?.degats || initialPopupConfig.degats || "").trim().toUpperCase(),
       formula: normalizeDamageFormula(nextConfig?.formula || initialPopupConfig.formula || "1d4"),
       bonusBrut: toNonNegativeInt(nextConfig?.bonusBrut, initialPopupConfig.bonusBrut),
-      penetration: toNonNegativeInt(nextConfig?.penetration, initialPopupConfig.penetration),
-      rollKeepHighest: nextConfig?.rollKeepHighest === true
+      penetration: toNonNegativeInt(nextConfig?.penetration, initialPopupConfig.penetration)
     };
     lastPopupConfig = payloadConfig;
     emitDamageConfigPopup(actor, sourceName, payloadConfig, {
@@ -721,6 +743,13 @@ async function promptDamageConfiguration({
         title: `${titleLabel}${titleSource}`,
         content,
         render: html => {
+          if (!lockFormulaSelection) {
+            const damageInput = html.find("input[name='degats']").first();
+            const current = normalizeDamageFormula(damageInput.val());
+            if (current !== normalizedDefaultFormula) {
+              damageInput.val(normalizedDefaultFormula);
+            }
+          }
           const syncDamageInputHighlights = () => {
             const bonusInput = html.find("input[name='bonus_brut']");
             const penetrationInput = html.find("input[name='penetration']");
@@ -728,6 +757,13 @@ async function promptDamageConfiguration({
             const penetrationValue = toNonNegativeInt(penetrationInput.val(), initialPenetration);
             bonusInput.toggleClass(highlightedNumberClass, bonusValue > 0);
             penetrationInput.toggleClass(highlightedNumberClass, penetrationValue > 0);
+          };
+          const adjustStepperInputValue = (fieldName, delta) => {
+            const target = html.find(`input[name='${fieldName}']`).first();
+            if (!target.length) return;
+            const current = toNonNegativeInt(target.val(), 0);
+            const next = Math.max(0, current + delta);
+            target.val(String(next));
           };
           const readCurrentConfig = () => {
             const selectedFormula = lockFormulaSelection
@@ -739,12 +775,22 @@ async function promptDamageConfiguration({
               degats: option?.label || selectedFormula.toUpperCase(),
               formula: option?.formula || selectedFormula,
               bonusBrut: toNonNegativeInt(html.find("input[name='bonus_brut']").val(), initialBonus),
-              penetration: toNonNegativeInt(html.find("input[name='penetration']").val(), initialPenetration),
-              rollKeepHighest: Boolean(html.find("input[name='roll_keep_highest']").is(":checked"))
+              penetration: toNonNegativeInt(html.find("input[name='penetration']").val(), initialPenetration)
             };
           };
           syncDamageInputHighlights();
-          html.on("input change", "input[name='degats'], input[name='bonus_brut'], input[name='penetration'], input[name='roll_keep_highest']", () => {
+          html.on("input change", "input[name='degats'], input[name='bonus_brut'], input[name='penetration']", () => {
+            syncDamageInputHighlights();
+            schedulePopupUpdate(readCurrentConfig());
+          });
+          html.on("click", ".bm-damage-config-stepper-btn", event => {
+            event.preventDefault();
+            const button = event.currentTarget;
+            const targetName = String(button?.dataset?.target || "").trim();
+            const action = String(button?.dataset?.action || "").trim().toLowerCase();
+            const delta = action === "increment" ? 1 : (action === "decrement" ? -1 : 0);
+            if (!targetName || delta === 0) return;
+            adjustStepperInputValue(targetName, delta);
             syncDamageInputHighlights();
             schedulePopupUpdate(readCurrentConfig());
           });
@@ -756,8 +802,11 @@ async function promptDamageConfiguration({
               const selectedFormula = lockFormulaSelection
                 ? selectedDefault.formula
                 : normalizeDamageFormula(html.find("input[name='degats']").val());
-              if (!isValidSimpleDamageFormula(selectedFormula)) {
-                safeWarn(tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide."));
+              const formulaValidation = validateDamageFormula(selectedFormula);
+              if (!formulaValidation.valid) {
+                const baseMessage = tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide.");
+                const compactReason = String(formulaValidation.error || "").split(/\r?\n/u)[0].trim();
+                safeWarn(`${baseMessage} ${compactReason}`.trim());
                 return false;
               }
               const option = getDamageOptionByFormula(selectedFormula)
@@ -765,7 +814,6 @@ async function promptDamageConfiguration({
 
               const bonusRaw = html.find("input[name='bonus_brut']").val();
               const penetrationRaw = html.find("input[name='penetration']").val();
-              const rollKeepHighest = Boolean(html.find("input[name='roll_keep_highest']").is(":checked"));
               const bonus = Number(bonusRaw);
               const penetration = Number(penetrationRaw);
               if (!Number.isFinite(bonus) || bonus < 0) {
@@ -782,7 +830,6 @@ async function promptDamageConfiguration({
                 formula: option.formula,
                 bonusBrut: Math.floor(bonus),
                 penetration: Math.floor(penetration),
-                rollKeepHighest,
                 attaquant_id: actor?.id || ""
               };
               if (rememberConfig) void rememberDamageDialogConfig(config);
@@ -803,7 +850,7 @@ async function promptDamageConfiguration({
         classes: isSimpleAttackVariant
           ? ["bloodman-damage-dialog", "bloodman-damage-dialog-simple-attack"]
           : ["bloodman-damage-dialog"],
-        width: 500
+        width: 470
       }
     ).render(true);
   });
@@ -884,7 +931,6 @@ function buildDamageRequestPayload(token, damage, options = {}) {
   const attackerId = String(options.attaquant_id || options.attackerId || "").trim();
   const attackerName = String(options.attackerName || "").trim();
   const rollResults = Array.isArray(options.rollResults) ? options.rollResults : [];
-  const rollKeepHighest = options.rollKeepHighest === true;
   const attackerUserId = String(options.attackerUserId || game.user?.id || "").trim();
   const rollId = String(options.rollId || "").trim();
   const itemId = String(options.itemId || "").trim();
@@ -919,7 +965,6 @@ function buildDamageRequestPayload(token, damage, options = {}) {
     attackerId,
     attackerName,
     rollResults,
-    rollKeepHighest,
     degats: damageLabel || damageFormula.toUpperCase(),
     bonus_brut: bonusBrut,
     cible_id: tokenId || actorId || "",
@@ -932,7 +977,6 @@ function buildDamageBackendInput(actor, config) {
   return {
     degats: config.degats,
     bonus_brut: config.bonusBrut,
-    roll_keep_highest: Boolean(config.rollKeepHighest),
     penetration: config.penetration,
     cible_id: targetIds[0] || "",
     attaquant_id: actor?.id || ""
@@ -958,7 +1002,6 @@ function buildDamageContext(actor, config, {
     formula: config.formula,
     degats: config.degats,
     bonusBrut: config.bonusBrut,
-    rollKeepHighest: Boolean(config.rollKeepHighest),
     penetration: config.penetration,
     totalDamage,
     targets: Array.isArray(targets) ? targets : []

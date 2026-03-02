@@ -161,6 +161,19 @@
         "Title": "Configuration du jet de dégâts",
         "SimpleAttackEyebrow": "Attaque",
         "SimpleAttackHint": "Configuration de l'attaque",
+        "FormulaHint": "Formule libre : 1d8, 4d6kh3, 10d6cs>=4",
+        "FormulaHelpSummary": "Aide rapide des formules",
+        "FormulaHelpItemStandard": "<code>NdF</code> : <code>1d20</code>, <code>2d6</code>, <code>4d10+3</code>",
+        "FormulaHelpItemMath": "Operations : <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, parentheses <code>()</code>",
+        "FormulaHelpItemKeepDrop": "Conserver/retirer : <code>kh</code>, <code>kl</code>, <code>dh</code>, <code>dl</code>",
+        "FormulaHelpItemRerollExplode": "Relance/explosion : <code>r</code>, <code>rr</code>, <code>x</code>, <code>xo</code>",
+        "FormulaHelpItemCount": "Succes/echec : <code>cs</code>, <code>cf</code> (ex: <code>10d6cs>=4</code>)",
+        "RawBonusCardLabel": "Dégâts bruts",
+        "PenetrationCardLabel": "Pénétration",
+        "StepperDecrease": "Diminuer",
+        "StepperIncrease": "Augmenter",
+        "FormulaPriorityNotice": "Formule de la fiche objet appliquee automatiquement.",
+        "FormulaDivergenceNotice": "La derniere formule memorisee est differente.",
         "RawBonusLabel": "Dégâts bruts +",
         "PenetrationLabel": "Pénétration +"
       },
@@ -275,4 +288,3 @@
   "TYPES.Item.protection": "Protection",
   "TYPES.Item.soin": "Soin"
 }
-

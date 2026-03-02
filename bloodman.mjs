@@ -66,7 +66,7 @@ import { buildDamageTargetResolution } from "./src/rules/damage-target-resolutio
 import { buildDamageRerollUtils } from "./src/rules/damage-reroll-utils.mjs";
 import { buildDamageCurrentHelpers } from "./src/rules/damage-current.mjs";
 import { getDamagePayloadField, toBooleanFlag } from "./src/rules/damage-payload-fields.mjs";
-import { normalizeRollDieFormula, isValidSimpleRollFormula } from "./src/rules/roll-formula.mjs";
+import { normalizeRollDieFormula, validateRollFormula } from "./src/rules/roll-formula.mjs";
 import { buildPowerCostRules } from "./src/rules/power-cost.mjs";
 import { createItemPriceRules } from "./src/rules/item-price.mjs";
 import { createWeaponAmmoRules } from "./src/rules/weapon-ammo.mjs";
@@ -5021,14 +5021,20 @@ function getItemRollFormulaFieldLabels(fields = []) {
   });
 }
 
-function notifyInvalidItemRollFormula(item, invalidFields = []) {
+function notifyInvalidItemRollFormula(item, invalidFields = [], invalidFieldErrors = {}) {
   const itemName = String(item?.name || "").trim()
     || t(`TYPES.Item.${String(item?.type || "").trim().toLowerCase()}`)
     || tl("BLOODMAN.Common.Name", "Item");
-  const labels = getItemRollFormulaFieldLabels(invalidFields)
-    .map(label => String(label || "").replace(/\s*:\s*$/, "").trim())
-    .filter(Boolean);
-  const details = labels.length ? ` (${labels.join(", ")})` : "";
+  const labelsByField = new Map(
+    invalidFields.map((field, index) => [field, getItemRollFormulaFieldLabels([field])[index] || field])
+  );
+  const detailsList = invalidFields.map(field => {
+    const label = String(labelsByField.get(field) || field).replace(/\s*:\s*$/, "").trim();
+    const rawError = String(invalidFieldErrors?.[field] || "").trim();
+    const compactError = rawError ? rawError.split(/\r?\n/u)[0].trim() : "";
+    return compactError ? `${label}: ${compactError}` : label;
+  }).filter(Boolean);
+  const details = detailsList.length ? ` (${detailsList.join(" ; ")})` : "";
   ui.notifications?.error(
     tl("BLOODMAN.Notifications.ItemRollFormulaInvalid", `Formule de des invalide pour ${itemName}${details}.`)
   );
@@ -5040,6 +5046,7 @@ function normalizeItemRollFormulaFields(item, updateData = null, options = {}) {
   if (!fields.length) return { invalid: false, changed: false, invalidFields: [] };
   const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
   const invalidFields = [];
+  const invalidFieldErrors = {};
   let changed = false;
 
   for (const field of fields) {
@@ -5061,12 +5068,14 @@ function normalizeItemRollFormulaFields(item, updateData = null, options = {}) {
       continue;
     }
 
-    if (!isValidSimpleRollFormula(textValue, "d4")) {
+    const validation = validateRollFormula(textValue, "d4", { useFallbackOnEmpty: false });
+    if (!validation.valid) {
       invalidFields.push(field);
+      invalidFieldErrors[field] = validation.error;
       continue;
     }
 
-    const normalized = normalizeRollDieFormula(textValue, "d4");
+    const normalized = validation.normalized || normalizeRollDieFormula(textValue, "d4");
     if (hasPathUpdate) {
       if (String(rawValue) !== normalized) {
         foundry.utils.setProperty(updateData, path, normalized);
@@ -5081,7 +5090,8 @@ function normalizeItemRollFormulaFields(item, updateData = null, options = {}) {
   return {
     invalid: invalidFields.length > 0,
     changed,
-    invalidFields
+    invalidFields,
+    invalidFieldErrors
   };
 }
 
@@ -5114,7 +5124,7 @@ Hooks.on("preCreateItem", (item, createData, options) => {
   normalizeCharacteristicBonusItemUpdate(item, createData);
   const normalizedRollFormula = normalizeItemRollFormulaFields(item, createData, { includeSourceWhenMissing: true });
   if (normalizedRollFormula.invalid) {
-    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields);
+    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields, normalizedRollFormula.invalidFieldErrors);
     return false;
   }
 
@@ -5166,7 +5176,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   normalizeCharacteristicBonusItemUpdate(item, updateData);
   const normalizedRollFormula = normalizeItemRollFormulaFields(item, updateData, { includeSourceWhenMissing: false });
   if (normalizedRollFormula.invalid) {
-    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields);
+    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields, normalizedRollFormula.invalidFieldErrors);
     return false;
   }
 

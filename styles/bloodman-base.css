@@ -626,19 +626,48 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 }
 
 .bm-damage-config .bm-damage-config-shell {
+  position: relative;
+  overflow: hidden;
   display: grid;
   gap: 10px;
-  background: linear-gradient(170deg, var(--bm-damage-bg-soft), var(--bm-damage-bg));
+  background:
+    radial-gradient(circle at 92% -10%, color-mix(in srgb, var(--bm-damage-border-strong) 36%, transparent), transparent 38%),
+    linear-gradient(160deg, var(--bm-damage-bg-soft), var(--bm-damage-bg));
   border: 1px solid var(--bm-damage-border);
   border-radius: 12px;
   color: var(--bm-damage-fg);
-  padding: 10px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 28px rgba(0, 0, 0, 0.2);
+  padding: 11px;
+  animation: bm-damage-config-shell-entry 160ms ease-out both;
+}
+
+.bm-damage-config .bm-damage-config-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.06), transparent 42%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.06), transparent 26%);
+}
+
+@keyframes bm-damage-config-shell-entry {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .bm-damage-config .bm-damage-config-head {
   display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 10px;
+  grid-template-columns: 40px 1fr;
+  gap: 9px;
   align-items: center;
 }
 
@@ -649,54 +678,195 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 }
 
 .bm-damage-config .bm-damage-config-icon-ring {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 999px;
   border: 1px solid var(--bm-damage-border);
-  background: var(--bm-damage-field);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bm-damage-field) 88%, #ffffff 12%), var(--bm-damage-field));
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .bm-damage-config .bm-damage-config-icon-ring i {
-  font-size: 18px;
+  font-size: 16px;
   color: var(--bm-damage-fg);
 }
 
 .bm-damage-config .bm-damage-config-head-copy {
   min-width: 0;
+  display: grid;
+  gap: 2px;
 }
 
 .bm-damage-config .bm-damage-config-eyebrow {
   margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.4px;
+  font-size: 10px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--bm-damage-fg);
+  color: var(--bm-damage-muted);
   line-height: 1;
 }
 
+.bm-damage-config .bm-damage-config-title {
+  margin: 0;
+  font-family: "Rajdhani", "Oswald", sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 0.2px;
+  color: var(--bm-damage-fg);
+}
+
 .bm-damage-config .bm-damage-config-hint {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.2;
   color: var(--bm-damage-muted);
 }
 
+.bm-damage-config .bm-damage-config-hint-sync {
+  margin-top: 4px;
+  padding: 3px 8px;
+  border: 1px dashed color-mix(in srgb, var(--bm-damage-border) 86%, transparent);
+  border-radius: 999px;
+  width: fit-content;
+  max-width: 100%;
+  background: color-mix(in srgb, var(--bm-damage-field) 76%, transparent);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 .bm-damage-config .bm-damage-config-grid {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  grid-template-columns: 1fr;
 }
 
 .bm-damage-config .bm-damage-config-row {
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .bm-damage-config .bm-damage-config-row-wide {
   grid-column: 1 / -1;
+}
+
+.bm-damage-config .bm-damage-config-row-formula input {
+  height: 36px;
+  font-size: 17px;
+}
+
+.bm-damage-config .bm-damage-config-field-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config .bm-damage-config-help {
+  border: 1px dashed color-mix(in srgb, var(--bm-damage-border) 76%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bm-damage-field) 80%, transparent);
+  padding: 4px 7px;
+}
+
+.bm-damage-config .bm-damage-config-help summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bm-damage-fg);
+}
+
+.bm-damage-config .bm-damage-config-help summary::-webkit-details-marker {
+  display: none;
+}
+
+.bm-damage-config .bm-damage-config-help summary i {
+  font-size: 11px;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config .bm-damage-config-help ul {
+  margin: 6px 0 2px;
+  padding: 0 0 0 16px;
+  display: grid;
+  gap: 3px;
+  color: var(--bm-damage-muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.bm-damage-config .bm-damage-config-help code {
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  padding: 0 3px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 60%, transparent);
+  background: color-mix(in srgb, var(--bm-damage-bg-soft) 70%, transparent);
+  color: var(--bm-damage-fg);
+}
+
+.bm-damage-config .bm-damage-config-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bm-damage-config .bm-damage-config-stat {
+  display: grid;
+  gap: 4px;
+  padding: 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 84%, transparent);
+  background: color-mix(in srgb, var(--bm-damage-field) 86%, transparent);
+}
+
+.bm-damage-config .bm-damage-config-stat label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0;
+  font-size: 11px;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config .bm-damage-config-stepper {
+  display: grid;
+  grid-template-columns: 30px 1fr 30px;
+  gap: 5px;
+  align-items: center;
+}
+
+.bm-damage-config .bm-damage-config-stat input[type="number"] {
+  height: 30px;
+}
+
+.bm-damage-config .bm-damage-config-stepper-btn {
+  height: 30px;
+  border: 1px solid var(--bm-damage-border);
+  border-radius: 7px;
+  padding: 0;
+  font-family: "Rajdhani", "Oswald", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--bm-damage-fg);
+  background: color-mix(in srgb, var(--bm-damage-field) 85%, transparent);
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.bm-damage-config .bm-damage-config-stepper-btn:hover,
+.bm-damage-config .bm-damage-config-stepper-btn:focus-visible {
+  filter: brightness(1.1);
+}
+
+.bm-damage-config .bm-damage-config-stepper-btn:active {
+  transform: translateY(1px);
 }
 
 .bm-damage-config .bm-damage-config-inline {
@@ -726,10 +896,11 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
   border: 1px solid var(--bm-damage-border);
   border-radius: 8px;
   padding: 0 10px;
-  font-family: "Oswald", sans-serif;
-  font-size: 16px;
-  font-weight: 500;
+  font-family: "Rajdhani", "Oswald", sans-serif;
+  font-size: 17px;
+  font-weight: 600;
   line-height: 1;
+  letter-spacing: 0.2px;
   color: var(--bm-damage-fg);
   background: var(--bm-damage-field);
 }
@@ -767,7 +938,7 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
   opacity: 1;
   cursor: not-allowed;
   border-style: dashed;
-  color: var(--bm-damage-muted);
+  color: color-mix(in srgb, var(--bm-damage-muted) 92%, #ffffff 8%);
 }
 
 .bm-damage-config input[type="number"] {
@@ -792,63 +963,13 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bm-damage-config .bm-damage-config-shell {
+    animation: none;
+  }
+
   .bm-damage-config input[type="number"].bm-damage-config-value-active {
     animation: none;
   }
-}
-
-.bm-damage-config .bm-damage-config-toggle {
-  display: grid;
-  grid-template-columns: 30px 1fr;
-  gap: 8px;
-  align-items: center;
-  border: 1px solid var(--bm-damage-border);
-  border-radius: 8px;
-  padding: 7px 8px;
-  background: var(--bm-damage-field);
-  cursor: pointer;
-}
-
-.bm-damage-config .bm-damage-config-toggle input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.bm-damage-config .bm-damage-config-toggle-indicator {
-  width: 30px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px solid var(--bm-damage-border);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--bm-damage-muted);
-  background: transparent;
-}
-
-.bm-damage-config .bm-damage-config-toggle-copy {
-  display: grid;
-  gap: 1px;
-}
-
-.bm-damage-config .bm-damage-config-toggle-title {
-  font-size: 13px;
-  line-height: 1.15;
-  color: var(--bm-damage-fg);
-}
-
-.bm-damage-config .bm-damage-config-toggle-hint {
-  font-size: 11px;
-  line-height: 1.2;
-  color: var(--bm-damage-muted);
-}
-
-.bm-damage-config .bm-damage-config-toggle input[type="checkbox"]:checked + .bm-damage-config-toggle-indicator {
-  border-color: var(--bm-damage-border-strong);
-  color: var(--bm-damage-fg);
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons,
@@ -1415,18 +1536,14 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
     grid-template-columns: 1fr;
   }
 
+  .bm-damage-config .bm-damage-config-stats {
+    grid-template-columns: 1fr;
+  }
+
   .bm-damage-config .bm-damage-config-inline {
     grid-template-columns: minmax(0, 1fr) 72px;
   }
 
-  .bm-damage-config .bm-damage-config-toggle {
-    grid-template-columns: 26px 1fr;
-    padding: 7px;
-  }
-
-  .bm-damage-config .bm-damage-config-toggle-indicator {
-    width: 26px;
-  }
 }
 
 #chat-log,

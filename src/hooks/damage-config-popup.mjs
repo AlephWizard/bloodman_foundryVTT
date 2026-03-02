@@ -1,6 +1,5 @@
 export function buildDamageConfigPopupHooks({
   toFiniteNumber,
-  t,
   getCurrentUser,
   getUsersCollection,
   isAssistantOrHigherRole,
@@ -17,7 +16,6 @@ export function buildDamageConfigPopupHooks({
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
     };
-  const translate = typeof t === "function" ? t : key => key;
   const resolveCurrentUser = typeof getCurrentUser === "function"
     ? getCurrentUser
     : () => globalThis.game?.user;
@@ -52,22 +50,16 @@ export function buildDamageConfigPopupHooks({
     const damageLabel = String(config.degats || "").trim().toUpperCase() || formula.toUpperCase();
     const bonusBrut = Math.max(0, Math.floor(parseFiniteNumber(config.bonusBrut, 0)));
     const penetration = Math.max(0, Math.floor(parseFiniteNumber(config.penetration, 0)));
-    const keepHighest = config.rollKeepHighest === true;
-    const yesLabel = translate("BLOODMAN.Common.Yes");
-    const noLabel = translate("BLOODMAN.Common.No");
     const actorDisplay = actorName || requesterName || "Attaquant";
     const sourceDisplay = sourceName || "-";
-    const keepHighestText = `2 jets, garder le plus haut: ${keepHighest ? yesLabel : noLabel}`;
     return {
       isSimpleAttackVariant,
       formula,
       damageLabel,
       bonusBrut,
       penetration,
-      keepHighest,
       actorDisplay,
       sourceDisplay,
-      keepHighestText,
       title: `Jet de degats - ${actorDisplay}`
     };
   }
@@ -101,13 +93,6 @@ export function buildDamageConfigPopupHooks({
           <input type="number" data-bm-popup-field="penetration" value="${state.penetration}"${penetrationInputClass} disabled />
         </div>
       </div>
-      <label class="bm-damage-config-toggle">
-        <input type="checkbox" data-bm-popup-field="roll-keep-highest" disabled ${state.keepHighest ? "checked" : ""} />
-        <span class="bm-damage-config-toggle-indicator" aria-hidden="true">2x</span>
-        <span class="bm-damage-config-toggle-copy">
-          <span class="bm-damage-config-toggle-title" data-bm-popup-field="keep-highest-text">${toSafeHtml(state.keepHighestText)}</span>
-        </span>
-      </label>
     </div>
   </form>`;
   }
@@ -125,8 +110,6 @@ export function buildDamageConfigPopupHooks({
     penetrationInput.val(String(state.penetration));
     bonusInput.toggleClass(highlightedNumberClass, Number(state?.bonusBrut) > 0);
     penetrationInput.toggleClass(highlightedNumberClass, Number(state?.penetration) > 0);
-    root.find("[data-bm-popup-field='roll-keep-highest']").prop("checked", state.keepHighest);
-    root.find("[data-bm-popup-field='keep-highest-text']").text(state.keepHighestText);
     return true;
   }
 
