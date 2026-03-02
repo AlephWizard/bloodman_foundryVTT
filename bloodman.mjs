@@ -2584,14 +2584,14 @@ const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const VOYAGE_XP_SKIP_CREATE_OPTION = "bloodmanSkipVoyageXPCost";
-const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin"]);
+const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin", "aptitude", "pouvoir"]);
 const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]);
-const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin", "objet"]);
+const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin", "objet", "ration", "protection"]);
 const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
 const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
 const CURRENCY_CURRENT_MAX = 1_000_000;
@@ -5004,10 +5004,13 @@ async function applyVoyageXPCostOnCreate(actor, item, options = null) {
 }
 
 const ITEM_ROLL_FORMULA_FIELDS = Object.freeze({
-  arme: ["damageDie"],
-  aptitude: ["damageDie"],
+  arme: ["damageDie", "healDie"],
+  aptitude: ["damageDie", "healDie"],
   pouvoir: ["damageDie", "healDie"],
-  soin: ["healDie"]
+  soin: ["damageDie", "healDie"],
+  objet: ["damageDie", "healDie"],
+  ration: ["damageDie", "healDie"],
+  protection: ["damageDie", "healDie"]
 });
 
 function getItemRollFormulaFieldLabels(fields = []) {
@@ -5608,13 +5611,62 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async deleteActorItem(item) {
     if (!item) return false;
-    if (this.actor?.isOwner || item.isOwner || game.user?.isGM) {
-      try {
-        await item.delete();
-      } catch (_error) {
-        // Fallback to GM relay when direct deletion fails on synthetic contexts.
+    const itemId = String(item.id || "").trim();
+    const actorCandidates = [];
+    const seenActorKeys = new Set();
+    const addActorCandidate = actorDoc => {
+      if (!actorDoc) return;
+      const actorId = String(actorDoc.id || "").trim();
+      const actorUuid = String(actorDoc.uuid || "").trim();
+      const key = `${actorId}|${actorUuid}`;
+      if (seenActorKeys.has(key)) return;
+      seenActorKeys.add(key);
+      actorCandidates.push(actorDoc);
+    };
+    addActorCandidate(this.actor);
+    addActorCandidate(item.parent);
+    addActorCandidate(item.actor);
+    addActorCandidate(this.actor?.baseActor);
+    const worldActorId = String(this.actor?.token?.actorId || this.actor?.id || "").trim();
+    if (worldActorId) addActorCandidate(game.actors?.get(worldActorId) || null);
+
+    const tryDeleteFromActor = async actorDoc => {
+      if (!actorDoc || !itemId) return false;
+      const actorItems = actorDoc.items;
+      if (!actorItems?.has?.(itemId)) return false;
+
+      if (typeof actorDoc.deleteEmbeddedDocuments === "function") {
+        try {
+          await actorDoc.deleteEmbeddedDocuments("Item", [itemId], { render: false });
+        } catch (_error) {
+          // Fallback below.
+        }
       }
-      const itemId = String(item.id || "");
+      if (!actorItems?.has?.(itemId)) return true;
+
+      const embeddedItem = actorItems?.get?.(itemId);
+      if (embeddedItem && typeof embeddedItem.delete === "function") {
+        try {
+          await embeddedItem.delete();
+        } catch (_error) {
+          // Socket relay fallback below.
+        }
+      }
+      return !actorItems?.has?.(itemId);
+    };
+
+    if (this.actor?.isOwner || item.isOwner || game.user?.isGM) {
+      for (const actorDoc of actorCandidates) {
+        if (await tryDeleteFromActor(actorDoc)) return true;
+      }
+
+      if (typeof item.delete === "function") {
+        try {
+          await item.delete();
+        } catch (_error) {
+          // Fallback to GM relay when direct deletion fails on synthetic contexts.
+        }
+      }
       if (itemId && !this.actor?.items?.has(itemId)) return true;
     }
     const sent = requestDeleteActorItem(this.actor, item);
@@ -7034,8 +7086,18 @@ class BloodmanActorSheet extends BaseActorSheet {
         displayItem.bagActionLabel = t("BLOODMAN.Common.Eat");
         displayItem.bagActionClass = "item-use bm-btn-heal";
       } else if (displayItem.type === "objet" && toCheckboxBoolean(displayItem.system?.useEnabled, false)) {
-        displayItem.bagActionLabel = t("BLOODMAN.Common.Use");
-        displayItem.bagActionClass = "item-use bm-btn-magic";
+        const objectDamageEnabled = toCheckboxBoolean(
+          displayItem.system?.damageEnabled,
+          displayItem.system?.damageDie != null
+        );
+        const objectDamageDie = String(displayItem.system?.damageDie || "").trim();
+        if (objectDamageEnabled && objectDamageDie) {
+          displayItem.bagActionLabel = normalizeRollDieFormula(objectDamageDie, "d4");
+          displayItem.bagActionClass = "item-use bm-btn-damage";
+        } else {
+          displayItem.bagActionLabel = t("BLOODMAN.Common.Use");
+          displayItem.bagActionClass = "item-use bm-btn-magic";
+        }
       }
 
       if (displayItem.type === "protection") {
@@ -7338,9 +7400,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.resetMovementGaugeToMax();
     });
 
-    html.find(".weapon-roll").click(ev => {
+    html.find(".weapon-roll").click(async ev => {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
+      const itemType = String(item?.type || "").trim().toLowerCase();
+      if (itemType === "objet") {
+        await this.useItem(item);
+        return;
+      }
       this.rollDamage(item);
     });
 
@@ -7996,6 +8063,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     const result = await doDamageRoll(this.actor, item);
     if (!result) return;
     await playItemAudio(item);
+    if (toBooleanFlag(item?.system?.singleUseEnabled)) {
+      await this.deleteActorItem(item);
+      this.clearItemReroll(item.id);
+      this.render(false);
+      return;
+    }
     if (result?.context) {
       result.context.kind = "item-damage";
       result.context.itemType = String(item.type || "arme");
@@ -8205,8 +8278,29 @@ class BloodmanActorSheet extends BaseActorSheet {
       return;
     }
     if (usePlan.kind === "object") {
+      const singleUseEnabled = toBooleanFlag(item?.system?.singleUseEnabled);
+      const objectDamageEnabled = toBooleanFlag(item?.system?.damageEnabled, item?.system?.damageDie != null)
+        && Boolean(String(item?.system?.damageDie || "").trim());
+      if (objectDamageEnabled) {
+        const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
+        const damageResult = await doDirectDamageRoll(this.actor, formula, item.name, {
+          itemId: item.id,
+          itemType: item.type
+        });
+        if (!damageResult) {
+          if (singleUseEnabled) {
+            await this.deleteActorItem(item);
+            this.clearItemReroll(item.id);
+            this.render(false);
+          }
+          return;
+        }
+      }
       await playItemAudio(item, { delayMs: 0 });
-      await this.deleteActorItem(item);
+      if (singleUseEnabled) {
+        await this.deleteActorItem(item);
+        this.clearItemReroll(item.id);
+      }
       this.render(false);
     }
   }
@@ -8336,7 +8430,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       validationMeta,
       defaultTargetName: "Cible"
     });
-
     this.markItemReroll(itemId, context);
     this.render(false);
   }
@@ -8583,70 +8676,110 @@ class BloodmanNpcSheet extends BloodmanActorSheet {
 
 class BloodmanItemSheet extends BaseItemSheet {
   get template() {
-    return `systems/bloodman/templates/item-${this.item.type}.html`;
+    return "systems/bloodman/templates/item-unified.html";
   }
 
   async getData(options) {
     const data = await super.getData(options);
-    if (this.item.type === "arme") {
-      if (!data.item.system) data.item.system = {};
-      const weaponType = getWeaponCategory(this.item.system?.weaponType);
-      const magazineCapacity = normalizeNonNegativeInteger(this.item.system?.magazineCapacity, 0);
-      const consumesAmmo = weaponType === "distance" && !toCheckboxBoolean(this.item.system?.infiniteAmmo, false);
-      const loadedAmmo = normalizeWeaponLoadedAmmoValue(this.item.system?.loadedAmmo, 0, consumesAmmo ? magazineCapacity : 0);
-      data.weaponTypeDistance = weaponType === "distance";
-      data.weaponTypeMelee = weaponType === "corps";
+    const itemType = String(this.item.type || "").trim().toLowerCase();
+    if (!data.item.system) data.item.system = {};
+
+    const supportsWeapon = itemType === "arme";
+    const supportsPrice = isPriceManagedItemType(itemType);
+
+    const systemData = data.item.system;
+    systemData.audioFile = String(this.item.system?.audioFile ?? "").trim();
+
+    const usableFieldPath = itemType === "pouvoir" ? "system.usableEnabled" : "system.useEnabled";
+    let usableValue = false;
+    if (itemType === "pouvoir") usableValue = isPowerUsableEnabled(this.item.system?.usableEnabled);
+    else if (itemType === "protection") usableValue = toCheckboxBoolean(this.item.system?.useEnabled, true);
+    else usableValue = toCheckboxBoolean(this.item.system?.useEnabled, false);
+    if (itemType === "pouvoir") systemData.usableEnabled = usableValue;
+    else systemData.useEnabled = usableValue;
+
+    if (supportsWeapon) {
       // Weapons predate the damageEnabled flag; treat missing as enabled for backward compatibility.
-      data.weaponDamageEnabled = this.item.system?.damageEnabled !== false;
-      data.item.system.magazineCapacity = magazineCapacity;
-      data.item.system.loadedAmmo = loadedAmmo;
-      data.weaponUsesAmmo = consumesAmmo;
-      data.weaponUsesMagazine = consumesAmmo && magazineCapacity > 0;
-      data.canEditMagazineCapacity = isAssistantOrHigherRole(game.user?.role);
+      systemData.damageEnabled = this.item.system?.damageEnabled !== false;
+    } else {
+      systemData.damageEnabled = toCheckboxBoolean(this.item.system?.damageEnabled, false);
     }
-    if (isVoyageXPCostItemType(this.item.type)) {
-      if (!data.item.system) data.item.system = {};
-      data.item.system.xpVoyageCost = normalizeNonNegativeInteger(this.item.system?.xpVoyageCost, 0);
+    systemData.damageDie = String(this.item.system?.damageDie ?? "").trim();
+
+    if (itemType === "soin") {
+      systemData.healEnabled = true;
+    } else {
+      systemData.healEnabled = toCheckboxBoolean(this.item.system?.healEnabled, false);
     }
-    if (this.item.type === "pouvoir") {
-      if (!data.item.system) data.item.system = {};
-      data.item.system.usableEnabled = isPowerUsableEnabled(this.item.system?.usableEnabled);
-      data.item.system.healEnabled = toCheckboxBoolean(this.item.system?.healEnabled, false);
+    systemData.healDie = String(this.item.system?.healDie ?? "").trim();
+
+    const rawWeaponType = normalizeWeaponType(this.item.system?.weaponType);
+    const weaponType = rawWeaponType === "corps"
+      ? "corps"
+      : (rawWeaponType === "distance" ? "distance" : (supportsWeapon ? "distance" : ""));
+    const magazineCapacity = normalizeNonNegativeInteger(this.item.system?.magazineCapacity, 0);
+    const infiniteAmmo = toCheckboxBoolean(this.item.system?.infiniteAmmo, false);
+    const consumesAmmo = weaponType === "distance" && !infiniteAmmo;
+    const loadedAmmo = normalizeWeaponLoadedAmmoValue(this.item.system?.loadedAmmo, 0, consumesAmmo ? magazineCapacity : 0);
+    data.weaponTypeDistance = weaponType === "distance";
+    data.weaponTypeMelee = weaponType === "corps";
+    systemData.infiniteAmmo = infiniteAmmo;
+    systemData.magazineCapacity = magazineCapacity;
+    systemData.loadedAmmo = loadedAmmo;
+    data.weaponUsesAmmo = consumesAmmo;
+    data.weaponUsesMagazine = consumesAmmo && magazineCapacity > 0;
+    data.canEditMagazineCapacity = supportsWeapon && isAssistantOrHigherRole(game.user?.role);
+
+    systemData.xpVoyageCost = normalizeNonNegativeInteger(this.item.system?.xpVoyageCost, 0);
+    systemData.powerCostEnabled = toCheckboxBoolean(this.item.system?.powerCostEnabled, false);
+    systemData.powerCost = normalizeNonNegativeInteger(this.item.system?.powerCost, 0);
+    systemData.singleUseEnabled = toCheckboxBoolean(this.item.system?.singleUseEnabled, false);
+
+    systemData.rawBonusEnabled = toCheckboxBoolean(this.item.system?.rawBonusEnabled, false);
+    systemData.rawBonuses = {
+      pv: toFiniteNumber(this.item.system?.rawBonuses?.pv, 0),
+      pp: toFiniteNumber(this.item.system?.rawBonuses?.pp, 0)
+    };
+
+    systemData.characteristicBonusEnabled = toCheckboxBoolean(this.item.system?.characteristicBonusEnabled, false);
+    const characteristicBonuses = {};
+    for (const characteristic of CHARACTERISTICS) {
+      characteristicBonuses[characteristic.key] = toFiniteNumber(
+        this.item.system?.characteristicBonuses?.[characteristic.key],
+        0
+      );
     }
-    const supportsCharacteristicBonuses = CHARACTERISTIC_BONUS_ITEM_TYPES.has(this.item.type);
-    const supportsPaBonus = PA_BONUS_ITEM_TYPES.has(this.item.type);
-    if (supportsCharacteristicBonuses || supportsPaBonus) {
-      if (!data.item.system) data.item.system = {};
-      if (this.item.type === "objet" || this.item.type === "protection") {
-        const defaultUseEnabled = this.item.type === "protection";
-        data.item.system.useEnabled = toCheckboxBoolean(this.item.system?.useEnabled, defaultUseEnabled);
-      }
-      if (supportsCharacteristicBonuses) {
-        data.item.system.characteristicBonusEnabled = toCheckboxBoolean(this.item.system?.characteristicBonusEnabled, false);
-        const characteristicBonuses = {};
-        for (const characteristic of CHARACTERISTICS) {
-          characteristicBonuses[characteristic.key] = toFiniteNumber(
-            this.item.system?.characteristicBonuses?.[characteristic.key],
-            0
-          );
-        }
-        data.item.system.characteristicBonuses = characteristicBonuses;
-      }
-      if (supportsPaBonus) {
-        data.item.system.pa = toFiniteNumber(this.item.system?.pa, 0);
-      }
-      const currentError = String(this.item.system?.erreur ?? "").trim();
-      data.item.system.erreur = currentError || null;
-    }
-    if (isPriceManagedItemType(this.item.type)) {
-      if (!data.item.system) data.item.system = {};
-      data.item.system.price = String(this.item.system?.price ?? "").trim();
-      data.item.system.salePrice = String(this.item.system?.salePrice ?? "").trim();
-      const preview = resolveItemSalePriceState(data.item.system.price, data.item.system.salePrice);
+    systemData.characteristicBonuses = characteristicBonuses;
+
+    systemData.pa = toFiniteNumber(this.item.system?.pa, 0);
+    const defaultProtectionEnabled = itemType === "protection" || Number(systemData.pa || 0) !== 0;
+    systemData.protectionEnabled = toCheckboxBoolean(this.item.system?.protectionEnabled, defaultProtectionEnabled);
+
+    systemData.price = String(this.item.system?.price ?? "").trim();
+    systemData.salePrice = String(this.item.system?.salePrice ?? "").trim();
+    data.itemComputedSellPrice = "";
+    data.itemPriceError = "";
+    if (supportsPrice) {
+      const preview = resolveItemSalePriceState(systemData.price, systemData.salePrice);
       data.itemComputedSellPrice = preview.salePrice;
       data.itemPriceError = preview.errorMessage;
-      data.item.system.salePrice = preview.salePrice;
+      systemData.salePrice = preview.salePrice;
     }
+
+    const currentError = String(this.item.system?.erreur ?? "").trim();
+    systemData.erreur = currentError || null;
+
+    data.itemNoteFieldPath = "system.note";
+    data.itemNoteValue = String(this.item.system?.note ?? this.item.system?.notes ?? "");
+    data.itemUsableFieldPath = usableFieldPath;
+    data.itemUsableValue = usableValue;
+
+    data.damageInputDisabled = !systemData.damageEnabled;
+    data.powerCostInputDisabled = !systemData.powerCostEnabled;
+    data.protectionInputDisabled = !systemData.protectionEnabled;
+    data.rawBonusInputDisabled = !systemData.rawBonusEnabled;
+    data.characteristicBonusInputDisabled = !systemData.characteristicBonusEnabled;
+    data.healInputDisabled = !systemData.healEnabled;
     return data;
   }
 

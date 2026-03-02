@@ -1,8 +1,3 @@
 @import url("./bloodman-base.css");
 @import url("./actor-personnage.css");
-@import url("./item-aptitude.css");
-@import url("./item-arme.css");
-@import url("./item-objet.css");
-@import url("./item-pouvoir.css");
-@import url("./item-protection.css");
-@import url("./item-soin.css");
+@import url("./item-unified.css");

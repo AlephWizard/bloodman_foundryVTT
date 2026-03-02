@@ -1,0 +1,188 @@
+.bloodman-item.bm-item-sheet.bm-item-unified {
+  gap: 10px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-top {
+  align-items: stretch;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-header-fields {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--bm-item-surface), var(--bm-item-surface-soft));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-pricing,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-costs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-combat {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-bonuses {
+  grid-template-columns: 1fr 1.3fr 1fr;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card {
+  padding: 8px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 9px;
+  background: var(--bm-item-surface-soft);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card-heal {
+  align-content: start;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-price-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field-power-toggle {
+  align-content: start;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 999px;
+  background: var(--bm-item-chip);
+  color: var(--bm-item-text);
+  font-weight: 800;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option input {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--bm-item-line);
+  border-radius: 999px;
+  background: var(--bm-item-panel-alt);
+  margin: 0;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option input:checked {
+  background: var(--bm-item-accent);
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 2px var(--bm-item-accent-glow);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid {
+  display: grid;
+  gap: 6px 8px;
+  align-items: stretch;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid-characteristics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  gap: 6px;
+  align-items: center;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border: 1px dashed var(--bm-item-dash);
+  border-radius: 8px;
+  background: var(--bm-item-chip);
+  color: var(--bm-item-text);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid input {
+  width: 54px;
+  height: 26px;
+  justify-self: end;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid.is-disabled {
+  opacity: 0.55;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid.is-disabled label {
+  background: var(--bm-item-surface-alt);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-input-narrow {
+  max-width: 110px;
+  justify-self: start;
+  font-weight: 700;
+}
+
+@media (max-width: 1120px) {
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-combat {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-bonuses {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card-heal {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 920px) {
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-pricing,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-costs,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-combat,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-bonuses {
+    grid-template-columns: 1fr;
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid-characteristics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid-characteristics {
+    grid-template-columns: 1fr;
+  }
+}

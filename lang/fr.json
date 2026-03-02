@@ -119,6 +119,7 @@
       "RawBonusLabel": "BONUS/MALUS BRUTE",
       "UsableLabel": "UTILISABLE :",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
+      "SingleUseLabel": "USAGE UNIQUE :",
       "MagazineCapacityLabel": "CAPACITE MAGASIN :",
       "AmmoTypeLabel": "TYPE DE MUNITION :",
       "LoadedAmmoLabel": "BALLE(S) CHARGEE(S) :",
