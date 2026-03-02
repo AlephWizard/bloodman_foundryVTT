@@ -53,6 +53,35 @@
         </div>
       </div>
 
+      <div class="bm-item-unified-field bm-item-unified-field-single-use">
+        <label class="inline-label">{{localize "BLOODMAN.Items.SingleUseLabel"}}</label>
+        <div class="bm-item-single-use-controls">
+          <div class="toggle-group">
+            <label class="toggle-option">
+              <input type="radio" name="system.singleUseEnabled" value="true" data-dtype="Boolean" {{#if item.system.singleUseEnabled}}checked{{/if}} />
+              {{localize "BLOODMAN.Common.Yes"}}
+            </label>
+            <label class="toggle-option">
+              <input type="radio" name="system.singleUseEnabled" value="false" data-dtype="Boolean" {{#unless item.system.singleUseEnabled}}checked{{/unless}} />
+              {{localize "BLOODMAN.Common.No"}}
+            </label>
+          </div>
+          <div class="bm-item-single-use-count">
+            <label class="inline-label bm-item-inline-sub-label">{{localize "BLOODMAN.Items.SingleUseCountLabel"}}</label>
+            <input
+              class="bm-item-input bm-item-input-narrow"
+              type="number"
+              min="1"
+              step="1"
+              name="system.singleUseCount"
+              value="{{item.system.singleUseCount}}"
+              data-dtype="Number"
+              {{#if singleUseCountInputDisabled}}disabled{{/if}}
+            />
+          </div>
+        </div>
+      </div>
+
       <p class="bm-price-error bm-item-unified-price-error" data-price-error>{{itemPriceError}}</p>
     </section>
 
@@ -121,18 +150,6 @@
           </label>
           <label class="toggle-option">
             <input type="radio" name="system.infiniteAmmo" value="false" data-dtype="Boolean" {{#unless item.system.infiniteAmmo}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
-          </label>
-        </div>
-
-        <label class="inline-label">{{localize "BLOODMAN.Items.SingleUseLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.singleUseEnabled" value="true" data-dtype="Boolean" {{#if item.system.singleUseEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.singleUseEnabled" value="false" data-dtype="Boolean" {{#unless item.system.singleUseEnabled}}checked{{/unless}} />
             {{localize "BLOODMAN.Common.No"}}
           </label>
         </div>

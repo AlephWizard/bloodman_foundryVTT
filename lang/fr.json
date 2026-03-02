@@ -120,6 +120,7 @@
       "UsableLabel": "UTILISABLE :",
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
       "SingleUseLabel": "USAGE UNIQUE :",
+      "SingleUseCountLabel": "NB USAGES :",
       "MagazineCapacityLabel": "CAPACITE MAGASIN :",
       "AmmoTypeLabel": "TYPE DE MUNITION :",
       "LoadedAmmoLabel": "BALLE(S) CHARGEE(S) :",
@@ -265,7 +266,8 @@
       "NotEnoughCurrency": "Fonds insuffisants pour cet achat (cout: {cost}, actuel: {current}).",
       "InvalidPurchasePrice": "Le prix de l'element est invalide; achat refuse.",
       "DropRequiresLimitedPermission": "Acces insuffisant: seul un droit Limite (ou plus) permet de deplacer un element vers la fiche.",
-      "DropBlockedForPlayerRole": "Le role Joueur ne permet pas de deplacer des elements du menu vers la fiche."
+      "DropBlockedForPlayerRole": "Le role Joueur ne permet pas de deplacer des elements du menu vers la fiche.",
+      "ItemSingleUseCounterUpdateFailed": "Mise a jour impossible du compteur d'usage unique."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos",

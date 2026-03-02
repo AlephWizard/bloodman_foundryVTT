@@ -1481,7 +1481,7 @@ export async function doHealRoll(actor, item, options = {}) {
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
   });
 
-  if (options?.consumeItem !== false) {
+  if (options?.consumeItem === true) {
     await deleteItemWithFallback(item, actor);
   }
   return roll;

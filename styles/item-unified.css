@@ -30,6 +30,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-pricing {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-combat {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -63,6 +67,33 @@
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field-power-toggle {
   align-content: start;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field-single-use {
+  align-content: start;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-single-use-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 6px;
+  align-items: end;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-single-use-count {
+  display: grid;
+  gap: 4px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-inline-sub-label {
+  font-size: 10px;
+  letter-spacing: 0.35px;
+  opacity: 0.9;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-single-use-count .bm-item-input {
+  width: 100%;
+  max-width: none;
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-group {
@@ -178,6 +209,10 @@
 
   .bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid-characteristics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-single-use-controls {
+    grid-template-columns: 1fr;
   }
 }
 

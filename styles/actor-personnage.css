@@ -1227,6 +1227,20 @@
   color: #ffffff !important;
 }
 
+.bloodman-sheet .item-chip.bm-btn-usage-count,
+.bloodman-sheet .bm-btn-usage-count {
+  min-height: 16px !important;
+  padding: 1px 5px !important;
+  border: 1px solid var(--bm-line) !important;
+  border-radius: 6px !important;
+  background: #f2f2f2 !important;
+  color: #111111 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px !important;
+  line-height: 1 !important;
+}
+
 .bloodman-sheet button.bm-btn-damage:hover,
 .bloodman-sheet button.bm-btn-heal:hover,
 .bloodman-sheet button.bm-btn-magic:hover,

@@ -290,6 +290,7 @@
                       <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                       <div class="item-actions">
                         <span class="weapon-roll bm-btn-damage">{{this.displayDamageFormula}}</span>
+                        {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                         {{#if this.showAmmoState}}<span class="weapon-ammo">{{this.ammoMagazine}} / {{this.ammoCapacityDisplay}}</span>{{/if}}
                         {{#if this.showReloadButton}}<button type="button" class="weapon-reload {{#if this.reloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                         {{#if this.showItemReroll}}
@@ -343,6 +344,7 @@
                       <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                       <div class="item-actions">
                         <span class="item-chip item-meta bm-btn-armor">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
+                        {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                       </div>
                       {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
                     </div>
@@ -395,6 +397,7 @@
                       {{#if this.system.noteSmall}}<span class="{{this.bagNoteSmallClass}}">{{this.system.noteSmall}}</span>{{/if}}
                       {{#if this.bagProtectionLabel}}<span class="{{this.bagProtectionClass}}">{{this.bagProtectionLabel}}</span>{{/if}}
                       {{#if this.bagActionLabel}}<span class="{{this.bagActionClass}}">{{this.bagActionLabel}}</span>{{/if}}
+                      {{#if this.bagShowSingleUseCount}}<span class="{{this.bagSingleUseCountClass}}">{{this.bagSingleUseCountLabel}}</span>{{/if}}
                       {{#if this.bagShowAmmoState}}<span class="weapon-ammo">{{this.bagAmmoMagazine}} / {{this.bagAmmoCapacityDisplay}}</span>{{/if}}
                       {{#if this.bagShowReloadButton}}<button type="button" class="weapon-reload {{#if this.bagReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                       {{#if this.showItemReroll}}
@@ -422,6 +425,7 @@
                       {{#if this.system.noteSmall}}<span class="{{this.bagNoteSmallClass}}">{{this.system.noteSmall}}</span>{{/if}}
                       {{#if this.bagProtectionLabel}}<span class="{{this.bagProtectionClass}}">{{this.bagProtectionLabel}}</span>{{/if}}
                       {{#if this.bagActionLabel}}<span class="{{this.bagActionClass}}">{{this.bagActionLabel}}</span>{{/if}}
+                      {{#if this.bagShowSingleUseCount}}<span class="{{this.bagSingleUseCountClass}}">{{this.bagSingleUseCountLabel}}</span>{{/if}}
                       {{#if this.bagShowAmmoState}}<span class="weapon-ammo">{{this.bagAmmoMagazine}} / {{this.bagAmmoCapacityDisplay}}</span>{{/if}}
                       {{#if this.bagShowReloadButton}}<button type="button" class="weapon-reload {{#if this.bagReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                       {{#if this.showItemReroll}}
@@ -449,6 +453,7 @@
                       {{#if this.system.noteSmall}}<span class="{{this.bagNoteSmallClass}}">{{this.system.noteSmall}}</span>{{/if}}
                       {{#if this.bagProtectionLabel}}<span class="{{this.bagProtectionClass}}">{{this.bagProtectionLabel}}</span>{{/if}}
                       {{#if this.bagActionLabel}}<span class="{{this.bagActionClass}}">{{this.bagActionLabel}}</span>{{/if}}
+                      {{#if this.bagShowSingleUseCount}}<span class="{{this.bagSingleUseCountClass}}">{{this.bagSingleUseCountLabel}}</span>{{/if}}
                       {{#if this.bagShowAmmoState}}<span class="weapon-ammo">{{this.bagAmmoMagazine}} / {{this.bagAmmoCapacityDisplay}}</span>{{/if}}
                       {{#if this.bagShowReloadButton}}<button type="button" class="weapon-reload {{#if this.bagReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                       {{#if this.showItemReroll}}
@@ -524,6 +529,7 @@
                   <div class="item-actions">
                     {{#if this.showAptitudeUseButton}}<button type="button" class="ability-show-gm bm-btn-magic">MONTRER MJ</button>{{/if}}
                     {{#if this.displayDamageDie}}<span class="ability-roll bm-btn-damage">{{this.displayDamageDie}}</span>{{/if}}
+                    {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                     {{#if this.showItemReroll}}
                       <button type="button" class="item-reroll">
                         <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
@@ -552,6 +558,7 @@
                   <div class="item-actions">
                     {{#if this.showPowerUseButton}}<button type="button" class="power-use bm-btn-magic">Utiliser</button>{{/if}}
                     {{#if this.showPowerRoll}}<span class="{{this.powerRollClass}}" data-roll-mode="{{this.powerRollMode}}">{{this.displayPowerDie}}</span>{{/if}}
+                    {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                     {{#if this.showItemReroll}}
                       <button type="button" class="item-reroll">
                         <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}

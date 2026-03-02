@@ -5012,6 +5012,98 @@ const ITEM_ROLL_FORMULA_FIELDS = Object.freeze({
   ration: ["damageDie", "healDie"],
   protection: ["damageDie", "healDie"]
 });
+const ITEM_SINGLE_USE_ENABLED_PATH = "system.singleUseEnabled";
+const ITEM_SINGLE_USE_COUNT_PATH = "system.singleUseCount";
+
+function normalizeSingleUseCountValue(value, { enabled = false, fallbackEnabled = 1 } = {}) {
+  const fallback = Math.max(1, normalizeNonNegativeInteger(fallbackEnabled, 1));
+  let normalized = normalizeNonNegativeInteger(value, fallback);
+  if (enabled && normalized < 1) normalized = 1;
+  return normalized;
+}
+
+function formatSingleUseCountLabel(remainingCount) {
+  const normalizedCount = normalizeNonNegativeInteger(remainingCount, 0);
+  if (normalizedCount <= 0) return "";
+  const rawLabel = String(tl("BLOODMAN.Items.SingleUseCountLabel", "NB USAGES :")).replace(/\s*:\s*$/u, "").trim();
+  return rawLabel ? `${rawLabel} ${normalizedCount}` : String(normalizedCount);
+}
+
+function resolveItemSingleUseDisplayData(systemData = null) {
+  const enabled = toBooleanFlag(systemData?.singleUseEnabled, false);
+  const rawCount = systemData?.singleUseCount;
+  const hasCount = rawCount != null && String(rawCount).trim() !== "";
+  if (!enabled || !hasCount) {
+    return {
+      show: false,
+      count: 0,
+      label: ""
+    };
+  }
+
+  const count = normalizeSingleUseCountValue(rawCount, {
+    enabled: true,
+    fallbackEnabled: 1
+  });
+  if (count <= 1) {
+    return {
+      show: false,
+      count: 0,
+      label: ""
+    };
+  }
+
+  return {
+    show: true,
+    count,
+    label: formatSingleUseCountLabel(count)
+  };
+}
+
+function normalizeItemSingleUseUpdate(item, updateData = null, options = {}) {
+  const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
+  const hasEnabledUpdate = updateData ? hasUpdatePath(updateData, ITEM_SINGLE_USE_ENABLED_PATH) : false;
+  const hasCountUpdate = updateData ? hasUpdatePath(updateData, ITEM_SINGLE_USE_COUNT_PATH) : false;
+  const shouldNormalize = includeSourceWhenMissing || hasEnabledUpdate || hasCountUpdate;
+  if (!shouldNormalize) return { changed: false };
+
+  const rawEnabled = hasEnabledUpdate
+    ? getUpdatedPathValue(updateData, ITEM_SINGLE_USE_ENABLED_PATH, undefined)
+    : item?.system?.singleUseEnabled;
+  const normalizedEnabled = toCheckboxBoolean(rawEnabled, false);
+  const rawCount = hasCountUpdate
+    ? getUpdatedPathValue(updateData, ITEM_SINGLE_USE_COUNT_PATH, undefined)
+    : item?.system?.singleUseCount;
+  const normalizedCount = normalizeSingleUseCountValue(rawCount, { enabled: normalizedEnabled, fallbackEnabled: 1 });
+
+  let changed = false;
+  if (updateData) {
+    if (hasEnabledUpdate && rawEnabled !== normalizedEnabled) {
+      foundry.utils.setProperty(updateData, ITEM_SINGLE_USE_ENABLED_PATH, normalizedEnabled);
+      changed = true;
+    }
+    if (!hasCountUpdate || Number(rawCount) !== normalizedCount) {
+      foundry.utils.setProperty(updateData, ITEM_SINGLE_USE_COUNT_PATH, normalizedCount);
+      changed = true;
+    }
+  } else if (item?.updateSource) {
+    const sourceEnabled = toCheckboxBoolean(item?.system?.singleUseEnabled, false);
+    const sourceCount = normalizeSingleUseCountValue(item?.system?.singleUseCount, { enabled: sourceEnabled, fallbackEnabled: 1 });
+    if (sourceEnabled !== normalizedEnabled || sourceCount !== normalizedCount) {
+      item.updateSource({
+        [ITEM_SINGLE_USE_ENABLED_PATH]: normalizedEnabled,
+        [ITEM_SINGLE_USE_COUNT_PATH]: normalizedCount
+      });
+      changed = true;
+    }
+  }
+
+  return {
+    changed,
+    enabled: normalizedEnabled,
+    count: normalizedCount
+  };
+}
 
 function getItemRollFormulaFieldLabels(fields = []) {
   return fields.map(field => {
@@ -5121,6 +5213,7 @@ Hooks.on("preCreateItem", (item, createData, options) => {
   normalizeItemPriceUpdate(item, createData);
   const normalizedWeaponAmmo = normalizeWeaponMagazineCapacityUpdate(item, createData);
   if (!normalizedWeaponAmmo) normalizeWeaponMagazineCapacityUpdate(item);
+  normalizeItemSingleUseUpdate(item, createData, { includeSourceWhenMissing: true });
   normalizeCharacteristicBonusItemUpdate(item, createData);
   const normalizedRollFormula = normalizeItemRollFormulaFields(item, createData, { includeSourceWhenMissing: true });
   if (normalizedRollFormula.invalid) {
@@ -5173,6 +5266,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
 
   normalizeItemPriceUpdate(item, updateData);
   normalizeWeaponMagazineCapacityUpdate(item, updateData);
+  normalizeItemSingleUseUpdate(item, updateData, { includeSourceWhenMissing: false });
   normalizeCharacteristicBonusItemUpdate(item, updateData);
   const normalizedRollFormula = normalizeItemRollFormulaFields(item, updateData, { includeSourceWhenMissing: false });
   if (normalizedRollFormula.invalid) {
@@ -5324,6 +5418,10 @@ function buildItemDisplayData(item) {
   data._id = data._id ?? item.id;
   data.usableEnabled = isPowerUsableEnabled(item.system?.usableEnabled);
   data.displayNoteHtml = formatMultilineTextToHtml(item.system?.note || item.system?.notes || "");
+  const singleUseDisplay = resolveItemSingleUseDisplayData(data.system || item.system || {});
+  data.showSingleUseCount = singleUseDisplay.show;
+  data.singleUseCountLabel = singleUseDisplay.label;
+  data.singleUseCountClass = "item-chip item-meta bm-btn-usage-count";
 
   if (item.system?.damageEnabled && item.system?.damageDie) {
     const rawDie = item.system.damageDie.toString();
@@ -5682,6 +5780,73 @@ class BloodmanActorSheet extends BaseActorSheet {
     const sent = requestDeleteActorItem(this.actor, item);
     if (!sent) safeWarn("Suppression impossible: aucun GM ou assistant actif.");
     return sent;
+  }
+
+  getSingleUseItemState(item) {
+    const enabled = toBooleanFlag(item?.system?.singleUseEnabled, false);
+    const remaining = normalizeSingleUseCountValue(item?.system?.singleUseCount, {
+      enabled,
+      fallbackEnabled: 1
+    });
+    return { enabled, remaining };
+  }
+
+  async updateSingleUseItemCount(item, nextCount) {
+    if (!item) return false;
+    const normalizedNext = normalizeSingleUseCountValue(nextCount, {
+      enabled: true,
+      fallbackEnabled: 1
+    });
+    const updateData = { [ITEM_SINGLE_USE_COUNT_PATH]: normalizedNext };
+    const parentActor = item.parent || item.actor || this.actor || null;
+
+    try {
+      if (item?.isOwner || parentActor?.isOwner || game.user?.isGM) {
+        await item.update(updateData);
+        return true;
+      }
+    } catch (_error) {
+      // Fallbacks below.
+    }
+
+    if (item?.id && parentActor?.isOwner && typeof parentActor.updateEmbeddedDocuments === "function") {
+      try {
+        await parentActor.updateEmbeddedDocuments("Item", [{ _id: item.id, ...updateData }]);
+        return true;
+      } catch (_error) {
+        // Warning below.
+      }
+    }
+
+    safeWarn(tl(
+      "BLOODMAN.Notifications.ItemSingleUseCounterUpdateFailed",
+      "Mise a jour impossible du compteur d'usage unique."
+    ));
+    return false;
+  }
+
+  async consumeSingleUseItem(item) {
+    const state = this.getSingleUseItemState(item);
+    if (!state.enabled) return { enabled: false, consumed: false, exhausted: false, remaining: state.remaining };
+
+    const nextRemaining = Math.max(0, state.remaining - 1);
+    if (nextRemaining <= 0) {
+      const deleted = await this.deleteActorItem(item);
+      return {
+        enabled: true,
+        consumed: deleted,
+        exhausted: deleted,
+        remaining: 0
+      };
+    }
+
+    const updated = await this.updateSingleUseItemCount(item, nextRemaining);
+    return {
+      enabled: true,
+      consumed: updated,
+      exhausted: false,
+      remaining: updated ? nextRemaining : state.remaining
+    };
   }
 
   getItemFromListElement(li) {
@@ -7067,6 +7232,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       displayItem.bagShowReloadButton = false;
       displayItem.bagReloadBlocked = false;
       displayItem.showItemReroll = shouldShowItemReroll(item.id);
+      const singleUseDisplay = resolveItemSingleUseDisplayData(displayItem.system || {});
+      displayItem.bagShowSingleUseCount = singleUseDisplay.show;
+      displayItem.bagSingleUseCountLabel = singleUseDisplay.label;
+      displayItem.bagSingleUseCountClass = "item-chip item-meta bm-btn-usage-count";
 
       if (displayItem.type === "arme") {
         const damageDie = String(displayItem.system?.damageDie || "").trim();
@@ -7125,6 +7294,10 @@ class BloodmanActorSheet extends BaseActorSheet {
         const weapon = item.toObject();
         weapon._id = weapon._id ?? item.id;
         weapon.displayDamageFormula = normalizeRollDieFormula(weapon.system?.damageDie, "d4");
+        const singleUseDisplay = resolveItemSingleUseDisplayData(weapon.system || {});
+        weapon.showSingleUseCount = singleUseDisplay.show;
+        weapon.singleUseCountLabel = singleUseDisplay.label;
+        weapon.singleUseCountClass = "item-chip item-meta bm-btn-usage-count";
         const normalized = normalizeWeaponType(weapon.system?.weaponType);
         const weaponCategory = getWeaponCategory(weapon.system?.weaponType);
         if (normalized === "corps") weapon.displayWeaponType = weaponTypeMelee;
@@ -7159,6 +7332,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       .map(item => {
         const protection = item.toObject();
         protection._id = protection._id ?? item.id;
+        const singleUseDisplay = resolveItemSingleUseDisplayData(protection.system || {});
+        protection.showSingleUseCount = singleUseDisplay.show;
+        protection.singleUseCountLabel = singleUseDisplay.label;
+        protection.singleUseCountClass = "item-chip item-meta bm-btn-usage-count";
         return protection;
       });
     const objectColumnOneItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_ONE] || []).map(buildCarryDisplayItem);
@@ -8073,8 +8250,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const result = await doDamageRoll(this.actor, item);
     if (!result) return;
     await playItemAudio(item);
-    if (toBooleanFlag(item?.system?.singleUseEnabled)) {
-      await this.deleteActorItem(item);
+    const consumption = await this.consumeSingleUseItem(item);
+    if (consumption.exhausted) {
       this.clearItemReroll(item.id);
       this.render(false);
       return;
@@ -8164,6 +8341,8 @@ class BloodmanActorSheet extends BaseActorSheet {
         });
         if (!healResult) return;
         await playItemAudio(item);
+        const consumption = await this.consumeSingleUseItem(item);
+        if (consumption.exhausted) this.clearItemReroll(item.id);
         if (powerPlan.isUsablePower) this.markPowerActivated(item.id, false);
         this.render(false);
         return;
@@ -8179,6 +8358,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       if (!result) return;
       await playItemAudio(item);
+      const consumption = await this.consumeSingleUseItem(item);
+      if (consumption.exhausted) {
+        this.clearItemReroll(item.id);
+        this.render(false);
+        return;
+      }
       if (result?.context) {
         result.context.kind = "item-damage";
         result.context.itemType = String(item.type || "");
@@ -8205,6 +8390,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     if (!result) return;
     await playItemAudio(item);
+    const consumption = await this.consumeSingleUseItem(item);
+    if (consumption.exhausted) {
+      this.clearItemReroll(item.id);
+      this.render(false);
+      return;
+    }
     if (result?.context) {
       result.context.kind = "item-damage";
       result.context.itemType = String(item.type || "");
@@ -8276,19 +8467,22 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!targetActor) return;
       const result = await doHealRoll(this.actor, item, {
         targetActor,
-        consumeItem: true
+        consumeItem: false
       });
       if (result) await playItemAudio(healAudioRef);
-      if (result) this.render(false);
+      if (!result) return;
+      const consumption = await this.consumeSingleUseItem(item);
+      if (consumption.exhausted) this.clearItemReroll(item.id);
+      this.render(false);
       return;
     }
     if (usePlan.kind === "ration") {
-      await this.deleteActorItem(item);
+      const consumption = await this.consumeSingleUseItem(item);
+      if (consumption.exhausted) this.clearItemReroll(item.id);
       this.render(false);
       return;
     }
     if (usePlan.kind === "object") {
-      const singleUseEnabled = toBooleanFlag(item?.system?.singleUseEnabled);
       const objectDamageEnabled = toBooleanFlag(item?.system?.damageEnabled, item?.system?.damageDie != null)
         && Boolean(String(item?.system?.damageDie || "").trim());
       if (objectDamageEnabled) {
@@ -8297,18 +8491,11 @@ class BloodmanActorSheet extends BaseActorSheet {
           itemId: item.id,
           itemType: item.type
         });
-        if (!damageResult) {
-          if (singleUseEnabled) {
-            await this.deleteActorItem(item);
-            this.clearItemReroll(item.id);
-            this.render(false);
-          }
-          return;
-        }
+        if (!damageResult) return;
       }
       await playItemAudio(item, { delayMs: 0 });
-      if (singleUseEnabled) {
-        await this.deleteActorItem(item);
+      const consumption = await this.consumeSingleUseItem(item);
+      if (consumption.exhausted) {
         this.clearItemReroll(item.id);
       }
       this.render(false);
@@ -8744,6 +8931,11 @@ class BloodmanItemSheet extends BaseItemSheet {
     systemData.powerCostEnabled = toCheckboxBoolean(this.item.system?.powerCostEnabled, false);
     systemData.powerCost = normalizeNonNegativeInteger(this.item.system?.powerCost, 0);
     systemData.singleUseEnabled = toCheckboxBoolean(this.item.system?.singleUseEnabled, false);
+    systemData.singleUseCount = normalizeSingleUseCountValue(this.item.system?.singleUseCount, {
+      enabled: systemData.singleUseEnabled,
+      fallbackEnabled: 1
+    });
+    data.singleUseCountInputDisabled = !systemData.singleUseEnabled;
 
     systemData.rawBonusEnabled = toCheckboxBoolean(this.item.system?.rawBonusEnabled, false);
     systemData.rawBonuses = {
@@ -8896,6 +9088,35 @@ class BloodmanItemSheet extends BaseItemSheet {
       itemId: this.item.id,
       itemType: this.item.type
     });
-    if (result) await playItemAudio(this.item);
+    if (!result) return;
+    await playItemAudio(this.item);
+
+    const singleUseEnabled = toBooleanFlag(this.item?.system?.singleUseEnabled, false);
+    if (!singleUseEnabled) return;
+    const remaining = normalizeSingleUseCountValue(this.item?.system?.singleUseCount, {
+      enabled: true,
+      fallbackEnabled: 1
+    });
+    const nextRemaining = Math.max(0, remaining - 1);
+    if (nextRemaining <= 0) {
+      try {
+        await this.item.delete();
+      } catch (_error) {
+        safeWarn(tl(
+          "BLOODMAN.Notifications.ItemDeleteRequiresGM",
+          "Suppression impossible: aucun MJ ou assistant actif."
+        ));
+      }
+      return;
+    }
+
+    try {
+      await this.item.update({ [ITEM_SINGLE_USE_COUNT_PATH]: nextRemaining });
+    } catch (_error) {
+      safeWarn(tl(
+        "BLOODMAN.Notifications.ItemSingleUseCounterUpdateFailed",
+        "Mise a jour impossible du compteur d'usage unique."
+      ));
+    }
   }
 }
