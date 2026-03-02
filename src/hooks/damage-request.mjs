@@ -14,7 +14,7 @@ export function buildDamageRequestHooks({
   bmLog
 } = {}) {
   async function handleIncomingDamageRequest(data, source = "socket") {
-    if (!data || !game.user.isGM) return;
+    if (!data || !globalThis.game?.user?.isGM) return;
     const requestId = typeof data.requestId === "string" ? data.requestId : "";
     if (requestId && wasDamageRequestProcessed(requestId)) return;
     if (requestId) rememberDamageRequest(requestId);

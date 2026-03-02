@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { buildDamageRequestHooks } from "../../src/hooks/damage-request.mjs";
 
-function withGameContext(gameValue, callback) {
+async function withGameContext(gameValue, callback) {
   const previousGame = globalThis.game;
   globalThis.game = gameValue;
   try {
-    return callback();
+    return await callback();
   } finally {
     globalThis.game = previousGame;
   }

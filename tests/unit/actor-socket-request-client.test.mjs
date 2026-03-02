@@ -107,6 +107,14 @@ function run() {
       }
     });
     assert.deepEqual(emitted[2].payload, {
+      type: "reorderActorItems",
+      requesterId: "u1",
+      actorUuid: "Actor.a1",
+      actorId: "a1",
+      actorBaseId: "a1",
+      updates: [{ _id: "it1", sort: 7 }]
+    });
+    assert.deepEqual(emitted[3].payload, {
       type: "deleteActorItem",
       requesterId: "u1",
       actorUuid: "Actor.a1",
@@ -116,14 +124,6 @@ function run() {
       itemUuid: "Actor.a1.Item.it1",
       itemType: "objet",
       itemName: "Corde"
-    });
-    assert.deepEqual(emitted[3].payload, {
-      type: "reorderActorItems",
-      requesterId: "u1",
-      actorUuid: "Actor.a1",
-      actorId: "a1",
-      actorBaseId: "a1",
-      updates: [{ _id: "it1", sort: 7 }]
     });
   });
 }

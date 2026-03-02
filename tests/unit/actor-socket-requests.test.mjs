@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { buildActorSocketRequestHandlers } from "../../src/hooks/actor-socket-requests.mjs";
 
-function withGameContext(gameConfig, callback) {
+async function withGameContext(gameConfig, callback) {
   const previousGame = globalThis.game;
   globalThis.game = {
     user: { isGM: Boolean(gameConfig?.isGM) },
@@ -9,7 +9,7 @@ function withGameContext(gameConfig, callback) {
     actors: new Map(gameConfig?.actors || [])
   };
   try {
-    return callback();
+    return await callback();
   } finally {
     globalThis.game = previousGame;
   }

@@ -135,14 +135,23 @@ export function createAmmoStateRules({
   function normalizeAmmoState(rawAmmo = null, options = {}) {
     const fallbackBase = options.fallback ?? buildDefaultAmmo();
     const fallback = mergeData(buildDefaultAmmo(), fallbackBase || {}, { inplace: false });
-    const source = mergeData(fallback, rawAmmo || {}, { inplace: false });
+    const rawSource = rawAmmo && typeof rawAmmo === "object" ? rawAmmo : {};
+    const source = mergeData(fallback, rawSource, { inplace: false });
     const type = normalizeAmmoType(source.type);
 
     const fallbackStock = normalizeInteger(fallback.stock ?? fallback.value, 0);
     const fallbackMagazine = normalizeInteger(fallback.magazine ?? fallback.value, 0);
 
-    const stockRaw = source.stock ?? source.value ?? fallbackStock;
-    const magazineRaw = source.magazine ?? source.value ?? fallbackMagazine;
+    const hasRawStock = Object.prototype.hasOwnProperty.call(rawSource, "stock");
+    const hasRawMagazine = Object.prototype.hasOwnProperty.call(rawSource, "magazine");
+    const hasRawValue = Object.prototype.hasOwnProperty.call(rawSource, "value");
+
+    const stockRaw = hasRawStock
+      ? rawSource.stock
+      : (hasRawValue ? rawSource.value : source.stock ?? source.value ?? fallbackStock);
+    const magazineRaw = hasRawMagazine
+      ? rawSource.magazine
+      : (hasRawValue ? rawSource.value : source.magazine ?? source.value ?? fallbackMagazine);
 
     let stock = normalizeInteger(stockRaw, fallbackStock);
     let magazine = normalizeInteger(magazineRaw, fallbackMagazine);

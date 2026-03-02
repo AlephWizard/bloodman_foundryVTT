@@ -14,11 +14,12 @@ export function buildActorSocketRequestHandlers({
   toFiniteNumber
 } = {}) {
   async function handleVitalResourceUpdateRequest(data) {
-    if (!game.user.isGM || !data) return;
+    const currentGame = globalThis.game;
+    if (!data || !currentGame?.user?.isGM) return;
     const requesterId = String(data.requesterId || "");
-    const requester = game.users?.get(requesterId);
+    const requester = currentGame.users?.get(requesterId);
     if (!requester) return;
-    const requesterRole = game.users?.get(requesterId)?.role ?? 0;
+    const requesterRole = requester?.role ?? 0;
     if (typeof canUserRoleEditCharacteristics === "function") {
       if (!canUserRoleEditCharacteristics(requesterRole)) return;
     } else {
@@ -43,11 +44,12 @@ export function buildActorSocketRequestHandlers({
   }
 
   async function handleActorSheetUpdateRequest(data) {
-    if (!game.user.isGM || !data) return;
+    const currentGame = globalThis.game;
+    if (!data || !currentGame?.user?.isGM) return;
     const requesterId = String(data.requesterId || "");
-    const requester = game.users?.get(requesterId);
+    const requester = currentGame.users?.get(requesterId);
     if (!requester) return;
-    const requesterRole = game.users?.get(requesterId)?.role ?? 0;
+    const requesterRole = requester?.role ?? 0;
     const actor = await resolveActorForSheetRequest(data);
     if (!isCharacterLikeActor(actor)) return;
 
@@ -77,9 +79,10 @@ export function buildActorSocketRequestHandlers({
   }
 
   async function handleDeleteItemRequest(data) {
-    if (!game.user.isGM || !data) return;
+    const currentGame = globalThis.game;
+    if (!data || !currentGame?.user?.isGM) return;
     const requesterId = String(data.requesterId || "");
-    const requester = game.users?.get(requesterId);
+    const requester = currentGame.users?.get(requesterId);
     if (!requester) return;
     const initialActor = await resolveActorForSheetRequest(data);
     if (!initialActor) return;
@@ -99,9 +102,9 @@ export function buildActorSocketRequestHandlers({
 
     addActor(initialActor);
     const worldActorId = String(data.actorBaseId || data.actorId || "");
-    if (worldActorId) addActor(game.actors?.get(worldActorId) || null);
+    if (worldActorId) addActor(currentGame.actors?.get(worldActorId) || null);
     if (initialActor?.isToken && initialActor?.token?.actorId) {
-      addActor(game.actors?.get(initialActor.token.actorId) || null);
+      addActor(currentGame.actors?.get(initialActor.token.actorId) || null);
     }
 
     const requestedItemId = String(data.itemId || "") || extractItemIdFromUuid(data.itemUuid);
@@ -150,9 +153,10 @@ export function buildActorSocketRequestHandlers({
   }
 
   async function handleReorderActorItemsRequest(data) {
-    if (!game.user.isGM || !data) return;
+    const currentGame = globalThis.game;
+    if (!data || !currentGame?.user?.isGM) return;
     const requesterId = String(data.requesterId || "");
-    const requester = game.users?.get(requesterId);
+    const requester = currentGame.users?.get(requesterId);
     if (!requester) return;
     const actor = await resolveActorForSheetRequest(data);
     if (!isCharacterLikeActor(actor)) return;

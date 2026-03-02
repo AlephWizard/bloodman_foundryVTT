@@ -26,7 +26,7 @@ export function buildDamageRerollHooks({
   async function handleDamageAppliedMessage(data) {
     if (!data) return;
     const attackerUserId = String(data.attackerUserId || "");
-    const localUserId = String(game.user?.id || "");
+    const localUserId = String(globalThis.game?.user?.id || "");
     if (attackerUserId && attackerUserId !== localUserId) return;
     const attackers = resolveAttackerActorInstancesForDamageApplied(data);
     if (!attackers.length) return;
@@ -129,7 +129,8 @@ export function buildDamageRerollHooks({
   }
 
   async function handleDamageRerollRequest(data) {
-    if (!data || !game.user.isGM) return;
+    const currentGame = globalThis.game;
+    if (!data || !currentGame?.user?.isGM) return;
     const requestId = String(data.requestId || "");
     if (requestId && wasRerollRequestProcessed(requestId)) return;
     if (requestId) rememberRerollRequest(requestId);
@@ -137,7 +138,7 @@ export function buildDamageRerollHooks({
     if (kind !== "item-damage") return;
     let itemType = String(data.itemType || "").toLowerCase();
     if (!isDamageRerollItemType(itemType)) {
-      const attacker = game.actors?.get(String(data.attackerId || ""));
+      const attacker = currentGame.actors?.get(String(data.attackerId || ""));
       const item = attacker?.items?.get(String(data.itemId || ""));
       itemType = String(item?.type || itemType).toLowerCase();
     }
@@ -173,7 +174,7 @@ export function buildDamageRerollHooks({
       }
       const tokenIsLinked = tokenDoc ? Boolean(tokenDoc.actorLink) : toBooleanFlag(target.targetActorLink);
       const targetActor = tokenIsLinked
-        ? (tokenDoc?.actor || (target.actorId ? game.actors?.get(target.actorId) : null))
+        ? (tokenDoc?.actor || (target.actorId ? currentGame.actors?.get(target.actorId) : null))
         : null;
       const rawHpBefore = target?.hpBefore;
       let hpBefore = (rawHpBefore == null || rawHpBefore === "")

@@ -135,8 +135,8 @@ async function run() {
     }),
     {
       hpBefore: 13,
-      hpAfter: 9,
-      finalDamage: 4,
+      hpAfter: 8,
+      finalDamage: 5,
       penetration: 2,
       paInitial: 3,
       paEffective: 1,
@@ -156,9 +156,9 @@ async function run() {
   assert.equal(
     utils.computeExpectedHpAfter({
       hpBefore: 13,
-      finalDamage: 4
+      finalDamage: 5
     }),
-    9
+    8
   );
   assert.equal(
     Number.isNaN(utils.computeExpectedHpAfter({ hpBefore: Number.NaN, finalDamage: 4 })),

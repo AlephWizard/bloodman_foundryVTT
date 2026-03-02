@@ -204,7 +204,11 @@ export function buildDamageRerollUtils({
     tokenCurrentHp = Number.NaN,
     tokenPaInitial = Number.NaN
   } = {}) {
-    const explicitHpBefore = Number(rawHpBefore);
+    const hasRawHpBeforeValue = !(
+      rawHpBefore == null
+      || (typeof rawHpBefore === "string" && !rawHpBefore.trim())
+    );
+    const explicitHpBefore = hasRawHpBeforeValue ? Number(rawHpBefore) : Number.NaN;
     if (Number.isFinite(explicitHpBefore)) return explicitHpBefore;
 
     const normalizedReferenceShare = Math.max(0, Math.floor(parseFiniteNumber(referenceShare, 0)));

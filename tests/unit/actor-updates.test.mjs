@@ -484,7 +484,7 @@ function run() {
       roleOverride: "boss-seul",
       derivePvMax: (phyEffective, role) => {
         assert.equal(role, "boss-seul");
-        return Math.round(phyEffective / 5) * 2;
+        return Math.round(phyEffective / 5) * 5;
       }
     }),
     {
@@ -507,7 +507,7 @@ function run() {
       roleOverride: "boss-seul",
       derivePvMax: (phyEffective, role) => {
         assert.equal(role, "boss-seul");
-        return Math.round(phyEffective / 5) * 2;
+        return Math.round(phyEffective / 5) * 5;
       },
       hasPvMaxUpdate: false,
       hasPpMaxUpdate: false,
