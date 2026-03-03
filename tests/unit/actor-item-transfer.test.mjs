@@ -23,6 +23,52 @@ function createDroppedItem(id, { isOwner = false } = {}) {
   };
 }
 
+function createLinkedItem(id, { type = "objet", name = "", system = {} } = {}) {
+  return {
+    id,
+    type,
+    name: name || `Item-${id}`,
+    toObject: () => ({
+      _id: id,
+      type,
+      name: name || `Item-${id}`,
+      system: JSON.parse(JSON.stringify(system || {}))
+    })
+  };
+}
+
+function createDroppedItemWithSourceRefs(id) {
+  return {
+    id,
+    isOwner: true,
+    toObject: () => ({
+      _id: id,
+      _templateSourceUuid: "Item.source-template",
+      _templateSourceId: "source-template",
+      name: `Item-${id}`,
+      type: "objet",
+      flags: {
+        core: { sourceId: "Item.source-template" }
+      },
+      system: {
+        quantity: 1,
+        link: {
+          equiperAvecTemplates: [
+            {
+              name: "Template Child",
+              type: "pouvoir",
+              _templateSourceUuid: "Item.child-template",
+              _templateSourceId: "child-template",
+              flags: { core: { sourceId: "Item.child-template" } },
+              system: { note: "test" }
+            }
+          ]
+        }
+      }
+    })
+  };
+}
+
 async function run() {
   const rules = buildRules();
   assert.equal(
@@ -220,6 +266,122 @@ async function run() {
     createItemOptions: { bloodmanSkipVoyageXPCost: true }
   });
   assert.deepEqual(transferCreateOptions, [{ bloodmanSkipVoyageXPCost: true }]);
+
+  const linkedRules = buildRules();
+  const linkedCreates = [];
+  const linkedUpdates = [];
+  const linkedDeletes = [];
+  const linkedTarget = {
+    id: "target",
+    isOwner: true,
+    createEmbeddedDocuments: async (_type, docs) => {
+      linkedCreates.push(docs);
+      if (linkedCreates.length === 1) return [{ id: "parent-created" }];
+      if (linkedCreates.length === 2) return [{ id: "child-created-1" }, { id: "child-created-2" }];
+      return [];
+    },
+    updateEmbeddedDocuments: async (_type, updates) => {
+      linkedUpdates.push(updates);
+      return updates;
+    },
+    deleteEmbeddedDocuments: async () => {}
+  };
+  const linkedSourceChildren = new Map([
+    [
+      "child-a",
+      createLinkedItem("child-a", {
+        type: "pouvoir",
+        name: "Electrokinese",
+        system: { link: { parentItemId: "parent-a" }, usableEnabled: true }
+      })
+    ],
+    [
+      "child-b",
+      createLinkedItem("child-b", {
+        type: "aptitude",
+        name: "Frappe lourde",
+        system: { link: { parentItemId: "parent-a" }, damageDie: "1d6" }
+      })
+    ]
+  ]);
+  const linkedParent = createLinkedItem("parent-a", {
+    type: "arme",
+    name: "Mjollnir",
+    system: {
+      link: {
+        equiperAvecEnabled: true,
+        equiperAvec: ["child-a", "child-b"]
+      }
+    }
+  });
+  const linkedSource = {
+    id: "source-linked",
+    isOwner: true,
+    items: {
+      get: itemId => linkedSourceChildren.get(itemId) || null
+    },
+    deleteEmbeddedDocuments: async (_type, ids) => {
+      linkedDeletes.push(ids);
+      return ids;
+    }
+  };
+  const linkedResult = await linkedRules.applyActorToActorItemTransfer({
+    targetActor: linkedTarget,
+    transferEntries: [{ droppedItem: linkedParent, sourceActor: linkedSource }],
+    isGM: false
+  });
+  assert.equal(Array.isArray(linkedResult), true);
+  assert.equal(linkedResult.length, 3);
+  assert.equal(linkedCreates.length, 2);
+  assert.equal(linkedCreates[0][0].system.link.equiperAvec.length, 0);
+  assert.equal(linkedCreates[0][0].system.link.parentItemId, "");
+  assert.equal(linkedCreates[1][0].system.link.parentItemId, "parent-created");
+  assert.equal(linkedCreates[1][1].system.link.parentItemId, "parent-created");
+  assert.deepEqual(linkedUpdates, [[{
+    _id: "parent-created",
+    "system.link.equiperAvecEnabled": true,
+    "system.link.equiperAvec": ["child-created-1", "child-created-2"]
+  }]]);
+  assert.deepEqual(linkedDeletes, [["parent-a", "child-a", "child-b"]]);
+
+  const isolationPayloads = [];
+  const isolationRules = buildRules();
+  await isolationRules.applyActorToActorItemTransfer({
+    targetActor: {
+      id: "target",
+      isOwner: true,
+      createEmbeddedDocuments: async (_type, docs) => {
+        isolationPayloads.push(docs[0]);
+        return [{ id: "created-isolation" }];
+      },
+      deleteEmbeddedDocuments: async () => {}
+    },
+    transferEntries: [{
+      droppedItem: createDroppedItemWithSourceRefs("i9"),
+      sourceActor: {
+        id: "source-isolation",
+        isOwner: true,
+        deleteEmbeddedDocuments: async () => {}
+      }
+    }],
+    isGM: false
+  });
+  assert.equal(isolationPayloads.length, 1);
+  assert.equal(Object.prototype.hasOwnProperty.call(isolationPayloads[0], "_templateSourceUuid"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(isolationPayloads[0], "_templateSourceId"), false);
+  assert.equal(isolationPayloads[0]?.flags?.core?.sourceId, undefined);
+  assert.equal(
+    isolationPayloads[0]?.system?.link?.equiperAvecTemplates?.[0]?._templateSourceUuid,
+    undefined
+  );
+  assert.equal(
+    isolationPayloads[0]?.system?.link?.equiperAvecTemplates?.[0]?._templateSourceId,
+    undefined
+  );
+  assert.equal(
+    isolationPayloads[0]?.system?.link?.equiperAvecTemplates?.[0]?.flags?.core?.sourceId,
+    undefined
+  );
 }
 
 run()

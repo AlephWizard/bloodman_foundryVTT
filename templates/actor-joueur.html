@@ -1,4 +1,4 @@
-<form class="bloodman-sheet">
+﻿<form class="bloodman-sheet">
   <header class="sheet-header">
     <img class="sheet-logo" src="systems/bloodman/images/bloodman_logo.svg" alt="Bloodman" />
     <div class="voyage-tools">
@@ -301,6 +301,38 @@
                         {{/if}}
                       </div>
                       {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                      {{#if this.equiperAvecEnabled}}
+                        <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                          <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                          <ul class="equiper-avec-list">
+                            {{#each this.equiperAvecChildren}}
+                              <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                                <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                                <img class="equiper-avec-icon" src="{{this.img}}" />
+                                <div class="equiper-avec-body">
+                                  <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                                  <div class="equiper-avec-meta">
+                                    
+                                    {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                    {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                    {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                    {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                    {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                    {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                    {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                    {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                  </div>
+                                  {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                </div>
+                              </li>
+                            {{/each}}
+                          </ul>
+                        </div>
+                      {{/if}}
                     </div>
                   </li>
                 {{/each}}
@@ -347,6 +379,38 @@
                         {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                       </div>
                       {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                      {{#if this.equiperAvecEnabled}}
+                        <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                          <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                          <ul class="equiper-avec-list">
+                            {{#each this.equiperAvecChildren}}
+                              <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                                <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                                <img class="equiper-avec-icon" src="{{this.img}}" />
+                                <div class="equiper-avec-body">
+                                  <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                                  <div class="equiper-avec-meta">
+                                    
+                                    {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                    {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                    {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                    {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                    {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                    {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                    {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                    {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                  </div>
+                                  {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                </div>
+                              </li>
+                            {{/each}}
+                          </ul>
+                        </div>
+                      {{/if}}
                     </div>
                   </li>
                 {{/each}}
@@ -408,6 +472,38 @@
                       {{/if}}
                     </div>
                     {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    {{#if this.equiperAvecEnabled}}
+                      <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                        <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                        <ul class="equiper-avec-list">
+                          {{#each this.equiperAvecChildren}}
+                            <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                              <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                              <img class="equiper-avec-icon" src="{{this.img}}" />
+                              <div class="equiper-avec-body">
+                                <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                                <div class="equiper-avec-meta">
+                                  
+                                  {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                  {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                  {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                  {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                  {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                  {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                  {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                  {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                </div>
+                                {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                              </div>
+                            </li>
+                          {{/each}}
+                        </ul>
+                      </div>
+                    {{/if}}
                   </div>
                 </li>
               {{/each}}
@@ -436,6 +532,38 @@
                       {{/if}}
                     </div>
                     {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    {{#if this.equiperAvecEnabled}}
+                      <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                        <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                        <ul class="equiper-avec-list">
+                          {{#each this.equiperAvecChildren}}
+                            <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                              <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                              <img class="equiper-avec-icon" src="{{this.img}}" />
+                              <div class="equiper-avec-body">
+                                <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                                <div class="equiper-avec-meta">
+                                  
+                                  {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                  {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                  {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                  {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                  {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                  {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                  {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                  {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                </div>
+                                {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                              </div>
+                            </li>
+                          {{/each}}
+                        </ul>
+                      </div>
+                    {{/if}}
                   </div>
                 </li>
               {{/each}}
@@ -464,6 +592,38 @@
                       {{/if}}
                     </div>
                     {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    {{#if this.equiperAvecEnabled}}
+                      <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                        <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                        <ul class="equiper-avec-list">
+                          {{#each this.equiperAvecChildren}}
+                            <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                              <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                              <img class="equiper-avec-icon" src="{{this.img}}" />
+                              <div class="equiper-avec-body">
+                                <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                                <div class="equiper-avec-meta">
+                                  
+                                  {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                  {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                  {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                  {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                  {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                  {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                  {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                  {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                </div>
+                                {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                              </div>
+                            </li>
+                          {{/each}}
+                        </ul>
+                      </div>
+                    {{/if}}
                   </div>
                 </li>
               {{/each}}
@@ -538,6 +698,38 @@
                     {{/if}}
                   </div>
                   {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
+                  {{#if this.equiperAvecEnabled}}
+                    <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                      <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                      <ul class="equiper-avec-list">
+                        {{#each this.equiperAvecChildren}}
+                          <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                            <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                            <img class="equiper-avec-icon" src="{{this.img}}" />
+                            <div class="equiper-avec-body">
+                              <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                              <div class="equiper-avec-meta">
+                                  
+                                  {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                  {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                  {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                  {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                  {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                  {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                  {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                  {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                </div>
+                              {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                            </div>
+                          </li>
+                        {{/each}}
+                      </ul>
+                    </div>
+                  {{/if}}
                 </div>
               </li>
             {{/each}}
@@ -567,6 +759,38 @@
                     {{/if}}
                   </div>
                   {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
+                  {{#if this.equiperAvecEnabled}}
+                    <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
+                      <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
+                      <ul class="equiper-avec-list">
+                        {{#each this.equiperAvecChildren}}
+                          <li class="equiper-avec-item" data-linked-child-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">
+                            <button type="button" class="equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                            <img class="equiper-avec-icon" src="{{this.img}}" />
+                            <div class="equiper-avec-body">
+                              <span class="equiper-avec-name equiper-avec-item-open" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}">{{this.name}}</span>
+                              <div class="equiper-avec-meta">
+                                  
+                                  {{#if this.childProtectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.childProtectionLabel}}</span>{{/if}}
+                                  {{#if this.childShowPowerUseButton}}<button type="button" class="equiper-avec-power-use bm-btn-magic">{{localize "BLOODMAN.Common.Use"}}</button>{{/if}}
+                                  {{#if this.childShowAptitudeUseButton}}<button type="button" class="equiper-avec-aptitude-use bm-btn-magic">MONTRER MJ</button>{{/if}}
+                                  {{#if this.childUseLabel}}<span class="{{this.childUseClass}} equiper-avec-item-use">{{this.childUseLabel}}</span>{{/if}}
+                                  {{#if this.childRollLabel}}<span class="{{this.childRollClass}} equiper-avec-ability-roll" data-roll-mode="{{this.childRollMode}}" data-roll-action="{{this.childRollAction}}">{{this.childRollLabel}}</span>{{/if}}
+                                    {{#if this.showItemReroll}}
+                                      <button type="button" class="equiper-avec-item-reroll"><i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}</button>
+                                      <button type="button" class="equiper-avec-item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
+                                    {{/if}}
+                                  {{#if this.childShowAmmoState}}<span class="weapon-ammo">{{this.childAmmoMagazine}} / {{this.childAmmoCapacityDisplay}}</span>{{/if}}
+                                  {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
+                                  {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
+                                </div>
+                              {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                            </div>
+                          </li>
+                        {{/each}}
+                      </ul>
+                    </div>
+                  {{/if}}
                 </div>
               </li>
             {{/each}}

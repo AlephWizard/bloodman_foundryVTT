@@ -77,6 +77,10 @@ import { createEquipmentCurrencyRules } from "./src/rules/equipment-currency.mjs
 import { createAmmoStateRules } from "./src/rules/ammo-state.mjs";
 import { createDefaultDataBuilders } from "./src/rules/default-data.mjs";
 import { createUpdatePathHelpers } from "./src/rules/update-paths.mjs";
+import {
+  createItemLinkRules,
+  resolveItemLinkData
+} from "./src/rules/item-links.mjs";
 import { createResourceGaugeRules } from "./src/rules/resource-gauge.mjs";
 import { createStatePresetRules } from "./src/rules/state-presets.mjs";
 import { createItemBucketRules } from "./src/rules/item-buckets.mjs";
@@ -2557,6 +2561,8 @@ const CARRIED_ITEM_LIMIT_WITH_BAG = CARRIED_ITEM_LIMIT_BASE + (CARRIED_ITEMS_PER
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
 const CARRIED_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
 const BAG_ZONE_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
+const ITEM_LINK_SUPPORTED_TYPES = new Set(["arme", "objet", "protection", "ration", "soin", "aptitude", "pouvoir"]);
+const ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES = "arme,objet,protection,ration,soin,aptitude,pouvoir";
 const BAG_ZONE_FLAG_KEY = "inBag";
 const CARRY_COLUMN_FLAG_KEY = "carryColumn";
 const CARRY_COLUMN_EQUIPMENT = "equipment";
@@ -2579,7 +2585,7 @@ const CARRY_COLUMN_CAPACITY = Object.freeze({
   [CARRY_COLUMN_BAG]: CARRIED_ITEMS_PER_MAIN_COLUMN
 });
 const CARRY_COLUMN_FULL_REASON = "colonne pleine";
-const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
+const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
@@ -2694,6 +2700,14 @@ const {
   buildDefaultProfile,
   buildDefaultEquipment
 } = defaultDataBuilders;
+
+const itemLinkRules = createItemLinkRules({
+  hasUpdatePath,
+  getUpdatedPathValue,
+  setProperty: foundry.utils.setProperty,
+  toCheckboxBoolean
+});
+const { normalizeItemLinkUpdate } = itemLinkRules;
 
 const equipmentCurrencyRules = createEquipmentCurrencyRules({
   parseSimpleArithmeticInput,
@@ -2861,7 +2875,8 @@ const dropEvaluationRules = createDropEvaluationRules({
   roundCurrencyValue,
   getDropItemQuantity: resolveDropItemQuantity,
   getDroppedItemUnitPrice: resolveDroppedItemUnitPrice,
-  carriedItemTypes: CARRIED_ITEM_TYPES
+  carriedItemTypes: CARRIED_ITEM_TYPES,
+  shouldCountCarriedItem: item => isCarriedItemCountedForBag(item)
 });
 const {
   resolveActorTransferEntries: resolveActorTransferEntriesFromDrop,
@@ -3572,10 +3587,384 @@ async function postFullPvRestoreSummary(result) {
   return true;
 }
 
+function resolveItemLinkState(itemOrSystem = null) {
+  return resolveItemLinkData(itemOrSystem, { toCheckboxBoolean });
+}
+
+function getLinkedParentItemId(item, actorLike = null) {
+  const itemId = String(item?.id || item?._id || "").trim();
+  const link = resolveItemLinkState(item);
+  const parentItemId = String(link?.parentItemId || "").trim();
+  if (!parentItemId) return "";
+  if (itemId && parentItemId === itemId) return "";
+  const actor = actorLike || item?.actor || item?.parent || null;
+  if (!actor?.items?.has?.(parentItemId)) return "";
+  return parentItemId;
+}
+
+function isActorItemLinkedChild(item, actorLike = null) {
+  return Boolean(getLinkedParentItemId(item, actorLike));
+}
+
+function isItemLinkSupportedType(typeLike) {
+  const type = String(typeLike || "").trim().toLowerCase();
+  return ITEM_LINK_SUPPORTED_TYPES.has(type);
+}
+
+function isCarriedItemCountedForBag(item, actorLike = null) {
+  const itemType = String(item?.type || "").trim().toLowerCase();
+  if (!CARRIED_ITEM_TYPES.has(itemType)) return false;
+  if (isActorItemLinkedChild(item, actorLike)) return false;
+  const link = resolveItemLinkState(item);
+  return Boolean(link.containerCountsForBag);
+}
+
+function resolveLinkedChildOriginalItemType(item) {
+  if (!item) return "";
+  const link = resolveItemLinkState(item);
+  if (!link.parentItemId) return "";
+  const rawOriginalType = String(
+    item?.system?.link?.originalItemType
+    || ""
+  ).trim().toLowerCase();
+  if (rawOriginalType === "pouvoir" || rawOriginalType === "aptitude") return rawOriginalType;
+  return "";
+}
+
+function getItemRuntimeType(item) {
+  const rawType = String(item?.type || "").trim().toLowerCase();
+  if (rawType !== "objet") return rawType;
+  const link = resolveItemLinkState(item);
+  if (!link.parentItemId) return rawType;
+
+  const originalType = resolveLinkedChildOriginalItemType(item);
+  if (originalType) return originalType;
+
+  // Legacy fallback: items remapped to "objet" from "pouvoir" can keep `usableEnabled`.
+  const systemData = item?.system && typeof item.system === "object"
+    ? item.system
+    : {};
+  if (
+    Object.prototype.hasOwnProperty.call(systemData, "usableEnabled")
+    && !Object.prototype.hasOwnProperty.call(systemData, "useEnabled")
+  ) {
+    return "pouvoir";
+  }
+  return rawType;
+}
+
+function sanitizeItemSourceReferences(entryData, options = {}) {
+  const keepSourceReference = options.keepSourceReference === true;
+  const source = entryData && typeof entryData === "object"
+    ? entryData
+    : {};
+
+  if (!keepSourceReference) {
+    delete source._templateSourceUuid;
+    delete source._templateSourceId;
+  }
+
+  if (source.flags?.core && typeof source.flags.core === "object") {
+    delete source.flags.core.sourceId;
+    if (!Object.keys(source.flags.core).length) delete source.flags.core;
+    if (source.flags && !Object.keys(source.flags).length) delete source.flags;
+  }
+
+  const linkData = source.system?.link;
+  if (linkData && typeof linkData === "object" && Array.isArray(linkData.equiperAvecTemplates)) {
+    linkData.equiperAvecTemplates = linkData.equiperAvecTemplates
+      .map(templateEntry => {
+        if (!templateEntry || typeof templateEntry !== "object") return null;
+        const clonedTemplate = foundry.utils.deepClone(templateEntry);
+        sanitizeItemSourceReferences(clonedTemplate, { keepSourceReference });
+        return clonedTemplate;
+      })
+      .filter(Boolean);
+  }
+
+  return source;
+}
+
+function normalizeItemLinkTemplateEntries(value, options = {}) {
+  const keepSourceReference = options.keepSourceReference !== false;
+  const source = Array.isArray(value) ? value : [];
+  const normalizedEntries = [];
+  for (const entry of source) {
+    if (!entry || typeof entry !== "object") continue;
+    const cloned = foundry.utils.deepClone(entry);
+    sanitizeItemSourceReferences(cloned, { keepSourceReference });
+    const type = String(cloned?.type || "").trim().toLowerCase();
+    if (!isItemLinkSupportedType(type)) continue;
+    cloned.type = type;
+    cloned.name = String(cloned?.name || "").trim() || t("BLOODMAN.Common.Name");
+    cloned.img = String(cloned?.img || "").trim() || "icons/svg/item-bag.svg";
+    cloned.system = cloned.system && typeof cloned.system === "object"
+      ? cloned.system
+      : {};
+    normalizedEntries.push(cloned);
+  }
+  return normalizedEntries;
+}
+
+function buildItemLinkTemplateEntryFromItemDocument(itemDocument, options = {}) {
+  const keepSourceReference = options.keepSourceReference !== false;
+  if (!itemDocument) return null;
+  const source = typeof itemDocument?.toObject === "function"
+    ? itemDocument.toObject()
+    : foundry.utils.deepClone(itemDocument);
+  if (!source || typeof source !== "object") return null;
+  const type = String(source?.type || itemDocument?.type || "").trim().toLowerCase();
+  if (!isItemLinkSupportedType(type)) return null;
+  const entry = foundry.utils.deepClone(source);
+  sanitizeItemSourceReferences(entry, { keepSourceReference });
+  entry.type = type;
+  entry.name = String(itemDocument?.name || entry?.name || "").trim() || t("BLOODMAN.Common.Name");
+  entry.img = String(itemDocument?.img || entry?.img || "").trim() || "icons/svg/item-bag.svg";
+  entry.system = entry.system && typeof entry.system === "object"
+    ? entry.system
+    : {};
+  if (keepSourceReference) {
+    entry._templateSourceUuid = String(itemDocument?.uuid || entry?._templateSourceUuid || "").trim();
+    entry._templateSourceId = String(itemDocument?.id || entry?._id || "").trim();
+  } else {
+    delete entry._templateSourceUuid;
+    delete entry._templateSourceId;
+  }
+  return entry;
+}
+
+function buildItemLinkTemplateDisplayData(entry, index = 0) {
+  const type = String(entry?.type || "").trim().toLowerCase();
+  const note = String(
+    entry?.system?.noteSmall
+    || entry?.system?.note
+    || entry?.system?.notes
+    || ""
+  ).trim();
+  return {
+    index,
+    type,
+    typeLabel: tl(`TYPES.Item.${type}`, type || t("BLOODMAN.Common.Name")),
+    name: String(entry?.name || "").trim() || t("BLOODMAN.Common.Name"),
+    img: String(entry?.img || "").trim() || "icons/svg/item-bag.svg",
+    shortNote: note,
+    sourceUuid: String(entry?._templateSourceUuid || "").trim()
+  };
+}
+
+function buildActorChildCreateDataFromItemTemplate(entry, parentItemId) {
+  if (!entry || typeof entry !== "object") return null;
+  const childData = foundry.utils.deepClone(entry);
+  sanitizeItemSourceReferences(childData, { keepSourceReference: false });
+  const type = String(childData?.type || "").trim().toLowerCase();
+  if (!isItemLinkSupportedType(type)) return null;
+
+  delete childData._id;
+  delete childData.folder;
+  delete childData.sort;
+  delete childData._stats;
+  delete childData._templateSourceUuid;
+  delete childData._templateSourceId;
+
+  childData.type = type;
+  childData.name = String(childData?.name || "").trim() || t("BLOODMAN.Common.Name");
+  childData.img = String(childData?.img || "").trim() || "icons/svg/item-bag.svg";
+  childData.system = childData.system && typeof childData.system === "object"
+    ? childData.system
+    : {};
+  childData.system.link = childData.system.link && typeof childData.system.link === "object"
+    ? childData.system.link
+    : {};
+  childData.system.link.parentItemId = String(parentItemId || "").trim();
+  childData.system.link.equiperAvecEnabled = false;
+  childData.system.link.equiperAvec = [];
+  childData.system.link.equiperAvecTemplates = [];
+  return childData;
+}
+
+function buildRuntimeTypedItem(item, runtimeType) {
+  if (!item) return item;
+  const normalizedRuntimeType = String(runtimeType || "").trim().toLowerCase();
+  const currentType = String(item?.type || "").trim().toLowerCase();
+  if (!normalizedRuntimeType || normalizedRuntimeType === currentType) return item;
+  return {
+    id: item.id,
+    name: item.name,
+    type: normalizedRuntimeType,
+    system: item.system || {},
+    actor: item.actor || item.parent || null
+  };
+}
+
+function buildLinkedChildDisplayData(childItem, options = {}) {
+  const display = buildItemDisplayData(childItem);
+  const rawType = String(childItem?.type || display?.type || "").trim().toLowerCase();
+  const runtimeType = getItemRuntimeType(childItem) || rawType;
+  display.type = runtimeType;
+  display.typeLabel = tl(`TYPES.Item.${runtimeType}`, runtimeType || t("BLOODMAN.Common.Name"));
+  display.shortNote = String(
+    childItem?.system?.noteSmall
+    || childItem?.system?.note
+    || childItem?.system?.notes
+    || ""
+  ).trim();
+  display.childShowPowerUseButton = false;
+  display.childShowAptitudeUseButton = false;
+  display.childUseLabel = "";
+  display.childUseClass = "";
+  display.childRollLabel = "";
+  display.childRollClass = "";
+  display.childRollMode = "";
+  display.childRollAction = "";
+  display.childShowAmmoState = false;
+  display.childAmmoMagazine = 0;
+  display.childAmmoCapacityDisplay = 0;
+  display.childShowReloadButton = false;
+  display.childReloadBlocked = false;
+  display.childProtectionLabel = "";
+
+  const powerUseState = options.powerUseState instanceof Set
+    ? options.powerUseState
+    : null;
+  const isPlayerActor = options.isPlayerActor === true;
+  const shouldShowItemReroll = typeof options.shouldShowItemReroll === "function"
+    ? options.shouldShowItemReroll
+    : () => false;
+  const ammo = options.ammo && typeof options.ammo === "object"
+    ? options.ammo
+    : null;
+  const itemId = String(childItem?.id || display?._id || "").trim();
+
+  if (runtimeType === "pouvoir") {
+    const usableEnabled = isPowerUsableEnabled(childItem?.system?.usableEnabled);
+    const isActivated = usableEnabled && itemId && powerUseState ? powerUseState.has(itemId) : false;
+    if (!usableEnabled && itemId && powerUseState) powerUseState.delete(itemId);
+    const hasPowerHeal = Boolean(display.displayHealDie);
+    const hasPowerDamage = !hasPowerHeal && Boolean(display.displayDamageDie);
+    display.childShowPowerUseButton = usableEnabled;
+    display.childRollMode = hasPowerHeal ? "heal" : (hasPowerDamage ? "damage" : "none");
+    display.childRollAction = "ability";
+    display.childRollClass = hasPowerHeal ? "ability-roll bm-btn-heal" : "ability-roll bm-btn-damage";
+    const rawPowerLabel = hasPowerHeal
+      ? String(display.displayHealDie || "")
+      : (hasPowerDamage ? String(display.displayDamageDie || "") : "");
+    display.childRollLabel = (usableEnabled && !isActivated) ? "" : rawPowerLabel;
+    if (display.childRollLabel && display.childRollMode === "damage") {
+      display.showItemReroll = shouldShowItemReroll(itemId);
+    }
+    return display;
+  }
+
+  if (runtimeType === "aptitude") {
+    display.childShowAptitudeUseButton = isPlayerActor;
+    if (display.displayDamageDie) {
+      display.childRollLabel = String(display.displayDamageDie || "");
+      display.childRollClass = "ability-roll bm-btn-damage";
+      display.childRollMode = "damage";
+      display.childRollAction = "ability";
+      display.showItemReroll = shouldShowItemReroll(itemId);
+    }
+    return display;
+  }
+
+  if (runtimeType === "arme") {
+    const damageDie = String(childItem?.system?.damageDie || "").trim();
+    if (damageDie) {
+      display.childRollLabel = normalizeRollDieFormula(damageDie, "d4");
+      display.childRollClass = "weapon-roll bm-btn-damage";
+      display.childRollMode = "damage";
+      display.childRollAction = "weapon";
+      display.showItemReroll = shouldShowItemReroll(itemId);
+    }
+
+    const weaponCategory = getWeaponCategory(childItem?.system?.weaponType);
+    const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(childItem?.system?.infiniteAmmo, false);
+    const magazineCapacity = normalizeNonNegativeInteger(childItem?.system?.magazineCapacity, 0);
+    const usesDirectStock = consumesAmmo && magazineCapacity <= 0;
+    const ammoStock = consumesAmmo && ammo ? Math.max(0, Number(ammo.stock || 0)) : 0;
+    const loadedAmmo = usesDirectStock
+      ? ammoStock
+      : getWeaponLoadedAmmo(childItem, { fallback: Number(ammo?.magazine || 0) });
+    const magazineMissingAmmo = !usesDirectStock && loadedAmmo < magazineCapacity;
+    display.childShowAmmoState = consumesAmmo;
+    display.childAmmoMagazine = loadedAmmo;
+    display.childAmmoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
+    display.childShowReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
+    display.childReloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
+    return display;
+  }
+
+  if (runtimeType === "soin") {
+    const healDie = String(childItem?.system?.healDie || "").trim();
+    display.childUseLabel = normalizeRollDieFormula(healDie || "d4", "d4");
+    display.childUseClass = "item-use bm-btn-heal";
+    return display;
+  }
+
+  if (runtimeType === "ration") {
+    display.childUseLabel = t("BLOODMAN.Common.Eat");
+    display.childUseClass = "item-use bm-btn-heal";
+    return display;
+  }
+
+  if (runtimeType === "objet" && toCheckboxBoolean(childItem?.system?.useEnabled, false)) {
+    const objectDamageEnabled = toCheckboxBoolean(
+      childItem?.system?.damageEnabled,
+      childItem?.system?.damageDie != null
+    );
+    const objectDamageDie = String(childItem?.system?.damageDie || "").trim();
+    if (objectDamageEnabled && objectDamageDie) {
+      display.childUseLabel = normalizeRollDieFormula(objectDamageDie, "d4");
+      display.childUseClass = "item-use bm-btn-damage";
+    } else {
+      display.childUseLabel = t("BLOODMAN.Common.Use");
+      display.childUseClass = "item-use bm-btn-magic";
+    }
+    return display;
+  }
+
+  if (runtimeType === "protection") {
+    const paValue = Math.max(0, Math.floor(toFiniteNumber(childItem?.system?.pa, 0)));
+    display.childProtectionLabel = `PA ${paValue}`;
+  }
+  return display;
+}
+
+function buildEquiperAvecChildrenForParent(actor, parentItem, options = {}) {
+  if (!actor || !parentItem) return [];
+  const parentId = String(parentItem.id || parentItem._id || "").trim();
+  if (!parentId) return [];
+  const parentLink = resolveItemLinkState(parentItem);
+  if (!parentLink.equiperAvecEnabled) return [];
+  const orderedChildren = [];
+  const seen = new Set();
+  for (const childId of parentLink.equiperAvec || []) {
+    const normalizedChildId = String(childId || "").trim();
+    if (!normalizedChildId || seen.has(normalizedChildId)) continue;
+    const child = actor.items?.get?.(normalizedChildId) || null;
+    if (!child) continue;
+    if (getLinkedParentItemId(child, actor) !== parentId) continue;
+    seen.add(normalizedChildId);
+    orderedChildren.push(buildLinkedChildDisplayData(child, options));
+  }
+  return orderedChildren;
+}
+
+function buildEquiperAvecDisplayData(actor, parentItem, options = {}) {
+  const link = resolveItemLinkState(parentItem);
+  const children = buildEquiperAvecChildrenForParent(actor, parentItem, options);
+  return {
+    equiperAvecEnabled: Boolean(link.equiperAvecEnabled),
+    equiperAvecChildren: children,
+    hasEquiperAvecChildren: children.length > 0
+  };
+}
+
 function getProtectionPA(actor) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
+    if (isActorItemLinkedChild(item, actor)) continue;
     const type = String(item?.type || "").trim().toLowerCase();
     if (!PA_BONUS_ITEM_TYPES.has(type)) continue;
     const pa = Number(item.system?.pa || 0);
@@ -5210,6 +5599,7 @@ Hooks.on("preCreateItem", (item, createData, options) => {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
   }
 
+  normalizeItemLinkUpdate(item, createData, { includeSourceWhenMissing: true });
   normalizeItemPriceUpdate(item, createData);
   const normalizedWeaponAmmo = normalizeWeaponMagazineCapacityUpdate(item, createData);
   if (!normalizedWeaponAmmo) normalizeWeaponMagazineCapacityUpdate(item);
@@ -5264,6 +5654,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
   }
 
+  normalizeItemLinkUpdate(item, updateData, { includeSourceWhenMissing: false });
   normalizeItemPriceUpdate(item, updateData);
   normalizeWeaponMagazineCapacityUpdate(item, updateData);
   normalizeItemSingleUseUpdate(item, updateData, { includeSourceWhenMissing: false });
@@ -5320,13 +5711,49 @@ Hooks.on("updateItem", (item) => {
   void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "updateItem");
 });
 
+async function cleanupItemLinksAfterDeletion(item) {
+  const actor = item?.actor;
+  if (!actor?.isOwner) return;
+  const deletedItemId = String(item?.id || "").trim();
+  if (!deletedItemId) return;
+  const updates = [];
+  for (const sibling of actor.items || []) {
+    const siblingId = String(sibling?.id || "").trim();
+    if (!siblingId) continue;
+    const siblingLink = resolveItemLinkState(sibling);
+    let changed = false;
+    const update = { _id: siblingId };
+    if (String(siblingLink.parentItemId || "").trim() === deletedItemId) {
+      update["system.link.parentItemId"] = "";
+      changed = true;
+    }
+    if (Array.isArray(siblingLink.equiperAvec) && siblingLink.equiperAvec.includes(deletedItemId)) {
+      update["system.link.equiperAvec"] = siblingLink.equiperAvec.filter(itemId => itemId !== deletedItemId);
+      changed = true;
+    }
+    if (changed) updates.push(update);
+  }
+  if (!updates.length) return;
+  try {
+    await actor.updateEmbeddedDocuments("Item", updates);
+  } catch (_error) {
+    safeWarn(tl("BLOODMAN.Notifications.ItemLinkUpdateFailed", "Mise a jour impossible des objets equipes."));
+  }
+}
+
 Hooks.on("deleteItem", (item) => {
+  void cleanupItemLinksAfterDeletion(item);
   void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "deleteItem");
 });
 
 function getItemBonusTotals(actor) {
+  const filteredItems = (actor?.items || []).filter(item => {
+    if (!item) return false;
+    if (isActorItemLinkedChild(item, actor)) return false;
+    return true;
+  });
   return computeItemCharacteristicBonusTotals({
-    items: actor?.items,
+    items: filteredItems,
     characteristics: CHARACTERISTICS,
     characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
     isBonusEnabled: value => toCheckboxBoolean(value, false)
@@ -5334,8 +5761,13 @@ function getItemBonusTotals(actor) {
 }
 
 function getItemResourceBonusTotals(actor) {
+  const filteredItems = (actor?.items || []).filter(item => {
+    if (!item) return false;
+    if (isActorItemLinkedChild(item, actor)) return false;
+    return true;
+  });
   return computeItemResourceBonusTotals({
-    items: actor?.items,
+    items: filteredItems,
     resourceBonusItemTypes: ITEM_RESOURCE_BONUS_ITEM_TYPES
   });
 }
@@ -6085,11 +6517,14 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   getCarriedOutsideBagItems(options = {}) {
     const excludeItemId = String(options?.excludeItemId || "").trim();
+    const includeUncounted = options?.includeUncounted === true;
     const carriedItems = this.actor?.items
       ?.filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()))
       || [];
     return carriedItems.filter(item => {
       if (!item) return false;
+      if (isActorItemLinkedChild(item, this.actor)) return false;
+      if (!includeUncounted && !isCarriedItemCountedForBag(item, this.actor)) return false;
       const itemId = String(item.id || "").trim();
       if (excludeItemId && itemId === excludeItemId) return false;
       if (!this.isBagZoneSupportedItemType(item.type)) return true;
@@ -6106,7 +6541,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       : (this.actor?.items || []).filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()));
 
     const carriedItems = sourceItems
-      .filter(item => item && CARRIED_ITEM_TYPES.has(String(item.type || "").trim().toLowerCase()))
+      .filter(item => {
+        if (!item || !CARRIED_ITEM_TYPES.has(String(item.type || "").trim().toLowerCase())) return false;
+        return !isActorItemLinkedChild(item, this.actor);
+      })
       .sort((left, right) => {
         const leftSort = toFiniteNumber(left?.sort, 0);
         const rightSort = toFiniteNumber(right?.sort, 0);
@@ -6973,6 +7411,265 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
   }
 
+  getEquiperAvecDropContainerFromEvent(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const currentTarget = eventLike?.currentTarget instanceof HTMLElement
+      ? eventLike.currentTarget
+      : null;
+    const target = currentTarget || nativeEvent?.target?.closest?.("[data-equiper-avec-drop='true']");
+    return target instanceof HTMLElement ? target : null;
+  }
+
+  getEquiperAvecParentItemFromContainer(container) {
+    if (!(container instanceof HTMLElement)) return null;
+    const parentItemId = String(container.dataset?.parentItemId || "").trim();
+    if (!parentItemId) return null;
+    return this.actor?.items?.get(parentItemId) || null;
+  }
+
+  getEquiperAvecAcceptedTypes(container) {
+    if (!(container instanceof HTMLElement)) return null;
+    const raw = String(container.dataset?.acceptedTypes || "").trim().toLowerCase();
+    if (!raw) return null;
+    return new Set(raw.split(",").map(entry => entry.trim()).filter(Boolean));
+  }
+
+  getLinkedChildItemFromEvent(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const trigger = eventLike?.currentTarget || nativeEvent?.target || null;
+    const row = trigger?.closest?.("[data-linked-child-item-id]") || null;
+    const itemId = String(row?.dataset?.linkedChildItemId || "").trim();
+    if (!itemId) return null;
+    return this.actor?.items?.get(itemId) || null;
+  }
+
+  async resolveDroppedItemDocument(data) {
+    const itemDocumentClass = Item?.implementation?.fromDropData
+      ? Item.implementation
+      : Item;
+    if (!itemDocumentClass?.fromDropData) return null;
+    return itemDocumentClass.fromDropData(data).catch(() => null);
+  }
+
+  isEquiperAvecTypeCompatible(parentItem, childItem, acceptedTypes = null) {
+    if (!parentItem || !childItem) return false;
+    const parentType = String(parentItem.type || "").trim().toLowerCase();
+    const childType = String(childItem.type || "").trim().toLowerCase();
+    if (!isItemLinkSupportedType(parentType)) return false;
+    if (!isItemLinkSupportedType(childType)) return false;
+    if (acceptedTypes && acceptedTypes.size && !acceptedTypes.has(childType)) return false;
+    return true;
+  }
+
+  async applyItemLinkUpdates(updates = []) {
+    if (!this.actor || !Array.isArray(updates) || !updates.length) return false;
+    const sanitized = updates
+      .map(update => {
+        const itemId = String(update?._id || "").trim();
+        if (!itemId) return null;
+        return { ...update, _id: itemId };
+      })
+      .filter(Boolean);
+    if (!sanitized.length) return false;
+
+    try {
+      await this.actor.updateEmbeddedDocuments("Item", sanitized);
+      return true;
+    } catch (_error) {
+      safeWarn(tl("BLOODMAN.Notifications.ItemLinkUpdateFailed", "Mise a jour impossible des objets equipes."));
+      return false;
+    }
+  }
+
+  async linkChildItemToParent(parentItem, childItem, options = {}) {
+    if (!parentItem || !childItem || !this.actor) return false;
+    const parentId = String(parentItem.id || "").trim();
+    const childId = String(childItem.id || "").trim();
+    if (!parentId || !childId) return false;
+    if (parentId === childId) {
+      if (options.notify !== false) {
+        safeWarn(tl("BLOODMAN.Notifications.ItemLinkSelfForbidden", "Un objet ne peut pas s'equiper avec lui-meme."));
+      }
+      return false;
+    }
+
+    const parentLink = resolveItemLinkState(parentItem);
+    if (!parentLink.equiperAvecEnabled) {
+      if (options.notify !== false) {
+        safeWarn(tl("BLOODMAN.Notifications.ItemLinkParentDisabled", "Activez d'abord Equiper avec sur l'objet parent."));
+      }
+      return false;
+    }
+    if (!this.isEquiperAvecTypeCompatible(parentItem, childItem, options.acceptedTypes || null)) {
+      if (options.notify !== false) {
+        safeWarn(tl("BLOODMAN.Notifications.ItemLinkTypeIncompatible", "Type incompatible avec Equiper avec."));
+      }
+      return false;
+    }
+
+    const childLink = resolveItemLinkState(childItem);
+    const childType = String(childItem?.type || "").trim().toLowerCase();
+    const sourceOriginalType = String(options?.sourceOriginalType || "").trim().toLowerCase();
+    const canPersistOriginalType = childType === "objet"
+      && (sourceOriginalType === "pouvoir" || sourceOriginalType === "aptitude");
+    const previousParentId = getLinkedParentItemId(childItem, this.actor);
+    const updates = [];
+
+    if (previousParentId && previousParentId !== parentId) {
+      const previousParent = this.actor.items.get(previousParentId);
+      if (previousParent) {
+        const previousParentLink = resolveItemLinkState(previousParent);
+        updates.push({
+          _id: previousParentId,
+          "system.link.equiperAvec": (previousParentLink.equiperAvec || []).filter(itemId => itemId !== childId)
+        });
+      }
+    }
+
+    const nextParentChildren = (parentLink.equiperAvec || []).filter(itemId => itemId !== childId);
+    nextParentChildren.push(childId);
+    updates.push({
+      _id: parentId,
+      "system.link.equiperAvec": nextParentChildren
+    });
+    const childUpdate = {
+      _id: childId,
+      "system.link.parentItemId": parentId,
+      "system.link.equiperAvecEnabled": false,
+      "system.link.equiperAvec": []
+    };
+    if (canPersistOriginalType) {
+      childUpdate["system.link.originalItemType"] = sourceOriginalType;
+    }
+    updates.push(childUpdate);
+
+    return this.applyItemLinkUpdates(updates);
+  }
+
+  async unlinkChildItemFromParent(parentItem, childItem) {
+    if (!parentItem || !childItem || !this.actor) return false;
+    const parentId = String(parentItem.id || "").trim();
+    const childId = String(childItem.id || "").trim();
+    if (!parentId || !childId) return false;
+
+    const parentLink = resolveItemLinkState(parentItem);
+    const childLink = resolveItemLinkState(childItem);
+    const updates = [{
+      _id: parentId,
+      "system.link.equiperAvec": (parentLink.equiperAvec || []).filter(itemId => itemId !== childId)
+    }];
+
+    if (String(childLink.parentItemId || "").trim() === parentId) {
+      updates.push({
+        _id: childId,
+        "system.link.parentItemId": ""
+      });
+    }
+    return this.applyItemLinkUpdates(updates);
+  }
+
+  onEquiperAvecDragOver(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const container = this.getEquiperAvecDropContainerFromEvent(eventLike);
+    if (!container) return;
+    const parentItem = this.getEquiperAvecParentItemFromContainer(container);
+    if (!parentItem) return;
+    const parentLink = resolveItemLinkState(parentItem);
+    if (!parentLink.equiperAvecEnabled) return;
+
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "move";
+    container.classList.add("is-drop-target");
+  }
+
+  onEquiperAvecDragLeave(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const container = this.getEquiperAvecDropContainerFromEvent(eventLike);
+    if (!container) return;
+    const relatedTarget = nativeEvent?.relatedTarget;
+    if (relatedTarget instanceof HTMLElement && container.contains(relatedTarget)) return;
+    container.classList.remove("is-drop-target");
+  }
+
+  async onEquiperAvecDrop(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const container = this.getEquiperAvecDropContainerFromEvent(eventLike);
+    if (!container) return false;
+
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
+    else nativeEvent?.stopPropagation?.();
+    container.classList.remove("is-drop-target");
+
+    const parentItem = this.getEquiperAvecParentItemFromContainer(container);
+    if (!parentItem) return false;
+    const parentLink = resolveItemLinkState(parentItem);
+    if (!parentLink.equiperAvecEnabled) {
+      safeWarn(tl("BLOODMAN.Notifications.ItemLinkParentDisabled", "Activez d'abord Equiper avec sur l'objet parent."));
+      return false;
+    }
+    const acceptedTypes = this.getEquiperAvecAcceptedTypes(container);
+
+    const reorderPayload = this.getItemReorderPayloadFromEvent(eventLike);
+    if (reorderPayload && this.isItemReorderPayloadForCurrentActor(reorderPayload)) {
+      const sourceItem = this.actor?.items?.get(String(reorderPayload.itemId || "").trim()) || null;
+      if (!sourceItem) return false;
+      const linked = await this.linkChildItemToParent(parentItem, sourceItem, { acceptedTypes });
+      if (linked) this.render(false);
+      return linked;
+    }
+
+    const data = getDragEventData(nativeEvent);
+    if (!data) return false;
+    const dataType = String(data?.type || "").trim().toLowerCase();
+    if (dataType !== "item") return false;
+    const droppedItem = await this.resolveDroppedItemDocument(data);
+    const sourceOriginalType = String(droppedItem?.type || "").trim().toLowerCase();
+    if (droppedItem?.actor?.id === this.actor?.id) {
+      const linked = await this.linkChildItemToParent(parentItem, droppedItem, {
+        acceptedTypes,
+        sourceOriginalType
+      });
+      if (linked) this.render(false);
+      return linked;
+    }
+
+    const beforeIds = new Set((this.actor?.items || []).map(item => String(item?.id || "").trim()).filter(Boolean));
+    this._equiperAvecDropInProgress = true;
+    let dropped = null;
+    try {
+      dropped = await this.withDropItemCreateOptions(
+        { bloodmanPreserveOriginalType: true },
+        () => this._onDropItem(eventLike, data)
+      );
+    } finally {
+      this._equiperAvecDropInProgress = false;
+    }
+    if (!dropped) return false;
+
+    const createdIds = this.getDropResultItemIds(dropped);
+    const candidateIds = createdIds.length
+      ? createdIds
+      : (this.actor?.items || [])
+        .map(item => String(item?.id || "").trim())
+        .filter(itemId => itemId && !beforeIds.has(itemId));
+    let linkedAny = false;
+    for (const candidateId of candidateIds) {
+      const createdItem = this.actor?.items?.get(candidateId) || null;
+      if (!createdItem) continue;
+      const linked = await this.linkChildItemToParent(parentItem, createdItem, {
+        acceptedTypes,
+        sourceOriginalType,
+        notify: !linkedAny
+      });
+      linkedAny = linkedAny || linked;
+    }
+    if (linkedAny) this.render(false);
+    return linkedAny;
+  }
+
   async _updateObject(_event, formData) {
     const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
     const allowVitalResourceUpdate = VITAL_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
@@ -7163,15 +7860,23 @@ class BloodmanActorSheet extends BaseActorSheet {
     );
     const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
-    const itemBuckets = buildTypedItemBuckets(this.actor.items);
+    const visibleActorItems = this.actor.items.filter(item => !isActorItemLinkedChild(item, this.actor));
+    const itemBuckets = buildTypedItemBuckets(visibleActorItems);
 
+    const powerUseState = this.getPowerUseState();
+    const childDisplayOptions = {
+      powerUseState,
+      isPlayerActor,
+      shouldShowItemReroll,
+      ammo
+    };
     const aptitudes = itemBuckets.aptitude.map(item => {
       const dataItem = buildItemDisplayData(item);
       dataItem.showAptitudeUseButton = isPlayerActor;
       dataItem.showItemReroll = Boolean(dataItem.displayDamageDie) && shouldShowItemReroll(item.id);
+      Object.assign(dataItem, buildEquiperAvecDisplayData(this.actor, item, childDisplayOptions));
       return dataItem;
     });
-    const powerUseState = this.getPowerUseState();
     const pouvoirs = itemBuckets.pouvoir.map(item => {
       const dataItem = buildItemDisplayData(item);
       const itemId = String(item.id || dataItem._id || "").trim();
@@ -7188,9 +7893,15 @@ class BloodmanActorSheet extends BaseActorSheet {
       dataItem.showItemReroll = dataItem.showPowerRoll
         && dataItem.powerRollMode === "damage"
         && shouldShowItemReroll(item.id);
+      Object.assign(dataItem, buildEquiperAvecDisplayData(this.actor, item, childDisplayOptions));
       return dataItem;
     });
-    const activePowerIds = new Set(itemBuckets.pouvoir.map(item => String(item.id || "").trim()).filter(Boolean));
+    const activePowerIds = new Set(
+      (this.actor?.items || [])
+        .filter(item => getItemRuntimeType(item) === "pouvoir")
+        .map(item => String(item.id || "").trim())
+        .filter(Boolean)
+    );
     for (const key of [...powerUseState]) {
       if (!activePowerIds.has(key)) powerUseState.delete(key);
     }
@@ -7205,7 +7916,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (leftSort !== rightSort) return leftSort - rightSort;
       return String(left?.id || "").localeCompare(String(right?.id || ""));
     };
-    const carriedItems = this.actor.items
+    const carriedItems = visibleActorItems
       .filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()))
       .sort(sortItemsBySortKey);
     const carriedColumnState = this.getCarriedColumnState({
@@ -7283,6 +7994,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         const paValue = Math.max(0, Math.floor(toFiniteNumber(displayItem.system?.pa, 0)));
         displayItem.bagProtectionLabel = `PA ${paValue}`;
       }
+      Object.assign(displayItem, buildEquiperAvecDisplayData(this.actor, item, childDisplayOptions));
       return displayItem;
     };
     const equipmentItems = carriedColumnState.columns[CARRY_COLUMN_EQUIPMENT] || [];
@@ -7325,6 +8037,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         weapon.showReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
         weapon.reloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
         weapon.showItemReroll = shouldShowItemReroll(item.id);
+        Object.assign(weapon, buildEquiperAvecDisplayData(this.actor, item, childDisplayOptions));
         return weapon;
       });
     const protections = equipmentItems
@@ -7336,12 +8049,15 @@ class BloodmanActorSheet extends BaseActorSheet {
         protection.showSingleUseCount = singleUseDisplay.show;
         protection.singleUseCountLabel = singleUseDisplay.label;
         protection.singleUseCountClass = "item-chip item-meta bm-btn-usage-count";
+        Object.assign(protection, buildEquiperAvecDisplayData(this.actor, item, childDisplayOptions));
         return protection;
       });
     const objectColumnOneItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_ONE] || []).map(buildCarryDisplayItem);
     const objectColumnTwoItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_TWO] || []).map(buildCarryDisplayItem);
     const bagItems = (carriedColumnState.columns[CARRY_COLUMN_BAG] || []).map(buildCarryDisplayItem);
-    const carriedItemsCount = carriedItems.length;
+    const carriedItemsCount = this.actor.items
+      .filter(item => isCarriedItemCountedForBag(item, this.actor))
+      .length;
 
     return {
       ...data,
@@ -7384,6 +8100,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       bagItems,
       aptitudes,
       pouvoirs,
+      itemLinkAcceptedTypes: ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES,
       ammo,
       transportNpcs,
       aptitudesThreeColumns,
@@ -7632,6 +8349,18 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.onItemReorderDrop(ev);
     });
 
+    html.on("dragover", "[data-equiper-avec-drop='true']", ev => {
+      this.onEquiperAvecDragOver(ev);
+    });
+
+    html.on("dragleave", "[data-equiper-avec-drop='true']", ev => {
+      this.onEquiperAvecDragLeave(ev);
+    });
+
+    html.on("drop", "[data-equiper-avec-drop='true']", async ev => {
+      await this.onEquiperAvecDrop(ev);
+    });
+
     html.find(".ability-roll").click(ev => {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
@@ -7653,6 +8382,87 @@ class BloodmanActorSheet extends BaseActorSheet {
       const li = ev.currentTarget.closest(".item");
       const item = this.getItemFromListElement(li);
       item?.sheet?.render(true);
+    });
+
+    html.find(".equiper-avec-item-open").click(ev => {
+      if (!canCurrentUserOpenItemSheets()) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const itemId = String(ev.currentTarget?.dataset?.itemId || "").trim();
+      if (!itemId) return;
+      const item = this.actor?.items?.get(itemId) || null;
+      item?.sheet?.render(true);
+    });
+
+    html.find(".equiper-avec-remove").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const childRow = ev.currentTarget?.closest?.("[data-linked-child-item-id]");
+      const container = ev.currentTarget?.closest?.("[data-equiper-avec-drop='true']");
+      const childId = String(childRow?.dataset?.linkedChildItemId || "").trim();
+      const parentId = String(container?.dataset?.parentItemId || "").trim();
+      if (!childId || !parentId) return;
+      const parentItem = this.actor?.items?.get(parentId) || null;
+      const childItem = this.actor?.items?.get(childId) || null;
+      if (!parentItem || !childItem) return;
+      const unlinked = await this.unlinkChildItemFromParent(parentItem, childItem);
+      if (unlinked) this.render(false);
+    });
+
+    html.find(".equiper-avec-item-use").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const item = this.getLinkedChildItemFromEvent(ev);
+      await this.useItem(item);
+    });
+
+    html.find(".equiper-avec-power-use").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const item = this.getLinkedChildItemFromEvent(ev);
+      await this.usePower(item);
+    });
+
+    html.find(".equiper-avec-aptitude-use").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const item = this.getLinkedChildItemFromEvent(ev);
+      await this.useAptitude(item);
+    });
+
+    html.find(".equiper-avec-ability-roll").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const item = this.getLinkedChildItemFromEvent(ev);
+      const rollAction = String(ev.currentTarget?.dataset?.rollAction || "").trim().toLowerCase();
+      if (rollAction === "weapon") {
+        this.rollDamage(item);
+        return;
+      }
+      this.rollAbilityDamage(item);
+    });
+
+    html.find(".equiper-avec-item-reroll").click(ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const item = this.getLinkedChildItemFromEvent(ev);
+      const itemId = String(item?.id || "").trim();
+      if (!itemId) return;
+      this.rerollItemRoll(itemId);
+    });
+
+    html.find(".equiper-avec-item-reroll-clear").click(ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.clearItemRerollState();
+      this.render(false);
+    });
+
+    html.find(".equiper-avec-weapon-reload").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const item = this.getLinkedChildItemFromEvent(ev);
+      await this.reloadWeapon(item);
     });
 
     html.find(".item-use").click(async ev => {
@@ -8066,10 +8876,15 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async withDropItemCreateOptions(createItemOptions, callback) {
     if (typeof callback !== "function") return null;
-    const nextOptions = createItemOptions && typeof createItemOptions === "object"
+    const incomingOptions = createItemOptions && typeof createItemOptions === "object"
       ? createItemOptions
       : null;
-    const previousOptions = this._dropItemCreateOptions || null;
+    const previousOptions = this._dropItemCreateOptions && typeof this._dropItemCreateOptions === "object"
+      ? this._dropItemCreateOptions
+      : null;
+    const nextOptions = previousOptions && incomingOptions
+      ? { ...previousOptions, ...incomingOptions }
+      : (incomingOptions || previousOptions || null);
     this._dropItemCreateOptions = nextOptions;
     try {
       return await callback();
@@ -8078,16 +8893,131 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
   }
 
+  getActivePrimaryTabId() {
+    const root = this.element;
+    const activeTab = String(
+      root?.find?.(".sheet-body .tab.active")?.first?.()?.data?.("tab")
+      || root?.find?.(".sheet-tabs .item.active")?.first?.()?.data?.("tab")
+      || ""
+    ).trim().toLowerCase();
+    return activeTab;
+  }
+
+  normalizeDropItemCreatePayload(itemData, options = {}) {
+    const preserveOriginalType = options?.preserveOriginalType === true;
+    const activeTab = this.getActivePrimaryTabId();
+    const shouldRemapToObject = !preserveOriginalType && activeTab === "equipement";
+    const source = Array.isArray(itemData) ? itemData : [itemData];
+    const mapped = source.map(entry => {
+      const clone = foundry.utils.deepClone(entry || {});
+      const type = String(clone?.type || "").trim().toLowerCase();
+      if (!shouldRemapToObject) return clone;
+      if (type !== "pouvoir" && type !== "aptitude") return clone;
+      clone.system = clone.system && typeof clone.system === "object" ? clone.system : {};
+      clone.system.link = clone.system.link && typeof clone.system.link === "object"
+        ? clone.system.link
+        : {};
+      clone.system.link.originalItemType = type;
+      clone.type = "objet";
+      return clone;
+    });
+    return Array.isArray(itemData) ? mapped : mapped[0];
+  }
+
+  extractTemplateChildrenFromDropItemData(itemData) {
+    const parent = foundry.utils.deepClone(itemData || {});
+    sanitizeItemSourceReferences(parent, { keepSourceReference: false });
+    const parentType = String(parent?.type || "").trim().toLowerCase();
+    if (!isItemLinkSupportedType(parentType)) {
+      return {
+        parentData: parent,
+        templateEntries: []
+      };
+    }
+
+    parent.system = parent.system && typeof parent.system === "object"
+      ? parent.system
+      : {};
+    parent.system.link = parent.system.link && typeof parent.system.link === "object"
+      ? parent.system.link
+      : {};
+    const templatesEnabled = toCheckboxBoolean(parent.system?.link?.equiperAvecEnabled, false);
+    const templateEntries = templatesEnabled
+      ? normalizeItemLinkTemplateEntries(parent.system?.link?.equiperAvecTemplates, { keepSourceReference: false })
+      : [];
+    parent.system.link.equiperAvecTemplates = [];
+    parent.system.link.equiperAvec = [];
+    parent.system.link.parentItemId = "";
+    parent.system.link.equiperAvecEnabled = templateEntries.length > 0
+      ? true
+      : toCheckboxBoolean(parent.system.link.equiperAvecEnabled, false);
+    return {
+      parentData: parent,
+      templateEntries
+    };
+  }
+
+  async createDroppedItemsWithTemplateChildren(itemDataList, createItemOptions = null) {
+    if (!this.actor?.createEmbeddedDocuments) return [];
+    const source = Array.isArray(itemDataList) ? itemDataList : [itemDataList];
+    const createdDocuments = [];
+    for (const entry of source) {
+      const { parentData, templateEntries } = this.extractTemplateChildrenFromDropItemData(entry);
+      const createdParent = await this.actor.createEmbeddedDocuments("Item", [parentData], createItemOptions || undefined);
+      const parentItem = Array.isArray(createdParent) ? createdParent[0] : null;
+      if (!parentItem) continue;
+      createdDocuments.push(parentItem);
+
+      if (!templateEntries.length) continue;
+
+      const childPayload = templateEntries
+        .map(templateEntry => buildActorChildCreateDataFromItemTemplate(templateEntry, parentItem.id))
+        .filter(Boolean);
+      if (!childPayload.length) continue;
+
+      const createdChildren = await this.actor.createEmbeddedDocuments("Item", childPayload, createItemOptions || undefined);
+      const childIds = (createdChildren || [])
+        .map(child => String(child?.id || "").trim())
+        .filter(Boolean);
+      createdDocuments.push(...(createdChildren || []));
+      if (!childIds.length) continue;
+
+      await parentItem.update({
+        "system.link.equiperAvecEnabled": true,
+        "system.link.equiperAvec": childIds
+      });
+    }
+    return createdDocuments;
+  }
+
   async _onDropItemCreate(itemData) {
     const createItemOptions = this._dropItemCreateOptions && typeof this._dropItemCreateOptions === "object"
       ? this._dropItemCreateOptions
       : null;
-    if (!createItemOptions) {
-      return super._onDropItemCreate(itemData);
+    const preserveOriginalType = Boolean(this._equiperAvecDropInProgress || createItemOptions?.bloodmanPreserveOriginalType);
+    const normalizedItemData = this.normalizeDropItemCreatePayload(itemData, { preserveOriginalType });
+    const source = (Array.isArray(normalizedItemData) ? normalizedItemData : [normalizedItemData])
+      .map(entry => {
+        const cloned = foundry.utils.deepClone(entry || {});
+        sanitizeItemSourceReferences(cloned, { keepSourceReference: false });
+        return cloned;
+      });
+    const hasTemplateChildren = source.some(entry => {
+      const candidate = entry && typeof entry === "object" ? entry : {};
+      const link = candidate.system?.link;
+      if (!link || typeof link !== "object") return false;
+      if (!toCheckboxBoolean(link.equiperAvecEnabled, false)) return false;
+      return normalizeItemLinkTemplateEntries(link.equiperAvecTemplates).length > 0;
+    });
+    if (hasTemplateChildren) {
+      return this.createDroppedItemsWithTemplateChildren(source, createItemOptions);
     }
-    const payload = Array.isArray(itemData)
-      ? itemData
-      : [itemData];
+    if (!createItemOptions) {
+      return super._onDropItemCreate(Array.isArray(normalizedItemData) ? source : source[0]);
+    }
+    const payload = Array.isArray(normalizedItemData)
+      ? source
+      : [source[0]];
     return this.actor?.createEmbeddedDocuments?.("Item", payload, createItemOptions);
   }
 
@@ -8100,7 +9030,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     if (incomingCarriedItemCount <= 0) return false;
 
-    const carriedCount = this.actor.items.filter(item => CARRIED_ITEM_TYPES.has(item.type)).length;
+    const carriedCount = this.actor.items
+      .filter(item => isCarriedItemCountedForBag(item, this.actor))
+      .length;
     const carriedItemsLimit = getActorCarriedItemsLimit(this.actor);
     if (!isCarriedItemsLimitExceeded({
       currentCarriedCount: carriedCount,
@@ -8320,16 +9252,18 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async rollAbilityDamage(item) {
     if (!item) return;
-    if (item.type === "pouvoir") {
+    const runtimeType = getItemRuntimeType(item);
+    const runtimeItem = buildRuntimeTypedItem(item, runtimeType);
+    if (runtimeType === "pouvoir") {
       const powerPlan = resolvePowerRollPlan({
-        item,
+        item: runtimeItem,
         powerUsableEnabled: isPowerUsableEnabled(item?.system?.usableEnabled),
         powerActivated: this.isPowerActivated(item?.id)
       });
       if (!powerPlan.allowed) return;
       if (powerPlan.mode === "heal") {
         if (!powerPlan.isUsablePower) {
-          const used = await applyPowerCost(this.actor, item);
+          const used = await applyPowerCost(this.actor, runtimeItem);
           if (!used) return;
         }
         const targetActor = this.resolveHealTargetActor(this.actor);
@@ -8349,12 +9283,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       const beforeRoll = async () => {
         if (powerPlan.isUsablePower) return true;
-        return applyPowerCost(this.actor, item);
+        return applyPowerCost(this.actor, runtimeItem);
       };
       const result = await doDirectDamageRoll(this.actor, powerPlan.formula, item.name, {
         beforeRoll,
         itemId: item.id,
-        itemType: item.type
+        itemType: runtimeType
       });
       if (!result) return;
       await playItemAudio(item);
@@ -8366,7 +9300,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       if (result?.context) {
         result.context.kind = "item-damage";
-        result.context.itemType = String(item.type || "");
+        result.context.itemType = String(runtimeType || "");
         this.markItemReroll(item.id, result.context);
       }
       this.render(false);
@@ -8374,19 +9308,19 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
 
     const plan = resolveAbilityDamageRollPlan({
-      item,
+      item: runtimeItem,
       powerUsableEnabled: isPowerUsableEnabled(item?.system?.usableEnabled),
       powerActivated: this.isPowerActivated(item?.id)
     });
     if (!plan.allowed) return;
     const beforeRoll = async () => {
       if (plan.isUsablePower) return true;
-      return applyPowerCost(this.actor, item);
+      return applyPowerCost(this.actor, runtimeItem);
     };
     const result = await doDirectDamageRoll(this.actor, plan.formula, item.name, {
       beforeRoll,
       itemId: item.id,
-      itemType: item.type
+      itemType: runtimeType || item.type
     });
     if (!result) return;
     await playItemAudio(item);
@@ -8398,16 +9332,18 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     if (result?.context) {
       result.context.kind = "item-damage";
-      result.context.itemType = String(item.type || "");
+      result.context.itemType = String(runtimeType || item.type || "");
       this.markItemReroll(item.id, result.context);
     }
     this.render(false);
   }
 
-  async usePower(item) {
-    if (!item || item.type !== "pouvoir") return;
+  async usePower(item, options = {}) {
+    const runtimeType = String(options?.runtimeType || getItemRuntimeType(item)).trim().toLowerCase();
+    if (!item || runtimeType !== "pouvoir") return;
+    const runtimeItem = buildRuntimeTypedItem(item, runtimeType);
     if (!isPowerUsableEnabled(item.system?.usableEnabled)) return;
-    const used = await applyPowerCost(this.actor, item);
+    const used = await applyPowerCost(this.actor, runtimeItem);
     if (!used) return;
     this.markPowerActivated(item.id, true);
     emitPowerUsePopup(this.actor, item, {
@@ -8421,8 +9357,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     ];
   }
 
-  async useAptitude(item) {
-    if (!item || item.type !== "aptitude") return;
+  async useAptitude(item, options = {}) {
+    const runtimeType = String(options?.runtimeType || getItemRuntimeType(item)).trim().toLowerCase();
+    if (!item || runtimeType !== "aptitude") return;
     emitPowerUsePopup(this.actor, item, {
       fromUseButton: true,
       includeRequesterUser: true
@@ -8451,14 +9388,17 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async useItem(item) {
+    if (!item) return;
+    const runtimeType = getItemRuntimeType(item);
+    const runtimeItem = buildRuntimeTypedItem(item, runtimeType);
     const usePlan = resolveItemUsePlan({
-      item,
+      item: runtimeItem,
       objectUseEnabled: isObjectUseEnabled(toBooleanFlag(item?.system?.useEnabled))
     });
-    if (usePlan.kind === "none" || !item) return;
+    if (usePlan.kind === "none") return;
 
     if (usePlan.kind === "power") {
-      await this.usePower(item);
+      await this.usePower(item, { runtimeType });
       return;
     }
     if (usePlan.kind === "heal") {
@@ -8489,7 +9429,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         const formula = normalizeRollDieFormula(item.system?.damageDie, "d4");
         const damageResult = await doDirectDamageRoll(this.actor, formula, item.name, {
           itemId: item.id,
-          itemType: item.type
+          itemType: runtimeType || item.type
         });
         if (!damageResult) return;
       }
@@ -8506,9 +9446,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!itemId) return;
     const item = this.actor.items.get(itemId);
     if (!item) return;
-    if (!isDamageRerollItemType(item.type)) return;
+    const runtimeType = getItemRuntimeType(item) || String(item.type || "").trim().toLowerCase();
+    if (!isDamageRerollItemType(runtimeType)) return;
     const state = this.getItemRerollState();
-    const context = normalizeItemRerollContext(state?.damage, item.type);
+    const context = normalizeItemRerollContext(state?.damage, runtimeType);
     if (!context || state?.itemId !== itemId) return;
     if (!isItemRerollContextValid(context)) return;
     if (shouldBlockByRerollWindow(this.actor?.type, this.isRerollWindowActive(state?.at))) return;
@@ -8608,7 +9549,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       await relayItemRerollToGMs({
         context,
         itemId,
-        itemType: item.type,
+        itemType: runtimeType,
         itemName: item.name,
         actorId: this.actor.id,
         attackerUserId: game.user?.id || "",
@@ -8886,6 +9827,37 @@ class BloodmanItemSheet extends BaseItemSheet {
 
     const systemData = data.item.system;
     systemData.audioFile = String(this.item.system?.audioFile ?? "").trim();
+    const linkData = resolveItemLinkState(this.item);
+    const isLinkedChild = Boolean(getLinkedParentItemId(this.item, this.item?.actor || this.item?.parent || null));
+    const keepTemplateSourceReference = !this.item?.actor;
+    const supportsEquiperAvec = isItemLinkSupportedType(itemType) && !isLinkedChild;
+    const supportsBagCount = CARRIED_ITEM_TYPES.has(itemType);
+    systemData.link = systemData.link && typeof systemData.link === "object"
+      ? systemData.link
+      : {};
+    systemData.link.parentItemId = linkData.parentItemId;
+    systemData.link.equiperAvecEnabled = supportsEquiperAvec
+      ? Boolean(linkData.equiperAvecEnabled)
+      : false;
+    systemData.link.equiperAvec = supportsEquiperAvec
+      ? [...linkData.equiperAvec]
+      : [];
+    systemData.link.containerCountsForBag = supportsBagCount
+      ? Boolean(linkData.containerCountsForBag)
+      : true;
+    const templateEntries = supportsEquiperAvec
+      ? normalizeItemLinkTemplateEntries(this.item.system?.link?.equiperAvecTemplates, { keepSourceReference: keepTemplateSourceReference })
+      : [];
+    systemData.link.equiperAvecTemplates = templateEntries;
+    data.itemLinkSupported = isItemLinkSupportedType(itemType);
+    data.itemLinkIsLinkedChild = isLinkedChild;
+    data.itemLinkSupportsEquiperAvec = supportsEquiperAvec;
+    data.itemLinkSupportsBagCount = supportsBagCount;
+    data.itemLinkAcceptedTypes = ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES;
+    data.itemLinkEquiperAvecTemplates = templateEntries.map((entry, index) => (
+      buildItemLinkTemplateDisplayData(entry, index)
+    ));
+    data.itemLinkHasEquiperAvecTemplates = data.itemLinkEquiperAvecTemplates.length > 0;
 
     const usableFieldPath = itemType === "pouvoir" ? "system.usableEnabled" : "system.useEnabled";
     let usableValue = false;
@@ -9033,11 +10005,189 @@ class BloodmanItemSheet extends BaseItemSheet {
     super.activateListeners(html);
     this.activatePricePreviewListeners(html);
 
+    html.on("dragover", "[data-item-equiper-avec-drop='true']", ev => {
+      const nativeEvent = ev.originalEvent || ev;
+      if (typeof ev.preventDefault === "function") ev.preventDefault();
+      else nativeEvent?.preventDefault?.();
+      const container = this.getItemSheetEquiperAvecDropContainerFromEvent(ev);
+      container?.classList?.add?.("is-drop-target");
+      if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "copy";
+    });
+
+    html.on("dragleave", "[data-item-equiper-avec-drop='true']", ev => {
+      const nativeEvent = ev.originalEvent || ev;
+      const container = this.getItemSheetEquiperAvecDropContainerFromEvent(ev);
+      if (!container) return;
+      const relatedTarget = nativeEvent?.relatedTarget;
+      if (relatedTarget instanceof HTMLElement && container.contains(relatedTarget)) return;
+      container.classList.remove("is-drop-target");
+    });
+
+    html.on("drop", "[data-item-equiper-avec-drop='true']", async ev => {
+      await this.onItemSheetEquiperAvecDrop(ev);
+    });
+
+    html.find(".bm-item-equiper-avec-remove").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const index = this.getItemSheetEquiperAvecTemplateIndexFromEvent(ev);
+      if (index < 0) return;
+      await this.removeItemSheetEquiperAvecTemplateByIndex(index);
+    });
+
+    html.find(".bm-item-equiper-avec-open").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const sourceUuid = String(ev.currentTarget?.dataset?.sourceUuid || "").trim();
+      if (!sourceUuid) return;
+      const sourceItem = await compatFromUuid(sourceUuid).catch(() => null);
+      sourceItem?.sheet?.render?.(true);
+    });
+
     if (this.item.type !== "aptitude" && this.item.type !== "pouvoir") return;
 
     html.find(".damage-roll").click(() => {
       this.rollAbilityDamage();
     });
+  }
+
+  getItemSheetEquiperAvecDropContainerFromEvent(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const currentTarget = eventLike?.currentTarget instanceof HTMLElement
+      ? eventLike.currentTarget
+      : null;
+    const target = currentTarget || nativeEvent?.target?.closest?.("[data-item-equiper-avec-drop='true']");
+    return target instanceof HTMLElement ? target : null;
+  }
+
+  getItemSheetEquiperAvecAcceptedTypes(container) {
+    if (!(container instanceof HTMLElement)) return null;
+    const raw = String(container.dataset?.acceptedTypes || "").trim().toLowerCase();
+    if (!raw) return null;
+    return new Set(raw.split(",").map(entry => entry.trim()).filter(Boolean));
+  }
+
+  getItemSheetEquiperAvecTemplateEntries() {
+    return normalizeItemLinkTemplateEntries(this.item?.system?.link?.equiperAvecTemplates, {
+      keepSourceReference: !this.item?.actor
+    });
+  }
+
+  getItemSheetEquiperAvecTemplateIndexFromEvent(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const trigger = eventLike?.currentTarget || nativeEvent?.target || null;
+    const row = trigger?.closest?.("[data-template-index]") || null;
+    const value = Number(row?.dataset?.templateIndex);
+    if (!Number.isInteger(value) || value < 0) return -1;
+    return value;
+  }
+
+  async resolveDroppedItemDocument(data) {
+    const itemDocumentClass = Item?.implementation?.fromDropData
+      ? Item.implementation
+      : Item;
+    if (!itemDocumentClass?.fromDropData) return null;
+    return itemDocumentClass.fromDropData(data).catch(() => null);
+  }
+
+  isItemSheetEquiperAvecTypeAccepted(itemType, acceptedTypes = null) {
+    const normalized = String(itemType || "").trim().toLowerCase();
+    if (!isItemLinkSupportedType(normalized)) return false;
+    if (acceptedTypes && acceptedTypes.size && !acceptedTypes.has(normalized)) return false;
+    return true;
+  }
+
+  async updateItemSheetEquiperAvecTemplates(nextTemplates, options = {}) {
+    if (!this.item?.update) return false;
+    const normalizedTemplates = normalizeItemLinkTemplateEntries(nextTemplates, {
+      keepSourceReference: !this.item?.actor
+    });
+    const updateData = {
+      "system.link.equiperAvecTemplates": normalizedTemplates
+    };
+    if (options.forceEnable === true) {
+      updateData["system.link.equiperAvecEnabled"] = true;
+    } else if (options.forceEnable === false) {
+      updateData["system.link.equiperAvecEnabled"] = false;
+    }
+    try {
+      await this.item.update(updateData);
+      return true;
+    } catch (_error) {
+      safeWarn(tl("BLOODMAN.Notifications.ItemLinkUpdateFailed", "Mise a jour impossible des objets equipes."));
+      return false;
+    }
+  }
+
+  async addItemSheetEquiperAvecTemplateFromDocument(itemDocument, acceptedTypes = null) {
+    const templateEntry = buildItemLinkTemplateEntryFromItemDocument(itemDocument, {
+      keepSourceReference: !this.item?.actor
+    });
+    if (!templateEntry) {
+      safeWarn(tl("BLOODMAN.Notifications.ItemLinkTypeIncompatible", "Type incompatible avec Equiper avec."));
+      return false;
+    }
+    if (!this.isItemSheetEquiperAvecTypeAccepted(templateEntry.type, acceptedTypes)) {
+      safeWarn(tl("BLOODMAN.Notifications.ItemLinkTypeIncompatible", "Type incompatible avec Equiper avec."));
+      return false;
+    }
+
+    const currentItemUuid = String(this.item?.uuid || "").trim();
+    const sourceUuid = String(templateEntry?._templateSourceUuid || "").trim();
+    const isSameUuid = currentItemUuid && sourceUuid && currentItemUuid === sourceUuid;
+    const isSameWorldItem = !this.item?.actor
+      && !itemDocument?.actor
+      && String(this.item?.id || "").trim()
+      && String(itemDocument?.id || "").trim()
+      && String(this.item.id).trim() === String(itemDocument.id).trim();
+    const isSameActorItem = this.item?.actor
+      && itemDocument?.actor
+      && String(this.item.actor?.id || "").trim()
+      && String(this.item.actor?.id || "").trim() === String(itemDocument.actor?.id || "").trim()
+      && String(this.item?.id || "").trim()
+      && String(this.item?.id || "").trim() === String(itemDocument?.id || "").trim();
+    if (isSameUuid || isSameWorldItem || isSameActorItem) {
+      safeWarn(tl("BLOODMAN.Notifications.ItemLinkSelfForbidden", "Un objet ne peut pas s'equiper avec lui-meme."));
+      return false;
+    }
+
+    const nextTemplates = this.getItemSheetEquiperAvecTemplateEntries();
+    nextTemplates.push(templateEntry);
+    const updated = await this.updateItemSheetEquiperAvecTemplates(nextTemplates, { forceEnable: true });
+    if (updated) this.render(false);
+    return updated;
+  }
+
+  async removeItemSheetEquiperAvecTemplateByIndex(index) {
+    const entries = this.getItemSheetEquiperAvecTemplateEntries();
+    if (!entries.length) return false;
+    if (!Number.isInteger(index) || index < 0 || index >= entries.length) return false;
+    entries.splice(index, 1);
+    const updated = await this.updateItemSheetEquiperAvecTemplates(entries, {});
+    if (updated) this.render(false);
+    return updated;
+  }
+
+  async onItemSheetEquiperAvecDrop(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const container = this.getItemSheetEquiperAvecDropContainerFromEvent(eventLike);
+    if (!container) return false;
+
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
+    else nativeEvent?.stopPropagation?.();
+    container.classList.remove("is-drop-target");
+
+    const acceptedTypes = this.getItemSheetEquiperAvecAcceptedTypes(container);
+    const data = getDragEventData(nativeEvent);
+    if (!data) return false;
+    const dataType = String(data?.type || "").trim().toLowerCase();
+    if (dataType !== "item") return false;
+
+    const droppedItem = await this.resolveDroppedItemDocument(data);
+    if (!droppedItem) return false;
+    return this.addItemSheetEquiperAvecTemplateFromDocument(droppedItem, acceptedTypes);
   }
 
   refreshPricePreview(htmlLike = null) {

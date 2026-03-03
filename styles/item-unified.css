@@ -25,6 +25,40 @@
   background: linear-gradient(180deg, var(--bm-item-surface), var(--bm-item-surface-soft));
 }
 
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-head {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--bm-item-dash);
+  margin-bottom: 2px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  color: var(--bm-item-text);
+  line-height: 1.15;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title i {
+  color: var(--bm-item-accent);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: var(--bm-item-muted);
+}
+
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-pricing,
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-costs {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -32,6 +66,151 @@
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-pricing {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-links {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-builder {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  padding: 8px;
+  border: 1px dashed var(--bm-item-dash);
+  border-radius: 9px;
+  background: var(--bm-item-surface-soft);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-builder.is-disabled {
+  opacity: 0.72;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.04) 8px,
+    rgba(255, 255, 255, 0) 8px,
+    rgba(255, 255, 255, 0) 16px
+  );
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-builder.is-drop-target {
+  border-color: var(--bm-item-accent);
+  background: var(--bm-item-panel-alt);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  min-height: 32px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  padding: 4px 6px 4px 18px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 8px;
+  background: var(--bm-item-panel-alt);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-remove {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--bm-item-text);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-remove:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-remove:focus-visible {
+  color: #8b0000;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-icon {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-name {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  min-height: 14px;
+  padding: 0 5px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 999px;
+  background: var(--bm-item-chip);
+  color: var(--bm-item-muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-open {
+  cursor: pointer;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-note {
+  font-size: 10px;
+  line-height: 1.25;
+  opacity: 0.86;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-empty {
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px dashed var(--bm-item-dash);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.88;
+  text-align: center;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-empty i {
+  color: var(--bm-item-accent);
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-combat {
@@ -47,6 +226,22 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field:not(.bm-item-equiper-avec-builder) {
+  padding: 8px;
+  border: 1px solid var(--bm-item-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field .inline-label,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card .inline-label {
+  letter-spacing: 0.6px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field .toggle-group {
+  min-height: 0;
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card {
@@ -89,6 +284,34 @@
   font-size: 10px;
   letter-spacing: 0.35px;
   opacity: 0.9;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-inline-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.86;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .toggle-option:hover {
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 1px var(--bm-item-accent-glow);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .toggle-option:has(input:checked) {
+  border-color: var(--bm-item-accent);
+  background: rgba(198, 78, 64, 0.2);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card:focus-within,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field:focus-within {
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 1px var(--bm-item-accent-glow);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry:hover {
+  border-color: var(--bm-item-accent);
+  background: rgba(198, 78, 64, 0.12);
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-single-use-count .bm-item-input {
@@ -200,8 +423,19 @@
 }
 
 @media (max-width: 920px) {
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section {
+    padding: 9px;
+    gap: 7px;
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-field:not(.bm-item-equiper-avec-builder) {
+    padding: 7px;
+  }
+
   .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-pricing,
   .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-costs,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-links,
   .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-combat,
   .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-bonuses {
     grid-template-columns: 1fr;
@@ -217,6 +451,20 @@
 }
 
 @media (max-width: 620px) {
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title {
+    font-size: 11px;
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-hint {
+    font-size: 10px;
+  }
+
+  .bloodman-item.bm-item-sheet.bm-item-unified .toggle-option,
+  .bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option {
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+
   .bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid-characteristics {
     grid-template-columns: 1fr;
   }

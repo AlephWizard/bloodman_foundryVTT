@@ -34,7 +34,8 @@ async function run() {
       if (!Number.isFinite(value) || value < 0) return { ok: false, value: 0 };
       return { ok: true, value };
     },
-    carriedItemTypes: new Set(["arme", "objet", "ration", "soin"])
+    carriedItemTypes: new Set(["arme", "objet", "ration", "soin"]),
+    shouldCountCarriedItem: item => item?.id !== "b"
   });
 
   const transfers = await rules.resolveActorTransferEntries({
@@ -111,7 +112,7 @@ async function run() {
     entries: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "e" }],
     targetActorId: "target"
   });
-  assert.equal(incomingCarried, 2);
+  assert.equal(incomingCarried, 1);
 }
 
 run()

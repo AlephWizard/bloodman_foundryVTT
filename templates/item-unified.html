@@ -29,6 +29,14 @@
 
   <div class="bm-item-unified-grid">
     <section class="bm-item-unified-section bm-item-unified-section-pricing">
+      <div class="bm-item-unified-section-head">
+        <h3 class="bm-item-unified-section-title">
+          <i class="fa-solid fa-wallet"></i>
+          {{localize "BLOODMAN.Items.SectionPricingTitle"}}
+        </h3>
+        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionPricingHint"}}</p>
+      </div>
+
       <div class="bm-item-unified-field">
         <label class="inline-label">{{localize "BLOODMAN.Items.PriceLabel"}}</label>
         <input class="bm-item-input" type="text" name="system.price" value="{{item.system.price}}" />
@@ -86,6 +94,14 @@
     </section>
 
     <section class="bm-item-unified-section bm-item-unified-section-costs">
+      <div class="bm-item-unified-section-head">
+        <h3 class="bm-item-unified-section-title">
+          <i class="fa-solid fa-bolt"></i>
+          {{localize "BLOODMAN.Items.SectionCostsTitle"}}
+        </h3>
+        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionCostsHint"}}</p>
+      </div>
+
       <div class="bm-item-unified-field">
         <label class="inline-label">{{localize "BLOODMAN.Items.VoyageXPCostLabel"}}</label>
         <input class="bm-item-input" type="number" min="0" step="1" name="system.xpVoyageCost" value="{{item.system.xpVoyageCost}}" data-dtype="Number" />
@@ -111,7 +127,91 @@
       </div>
     </section>
 
+    {{#if itemLinkSupported}}
+      <section class="bm-item-unified-section bm-item-unified-section-links">
+        <div class="bm-item-unified-section-head">
+          <h3 class="bm-item-unified-section-title">
+            <i class="fa-solid fa-link"></i>
+            {{localize "BLOODMAN.Items.SectionLinksTitle"}}
+          </h3>
+          <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionLinksHint"}}</p>
+        </div>
+
+        <div class="bm-item-unified-field">
+          <label class="inline-label">{{localize "BLOODMAN.Items.EquipWithLabel"}}</label>
+          {{#if itemLinkSupportsEquiperAvec}}
+            <div class="toggle-group">
+              <label class="toggle-option">
+                <input type="radio" name="system.link.equiperAvecEnabled" value="true" data-dtype="Boolean" {{#if item.system.link.equiperAvecEnabled}}checked{{/if}} />
+                {{localize "BLOODMAN.Common.Yes"}}
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="system.link.equiperAvecEnabled" value="false" data-dtype="Boolean" {{#unless item.system.link.equiperAvecEnabled}}checked{{/unless}} />
+                {{localize "BLOODMAN.Common.No"}}
+              </label>
+            </div>
+          {{else}}
+            <p class="bm-item-inline-hint">{{localize "BLOODMAN.Items.EquipWithChildHint"}}</p>
+          {{/if}}
+        </div>
+
+        {{#if itemLinkSupportsBagCount}}
+          <div class="bm-item-unified-field">
+            <label class="inline-label">{{localize "BLOODMAN.Items.CountForBagLabel"}}</label>
+            <div class="toggle-group">
+              <label class="toggle-option">
+                <input type="radio" name="system.link.containerCountsForBag" value="true" data-dtype="Boolean" {{#if item.system.link.containerCountsForBag}}checked{{/if}} />
+                {{localize "BLOODMAN.Common.Yes"}}
+              </label>
+              <label class="toggle-option">
+                <input type="radio" name="system.link.containerCountsForBag" value="false" data-dtype="Boolean" {{#unless item.system.link.containerCountsForBag}}checked{{/unless}} />
+                {{localize "BLOODMAN.Common.No"}}
+              </label>
+            </div>
+          </div>
+        {{/if}}
+
+        {{#if itemLinkSupportsEquiperAvec}}
+          <div
+            class="bm-item-unified-field bm-item-equiper-avec-builder {{#unless item.system.link.equiperAvecEnabled}}is-disabled{{/unless}}"
+            data-item-equiper-avec-drop="true"
+            data-accepted-types="{{itemLinkAcceptedTypes}}"
+          >
+            <label class="inline-label">{{localize "BLOODMAN.Items.EquipWithTitle"}}</label>
+            <ul class="bm-item-equiper-avec-list">
+              {{#if itemLinkHasEquiperAvecTemplates}}
+                {{#each itemLinkEquiperAvecTemplates}}
+                  <li class="bm-item-equiper-avec-entry" data-template-index="{{this.index}}">
+                    <button type="button" class="bm-item-equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                    <img class="bm-item-equiper-avec-icon" src="{{this.img}}" />
+                    <div class="bm-item-equiper-avec-body">
+                      <span class="bm-item-equiper-avec-name {{#if this.sourceUuid}}bm-item-equiper-avec-open{{/if}}" data-source-uuid="{{this.sourceUuid}}">{{this.name}}</span>
+                      <span class="bm-item-equiper-avec-type">{{this.typeLabel}}</span>
+                      {{#if this.shortNote}}<div class="bm-item-equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                    </div>
+                  </li>
+                {{/each}}
+              {{else}}
+                <li class="bm-item-equiper-avec-empty">
+                  <i class="fa-solid fa-down-long" aria-hidden="true"></i>
+                  <span>{{localize "BLOODMAN.Items.EquipWithDropHint"}}</span>
+                </li>
+              {{/if}}
+            </ul>
+          </div>
+        {{/if}}
+      </section>
+    {{/if}}
+
     <section class="bm-item-unified-section bm-item-unified-section-combat">
+      <div class="bm-item-unified-section-head">
+        <h3 class="bm-item-unified-section-title">
+          <i class="fa-solid fa-shield-halved"></i>
+          {{localize "BLOODMAN.Items.SectionCombatTitle"}}
+        </h3>
+        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionCombatHint"}}</p>
+      </div>
+
       <div class="bm-item-unified-card">
         <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
         <div class="toggle-group">
@@ -188,6 +288,14 @@
     </section>
 
     <section class="bm-item-unified-section bm-item-unified-section-bonuses">
+      <div class="bm-item-unified-section-head">
+        <h3 class="bm-item-unified-section-title">
+          <i class="fa-solid fa-chart-line"></i>
+          {{localize "BLOODMAN.Items.SectionBonusesTitle"}}
+        </h3>
+        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionBonusesHint"}}</p>
+      </div>
+
       <div class="bm-item-unified-card">
         <label class="inline-label">{{localize "BLOODMAN.Items.RawBonusLabel"}}</label>
         <div class="toggle-group">

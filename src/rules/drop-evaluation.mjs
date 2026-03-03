@@ -3,7 +3,8 @@ export function createDropEvaluationRules({
   roundCurrencyValue,
   getDropItemQuantity,
   getDroppedItemUnitPrice,
-  carriedItemTypes
+  carriedItemTypes,
+  shouldCountCarriedItem
 } = {}) {
   const resolveDropData = typeof fromDropData === "function"
     ? fromDropData
@@ -20,6 +21,9 @@ export function createDropEvaluationRules({
   const carriedTypes = carriedItemTypes instanceof Set
     ? carriedItemTypes
     : new Set(Array.isArray(carriedItemTypes) ? carriedItemTypes : []);
+  const shouldCountCarried = typeof shouldCountCarriedItem === "function"
+    ? shouldCountCarriedItem
+    : () => true;
 
   async function resolveActorTransferEntries({
     entries = [],
@@ -102,6 +106,7 @@ export function createDropEvaluationRules({
     for (const entry of entries) {
       const droppedItem = await resolveDropData(entry).catch(() => null);
       if (!droppedItem || !carriedTypes.has(droppedItem.type)) continue;
+      if (!shouldCountCarried(droppedItem)) continue;
       const sourceActor = droppedItem.actor;
       if (sourceActor?.id === targetActorId) continue;
       incomingCarriedItemCount += 1;

@@ -19,7 +19,7 @@ import {
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
-const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["objet", "protection", "aptitude", "pouvoir"]);
+const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
@@ -89,6 +89,20 @@ function isBonusItem(item) {
   return BONUS_ITEM_TYPES.has(item?.type);
 }
 
+function getLinkedParentItemId(item, actorLike = null) {
+  const itemId = String(item?.id || item?._id || "").trim();
+  const parentItemId = String(item?.system?.link?.parentItemId || "").trim();
+  if (!parentItemId) return "";
+  if (itemId && parentItemId === itemId) return "";
+  const actor = actorLike || item?.actor || item?.parent || null;
+  if (!actor?.items?.has?.(parentItemId)) return "";
+  return parentItemId;
+}
+
+function isActorItemLinkedChild(item, actorLike = null) {
+  return Boolean(getLinkedParentItemId(item, actorLike));
+}
+
 export function normalizeWeaponType(value) {
   const raw = (value ?? "").toString().toLowerCase();
   if (!raw) return "";
@@ -110,6 +124,7 @@ function getItemBonus(actor, key) {
 
   let total = 0;
   for (const item of actor.items) {
+    if (isActorItemLinkedChild(item, actor)) continue;
     const type = String(item?.type || "").trim().toLowerCase();
     if (!CHARACTERISTIC_BONUS_ITEM_TYPES.has(type)) continue;
     if (!toCheckboxBoolean(item?.system?.characteristicBonusEnabled, false)) continue;
@@ -123,6 +138,7 @@ function getRawDamageBonus(actor) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
+    if (isActorItemLinkedChild(item, actor)) continue;
     if (!isBonusItem(item)) continue;
     if (!item.system?.rawBonusEnabled) continue;
     const bonus = Number(item.system?.rawBonuses?.deg);
@@ -169,6 +185,7 @@ function getProtectionPA(actor) {
   if (!actor?.items) return 0;
   let total = 0;
   for (const item of actor.items) {
+    if (isActorItemLinkedChild(item, actor)) continue;
     const type = String(item?.type || "").trim().toLowerCase();
     if (!PA_BONUS_ITEM_TYPES.has(type)) continue;
     const pa = Number(item.system?.pa || 0);
