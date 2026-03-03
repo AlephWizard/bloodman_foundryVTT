@@ -8615,23 +8615,23 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (kind === "pp") {
       return {
         count: 30,
-        minSize: 1.1,
-        maxSize: 4.3,
+        minSize: 2.2,
+        maxSize: 6.4,
         minDuration: 2.9,
         maxDuration: 8.9,
-        minOpacity: 0.12,
-        maxOpacity: 0.38,
+        minOpacity: 0.24,
+        maxOpacity: 0.62,
         maxDrift: 13.8
       };
     }
     return {
       count: 32,
-      minSize: 1.1,
-      maxSize: 4.5,
+      minSize: 2.3,
+      maxSize: 6.8,
       minDuration: 2.7,
       maxDuration: 8.4,
-      minOpacity: 0.14,
-      maxOpacity: 0.44,
+      minOpacity: 0.26,
+      maxOpacity: 0.68,
       maxDrift: 14.4
     };
   }

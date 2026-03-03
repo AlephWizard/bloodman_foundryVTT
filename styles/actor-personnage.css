@@ -1950,7 +1950,7 @@
   flex: 1;
   min-height: 160px;
   border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.92);
+  border: 2px solid rgba(0, 0, 0, 0.96);
   background: linear-gradient(
     180deg,
     var(--tube-bg-top, var(--tube-bg, #561812)) 0%,
