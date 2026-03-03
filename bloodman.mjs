@@ -6070,6 +6070,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.clearRerollDisplayState();
     this.clearPowerUseState();
     this.clearDeferredSheetUiTasks();
+    this._resourceBubbleRuntimeMap = null;
     clearUiMicrotask(this._pvGaugePulseTimer);
     clearUiMicrotask(this._ppGaugePulseTimer);
     this._pvGaugePulseTimer = null;
@@ -8603,6 +8604,138 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.render(false);
   }
 
+  getResourceBubbleRuntimeMap() {
+    if (!(this._resourceBubbleRuntimeMap instanceof WeakMap)) {
+      this._resourceBubbleRuntimeMap = new WeakMap();
+    }
+    return this._resourceBubbleRuntimeMap;
+  }
+
+  buildResourceBubbleConfig(kind = "pv") {
+    if (kind === "pp") {
+      return {
+        count: 30,
+        minSize: 1.1,
+        maxSize: 4.3,
+        minDuration: 2.9,
+        maxDuration: 8.9,
+        minOpacity: 0.12,
+        maxOpacity: 0.38,
+        maxDrift: 13.8
+      };
+    }
+    return {
+      count: 32,
+      minSize: 1.1,
+      maxSize: 4.5,
+      minDuration: 2.7,
+      maxDuration: 8.4,
+      minOpacity: 0.14,
+      maxOpacity: 0.44,
+      maxDrift: 14.4
+    };
+  }
+
+  randomizeResourceBubbleNode(node, config = {}, circleHeight = 160) {
+    if (!(node instanceof HTMLElement)) return;
+    const randomBetween = (min, max) => {
+      const lo = Number.isFinite(min) ? min : 0;
+      const hi = Number.isFinite(max) ? max : lo;
+      if (hi <= lo) return lo;
+      return lo + (Math.random() * (hi - lo));
+    };
+    const signedBetween = (min, max) => {
+      const value = randomBetween(min, max);
+      return Math.random() < 0.5 ? -value : value;
+    };
+
+    const minSize = Number.isFinite(config.minSize) ? config.minSize : 1.2;
+    const maxSize = Number.isFinite(config.maxSize) ? config.maxSize : 4.2;
+    const minDuration = Number.isFinite(config.minDuration) ? config.minDuration : 2.8;
+    const maxDuration = Number.isFinite(config.maxDuration) ? config.maxDuration : 8.5;
+    const minOpacity = Number.isFinite(config.minOpacity) ? config.minOpacity : 0.14;
+    const maxOpacity = Number.isFinite(config.maxOpacity) ? config.maxOpacity : 0.4;
+    const maxDrift = Number.isFinite(config.maxDrift) ? config.maxDrift : 13;
+
+    const size = randomBetween(minSize, maxSize);
+    const duration = randomBetween(minDuration, maxDuration);
+    const extraDelaySpread = randomBetween(0.2, 2.2);
+    const delay = -randomBetween(0, duration + extraDelaySpread);
+    const opacity = randomBetween(minOpacity, maxOpacity);
+    const blur = randomBetween(0, 0.28);
+    const x = randomBetween(3, 95);
+    const driftA = signedBetween(1.3, maxDrift * 0.42);
+    const driftB = signedBetween(2.1, maxDrift * 0.75);
+    const driftC = signedBetween(2.6, maxDrift);
+    const driftD = signedBetween(1.6, maxDrift * 0.88);
+    const scaleStart = randomBetween(0.62, 0.95);
+    const scaleMid = randomBetween(0.9, 1.18);
+    const scaleEnd = randomBetween(0.68, 0.93);
+    const rise = -Math.max(58, Math.floor(circleHeight + randomBetween(16, 34)));
+
+    node.style.setProperty("--bubble-size", `${size.toFixed(2)}px`);
+    node.style.setProperty("--bubble-duration", `${duration.toFixed(2)}s`);
+    node.style.setProperty("--bubble-delay", `${delay.toFixed(2)}s`);
+    node.style.setProperty("--bubble-opacity", opacity.toFixed(3));
+    node.style.setProperty("--bubble-blur", `${blur.toFixed(2)}px`);
+    node.style.setProperty("--bubble-x", `${x.toFixed(2)}%`);
+    node.style.setProperty("--bubble-drift-a", `${driftA.toFixed(2)}px`);
+    node.style.setProperty("--bubble-drift-b", `${driftB.toFixed(2)}px`);
+    node.style.setProperty("--bubble-drift-c", `${driftC.toFixed(2)}px`);
+    node.style.setProperty("--bubble-drift-d", `${driftD.toFixed(2)}px`);
+    node.style.setProperty("--bubble-scale-start", scaleStart.toFixed(3));
+    node.style.setProperty("--bubble-scale-mid", scaleMid.toFixed(3));
+    node.style.setProperty("--bubble-scale-end", scaleEnd.toFixed(3));
+    node.style.setProperty("--bubble-rise", `${rise}px`);
+    node.dataset.seeded = "1";
+  }
+
+  ensureResourceBubbleLayer(circle, kind, ratio = 0) {
+    const circleElement = circle?.get?.(0) ?? circle?.[0] ?? null;
+    if (!(circleElement instanceof HTMLElement)) return;
+    let layer = circleElement.querySelector(".resource-bubble-layer");
+    if (!(layer instanceof HTMLElement)) {
+      layer = document.createElement("div");
+      layer.className = "resource-bubble-layer";
+      layer.setAttribute("aria-hidden", "true");
+      circleElement.prepend(layer);
+    }
+
+    const config = this.buildResourceBubbleConfig(kind);
+    const desiredCount = Math.max(8, Math.floor(toFiniteNumber(config.count, 24)));
+    while (layer.children.length < desiredCount) {
+      const bubble = document.createElement("span");
+      bubble.className = "resource-bubble";
+      layer.appendChild(bubble);
+    }
+    while (layer.children.length > desiredCount) {
+      layer.lastElementChild?.remove();
+    }
+
+    const runtimeMap = this.getResourceBubbleRuntimeMap();
+    const runtime = runtimeMap.get(circleElement) || { tick: 0 };
+    runtime.tick = Math.max(0, Math.floor(toFiniteNumber(runtime.tick, 0))) + 1;
+    runtimeMap.set(circleElement, runtime);
+
+    const safeRatio = Math.max(0, Math.min(1, toFiniteNumber(ratio, 0)));
+    const circleHeight = Math.max(96, Math.round(toFiniteNumber(circleElement.clientHeight, 160)));
+    const liquidHeight = Math.max(34, Math.round(circleHeight * Math.max(0.2, safeRatio)));
+    const layerRise = -(liquidHeight + 26);
+    layer.style.setProperty("--bubble-rise", `${layerRise}px`);
+
+    const bubbles = Array.from(layer.children);
+    for (let index = 0; index < bubbles.length; index += 1) {
+      const bubble = bubbles[index];
+      if (!(bubble instanceof HTMLElement)) continue;
+      const neverSeeded = bubble.dataset.seeded !== "1";
+      const periodicReseed = !neverSeeded && ((runtime.tick + index) % 11 === 0);
+      const randomReseed = !neverSeeded && Math.random() < 0.07;
+      if (neverSeeded || periodicReseed || randomReseed) {
+        this.randomizeResourceBubbleNode(bubble, config, liquidHeight);
+      }
+    }
+  }
+
   refreshResourceVisuals(html) {
     const root = html?.find ? html : this.element;
     if (!root?.length) return;
@@ -8612,7 +8745,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       const circle = root.find(`.resource-circle.${kind}`).first();
       if (!currentInput.length || !maxInput.length || !circle.length) return;
 
-      const gauge = resolveResourceGaugeState(currentInput.val(), maxInput.val(), { useUnitMaxWhenZero: true });
+      const normalizedMax = Math.max(0, Math.floor(toFiniteNumber(maxInput.val(), 0)));
+      const normalizedCurrentRaw = Math.max(0, Math.floor(toFiniteNumber(currentInput.val(), 0)));
+      const normalizedCurrent = Math.min(normalizedCurrentRaw, normalizedMax);
+
+      if (String(maxInput.val()) !== String(normalizedMax)) maxInput.val(String(normalizedMax));
+      if (String(currentInput.val()) !== String(normalizedCurrent)) currentInput.val(String(normalizedCurrent));
+
+      const gauge = resolveResourceGaugeState(normalizedCurrent, normalizedMax, { useUnitMaxWhenZero: true });
       const ratioKey = `data-${kind}-ratio`;
       const previousRatio = Number(circle.attr(ratioKey));
       const ratio = gauge.ratio;
@@ -8624,6 +8764,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
       circle.removeClass("is-empty is-critical is-warning is-healthy");
       circle.addClass(gauge.stateClass);
+      this.ensureResourceBubbleLayer(circle, kind, ratio);
 
       if (Number.isFinite(previousRatio) && Math.abs(previousRatio - ratio) >= 0.001) {
         const directionClass = ratio > previousRatio ? "is-rising" : "is-falling";

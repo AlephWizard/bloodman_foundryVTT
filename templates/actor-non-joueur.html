@@ -85,17 +85,17 @@
         <div class="resource-badges">
           <div class="resource-circle pv {{resources.pv.stateClass}}" style="--pv-fill: {{resources.pv.fill}}; --pv-ratio: {{resources.pv.ratio}}; --pv-steps: {{resources.pv.steps}};">
             <div class="value">
-              <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" max="{{resources.pv.max}}" />
+              <input type="number" name="system.resources.pv.current" value="{{resources.pv.current}}" min="0" max="{{resources.pv.max}}" />
               <span>/</span>
-              <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" />
+              <input type="number" name="system.resources.pv.max" value="{{resources.pv.max}}" min="0" />
             </div>
             <div class="label">{{localize "BLOODMAN.Resources.PV"}}</div>
           </div>
           <div class="resource-circle pp {{resources.pp.stateClass}}" style="--pp-fill: {{resources.pp.fill}}; --pp-ratio: {{resources.pp.ratio}}; --pp-steps: {{resources.pp.steps}};">
             <div class="value">
-              <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" max="{{resources.pp.max}}" />
+              <input type="number" name="system.resources.pp.current" value="{{resources.pp.current}}" min="0" max="{{resources.pp.max}}" />
               <span>/</span>
-              <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" />
+              <input type="number" name="system.resources.pp.max" value="{{resources.pp.max}}" min="0" />
             </div>
             <div class="label">{{localize "BLOODMAN.Resources.PP"}}</div>
           </div>
