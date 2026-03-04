@@ -2089,3 +2089,75 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   }
 
 }
+
+/* Visual pass: item sheets */
+.bloodman-item.bm-item-sheet {
+  gap: 12px;
+  padding: 13px;
+  border-radius: 14px;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bloodman-item.bm-item-sheet .bm-item-top {
+  gap: 14px;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-fields {
+  gap: 9px 11px;
+  padding: 10px;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.bloodman-item.bm-item-sheet .bm-item-row {
+  min-height: 30px;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-tag {
+  min-height: 26px;
+  font-size: 10px;
+  letter-spacing: 0.65px;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-input {
+  height: 32px;
+}
+
+.bloodman-item.bm-item-sheet input[type="number"] {
+  height: 30px;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-textarea {
+  min-height: 84px;
+  line-height: 1.35;
+}
+
+.bloodman-item.bm-item-sheet .bm-item-input:hover,
+.bloodman-item.bm-item-sheet .bm-item-textarea:hover,
+.bloodman-item.bm-item-sheet input[type="number"]:hover,
+.bloodman-item.bm-item-sheet select:hover {
+  border-color: var(--bm-item-accent);
+}
+
+.bloodman-item.bm-item-sheet .toggle-option {
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.bloodman-item.bm-item-sheet .toggle-option:hover,
+.bloodman-item.bm-item-sheet .toggle-option:focus-within {
+  border-color: var(--bm-item-accent);
+  box-shadow: 0 0 0 1px var(--bm-item-accent-glow);
+}
+
+@media (max-width: 860px) {
+  .bloodman-item.bm-item-sheet {
+    padding: 11px;
+    gap: 10px;
+  }
+
+  .bloodman-item.bm-item-sheet .bm-item-fields {
+    padding: 9px;
+    gap: 8px;
+  }
+}
