@@ -1014,7 +1014,7 @@
 .equiper-avec-item {
   position: relative;
   display: grid;
-  grid-template-columns: 50px minmax(0, 1fr);
+  grid-template-columns: 25px minmax(0, 1fr);
   gap: 2px 6px;
   padding: 2px 2px 2px 17px;
   border: 1px solid #d2d2d2;
@@ -1077,8 +1077,8 @@
 }
 
 .equiper-avec-icon {
-  width: 50px;
-  height: 50px;
+  width: 25px;
+  height: 25px;
   border: 1px solid var(--bm-line);
   border-radius: 5px;
   object-fit: cover;
