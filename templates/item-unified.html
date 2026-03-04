@@ -37,17 +37,17 @@
         <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionPricingHint"}}</p>
       </div>
 
-      <div class="bm-item-unified-field">
+      <div class="bm-item-unified-field bm-item-unified-field-price">
         <label class="inline-label">{{localize "BLOODMAN.Items.PriceLabel"}}</label>
         <input class="bm-item-input" type="text" name="system.price" value="{{item.system.price}}" />
       </div>
 
-      <div class="bm-item-unified-field">
+      <div class="bm-item-unified-field bm-item-unified-field-sale-price">
         <label class="inline-label">{{localize "BLOODMAN.Items.SalePriceLabel"}}</label>
         <input class="bm-item-input" type="text" name="system.salePrice" value="{{item.system.salePrice}}" data-price-sale />
       </div>
 
-      <div class="bm-item-unified-field">
+      <div class="bm-item-unified-field bm-item-unified-field-usable">
         <label class="inline-label">{{localize "BLOODMAN.Items.UsableLabel"}}</label>
         <div class="toggle-group">
           <label class="toggle-option">
@@ -102,7 +102,7 @@
         <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionCostsHint"}}</p>
       </div>
 
-      <div class="bm-item-unified-field">
+      <div class="bm-item-unified-field bm-item-unified-field-xp-cost">
         <label class="inline-label">{{localize "BLOODMAN.Items.VoyageXPCostLabel"}}</label>
         <input class="bm-item-input" type="number" min="0" step="1" name="system.xpVoyageCost" value="{{item.system.xpVoyageCost}}" data-dtype="Number" />
       </div>
@@ -121,7 +121,7 @@
         </div>
       </div>
 
-      <div class="bm-item-unified-field">
+      <div class="bm-item-unified-field bm-item-unified-field-power-amount">
         <label class="inline-label">PP</label>
         <input class="bm-item-input" type="number" min="0" step="1" name="system.powerCost" value="{{item.system.powerCost}}" data-dtype="Number" {{#if powerCostInputDisabled}}disabled{{/if}} />
       </div>
@@ -137,7 +137,7 @@
           <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionLinksHint"}}</p>
         </div>
 
-        <div class="bm-item-unified-field">
+        <div class="bm-item-unified-field bm-item-unified-field-equip-with-toggle">
           <label class="inline-label">{{localize "BLOODMAN.Items.EquipWithLabel"}}</label>
           {{#if itemLinkSupportsEquiperAvec}}
             <div class="toggle-group">
@@ -156,7 +156,7 @@
         </div>
 
         {{#if itemLinkSupportsBagCount}}
-          <div class="bm-item-unified-field">
+          <div class="bm-item-unified-field bm-item-unified-field-bag-count">
             <label class="inline-label">{{localize "BLOODMAN.Items.CountForBagLabel"}}</label>
             <div class="toggle-group">
               <label class="toggle-option">
@@ -212,7 +212,7 @@
         <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionCombatHint"}}</p>
       </div>
 
-      <div class="bm-item-unified-card">
+      <div class="bm-item-unified-card bm-item-unified-card-damage">
         <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
         <div class="toggle-group">
           <label class="toggle-option">
@@ -227,7 +227,7 @@
         <input class="bm-item-input damage-die-input" type="text" name="system.damageDie" value="{{item.system.damageDie}}" placeholder="/r 1d6+2" {{#if damageInputDisabled}}disabled{{/if}} />
       </div>
 
-      <div class="bm-item-unified-card">
+      <div class="bm-item-unified-card bm-item-unified-card-weapon-type">
         <label class="inline-label">{{localize "BLOODMAN.Equipment.WeaponType.Label"}}</label>
         <div class="weapon-type-group">
           <label class="weapon-type-option">
@@ -241,7 +241,7 @@
         </div>
       </div>
 
-      <div class="bm-item-unified-card">
+      <div class="bm-item-unified-card bm-item-unified-card-ammo">
         <label class="inline-label">{{localize "BLOODMAN.Items.InfiniteAmmoLabel"}}</label>
         <div class="toggle-group">
           <label class="toggle-option">
@@ -269,7 +269,7 @@
         />
       </div>
 
-      <div class="bm-item-unified-card">
+      <div class="bm-item-unified-card bm-item-unified-card-protection">
         <label class="inline-label">{{localize "TYPES.Item.protection"}}</label>
         <div class="toggle-group">
           <label class="toggle-option">
@@ -296,7 +296,7 @@
         <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionBonusesHint"}}</p>
       </div>
 
-      <div class="bm-item-unified-card">
+      <div class="bm-item-unified-card bm-item-unified-card-raw">
         <label class="inline-label">{{localize "BLOODMAN.Items.RawBonusLabel"}}</label>
         <div class="toggle-group">
           <label class="toggle-option">
@@ -314,7 +314,7 @@
         </div>
       </div>
 
-      <div class="bm-item-unified-card">
+      <div class="bm-item-unified-card bm-item-unified-card-characteristics">
         <label class="inline-label">{{localize "BLOODMAN.Items.BonusLabel"}}</label>
         <div class="toggle-group">
           <label class="toggle-option">
