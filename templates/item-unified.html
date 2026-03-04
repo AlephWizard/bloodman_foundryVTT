@@ -187,7 +187,7 @@
                     <div class="bm-item-equiper-avec-body">
                       <span class="bm-item-equiper-avec-name {{#if this.sourceUuid}}bm-item-equiper-avec-open{{/if}}" data-source-uuid="{{this.sourceUuid}}">{{this.name}}</span>
                       <span class="bm-item-equiper-avec-type">{{this.typeLabel}}</span>
-                      {{#if this.shortNote}}<div class="bm-item-equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                      {{#if this.shortNoteHtml}}<div class="bm-item-equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                     </div>
                   </li>
                 {{/each}}

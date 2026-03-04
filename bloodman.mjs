@@ -2587,7 +2587,7 @@ const CARRY_COLUMN_CAPACITY = Object.freeze({
 const CARRY_COLUMN_FULL_REASON = "colonne pleine";
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
-const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
+const PA_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const VOYAGE_XP_SKIP_CREATE_OPTION = "bloodmanSkipVoyageXPCost";
 const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin", "aptitude", "pouvoir"]);
@@ -3748,6 +3748,7 @@ function buildItemLinkTemplateDisplayData(entry, index = 0) {
     name: String(entry?.name || "").trim() || t("BLOODMAN.Common.Name"),
     img: String(entry?.img || "").trim() || "icons/svg/item-bag.svg",
     shortNote: note,
+    shortNoteHtml: formatMultilineTextToHtml(note),
     sourceUuid: String(entry?._templateSourceUuid || "").trim()
   };
 }
@@ -3796,6 +3797,17 @@ function buildRuntimeTypedItem(item, runtimeType) {
   };
 }
 
+function resolveItemProtectionLabel(itemLike, options = {}) {
+  const type = String(options?.type || itemLike?.type || "").trim().toLowerCase();
+  if (!type || !PA_BONUS_ITEM_TYPES.has(type)) return "";
+  const rawPa = toFiniteNumber(itemLike?.system?.pa, 0);
+  const pa = Math.max(0, Math.floor(rawPa));
+  const defaultProtectionEnabled = type === "protection" || rawPa !== 0;
+  const protectionEnabled = toCheckboxBoolean(itemLike?.system?.protectionEnabled, defaultProtectionEnabled);
+  if (!protectionEnabled || pa <= 0) return "";
+  return `PA ${pa}`;
+}
+
 function buildLinkedChildDisplayData(childItem, options = {}) {
   const display = buildItemDisplayData(childItem);
   const rawType = String(childItem?.type || display?.type || "").trim().toLowerCase();
@@ -3808,6 +3820,7 @@ function buildLinkedChildDisplayData(childItem, options = {}) {
     || childItem?.system?.notes
     || ""
   ).trim();
+  display.shortNoteHtml = formatMultilineTextToHtml(display.shortNote);
   display.childShowPowerUseButton = false;
   display.childShowAptitudeUseButton = false;
   display.childUseLabel = "";
@@ -3821,7 +3834,7 @@ function buildLinkedChildDisplayData(childItem, options = {}) {
   display.childAmmoCapacityDisplay = 0;
   display.childShowReloadButton = false;
   display.childReloadBlocked = false;
-  display.childProtectionLabel = "";
+  display.childProtectionLabel = resolveItemProtectionLabel(childItem, { type: runtimeType });
 
   const powerUseState = options.powerUseState instanceof Set
     ? options.powerUseState
@@ -3923,10 +3936,6 @@ function buildLinkedChildDisplayData(childItem, options = {}) {
     return display;
   }
 
-  if (runtimeType === "protection") {
-    const paValue = Math.max(0, Math.floor(toFiniteNumber(childItem?.system?.pa, 0)));
-    display.childProtectionLabel = `PA ${paValue}`;
-  }
   return display;
 }
 
@@ -3967,8 +3976,12 @@ function getProtectionPA(actor) {
     if (isActorItemLinkedChild(item, actor)) continue;
     const type = String(item?.type || "").trim().toLowerCase();
     if (!PA_BONUS_ITEM_TYPES.has(type)) continue;
-    const pa = Number(item.system?.pa || 0);
-    if (Number.isFinite(pa)) total += pa;
+    const rawPa = toFiniteNumber(item?.system?.pa, 0);
+    const defaultProtectionEnabled = type === "protection" || rawPa !== 0;
+    const protectionEnabled = toCheckboxBoolean(item?.system?.protectionEnabled, defaultProtectionEnabled);
+    if (!protectionEnabled) continue;
+    const pa = Math.floor(rawPa);
+    if (Number.isFinite(pa) && pa > 0) total += pa;
   }
   return total;
 }
@@ -5713,13 +5726,65 @@ Hooks.on("updateItem", (item) => {
 
 async function cleanupItemLinksAfterDeletion(item) {
   const actor = item?.actor;
-  if (!actor?.isOwner) return;
+  const canMutateActorItems = Boolean(globalThis.game?.user?.isGM || actor?.isOwner);
+  if (!canMutateActorItems) return;
   const deletedItemId = String(item?.id || "").trim();
   if (!deletedItemId) return;
+
+  // If a parent item is deleted, remove all linked children from the actor sheet.
+  const deletedLink = resolveItemLinkState(item);
+  const linkedChildIds = new Set();
+  const deletedFromParentList = Array.isArray(deletedLink?.equiperAvec)
+    ? deletedLink.equiperAvec.map(entry => String(entry || "").trim()).filter(Boolean)
+    : [];
+  for (const childId of deletedFromParentList) {
+    if (!childId || childId === deletedItemId) continue;
+    const child = actor.items?.get?.(childId) || null;
+    if (!child) continue;
+    const childLink = resolveItemLinkState(child);
+    const childParentId = String(childLink?.parentItemId || "").trim();
+    // Keep backward compatibility with legacy records where parent id was not persisted.
+    if (!childParentId || childParentId === deletedItemId) linkedChildIds.add(childId);
+  }
+
+  for (const sibling of actor.items || []) {
+    const siblingId = String(sibling?.id || "").trim();
+    if (!siblingId || siblingId === deletedItemId) continue;
+    const siblingLink = resolveItemLinkState(sibling);
+    if (String(siblingLink.parentItemId || "").trim() === deletedItemId) {
+      linkedChildIds.add(siblingId);
+    }
+  }
+
+  const cascadeDeletedIds = new Set();
+  if (linkedChildIds.size) {
+    const childIds = [...linkedChildIds].filter(itemId => itemId && itemId !== deletedItemId);
+    if (childIds.length) {
+      try {
+        await actor.deleteEmbeddedDocuments("Item", childIds, { render: false });
+        for (const childId of childIds) {
+          if (!actor.items?.has?.(childId)) cascadeDeletedIds.add(childId);
+        }
+      } catch (_error) {
+        for (const childId of childIds) {
+          const child = actor.items?.get?.(childId);
+          if (!child) continue;
+          try {
+            await child.delete();
+            if (!actor.items?.has?.(childId)) cascadeDeletedIds.add(childId);
+          } catch (_fallbackError) {
+            // Non-fatal: cleanup below still removes stale links.
+          }
+        }
+      }
+    }
+  }
+
+  const removedIds = new Set([deletedItemId, ...cascadeDeletedIds]);
   const updates = [];
   for (const sibling of actor.items || []) {
     const siblingId = String(sibling?.id || "").trim();
-    if (!siblingId) continue;
+    if (!siblingId || removedIds.has(siblingId)) continue;
     const siblingLink = resolveItemLinkState(sibling);
     let changed = false;
     const update = { _id: siblingId };
@@ -5727,9 +5792,12 @@ async function cleanupItemLinksAfterDeletion(item) {
       update["system.link.parentItemId"] = "";
       changed = true;
     }
-    if (Array.isArray(siblingLink.equiperAvec) && siblingLink.equiperAvec.includes(deletedItemId)) {
-      update["system.link.equiperAvec"] = siblingLink.equiperAvec.filter(itemId => itemId !== deletedItemId);
-      changed = true;
+    if (Array.isArray(siblingLink.equiperAvec)) {
+      const filteredChildren = siblingLink.equiperAvec.filter(itemId => !removedIds.has(String(itemId || "").trim()));
+      if (filteredChildren.length !== siblingLink.equiperAvec.length) {
+        update["system.link.equiperAvec"] = filteredChildren;
+        changed = true;
+      }
     }
     if (changed) updates.push(update);
   }
@@ -7928,9 +7996,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       const displayItem = item.toObject();
       displayItem._id = displayItem._id ?? item.id;
       displayItem.type = String(item.type || displayItem.type || "").trim().toLowerCase();
+      displayItem.displayNoteHtml = formatMultilineTextToHtml(
+        displayItem.system?.note || displayItem.system?.notes || ""
+      );
       displayItem.bagActionLabel = "";
       displayItem.bagActionClass = "";
-      displayItem.bagProtectionLabel = "";
+      displayItem.bagProtectionLabel = resolveItemProtectionLabel(displayItem, { type: displayItem.type });
       displayItem.bagProtectionClass = "item-chip item-meta bm-btn-armor";
       const markValue = String(displayItem.system?.mark || "").trim();
       const noteSmallValue = String(displayItem.system?.noteSmall || "").trim();
@@ -7991,10 +8062,6 @@ class BloodmanActorSheet extends BaseActorSheet {
         }
       }
 
-      if (displayItem.type === "protection") {
-        const paValue = Math.max(0, Math.floor(toFiniteNumber(displayItem.system?.pa, 0)));
-        displayItem.bagProtectionLabel = `PA ${paValue}`;
-      }
       Object.assign(displayItem, buildEquiperAvecDisplayData(this.actor, item, childDisplayOptions));
       return displayItem;
     };
@@ -8006,6 +8073,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       .map(item => {
         const weapon = item.toObject();
         weapon._id = weapon._id ?? item.id;
+        weapon.protectionLabel = resolveItemProtectionLabel(weapon, {
+          type: String(weapon.type || item.type || "").trim().toLowerCase()
+        });
+        weapon.displayNoteHtml = formatMultilineTextToHtml(
+          weapon.system?.note || weapon.system?.notes || ""
+        );
         weapon.displayDamageFormula = normalizeRollDieFormula(weapon.system?.damageDie, "d4");
         const singleUseDisplay = resolveItemSingleUseDisplayData(weapon.system || {});
         weapon.showSingleUseCount = singleUseDisplay.show;
@@ -8046,6 +8119,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       .map(item => {
         const protection = item.toObject();
         protection._id = protection._id ?? item.id;
+        protection.displayNoteHtml = formatMultilineTextToHtml(
+          protection.system?.note || protection.system?.notes || ""
+        );
         const singleUseDisplay = resolveItemSingleUseDisplayData(protection.system || {});
         protection.showSingleUseCount = singleUseDisplay.show;
         protection.singleUseCountLabel = singleUseDisplay.label;
@@ -8619,8 +8695,8 @@ class BloodmanActorSheet extends BaseActorSheet {
         maxSize: 6.4,
         minDuration: 2.9,
         maxDuration: 8.9,
-        minOpacity: 0.24,
-        maxOpacity: 0.62,
+        minOpacity: 0.26,
+        maxOpacity: 0.68,
         maxDrift: 13.8
       };
     }
@@ -8630,8 +8706,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       maxSize: 6.8,
       minDuration: 2.7,
       maxDuration: 8.4,
-      minOpacity: 0.26,
-      maxOpacity: 0.68,
+      minOpacity: 0.29,
+      maxOpacity: 0.75,
       maxDrift: 14.4
     };
   }
@@ -10411,3 +10487,4 @@ class BloodmanItemSheet extends BaseItemSheet {
     }
   }
 }
+

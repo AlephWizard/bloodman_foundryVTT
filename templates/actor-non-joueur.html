@@ -1,4 +1,4 @@
-﻿<form class="bloodman-sheet npc-sheet">
+<form class="bloodman-sheet npc-sheet">
   <header class="sheet-header">
     <img class="sheet-logo" src="systems/bloodman/images/bloodman_logo.svg" alt="Bloodman" />
     <nav class="sheet-tabs tabs" data-group="primary">
@@ -299,6 +299,7 @@
                       <span class="item-name {{#if ../canOpenItemSheets}}item-edit{{/if}}">{{this.name}}</span>
                       <div class="item-actions">
                         <span class="weapon-roll bm-btn-damage">{{this.displayDamageFormula}}</span>
+                        {{#if this.protectionLabel}}<span class="item-chip item-meta bm-btn-armor">{{this.protectionLabel}}</span>{{/if}}
                         {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                         {{#if this.showAmmoState}}<span class="weapon-ammo">{{this.ammoMagazine}} / {{this.ammoCapacityDisplay}}</span>{{/if}}
                         {{#if this.showReloadButton}}<button type="button" class="weapon-reload {{#if this.reloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
@@ -309,7 +310,7 @@
                           <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                         {{/if}}
                       </div>
-                      {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                      {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
                       {{#if this.equiperAvecEnabled}}
                         <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
                           <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
@@ -335,7 +336,7 @@
                                     {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                     {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                   </div>
-                                  {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                  {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                                 </div>
                               </li>
                             {{/each}}
@@ -387,7 +388,7 @@
                         <span class="item-chip item-meta bm-btn-armor">{{#if this.system.pa}}PA {{this.system.pa}}{{else}}PA 0{{/if}}</span>
                         {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                       </div>
-                      {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                      {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
                       {{#if this.equiperAvecEnabled}}
                         <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
                           <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
@@ -413,7 +414,7 @@
                                     {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                     {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                   </div>
-                                  {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                  {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                                 </div>
                               </li>
                             {{/each}}
@@ -480,7 +481,7 @@
                         <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                       {{/if}}
                     </div>
-                    {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
                     {{#if this.equiperAvecEnabled}}
                       <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
                         <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
@@ -506,7 +507,7 @@
                                   {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                   {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                 </div>
-                                {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                               </div>
                             </li>
                           {{/each}}
@@ -540,7 +541,7 @@
                         <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                       {{/if}}
                     </div>
-                    {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
                     {{#if this.equiperAvecEnabled}}
                       <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
                         <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
@@ -566,7 +567,7 @@
                                   {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                   {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                 </div>
-                                {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                               </div>
                             </li>
                           {{/each}}
@@ -600,7 +601,7 @@
                         <button type="button" class="item-reroll-clear" title="{{localize 'BLOODMAN.Common.Cancel'}}" aria-label="{{localize 'BLOODMAN.Common.Cancel'}}">&times;</button>
                       {{/if}}
                     </div>
-                    {{#if this.system.note}}<div class="item-notes">{{this.system.note}}</div>{{else}}{{#if this.system.notes}}<div class="item-notes">{{this.system.notes}}</div>{{/if}}{{/if}}
+                    {{#if this.displayNoteHtml}}<div class="item-notes">{{{this.displayNoteHtml}}}</div>{{/if}}
                     {{#if this.equiperAvecEnabled}}
                       <div class="equiper-avec-block" data-equiper-avec-drop="true" data-parent-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-accepted-types="{{../itemLinkAcceptedTypes}}">
                         <div class="equiper-avec-title">{{localize "BLOODMAN.Items.EquipWithTitle"}}</div>
@@ -626,7 +627,7 @@
                                   {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                   {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                 </div>
-                                {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                                {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                               </div>
                             </li>
                           {{/each}}
@@ -732,7 +733,7 @@
                                   {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                   {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                 </div>
-                              {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                              {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                             </div>
                           </li>
                         {{/each}}
@@ -793,7 +794,7 @@
                                   {{#if this.childShowReloadButton}}<button type="button" class="equiper-avec-weapon-reload {{#if this.childReloadBlocked}}is-blocked{{/if}}">{{localize "BLOODMAN.Common.Reload"}}</button>{{/if}}
                                   {{#if this.showSingleUseCount}}<span class="{{this.singleUseCountClass}}">{{this.singleUseCountLabel}}</span>{{/if}}
                                 </div>
-                              {{#if this.shortNote}}<div class="equiper-avec-note">{{this.shortNote}}</div>{{/if}}
+                              {{#if this.shortNoteHtml}}<div class="equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
                             </div>
                           </li>
                         {{/each}}
@@ -824,3 +825,4 @@
     </section>
   </section>
 </form>
+

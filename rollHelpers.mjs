@@ -20,7 +20,7 @@ import {
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
-const PA_BONUS_ITEM_TYPES = new Set(["protection", "aptitude", "pouvoir"]);
+const PA_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const SYSTEM_SOCKET = "system.bloodman";
 const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
@@ -188,8 +188,12 @@ function getProtectionPA(actor) {
     if (isActorItemLinkedChild(item, actor)) continue;
     const type = String(item?.type || "").trim().toLowerCase();
     if (!PA_BONUS_ITEM_TYPES.has(type)) continue;
-    const pa = Number(item.system?.pa || 0);
-    if (Number.isFinite(pa)) total += pa;
+    const rawPa = Number(item?.system?.pa || 0);
+    const defaultProtectionEnabled = type === "protection" || rawPa !== 0;
+    const protectionEnabled = toCheckboxBoolean(item?.system?.protectionEnabled, defaultProtectionEnabled);
+    if (!protectionEnabled) continue;
+    const pa = Math.floor(rawPa);
+    if (Number.isFinite(pa) && pa > 0) total += pa;
   }
   return total;
 }
