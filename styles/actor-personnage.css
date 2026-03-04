@@ -333,12 +333,12 @@
 }
 
 .resource-circle.pv {
-  background: var(--bm-red);
+  background: #2a1113;
   color: var(--bm-white);
 }
 
 .resource-circle.pp {
-  background: var(--bm-purple);
+  background: #241731;
   color: var(--bm-white);
 }
 
@@ -2067,13 +2067,14 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: 12px;
-  top: clamp(-2px, calc(100% - var(--resource-fill, 0%) - 6px), calc(100% - 10px));
-  background: var(--liquid-meniscus, #861A11);
-  background-position: center;
+  height: 2px;
+  top: clamp(0px, calc(100% - var(--resource-fill, 0%) - 1px), calc(100% - 2px));
+  background: var(--liquid-level-line, #5a1317);
   background-repeat: no-repeat;
-  border-radius: 999px;
+  border-radius: 0;
   box-shadow: none;
+  transition: top 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: top;
   pointer-events: none;
   z-index: 2;
 }
@@ -2133,10 +2134,6 @@
 
 .resource-circle.pp.is-empty::before {
   filter: saturate(0.7) brightness(0.7);
-}
-
-.resource-circle.is-rising {
-  transform: translateY(-1px);
 }
 
 .resource-circle.pv.is-rising {
@@ -2226,18 +2223,18 @@
 }
 
 .resource-circle.pv {
-  --tube-bg: #4f191c;
+  --tube-bg: #2a1113;
   --resource-fill: var(--pv-fill, 100%);
   --liquid-solid: #b52129;
-  --liquid-meniscus: #802730;
+  --liquid-level-line: #611015;
   --liquid-speed: calc(2.8s - (var(--pv-ratio, 1) * 0.35s));
 }
 
 .resource-circle.pp {
-  --tube-bg: #312150;
+  --tube-bg: #241731;
   --resource-fill: var(--pp-fill, 100%);
   --liquid-solid: #78509c;
-  --liquid-meniscus: #533177;
+  --liquid-level-line: #3c1a64;
   --liquid-speed: calc(3s - (var(--pp-ratio, 1) * 0.38s));
 }
 
@@ -2696,5 +2693,219 @@
 
   .tab[data-tab="pouvoirs"] .abilities-powers-layout {
     gap: 10px;
+  }
+}
+
+/* Window mockup pass: PJ / PNJ */
+.window-app.bloodman.sheet.actor {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #000000;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.48);
+}
+
+.window-app.bloodman.sheet.actor .window-content,
+.bloodman.sheet.actor .window-content {
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 13px 13px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(255, 255, 255, 0.24), transparent 38%),
+    linear-gradient(180deg, #191919 0%, #0d0d0d 56%, #151515 100%);
+}
+
+.window-app.bloodman.sheet.actor .window-header,
+.bloodman.sheet.actor .window-header {
+  background: linear-gradient(180deg, #171717 0%, #080808 100%);
+  border-top-left-radius: 13px;
+  border-top-right-radius: 13px;
+  border-bottom: 1px solid #2a2a2a;
+  overflow: hidden;
+}
+
+.bloodman.sheet.actor .window-title {
+  letter-spacing: 0.35px;
+}
+
+.bloodman-sheet {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0 0 10px 10px;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.bloodman-sheet .sheet-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  padding: 10px 14px 8px;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(17, 17, 17, 0.94) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(3px);
+}
+
+.bloodman-sheet .sheet-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), transparent 74%);
+  pointer-events: none;
+}
+
+.pj-sheet .sheet-header::after {
+  background: linear-gradient(90deg, rgba(200, 55, 46, 0.66), transparent 72%);
+}
+
+.npc-sheet .sheet-header::after {
+  background: linear-gradient(90deg, rgba(92, 124, 156, 0.62), transparent 72%);
+}
+
+.bloodman-sheet .sheet-logo {
+  height: 36px;
+  width: auto;
+}
+
+.bloodman-sheet .sheet-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: min(100%, 680px);
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  gap: 8px;
+}
+
+.bloodman-sheet .sheet-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bloodman-sheet .sheet-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+}
+
+.bloodman-sheet .sheet-tabs .item {
+  min-height: 32px;
+  min-width: max-content;
+  padding: 5px 10px;
+}
+
+.bloodman-sheet .sheet-tabs .item:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+
+.pj-sheet .sheet-tabs .item.active {
+  background: linear-gradient(180deg, #cc3e35 0%, #9f271f 100%);
+}
+
+.npc-sheet .sheet-tabs .item.active {
+  background: linear-gradient(180deg, #4f5f71 0%, #374553 100%);
+}
+
+.bloodman-sheet .sheet-body {
+  flex: 1;
+  padding: 12px 14px 14px;
+  background: linear-gradient(180deg, #f3f3f3 0%, #e7e7e7 100%);
+}
+
+.bloodman-sheet .tab-grid {
+  grid-template-columns: clamp(196px, 23vw, 258px) clamp(92px, 9vw, 116px) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.bloodman-sheet .portrait-frame {
+  border-radius: 18px;
+  border: 0 !important;
+  box-shadow: none;
+}
+
+.portrait-frame,
+.portrait-frame.is-empty,
+.portrait-frame.has-image {
+  border: 0 !important;
+}
+
+.bloodman-sheet .resource-badges {
+  gap: 10px;
+}
+
+.bloodman-sheet .resource-circle {
+  border: 2px solid #101010;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.bloodman-sheet .card {
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8f8f8 0%, #ececec 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.66) inset,
+    0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+.bloodman-sheet .card-header {
+  margin-bottom: 9px;
+  padding-bottom: 6px;
+  border-bottom-color: rgba(0, 0, 0, 0.76);
+}
+
+.bloodman-sheet .item.item--stacked {
+  border-radius: 9px;
+  border-bottom-color: rgba(0, 0, 0, 0.2);
+}
+
+.bloodman-sheet .item.item--stacked:hover {
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.npc-sheet .npc-role-bar {
+  padding-top: 1px;
+  padding-bottom: 11px;
+}
+
+.npc-sheet .npc-quick-notes-block {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.36);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f2f2f2 0%, #e5e5e5 100%);
+}
+
+.notes-card {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 2px 2px;
+}
+
+@media (max-width: 1200px) {
+  .bloodman-sheet .sheet-tabs {
+    max-width: min(100%, 560px);
+  }
+
+  .bloodman-sheet .tab-grid {
+    grid-template-columns: clamp(180px, 27vw, 230px) 88px minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 980px) {
+  .bloodman-sheet .sheet-header {
+    position: static;
+    padding: 9px 11px 8px;
+  }
+
+  .bloodman-sheet .sheet-body {
+    padding: 10px;
+  }
+
+  .bloodman-sheet .sheet-tabs {
+    max-width: 100%;
   }
 }
