@@ -433,7 +433,19 @@ function refreshAllCreateTypeIcons() {
 function shouldRefreshCreateTypeIconsForNode(node) {
   if (!(node instanceof HTMLElement)) return false;
   if (node.matches("select[name='type'], input[name='type'], .window-app, .application, dialog")) return true;
+  if (!node.childElementCount) return false;
   return Boolean(node.querySelector("select[name='type'], input[name='type']"));
+}
+
+function resolveCreateTypeRefreshRoot(node) {
+  if (!(node instanceof HTMLElement)) return null;
+  const appRootSelector = ".window-app, .application, dialog";
+  if (node.matches(appRootSelector)) return node;
+  const closestRoot = node.closest(appRootSelector);
+  if (closestRoot) return closestRoot;
+  const nestedRoot = node.querySelector(appRootSelector);
+  if (nestedRoot instanceof HTMLElement) return nestedRoot;
+  return node;
 }
 
 function scheduleCreateTypeIconsRefresh() {
@@ -446,12 +458,21 @@ function scheduleCreateTypeIconsRefresh() {
 
 function queueCreateTypeIconsRefreshFromMutations(mutations = []) {
   let hasRelevantMutation = false;
+  let saturated = false;
   for (const mutation of mutations || []) {
+    if (saturated) break;
     if (!mutation?.addedNodes?.length) continue;
     for (const node of mutation.addedNodes) {
       if (!shouldRefreshCreateTypeIconsForNode(node)) continue;
-      CREATE_TYPE_REFRESH_ROOTS.add(node);
+      const root = resolveCreateTypeRefreshRoot(node) || node;
+      CREATE_TYPE_REFRESH_ROOTS.add(root);
       hasRelevantMutation = true;
+      if (CREATE_TYPE_REFRESH_ROOTS.size >= CREATE_TYPE_REFRESH_MAX_ROOTS) {
+        CREATE_TYPE_REFRESH_ROOTS.clear();
+        CREATE_TYPE_REFRESH_ROOTS.add(document.body);
+        saturated = true;
+        break;
+      }
     }
   }
   if (!hasRelevantMutation) return;
@@ -5529,9 +5550,15 @@ function notifyInvalidItemRollFormula(item, invalidFields = [], invalidFieldErro
     return compactError ? `${label}: ${compactError}` : label;
   }).filter(Boolean);
   const details = detailsList.length ? ` (${detailsList.join(" ; ")})` : "";
-  ui.notifications?.error(
-    tl("BLOODMAN.Notifications.ItemRollFormulaInvalid", `Formule de des invalide pour ${itemName}${details}.`)
-  );
+  const localizedMessage = t("BLOODMAN.Notifications.ItemRollFormulaInvalid", {
+    itemName,
+    details
+  });
+  const fallbackMessage = `Formule de des invalide pour ${itemName}${details}.`;
+  const errorMessage = localizedMessage && localizedMessage !== "BLOODMAN.Notifications.ItemRollFormulaInvalid"
+    ? localizedMessage
+    : fallbackMessage;
+  ui.notifications?.error(errorMessage);
 }
 
 function normalizeItemRollFormulaFields(item, updateData = null, options = {}) {

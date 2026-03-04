@@ -42,6 +42,27 @@ function run() {
   };
   assert.equal(computeActorStructureMigrationData(alreadyNormalized), null);
 
+  const legacyBooleanXpAndTransport = {
+    type: "personnage",
+    system: {
+      npcRole: "",
+      profile: { quickNotes: "RAS" },
+      equipment: {
+        monnaies: "Couronnes",
+        monnaiesActuel: 12.5,
+        bagSlotsEnabled: false,
+        transportNpcs: [" Actor.abc ", 123, { bad: true }, "Actor.xyz", ""]
+      },
+      characteristics: {
+        PHY: { xp: ["false", "off", "1"] }
+      }
+    }
+  };
+  assert.deepEqual(computeActorStructureMigrationData(legacyBooleanXpAndTransport), {
+    "system.equipment.transportNpcs": ["Actor.abc", "Actor.xyz"],
+    "system.characteristics.PHY.xp": [false, false, true]
+  });
+
   assert.deepEqual(
     normalizeMigrationRunOptions({ includeCompendiums: true }, { includeCompendiums: false }),
     { includeCompendiums: true }

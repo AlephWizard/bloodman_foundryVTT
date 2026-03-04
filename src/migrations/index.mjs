@@ -90,7 +90,10 @@ function normalizeBooleanFlag(value, fallback = false) {
 function normalizeTransportNpcRefs(value) {
   const rawEntries = [];
   if (Array.isArray(value)) {
-    rawEntries.push(...value);
+    for (const entry of value) {
+      if (typeof entry !== "string") continue;
+      rawEntries.push(entry);
+    }
   } else if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed) {
@@ -117,7 +120,11 @@ function normalizeNpcRole(value) {
 
 function normalizeXpArray(value) {
   const source = Array.isArray(value) ? value : [];
-  return [Boolean(source[0]), Boolean(source[1]), Boolean(source[2])];
+  return [
+    normalizeBooleanFlag(source[0], false),
+    normalizeBooleanFlag(source[1], false),
+    normalizeBooleanFlag(source[2], false)
+  ];
 }
 
 function areArraysEqual(left, right) {

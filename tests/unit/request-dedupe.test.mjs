@@ -30,6 +30,20 @@ async function run() {
   tracker.prune();
   assert.equal(tracker.wasRequestProcessed("b"), false);
   assert.equal(tracker.wasRequestProcessed("c"), false);
+
+  tracker.rememberRequest("stale");
+  now = 400;
+  assert.equal(tracker.wasRequestProcessed("stale"), false);
+
+  const zeroTtlTracker = createRequestRetentionTracker({
+    retentionMs: -5,
+    getNow: () => now
+  });
+  now = 500;
+  zeroTtlTracker.rememberRequest("short");
+  assert.equal(zeroTtlTracker.wasRequestProcessed("short"), true);
+  now = 501;
+  assert.equal(zeroTtlTracker.wasRequestProcessed("short"), false);
 }
 
 run()

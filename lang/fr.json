@@ -49,7 +49,8 @@
     "Resources": {
       "VoyageXP": "XP VOYAGE",
       "PV": "PV",
-      "PP": "PP"
+      "PP": "PP",
+      "MoveResetAction": "Recharger PM"
     },
     "Characteristics": {
       "Title": "CARACTÉRISTIQUES",
@@ -191,7 +192,8 @@
         "FormulaPriorityNotice": "Formule de la fiche objet appliquee automatiquement.",
         "FormulaDivergenceNotice": "La derniere formule memorisee est differente.",
         "RawBonusLabel": "Dégâts bruts +",
-        "PenetrationLabel": "Pénétration +"
+        "PenetrationLabel": "Pénétration +",
+        "SettingsLabel": "Reglages du jet"
       },
       "RerollDamage": {
         "Title": "Relance du jet de degats",
@@ -286,7 +288,17 @@
       "ItemLinkTypeIncompatible": "Type incompatible avec Equiper avec.",
       "ItemLinkSelfForbidden": "Un objet ne peut pas s'equiper avec lui-meme.",
       "ItemLinkParentDisabled": "Activez d'abord Equiper avec sur l'objet parent.",
-      "ItemLinkUpdateFailed": "Mise a jour impossible des objets equipes."
+      "ItemLinkUpdateFailed": "Mise a jour impossible des objets equipes.",
+      "ActorUpdateRequiresGM": "Mise a jour impossible: aucun MJ ou assistant actif.",
+      "DamageApplyFailed": "Impossible d'appliquer les degats a la cible.",
+      "DamageRequestFailed": "Le message de degats n'a pas pu etre transmis au MJ.",
+      "HealSingleTargetOnly": "Selectionnez une seule cible pour le soin.",
+      "HealTargetResolveFailed": "Impossible de resoudre la cible de soin.",
+      "InvalidDamageFormula": "Selection de degats invalide.",
+      "InvalidPenetration": "La valeur Penetration + doit etre un nombre entier >= 0.",
+      "InvalidRawDamageBonus": "La valeur Degats bruts + doit etre un nombre entier >= 0.",
+      "ItemDeleteRequiresGM": "Suppression impossible: aucun MJ ou assistant actif.",
+      "ItemRollFormulaInvalid": "Formule de des invalide pour {itemName}{details}."
     },
     "Settings": {
       "ChaosDiceName": "Dés du chaos",
@@ -297,6 +309,11 @@
       "LogLevelWarn": "Avertissements",
       "LogLevelInfo": "Infos",
       "LogLevelDebug": "Debug"
+    },
+    "Chat": {
+      "RollTypes": {
+        "Experience": "Experience"
+      }
     }
   },
   "TYPES.Actor.personnage": "Joueur",
