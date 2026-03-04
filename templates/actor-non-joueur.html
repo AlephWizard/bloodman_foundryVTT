@@ -685,12 +685,13 @@
     </section>
 
     <section class="tab" data-group="primary" data-tab="pouvoirs">
-      <section class="card aptitudes-card">
-        <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-hand-fist"></i> {{localize "BLOODMAN.Abilities.Title"}}</span>
-        </div>
-        <ol class="item-list {{#if aptitudesThreeColumns}}item-list-three-columns{{/if}}">
-          {{#each aptitudes}}
+      <div class="abilities-powers-layout">
+        <section class="card aptitudes-card">
+          <div class="card-header">
+            <span class="card-title"><i class="fa-solid fa-hand-fist"></i> {{localize "BLOODMAN.Abilities.Title"}}</span>
+          </div>
+          <ol class="item-list {{#if (lookup aptitudes 5)}}item-list-split-columns{{/if}}">
+            {{#each aptitudes}}
               <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
@@ -744,14 +745,14 @@
               </li>
             {{/each}}
           </ol>
-      </section>
+        </section>
 
-      <section class="card powers-card">
-        <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-bolt"></i> {{localize "BLOODMAN.Powers.Title"}}</span>
-        </div>
-        <ol class="item-list {{#if pouvoirsThreeColumns}}item-list-three-columns{{/if}}">
-          {{#each pouvoirs}}
+        <section class="card powers-card">
+          <div class="card-header">
+            <span class="card-title"><i class="fa-solid fa-bolt"></i> {{localize "BLOODMAN.Powers.Title"}}</span>
+          </div>
+          <ol class="item-list {{#if (lookup pouvoirs 5)}}item-list-split-columns{{/if}}">
+            {{#each pouvoirs}}
               <li class="item item--stacked" data-item-id="{{#if this._id}}{{this._id}}{{else}}{{this.id}}{{/if}}" data-item-type="{{this.type}}">
                 <a class="item-delete" title="{{localize 'BLOODMAN.Common.Delete'}}">&times;</a>
                 <img class="item-icon" src="{{this.img}}" />
@@ -805,7 +806,8 @@
               </li>
             {{/each}}
           </ol>
-      </section>
+        </section>
+      </div>
     </section>
 
     <section class="tab" data-group="primary" data-tab="notes">
