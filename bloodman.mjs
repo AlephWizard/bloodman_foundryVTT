@@ -5969,13 +5969,46 @@ function getTransportNpcRefs(actor) {
     .filter(ref => ref.length > 0);
 }
 
-function resolveTransportNpc(ref) {
-  if (!ref || typeof ref !== "string") return null;
-  const uuidRef = ref.startsWith("Actor.") ? ref : null;
-  const byUuid = uuidRef ? compatFromUuidSync(uuidRef) : null;
-  const actor = byUuid || game.actors?.get(ref) || null;
-  if (!actor || actor.type !== "personnage-non-joueur") return null;
-  return actor;
+function resolveTransportNpcSync(ref) {
+  const normalizedRef = String(ref || "").trim();
+  if (!normalizedRef) return null;
+
+  const uuidCandidates = normalizedRef.startsWith("Actor.") || normalizedRef.startsWith("Compendium.")
+    ? [normalizedRef]
+    : [`Actor.${normalizedRef}`];
+  const syncCandidates = [...uuidCandidates, normalizedRef];
+
+  for (const candidate of syncCandidates) {
+    if (!candidate.includes(".")) continue;
+    const resolved = compatFromUuidSync(candidate);
+    if (resolved?.type === "personnage-non-joueur") return resolved;
+  }
+
+  const worldActor = game.actors?.get(normalizedRef) || null;
+  if (worldActor?.type === "personnage-non-joueur") return worldActor;
+
+  return null;
+}
+
+async function resolveTransportNpc(ref) {
+  const normalizedRef = String(ref || "").trim();
+  if (!normalizedRef) return null;
+
+  const syncResolved = resolveTransportNpcSync(normalizedRef);
+  const isDocument = syncResolved?.documentName === "Actor"
+    || typeof syncResolved?.toObject === "function"
+    || typeof syncResolved?.sheet === "object";
+  if (isDocument) return syncResolved;
+
+  const uuidCandidates = normalizedRef.startsWith("Actor.") || normalizedRef.startsWith("Compendium.")
+    ? [normalizedRef]
+    : [`Actor.${normalizedRef}`];
+  for (const candidate of uuidCandidates) {
+    const resolved = await compatFromUuid(candidate).catch(() => null);
+    if (resolved?.type === "personnage-non-joueur") return resolved;
+  }
+
+  return syncResolved;
 }
 
 function buildTransportNpcDisplayData(actor) {
@@ -5984,13 +6017,26 @@ function buildTransportNpcDisplayData(actor) {
   for (const ref of getTransportNpcRefs(actor)) {
     if (seen.has(ref)) continue;
     seen.add(ref);
-    const npc = resolveTransportNpc(ref);
-    if (!npc) continue;
+    const npc = resolveTransportNpcSync(ref);
+    if (!npc) {
+      const fallbackName = String(ref || "").trim().split(".").at(-1) || "PNJ";
+      transportNpcs.push({
+        ref,
+        id: ref,
+        name: fallbackName,
+        img: "icons/svg/mystery-man.svg",
+        missing: true
+      });
+      continue;
+    }
+    const id = String(npc.id || npc._id || "").trim() || ref;
+    const name = String(npc.name || "").trim() || id;
+    const img = String(npc.img || "").trim() || "icons/svg/mystery-man.svg";
     transportNpcs.push({
       ref,
-      id: npc.id,
-      name: npc.name,
-      img: npc.img || "icons/svg/mystery-man.svg"
+      id,
+      name,
+      img
     });
   }
   return transportNpcs;
@@ -7793,8 +7839,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
   }
 
-  getData() {
-    const data = super.getData();
+  getData(options = {}) {
+    const data = super.getData(options);
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const canEditTokenImage = isAssistantOrHigherRole(game.user?.role);
     const canEditAmmoFields = isAssistantOrHigherRole(game.user?.role);
@@ -8607,11 +8653,16 @@ class BloodmanActorSheet extends BaseActorSheet {
       this.clearItemReroll(itemId);
     });
 
-    html.find(".transport-npc-open").click(ev => {
+    html.find(".transport-npc-open").click(async ev => {
       const li = ev.currentTarget.closest(".item");
       const ref = li?.dataset?.transportNpcRef;
-      const npc = resolveTransportNpc(ref);
-      npc?.sheet?.render(true);
+      const npc = await resolveTransportNpc(ref);
+      if (npc?.sheet?.render) {
+        npc.sheet.render(true);
+        return;
+      }
+      const byUuid = ref ? await compatFromUuid(ref).catch(() => null) : null;
+      if (byUuid?.sheet?.render) byUuid.sheet.render(true);
     });
 
     html.find(".transport-npc-delete").click(async ev => {
@@ -9291,10 +9342,16 @@ class BloodmanActorSheet extends BaseActorSheet {
   async _onDropTransportNpc(event, data) {
     const transportZone = event.target?.closest?.("[data-transport-drop]");
     if (!transportZone) return false;
-    const droppedActor = await Actor.implementation.fromDropData(data).catch(() => null);
+    let droppedActor = await Actor.implementation.fromDropData(data).catch(() => null);
+    if (!droppedActor && data?.uuid) {
+      droppedActor = await resolveTransportNpc(data.uuid);
+    }
+    if (!droppedActor && data?.id) {
+      droppedActor = await resolveTransportNpc(data.id);
+    }
     if (!droppedActor || droppedActor.type !== "personnage-non-joueur") return true;
 
-    const ref = droppedActor.uuid || droppedActor.id;
+    const ref = String(data?.uuid || droppedActor.uuid || droppedActor.id || "").trim();
     if (!ref) return true;
 
     const refs = getTransportNpcRefs(this.actor);
