@@ -8825,7 +8825,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const scaleStart = randomBetween(0.62, 0.95);
     const scaleMid = randomBetween(0.9, 1.18);
     const scaleEnd = randomBetween(0.68, 0.93);
-    const rise = -Math.max(58, Math.floor(circleHeight + randomBetween(16, 34)));
+    const riseBase = (circleHeight * 1.2) + randomBetween(16, 34);
+    const rise = -Math.max(58, Math.floor(riseBase));
 
     node.style.setProperty("--bubble-size", `${size.toFixed(2)}px`);
     node.style.setProperty("--bubble-duration", `${duration.toFixed(2)}s`);
@@ -8875,6 +8876,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const circleHeight = Math.max(96, Math.round(toFiniteNumber(circleElement.clientHeight, 160)));
     const liquidHeight = Math.max(34, Math.round(circleHeight * Math.max(0.2, safeRatio)));
     const layerRise = -(liquidHeight + 26);
+    layer.style.removeProperty("height");
+    layer.style.removeProperty("opacity");
     layer.style.setProperty("--bubble-rise", `${layerRise}px`);
 
     const bubbles = Array.from(layer.children);
