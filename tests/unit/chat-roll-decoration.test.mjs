@@ -81,13 +81,16 @@ async function run() {
       user: "u1",
       speaker: { actor: "a1", token: "t1", scene: "s1", alias: "Alias" },
       rolls: [{ total: 7 }],
-      flags: { bloodman: { chatRollType: "damage" } }
+      flags: { bloodman: { chatRollType: "damage", chatRollReroll: true } }
     }, root);
 
     assert.equal(contentElement.innerHTML.includes("bm-chat-roll-frame"), true);
+    assert.equal(contentElement.innerHTML.includes("bm-chat-roll-reroll"), true);
     assert.equal(root.classList.has("bm-chat-roll"), true);
     assert.equal(root.classList.has("bm-chat-roll--damage"), true);
+    assert.equal(root.classList.has("bm-chat-roll--reroll"), true);
     assert.equal(root.dataset.bmChatRollType, "damage");
+    assert.equal(root.dataset.bmChatRollReroll, "true");
 
     assert.equal(hooks.normalizeChatCssColor("not-a-color", "#ff0000"), "#ff0000");
     assert.equal(hooks.resolveChatRollTypeLabel("heal"), "Soin");

@@ -78,6 +78,15 @@ async function run() {
   }, 9);
   assert.deepEqual(allocations.map(target => target.share), [5, 4]);
 
+  const freeAllocations = utils.buildRerollAllocations({
+    totalDamage: 7,
+    targets: [
+      { share: 12, baseShare: 12, id: "a" },
+      { share: 8, baseShare: 8, id: "b" }
+    ]
+  }, 10);
+  assert.deepEqual(freeAllocations.map(target => target.share), [6, 4]);
+
   assert.deepEqual(
     utils.computeDamageAfterProtection({
       share: 9,

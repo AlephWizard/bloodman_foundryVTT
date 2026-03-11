@@ -117,6 +117,12 @@ export function buildChatRollDecorationHooks({
     return types.GENERIC;
   }
 
+  function isChatRollReroll(message) {
+    return readProperty(message, "flags.bloodman.chatRollReroll") === true
+      || readProperty(message, "flags.bloodman.chatRollReroll") === "true"
+      || readProperty(message, "flags.bloodman.reroll") === true;
+  }
+
   function resolveChatRollTypeLabel(chatRollType) {
     const type = normalizeType(chatRollType);
     if (type === types.CHARACTERISTIC) return translateWithFallback("BLOODMAN.Chat.RollTypes.Characteristic", "Caracteristique");
@@ -160,12 +166,18 @@ export function buildChatRollDecorationHooks({
     const chatRollType = resolveChatRollType(message);
     const chatRollTypeClass = toChatRollTypeClassSuffix(chatRollType);
     const chatRollTypeLabel = resolveChatRollTypeLabel(chatRollType);
+    const chatRollIsReroll = isChatRollReroll(message);
+    const rerollLabel = translateWithFallback("BLOODMAN.Common.Reroll", "Relance");
 
     const escapedPseudo = escapeMarkup(pseudo);
     const escapedImage = escapeMarkup(tokenImage);
     const escapedAccent = escapeMarkup(accent);
     const escapedTypeLabel = escapeMarkup(chatRollTypeLabel);
+    const escapedRerollLabel = escapeMarkup(rerollLabel);
     const originalContent = contentEl.innerHTML;
+    const rerollBadge = chatRollIsReroll
+      ? `<span class="bm-chat-roll-reroll">${escapedRerollLabel}</span>`
+      : "";
 
     contentEl.innerHTML = `<div class="bm-chat-roll-frame" style="--bm-chat-roll-author-accent:${escapedAccent};">
     <div class="bm-chat-roll-head">
@@ -173,7 +185,10 @@ export function buildChatRollDecorationHooks({
       <div class="bm-chat-roll-token"><img src="${escapedImage}" alt="${escapedPseudo}" /></div>
       <div class="bm-chat-roll-pseudo-wrap">
         <div class="bm-chat-roll-pseudo">${escapedPseudo}</div>
-        <div class="bm-chat-roll-type">${escapedTypeLabel}</div>
+        <div class="bm-chat-roll-badges">
+          <div class="bm-chat-roll-type">${escapedTypeLabel}</div>
+          ${rerollBadge}
+        </div>
       </div>
     </div>
     <div class="bm-chat-roll-inner bm-chat-roll-native">${originalContent}</div>
@@ -195,7 +210,9 @@ export function buildChatRollDecorationHooks({
       }
     }
     root.classList.add("bm-chat-roll", `bm-chat-roll--${chatRollTypeClass}`);
+    if (chatRollIsReroll) root.classList.add("bm-chat-roll--reroll");
     root.dataset.bmChatRollType = chatRollTypeClass;
+    root.dataset.bmChatRollReroll = chatRollIsReroll ? "true" : "false";
   }
 
   return {

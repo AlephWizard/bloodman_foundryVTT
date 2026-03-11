@@ -59,6 +59,7 @@ export function buildChatRelayHelpers({
     const bloodmanFlags = readProperty(message, "flags.bloodman") || {};
     if (!bloodmanFlags || typeof bloodmanFlags !== "object") return false;
     if (bloodmanFlags.damageConfigPopup) return true;
+    if (bloodmanFlags.damageSplitPopup) return true;
     if (bloodmanFlags.powerUsePopup) return true;
     if (bloodmanFlags.damageRequest) return true;
     if (bloodmanFlags.chaosDeltaRequest) return true;
@@ -67,6 +68,7 @@ export function buildChatRelayHelpers({
     const content = String(message?.content || "").toLowerCase();
     if (!content) return false;
     return content.includes("bloodman-damage-config-popup")
+      || content.includes("bloodman-damage-split-popup")
       || content.includes("bloodman-power-use-popup")
       || content.includes("bloodman-damage-request")
       || content.includes("bloodman-chaos-request")

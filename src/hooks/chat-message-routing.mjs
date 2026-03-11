@@ -6,6 +6,7 @@ function defaultGetProperty(object, path) {
 export function buildChatMessageRoutingHooks({
   getProperty,
   handleDamageConfigPopupMessage,
+  handleDamageSplitPopupMessage,
   handlePowerUsePopupMessage,
   isCurrentUserPrimaryPrivilegedOperator,
   isInitiativeRollMessage,
@@ -25,6 +26,9 @@ export function buildChatMessageRoutingHooks({
   const readProperty = typeof getProperty === "function" ? getProperty : defaultGetProperty;
   const onDamageConfigPopup = typeof handleDamageConfigPopupMessage === "function"
     ? handleDamageConfigPopupMessage
+    : async () => false;
+  const onDamageSplitPopup = typeof handleDamageSplitPopupMessage === "function"
+    ? handleDamageSplitPopupMessage
     : async () => false;
   const onPowerUsePopup = typeof handlePowerUsePopupMessage === "function"
     ? handlePowerUsePopupMessage
@@ -74,6 +78,13 @@ export function buildChatMessageRoutingHooks({
     const damageConfigPopupPayload = readProperty(message, "flags.bloodman.damageConfigPopup");
     if (damageConfigPopupPayload) {
       await onDamageConfigPopup(damageConfigPopupPayload, "chat");
+      scheduleDeletion(message, 250);
+      return;
+    }
+
+    const damageSplitPopupPayload = readProperty(message, "flags.bloodman.damageSplitPopup");
+    if (damageSplitPopupPayload) {
+      await onDamageSplitPopup(damageSplitPopupPayload, "chat");
       scheduleDeletion(message, 250);
       return;
     }

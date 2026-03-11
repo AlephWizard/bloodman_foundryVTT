@@ -11,6 +11,7 @@ async function run() {
   const hooks = buildChatMessageRoutingHooks({
     getProperty: (object, path) => String(path).split(".").reduce((acc, key) => (acc == null ? undefined : acc[key]), object),
     handleDamageConfigPopupMessage: async () => calls.push("damage-config"),
+    handleDamageSplitPopupMessage: async () => calls.push("damage-split"),
     handlePowerUsePopupMessage: async () => calls.push("power-popup"),
     isCurrentUserPrimaryPrivilegedOperator: () => privileged,
     isInitiativeRollMessage: () => initiative,
@@ -38,8 +39,9 @@ async function run() {
   });
 
   await hooks.onCreateChatMessage({ flags: { bloodman: { damageConfigPopup: { ok: true } } } });
+  await hooks.onCreateChatMessage({ flags: { bloodman: { damageSplitPopup: { ok: true } } } });
   await hooks.onCreateChatMessage({ flags: { bloodman: { powerUsePopup: { ok: true } } } });
-  assert.deepEqual(calls.slice(0, 4), ["damage-config", "delete:250", "power-popup", "delete:250"]);
+  assert.deepEqual(calls.slice(0, 6), ["damage-config", "delete:250", "damage-split", "delete:250", "power-popup", "delete:250"]);
 
   privileged = false;
   await hooks.onCreateChatMessage({ flags: { bloodman: { chaosDeltaRequest: { delta: 2, requestId: "c1" } } } });

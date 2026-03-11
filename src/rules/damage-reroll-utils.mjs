@@ -154,7 +154,8 @@ export function buildDamageRerollUtils({
       const baseShare = Math.max(0, Math.floor(Number(targets[0]?.baseShare ?? targets[0]?.share ?? 0)));
       return [{ ...targets[0], baseShare, share: Math.max(0, Math.floor(Number(totalDamage) || 0)) }];
     }
-    const originalTotal = Number(context.totalDamage || 0);
+    const sharesTotal = targets.reduce((sum, target) => sum + Math.max(0, Math.floor(Number(target?.share || 0))), 0);
+    const originalTotal = sharesTotal > 0 ? sharesTotal : Number(context.totalDamage || 0);
     let remaining = Math.max(0, Math.floor(Number(totalDamage) || 0));
     const allocations = targets.map((target, index) => {
       let share = 0;

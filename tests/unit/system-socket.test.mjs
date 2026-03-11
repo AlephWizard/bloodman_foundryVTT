@@ -25,6 +25,7 @@ async function run() {
     },
     isCurrentUserPrimaryPrivilegedOperator: () => privileged,
     handleDamageConfigPopupMessage: async () => calls.push("msg:damage-config"),
+    handleDamageSplitPopupMessage: async () => calls.push("msg:damage-split"),
     handlePowerUsePopupMessage: async () => calls.push("msg:power-popup"),
     handleDamageAppliedMessage: async () => calls.push("msg:damage-applied"),
     handleDamageRerollRequest: async () => calls.push("msg:reroll"),
@@ -51,6 +52,7 @@ async function run() {
   assert.equal(globalThis.__bmDamageSocketReady, true);
 
   await registeredHandler({ type: "damageConfigPopup" });
+  await registeredHandler({ type: "damageSplitPopup" });
   await registeredHandler({ type: "powerUsePopup" });
   await registeredHandler({ type: "damageApplied" });
   await registeredHandler({ type: "rerollDamage" });
@@ -74,6 +76,7 @@ async function run() {
     "socket:off-prev",
     "socket:on",
     "msg:damage-config",
+    "msg:damage-split",
     "msg:power-popup",
     "msg:damage-applied",
     "msg:reroll",

@@ -37,6 +37,7 @@ import { buildDamageRequestHooks } from "./src/hooks/damage-request.mjs";
 import { buildDamageAppliedMessageHelpers } from "./src/hooks/damage-applied-message.mjs";
 import { buildInitiativeGroupingHooks } from "./src/hooks/initiative-grouping.mjs";
 import { buildDamageConfigPopupHooks } from "./src/hooks/damage-config-popup.mjs";
+import { buildDamageSplitPopupHooks } from "./src/hooks/damage-split-popup.mjs";
 import { buildPowerUsePopupHooks } from "./src/hooks/power-use-popup.mjs";
 import { buildChatRelayHelpers } from "./src/hooks/chat-relay.mjs";
 import { buildChatRollDecorationHooks } from "./src/hooks/chat-roll-decoration.mjs";
@@ -2938,7 +2939,6 @@ const {
   resolvePowerRollPlan,
   resolveItemRerollRollPlan,
   resolveItemUsePlan,
-  resolveManualHealNextValue,
   isObjectUseEnabled,
   buildHealAudioReference
 } = itemUseFlowRules;
@@ -4047,6 +4047,7 @@ async function refreshBossSoloNpcPvMax() {
 
 const damageRequestTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
 const damageConfigPopupTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
+const damageSplitPopupTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
 const powerUsePopupTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
 const chaosRequestTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
 const rerollRequestTracker = createRequestRetentionTracker({ retentionMs: DAMAGE_REQUEST_RETENTION_MS });
@@ -4054,6 +4055,7 @@ const POWER_USE_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-power-u
 
 const { rememberRequest: rememberDamageRequest, wasRequestProcessed: wasDamageRequestProcessed } = damageRequestTracker;
 const { rememberRequest: rememberDamageConfigPopupRequest, wasRequestProcessed: wasDamageConfigPopupRequestProcessed } = damageConfigPopupTracker;
+const { rememberRequest: rememberDamageSplitPopupRequest, wasRequestProcessed: wasDamageSplitPopupRequestProcessed } = damageSplitPopupTracker;
 const { rememberRequest: rememberPowerUsePopupRequest, wasRequestProcessed: wasPowerUsePopupRequestProcessed } = powerUsePopupTracker;
 const { rememberRequest: rememberChaosRequest, wasRequestProcessed: wasChaosRequestProcessed } = chaosRequestTracker;
 const { rememberRequest: rememberRerollRequest, wasRequestProcessed: wasRerollRequestProcessed } = rerollRequestTracker;
@@ -4222,6 +4224,20 @@ const damageConfigPopupHooks = buildDamageConfigPopupHooks({
   logWarn: (...args) => bmLog.warn(...args)
 });
 const { handleDamageConfigPopupMessage } = damageConfigPopupHooks;
+const damageSplitPopupHooks = buildDamageSplitPopupHooks({
+  toFiniteNumber,
+  t,
+  tl,
+  getCurrentUser: () => game.user,
+  getUsersCollection: () => game.users,
+  isAssistantOrHigherRole,
+  escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
+  dialogClass: Dialog,
+  wasDamageSplitPopupRequestProcessed,
+  rememberDamageSplitPopupRequest,
+  logWarn: (...args) => bmLog.warn(...args)
+});
+const { handleDamageSplitPopupMessage } = damageSplitPopupHooks;
 
 const powerUsePopupHooks = buildPowerUsePopupHooks({
   hasSocket,
@@ -4353,6 +4369,7 @@ const systemSocketHooks = buildSystemSocketHooks({
   socketOff,
   isCurrentUserPrimaryPrivilegedOperator,
   handleDamageConfigPopupMessage,
+  handleDamageSplitPopupMessage,
   handlePowerUsePopupMessage,
   handleDamageAppliedMessage,
   handleDamageRerollRequest,
@@ -5718,6 +5735,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
 const chatMessageRoutingHooks = buildChatMessageRoutingHooks({
   getProperty: foundry.utils.getProperty,
   handleDamageConfigPopupMessage,
+  handleDamageSplitPopupMessage,
   handlePowerUsePopupMessage,
   isCurrentUserPrimaryPrivilegedOperator,
   isInitiativeRollMessage,
@@ -9450,7 +9468,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         bloodmanAllowVitalResourceUpdate: true
       });
       if (!resourceUpdated) return;
-      await doCharacteristicRoll(this.actor, key, { hidden: hiddenRoll });
+      await doCharacteristicRoll(this.actor, key, { hidden: hiddenRoll, reroll: true });
       await requestChaosDelta(CHAOS_PER_PLAYER_REROLL);
       this.markCharacteristicReroll(key);
       this.render(false);
@@ -9458,7 +9476,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
 
     await setChaosValue(plan.nextChaos);
-    await doCharacteristicRoll(this.actor, key, { hidden: hiddenRoll });
+    await doCharacteristicRoll(this.actor, key, { hidden: hiddenRoll, reroll: true });
     this.markCharacteristicReroll(key);
     this.render(false);
   }
@@ -9846,7 +9864,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         amount: totalDamage,
         source: context.itemName ? ` (${context.itemName})` : ""
       })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration}${modeTag ? ` | ${modeTag}` : ""} | ${t("BLOODMAN.Common.Reroll")}</small>`,
-      flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE)
+      flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE, { chatRollReroll: true })
     });
 
     if (!game.user.isGM && hasActiveGM) {
@@ -9971,21 +9989,15 @@ class BloodmanActorSheet extends BaseActorSheet {
       return Boolean(result);
     }
     if (plan.mode === "heal") {
-      const roll = await new Roll(plan.formula).evaluate();
-      const healState = resolveManualHealNextValue({
-        current: this.actor?.system?.resources?.pv?.current,
-        max: this.actor?.system?.resources?.pv?.max,
-        rollTotal: roll.total
+      const targetActor = this.resolveHealTargetActor(this.actor);
+      if (!targetActor) return false;
+      const result = await doHealRoll(this.actor, item, {
+        formula: plan.formula,
+        targetActor,
+        consumeItem: false,
+        reroll: true
       });
-      await this.applyActorUpdate({ "system.resources.pv.current": healState.next }, {
-        bloodmanAllowVitalResourceUpdate: true
-      });
-      roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: this.actor.name, amount: roll.total }),
-        flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
-      });
-      return true;
+      return Boolean(result);
     }
     return false;
   }

@@ -5,6 +5,7 @@ export function buildSystemSocketHooks({
   socketOff,
   isCurrentUserPrimaryPrivilegedOperator,
   handleDamageConfigPopupMessage,
+  handleDamageSplitPopupMessage,
   handlePowerUsePopupMessage,
   handleDamageAppliedMessage,
   handleDamageRerollRequest,
@@ -18,6 +19,37 @@ export function buildSystemSocketHooks({
   getChaosValue,
   handleIncomingDamageRequest
 } = {}) {
+  const onDamageConfigPopup = typeof handleDamageConfigPopupMessage === "function"
+    ? handleDamageConfigPopupMessage
+    : async () => {};
+  const onDamageSplitPopup = typeof handleDamageSplitPopupMessage === "function"
+    ? handleDamageSplitPopupMessage
+    : async () => {};
+  const onPowerUsePopup = typeof handlePowerUsePopupMessage === "function"
+    ? handlePowerUsePopupMessage
+    : async () => {};
+  const onDamageApplied = typeof handleDamageAppliedMessage === "function"
+    ? handleDamageAppliedMessage
+    : async () => {};
+  const onDamageReroll = typeof handleDamageRerollRequest === "function"
+    ? handleDamageRerollRequest
+    : async () => {};
+  const onVitalResourceUpdate = typeof handleVitalResourceUpdateRequest === "function"
+    ? handleVitalResourceUpdateRequest
+    : async () => {};
+  const onActorSheetUpdate = typeof handleActorSheetUpdateRequest === "function"
+    ? handleActorSheetUpdateRequest
+    : async () => {};
+  const onDeleteItem = typeof handleDeleteItemRequest === "function"
+    ? handleDeleteItemRequest
+    : async () => {};
+  const onReorderActorItems = typeof handleReorderActorItemsRequest === "function"
+    ? handleReorderActorItemsRequest
+    : async () => {};
+  const onIncomingDamage = typeof handleIncomingDamageRequest === "function"
+    ? handleIncomingDamageRequest
+    : async () => {};
+
   function registerDamageSocketHandlers() {
     if (typeof hasSocket !== "function" || !hasSocket()) return;
     const previousHandler = globalThis.__bmDamageSocketHandler;
@@ -27,35 +59,39 @@ export function buildSystemSocketHooks({
       if (!data) return;
       const canHandlePrivilegedRequests = isCurrentUserPrimaryPrivilegedOperator();
       if (data.type === "damageConfigPopup") {
-        await handleDamageConfigPopupMessage(data, "socket");
+        await onDamageConfigPopup(data, "socket");
+        return;
+      }
+      if (data.type === "damageSplitPopup") {
+        await onDamageSplitPopup(data, "socket");
         return;
       }
       if (data.type === "powerUsePopup") {
-        await handlePowerUsePopupMessage(data, "socket");
+        await onPowerUsePopup(data, "socket");
         return;
       }
       if (data.type === "damageApplied") {
-        await handleDamageAppliedMessage(data);
+        await onDamageApplied(data);
         return;
       }
       if (data.type === "rerollDamage") {
-        if (canHandlePrivilegedRequests) await handleDamageRerollRequest(data);
+        if (canHandlePrivilegedRequests) await onDamageReroll(data);
         return;
       }
       if (data.type === "updateVitalResources") {
-        if (canHandlePrivilegedRequests) await handleVitalResourceUpdateRequest(data);
+        if (canHandlePrivilegedRequests) await onVitalResourceUpdate(data);
         return;
       }
       if (data.type === "updateActorSheetData") {
-        if (canHandlePrivilegedRequests) await handleActorSheetUpdateRequest(data);
+        if (canHandlePrivilegedRequests) await onActorSheetUpdate(data);
         return;
       }
       if (data.type === "deleteActorItem") {
-        if (canHandlePrivilegedRequests) await handleDeleteItemRequest(data);
+        if (canHandlePrivilegedRequests) await onDeleteItem(data);
         return;
       }
       if (data.type === "reorderActorItems") {
-        if (canHandlePrivilegedRequests) await handleReorderActorItemsRequest(data);
+        if (canHandlePrivilegedRequests) await onReorderActorItems(data);
         return;
       }
       if (data.type === "adjustChaosDice") {
@@ -70,7 +106,7 @@ export function buildSystemSocketHooks({
       }
       if (data.type !== "applyDamage") return;
       if (!canHandlePrivilegedRequests) return;
-      await handleIncomingDamageRequest(data, "socket");
+      await onIncomingDamage(data, "socket");
     };
 
     if (!socketOn(systemSocket, handler)) return;

@@ -15,6 +15,12 @@ import {
   normalizeOptionalRollFormula,
   validateRollFormula
 } from "./src/rules/roll-formula.mjs";
+import {
+  buildDamageSplitDialogContent,
+  computeDamageSplitAllocatedTotal,
+  normalizeDamageSplitAllocations,
+  resolveDamageSplitAllocatedState
+} from "./src/ui/damage-split-dialog.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
@@ -25,8 +31,10 @@ const SYSTEM_SOCKET = "system.bloodman";
 const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
+const DAMAGE_SPLIT_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-split-popup</span>";
 const DAMAGE_DIALOG_CONFIG_USER_FLAG = "damageDialogConfig";
 const DAMAGE_CONFIG_POPUP_SOCKET_TYPE = "damageConfigPopup";
+const DAMAGE_SPLIT_POPUP_SOCKET_TYPE = "damageSplitPopup";
 const DAMAGE_CONFIG_OPTIONS = [
   { label: "1D4", formula: "1d4" },
   { label: "1D6", formula: "1d6" },
@@ -61,9 +69,11 @@ function tl(key, fallback, data = null) {
   return localized;
 }
 
-function buildChatRollFlags(chatRollType) {
+function buildChatRollFlags(chatRollType, extraBloodman = null) {
   const type = String(chatRollType || "").trim().toLowerCase() || "generic";
-  return { bloodman: { chatRollType: type } };
+  const bloodmanFlags = { chatRollType: type };
+  if (extraBloodman && typeof extraBloodman === "object") Object.assign(bloodmanFlags, extraBloodman);
+  return { bloodman: bloodmanFlags };
 }
 
 function safeWarn(message) {
@@ -295,6 +305,56 @@ function emitDamageConfigPopup(actor, sourceName, config, options = {}) {
       flags: { bloodman: { damageConfigPopup: payload } }
     }).catch(error => {
       bmLog.error("damage:config popup chat fallback failed", { error });
+    });
+  }
+  return true;
+}
+
+function normalizeDamageSplitPopupAllocations(allocations = []) {
+  return normalizeDamageSplitAllocations(allocations, {
+    fallbackName: "Cible",
+    toFiniteNumber: toNonNegativeInt
+  });
+}
+
+function emitDamageSplitPopup(actor, sourceName, splitData, options = {}) {
+  if (!hasSocket()) return false;
+  const requesterUserId = String(game.user?.id || "").trim();
+  const viewerIds = getDamageConfigPopupViewerIds(requesterUserId);
+  if (!viewerIds.length) return false;
+  if (viewerIds.length === 1 && viewerIds[0] === requesterUserId) return false;
+
+  const requestId = String(options.requestId || generateRandomId()).trim() || generateRandomId();
+  const eventId = generateRandomId();
+  const action = String(options.action || "open").trim().toLowerCase() || "open";
+  const useChatFallback = options.useChatFallback === true;
+  const allocations = normalizeDamageSplitPopupAllocations(splitData?.allocations);
+  const payload = {
+    type: DAMAGE_SPLIT_POPUP_SOCKET_TYPE,
+    eventId,
+    requestId,
+    action,
+    requesterUserId,
+    viewerIds,
+    actorId: String(actor?.id || ""),
+    actorName: String(actor?.name || "").trim(),
+    sourceName: String(sourceName || "").trim(),
+    totalDamage: toNonNegativeInt(splitData?.totalDamage, 0),
+    allocatedTotal: allocations.reduce((sum, entry) => sum + toNonNegativeInt(entry.value, 0), 0),
+    allocations
+  };
+  if (!socketEmit(SYSTEM_SOCKET, payload)) {
+    bmLog.error("damage:split popup socket emit failed", { payloadType: payload?.type });
+    return false;
+  }
+  const observerIds = viewerIds.filter(id => id && id !== requesterUserId);
+  if (ENABLE_CHAT_TRANSPORT_FALLBACK && useChatFallback && observerIds.length && typeof ChatMessage?.create === "function") {
+    void ChatMessage.create({
+      content: DAMAGE_SPLIT_POPUP_CHAT_MARKUP,
+      whisper: observerIds,
+      flags: { bloodman: { damageSplitPopup: payload } }
+    }).catch(error => {
+      bmLog.error("damage:split popup chat fallback failed", { error });
     });
   }
   return true;
@@ -1062,7 +1122,10 @@ export async function doCharacteristicRoll(actor, key, options = {}) {
   const messageData = {
     speaker: ChatMessage.getSpeaker({ actor }),
     flavor,
-    flags: buildChatRollFlags(CHAT_ROLL_TYPES.CHARACTERISTIC)
+    flags: buildChatRollFlags(
+      CHAT_ROLL_TYPES.CHARACTERISTIC,
+      options?.reroll === true ? { chatRollReroll: true } : null
+    )
   };
   if (shouldHideForGm && gmIds.length && typeof ChatMessage?.create === "function") {
     const privateChatData = {
@@ -1082,6 +1145,24 @@ export async function doCharacteristicRoll(actor, key, options = {}) {
     r.toMessage(messageData);
   }
   return { roll: r, success, effective, critical };
+}
+
+function resolveHealRollTargetActor(defaultActor, explicitTargetActor = null) {
+  if (explicitTargetActor) return explicitTargetActor;
+  const fallbackActor = defaultActor || null;
+  const targets = Array.from(game.user?.targets || []);
+  if (!targets.length) return fallbackActor;
+  if (targets.length > 1) {
+    safeWarn(tl("BLOODMAN.Notifications.HealSingleTargetOnly", "Selectionnez une seule cible pour le soin."));
+    return null;
+  }
+  const token = targets[0];
+  const targetActor = token?.actor || token?.document?.actor || token?.object?.actor || null;
+  if (!targetActor) {
+    safeWarn(tl("BLOODMAN.Notifications.HealTargetResolveFailed", "Impossible de resoudre la cible de soin."));
+    return null;
+  }
+  return targetActor;
 }
 
 async function requestDamageFromGM(token, damage, options = {}) {
@@ -1193,6 +1274,17 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
     if (targetTokens.length <= 1) return null;
     const base = Math.floor(totalDamage / targetTokens.length);
     const remainder = totalDamage - base * targetTokens.length;
+    const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value ?? "")) : String(value ?? ""));
+    const titleLabel = tl("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats");
+    const eyebrowLabel = tl("BLOODMAN.Dialogs.DamageSplit.Eyebrow", "Repartition");
+    const sourceLabel = String(options?.sourceName || "").trim() || tl("BLOODMAN.Common.SimpleAttack", "Attaque");
+    const rolledTotalLabel = tl("BLOODMAN.Dialogs.DamageSplit.RolledTotal", "Jet");
+    const allocatedTotalLabel = tl("BLOODMAN.Dialogs.DamageSplit.AllocatedTotal", "Total attribue");
+    const targetCountLabel = tl("BLOODMAN.Dialogs.DamageSplit.TargetCount", "Cibles");
+    const freeHintLabel = tl(
+      "BLOODMAN.Dialogs.DamageSplit.FreeHint",
+      "Le total attribue peut etre libre et depasser le jet."
+    );
     const defaults = targetTokens.map((token, index) => {
       const targetActor = getTokenActor(token);
       const displayName = resolveCombatTargetName(
@@ -1222,48 +1314,76 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
       }
     }
 
-    const rows = defaults
-      .map(
-        entry => `<div class="split-row">
-          <label>${entry.name}</label>
-          <input type="number" min="0" step="1" data-target-id="${entry.id}" value="${entry.value}" />
-        </div>`
-      )
-      .join("");
-
-    const content = `<form class="damage-split">
-      <p>${t("BLOODMAN.Dialogs.DamageSplit.Prompt", { damage: totalDamage, targets: targetTokens.length })}</p>
-      <div class="split-grid">${rows}</div>
-    </form>`;
+    const getEntriesAllocatedTotal = entries => computeDamageSplitAllocatedTotal(entries, { toFiniteNumber: toNonNegativeInt });
+    const resolveAllocatedStateClass = entries => resolveDamageSplitAllocatedState(totalDamage, getEntriesAllocatedTotal(entries), {
+      toFiniteNumber: toNonNegativeInt
+    });
+    const buildContent = entries => buildDamageSplitDialogContent({
+      actorDisplay: String(sourceActor?.name || "").trim() || tl("BLOODMAN.Common.Name", "Acteur"),
+      sourceDisplay: sourceLabel,
+      totalDamage,
+      allocations: entries,
+      labels: {
+        eyebrow: eyebrowLabel,
+        title: titleLabel,
+        rolledTotal: rolledTotalLabel,
+        allocatedTotal: allocatedTotalLabel,
+        targetCount: targetCountLabel,
+        freeHint: freeHintLabel
+      },
+      editable: true,
+      escapeHtml
+    });
+    const collectEntriesFromHtml = html => {
+      const entries = [];
+      html.find("input[data-target-id]").each((_, input) => {
+        entries.push({
+          id: String(input?.dataset?.targetId || "").trim(),
+          name: String(input?.dataset?.targetName || "").trim() || "Cible",
+          value: toNonNegativeInt(input?.value, 0)
+        });
+      });
+      return entries;
+    };
+    const buildAllocationMap = entries => {
+      const allocations = {};
+      for (const entry of entries) {
+        if (!entry?.id) continue;
+        allocations[entry.id] = toNonNegativeInt(entry.value, 0);
+      }
+      return allocations;
+    };
+    const observerRequestId = generateRandomId();
+    const syncObserverPopup = (entries, action = "update") => {
+      emitDamageSplitPopup(sourceActor, sourceLabel, {
+        totalDamage,
+        allocations: entries
+      }, {
+        requestId: observerRequestId,
+        action,
+        useChatFallback: true
+      });
+    };
+    syncObserverPopup(defaults, "open");
 
     return new Promise(resolve => {
       let resolved = false;
       const finish = value => {
         if (resolved) return;
         resolved = true;
+        syncObserverPopup([], "close");
         resolve(value);
       };
 
       new Dialog({
-        title: t("BLOODMAN.Dialogs.DamageSplit.Title"),
-        content,
+        title: titleLabel,
+        content: buildContent(defaults),
         buttons: {
           apply: {
             label: t("BLOODMAN.Common.Apply"),
             callback: html => {
-              const allocations = {};
-              let sum = 0;
-              html.find("input[data-target-id]").each((_, input) => {
-                const value = Number(input.value);
-                const safe = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-                allocations[input.dataset.targetId] = safe;
-                sum += safe;
-              });
-              if (sum !== totalDamage) {
-                ui.notifications?.warn(t("BLOODMAN.Notifications.DamageSplitTotal", { total: totalDamage }));
-                return false;
-              }
-              finish(allocations);
+              const entries = collectEntriesFromHtml(html);
+              finish(buildAllocationMap(entries));
             }
           },
           cancel: {
@@ -1272,19 +1392,36 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
           }
         },
         default: "apply",
+        render: html => {
+          const syncSummary = () => {
+            const entries = collectEntriesFromHtml(html);
+            html.find("[data-bm-damage-split-field='allocated']").text(String(getEntriesAllocatedTotal(entries)));
+            html.find("[data-bm-damage-split-field='count']").text(String(entries.length));
+            const allocatedCard = html.find("[data-bm-damage-split-field='allocated-card']");
+            allocatedCard.removeClass("is-over is-under is-match").addClass(resolveAllocatedStateClass(entries));
+            syncObserverPopup(entries, "update");
+          };
+          syncSummary();
+          html.on("input change", "input[data-target-id]", () => {
+            syncSummary();
+          });
+        },
         close: () => finish(null)
+      }, {
+        classes: ["bloodman-damage-dialog", "bloodman-damage-split-dialog"],
+        width: 540
       }).render(true);
     });
   };
 
   let allocations = null;
   if (targets.length > 1) {
-    allocations = await promptDamageSplit(total, targets);
+    allocations = await promptDamageSplit(totalDamage, targets);
     if (!allocations) return { outputs: [], contextTargets: [] };
   }
 
   for (const token of targets) {
-    const share = allocations ? Number(allocations[token.id] || 0) : total;
+    const share = allocations ? Number(allocations[token.id] || 0) : totalDamage;
     if (!Number.isFinite(share) || share <= 0) continue;
     if (!canUserProcessPrivilegedRequests(game.user) && hasActivePrivilegedOperator) {
       const ok = await requestDamageFromGM(token, share, {
@@ -1480,7 +1617,7 @@ export async function doDamageRoll(actor, item) {
 
 export async function doHealRoll(actor, item, options = {}) {
   if (!actor || !item) return null;
-  const resolvedTargetActor = options?.targetActor || actor;
+  const resolvedTargetActor = resolveHealRollTargetActor(actor, options?.targetActor);
   if (!resolvedTargetActor) return null;
   const rawFormula = String(options?.formula || item.system?.healDie || "d4");
   const formula = normalizeDamageFormula(rawFormula) || "1d4";
@@ -1499,7 +1636,10 @@ export async function doHealRoll(actor, item, options = {}) {
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
     flavor: t("BLOODMAN.Rolls.Heal.Gain", { name: resolvedTargetActor.name, amount: roll.total }),
-    flags: buildChatRollFlags(CHAT_ROLL_TYPES.HEAL)
+    flags: buildChatRollFlags(
+      CHAT_ROLL_TYPES.HEAL,
+      options?.reroll === true ? { chatRollReroll: true } : null
+    )
   });
 
   if (options?.consumeItem === true) {

@@ -44,6 +44,9 @@ async function run() {
     flags: { bloodman: { damageConfigPopup: { ok: true } } }
   }), true);
   assert.equal(helpers.isTransportRelayChatMessage({
+    flags: { bloodman: { damageSplitPopup: { ok: true } } }
+  }), true);
+  assert.equal(helpers.isTransportRelayChatMessage({
     content: "BLOODMAN-REROLL-REQUEST"
   }), true);
   assert.equal(helpers.isTransportRelayChatMessage({
