@@ -145,64 +145,76 @@ export function buildActorPreUpdateHooks({
       );
     }
 
-    const itemBonuses = getItemBonusTotals(actor);
-    const storedPvBonus = getUpdatedNumber("system.resources.pv.itemBonus", actor.system.resources?.pv?.itemBonus || 0);
-    const storedPpBonus = getUpdatedNumber("system.resources.pp.itemBonus", actor.system.resources?.pp?.itemBonus || 0);
-    const archetypeBonusValue = normalizeArchetypeBonusValue(
-      getUpdatedRawValue("system.profile.archetypeBonusValue", currentProfile.archetypeBonusValue ?? 0),
-      currentProfile.archetypeBonusValue ?? 0
-    );
-    const archetypeBonusCharacteristic = normalizeCharacteristicKey(
-      getUpdatedRawValue("system.profile.archetypeBonusCharacteristic", currentProfile.archetypeBonusCharacteristic || "")
-    );
-
     const pvMaxPath = "system.resources.pv.max";
     const ppMaxPath = "system.resources.pp.max";
     const pvCurrentPath = "system.resources.pv.current";
     const ppCurrentPath = "system.resources.pp.current";
     const hasPvMaxUpdate = hasUpdatePath(pvMaxPath);
     const hasPpMaxUpdate = hasUpdatePath(ppMaxPath);
-    const storedPvMax = getUpdatedNumber(pvMaxPath, actor.system.resources?.pv?.max);
-    const storedPpMax = getUpdatedNumber(ppMaxPath, actor.system.resources?.pp?.max);
     const hasPvCurrentUpdate = hasUpdatePath(pvCurrentPath);
     const hasPpCurrentUpdate = hasUpdatePath(ppCurrentPath);
-    const { normalizedVitalMaxValues, normalizedVitalCurrentValues } = planPreUpdateActorDerivedVitalPatch({
-      phyBase: getUpdatedNumber("system.characteristics.PHY.base", actor.system.characteristics?.PHY?.base || 0),
-      espBase: getUpdatedNumber("system.characteristics.ESP.base", actor.system.characteristics?.ESP?.base || 0),
-      phyItemBonus: itemBonuses?.PHY,
-      espItemBonus: itemBonuses?.ESP,
-      archetypeBonusValue,
-      archetypeBonusCharacteristic,
-      storedPvBonus,
-      storedPpBonus,
-      roleOverride: foundry.utils.getProperty(updateData, "system.npcRole"),
-      derivePvMax: (phyEffective, updateRoleOverride) => getDerivedPvMax(actor, phyEffective, updateRoleOverride),
-      hasPvMaxUpdate,
-      hasPpMaxUpdate,
-      hasPvCurrentUpdate,
-      hasPpCurrentUpdate,
-      rawPvMax: getUpdatedRawValue(pvMaxPath, actor.system.resources?.pv?.max || 0),
-      rawPpMax: getUpdatedRawValue(ppMaxPath, actor.system.resources?.pp?.max || 0),
-      rawPvCurrent: getUpdatedRawValue(pvCurrentPath, actor.system.resources?.pv?.current || 0),
-      rawPpCurrent: getUpdatedRawValue(ppCurrentPath, actor.system.resources?.pp?.current || 0),
-      fallbackPvMax: actor.system.resources?.pv?.max || 0,
-      fallbackPpMax: actor.system.resources?.pp?.max || 0,
-      fallbackPvCurrent: actor.system.resources?.pv?.current || 0,
-      fallbackPpCurrent: actor.system.resources?.pp?.current || 0,
-      storedPvMax,
-      storedPpMax
-    });
-    if (Object.prototype.hasOwnProperty.call(normalizedVitalMaxValues, "pvMax")) {
-      foundry.utils.setProperty(updateData, pvMaxPath, normalizedVitalMaxValues.pvMax);
-    }
-    if (Object.prototype.hasOwnProperty.call(normalizedVitalMaxValues, "ppMax")) {
-      foundry.utils.setProperty(updateData, ppMaxPath, normalizedVitalMaxValues.ppMax);
-    }
-    if (Object.prototype.hasOwnProperty.call(normalizedVitalCurrentValues, "pvCurrent")) {
-      foundry.utils.setProperty(updateData, pvCurrentPath, normalizedVitalCurrentValues.pvCurrent);
-    }
-    if (Object.prototype.hasOwnProperty.call(normalizedVitalCurrentValues, "ppCurrent")) {
-      foundry.utils.setProperty(updateData, ppCurrentPath, normalizedVitalCurrentValues.ppCurrent);
+    const hasDerivedVitalInputUpdate = hasArchetypeBonusValueUpdate
+      || hasArchetypeBonusCharacteristicUpdate
+      || hasUpdatePath("system.characteristics.PHY.base")
+      || hasUpdatePath("system.characteristics.ESP.base")
+      || hasUpdatePath("system.resources.pv.itemBonus")
+      || hasUpdatePath("system.resources.pp.itemBonus")
+      || hasUpdatePath("system.npcRole")
+      || hasPvMaxUpdate
+      || hasPpMaxUpdate
+      || hasPvCurrentUpdate
+      || hasPpCurrentUpdate;
+    if (hasDerivedVitalInputUpdate) {
+      const itemBonuses = getItemBonusTotals(actor);
+      const storedPvBonus = getUpdatedNumber("system.resources.pv.itemBonus", actor.system.resources?.pv?.itemBonus || 0);
+      const storedPpBonus = getUpdatedNumber("system.resources.pp.itemBonus", actor.system.resources?.pp?.itemBonus || 0);
+      const archetypeBonusValue = normalizeArchetypeBonusValue(
+        getUpdatedRawValue("system.profile.archetypeBonusValue", currentProfile.archetypeBonusValue ?? 0),
+        currentProfile.archetypeBonusValue ?? 0
+      );
+      const archetypeBonusCharacteristic = normalizeCharacteristicKey(
+        getUpdatedRawValue("system.profile.archetypeBonusCharacteristic", currentProfile.archetypeBonusCharacteristic || "")
+      );
+      const storedPvMax = getUpdatedNumber(pvMaxPath, actor.system.resources?.pv?.max);
+      const storedPpMax = getUpdatedNumber(ppMaxPath, actor.system.resources?.pp?.max);
+      const { normalizedVitalMaxValues, normalizedVitalCurrentValues } = planPreUpdateActorDerivedVitalPatch({
+        phyBase: getUpdatedNumber("system.characteristics.PHY.base", actor.system.characteristics?.PHY?.base || 0),
+        espBase: getUpdatedNumber("system.characteristics.ESP.base", actor.system.characteristics?.ESP?.base || 0),
+        phyItemBonus: itemBonuses?.PHY,
+        espItemBonus: itemBonuses?.ESP,
+        archetypeBonusValue,
+        archetypeBonusCharacteristic,
+        storedPvBonus,
+        storedPpBonus,
+        roleOverride: foundry.utils.getProperty(updateData, "system.npcRole"),
+        derivePvMax: (phyEffective, updateRoleOverride) => getDerivedPvMax(actor, phyEffective, updateRoleOverride),
+        hasPvMaxUpdate,
+        hasPpMaxUpdate,
+        hasPvCurrentUpdate,
+        hasPpCurrentUpdate,
+        rawPvMax: getUpdatedRawValue(pvMaxPath, actor.system.resources?.pv?.max || 0),
+        rawPpMax: getUpdatedRawValue(ppMaxPath, actor.system.resources?.pp?.max || 0),
+        rawPvCurrent: getUpdatedRawValue(pvCurrentPath, actor.system.resources?.pv?.current || 0),
+        rawPpCurrent: getUpdatedRawValue(ppCurrentPath, actor.system.resources?.pp?.current || 0),
+        fallbackPvMax: actor.system.resources?.pv?.max || 0,
+        fallbackPpMax: actor.system.resources?.pp?.max || 0,
+        fallbackPvCurrent: actor.system.resources?.pv?.current || 0,
+        fallbackPpCurrent: actor.system.resources?.pp?.current || 0,
+        storedPvMax,
+        storedPpMax
+      });
+      if (Object.prototype.hasOwnProperty.call(normalizedVitalMaxValues, "pvMax")) {
+        foundry.utils.setProperty(updateData, pvMaxPath, normalizedVitalMaxValues.pvMax);
+      }
+      if (Object.prototype.hasOwnProperty.call(normalizedVitalMaxValues, "ppMax")) {
+        foundry.utils.setProperty(updateData, ppMaxPath, normalizedVitalMaxValues.ppMax);
+      }
+      if (Object.prototype.hasOwnProperty.call(normalizedVitalCurrentValues, "pvCurrent")) {
+        foundry.utils.setProperty(updateData, pvCurrentPath, normalizedVitalCurrentValues.pvCurrent);
+      }
+      if (Object.prototype.hasOwnProperty.call(normalizedVitalCurrentValues, "ppCurrent")) {
+        foundry.utils.setProperty(updateData, ppCurrentPath, normalizedVitalCurrentValues.ppCurrent);
+      }
     }
 
     const actorVoyageCurrent = actor.system?.resources?.voyage?.current;

@@ -177,6 +177,21 @@ function run() {
     assert.equal(getProperty(updateData, "system.resources.pv.current"), 5);
     assert.deepEqual(notificationErrors, []);
   });
+
+  withGlobals(({ notificationErrors }) => {
+    let itemBonusCallCount = 0;
+    const hooks = buildHooks({
+      getItemBonusTotals: () => {
+        itemBonusCallCount += 1;
+        return { PHY: 0, ESP: 0 };
+      }
+    });
+    const updateData = { name: "Nouveau nom" };
+    hooks.onPreUpdateActor(buildActor("personnage"), updateData, {}, "u2");
+    assert.equal(itemBonusCallCount, 0);
+    assert.equal(updateData.name, "Nouveau nom");
+    assert.deepEqual(notificationErrors, []);
+  });
 }
 
 run();

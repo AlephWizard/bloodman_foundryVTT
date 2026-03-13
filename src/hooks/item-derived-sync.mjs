@@ -2,8 +2,13 @@ export function buildItemDerivedSyncHooks({
   applyItemResourceBonuses,
   syncActorDerivedCharacteristicsResources,
   characteristicBonusItemTypes,
-  bmLog
+  bmLog,
+  shouldProcessItemMutation
 } = {}) {
+  const shouldProcessMutation = typeof shouldProcessItemMutation === "function"
+    ? shouldProcessItemMutation
+    : () => true;
+
   async function syncActorDerivedFromItemMutation(item) {
     if (!item?.actor) return;
     const type = String(item.type || "").trim().toLowerCase();
@@ -17,7 +22,8 @@ export function buildItemDerivedSyncHooks({
     }
   }
 
-  async function handleItemDerivedSyncHook(item, sourceHook = "itemMutation") {
+  async function handleItemDerivedSyncHook(item, sourceHook = "itemMutation", context = {}) {
+    if (!shouldProcessMutation(item, context)) return;
     try {
       await syncActorDerivedFromItemMutation(item);
     } catch (error) {
@@ -35,4 +41,3 @@ export function buildItemDerivedSyncHooks({
     handleItemDerivedSyncHook
   };
 }
-

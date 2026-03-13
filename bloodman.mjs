@@ -5665,7 +5665,11 @@ const itemDerivedSyncHooks = buildItemDerivedSyncHooks({
   applyItemResourceBonuses,
   syncActorDerivedCharacteristicsResources,
   characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
-  bmLog
+  bmLog,
+  shouldProcessItemMutation: (_item, context = {}) => {
+    const sourceUserId = String(context?.userId || context?.options?.userId || "");
+    return !sourceUserId || sourceUserId === String(game.user?.id || "");
+  }
 });
 
 Hooks.on("createItem", async (item, options, userId) => {
@@ -5675,7 +5679,7 @@ Hooks.on("createItem", async (item, options, userId) => {
   if (sourceUserId && sourceUserId !== game.user?.id) return;
 
   await applyVoyageXPCostOnCreate(item.actor, item, options);
-  await itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "createItem");
+  await itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "createItem", { options, userId });
 });
 
 Hooks.on("preCreateItem", (item, createData, options) => {
@@ -5793,8 +5797,8 @@ Hooks.on("renderHotbar", () => {
   positionChaosDiceUI();
 });
 
-Hooks.on("updateItem", (item) => {
-  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "updateItem");
+Hooks.on("updateItem", (item, _changes, options, userId) => {
+  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "updateItem", { options, userId });
 });
 
 async function cleanupItemLinksAfterDeletion(item) {
@@ -5882,17 +5886,25 @@ async function cleanupItemLinksAfterDeletion(item) {
   }
 }
 
-Hooks.on("deleteItem", (item) => {
+Hooks.on("deleteItem", (item, options, userId) => {
+  const sourceUserId = String(userId || options?.userId || "");
+  if (sourceUserId && sourceUserId !== game.user?.id) return;
   void cleanupItemLinksAfterDeletion(item);
-  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "deleteItem");
+  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "deleteItem", { options, userId });
 });
 
-function getItemBonusTotals(actor) {
-  const filteredItems = (actor?.items || []).filter(item => {
+function getVisibleActorItems(actor) {
+  return (actor?.items || []).filter(item => {
     if (!item) return false;
     if (isActorItemLinkedChild(item, actor)) return false;
     return true;
   });
+}
+
+function getItemBonusTotals(actor, options = {}) {
+  const filteredItems = Array.isArray(options?.items)
+    ? options.items.filter(Boolean)
+    : getVisibleActorItems(actor);
   return computeItemCharacteristicBonusTotals({
     items: filteredItems,
     characteristics: CHARACTERISTICS,
@@ -5901,12 +5913,10 @@ function getItemBonusTotals(actor) {
   });
 }
 
-function getItemResourceBonusTotals(actor) {
-  const filteredItems = (actor?.items || []).filter(item => {
-    if (!item) return false;
-    if (isActorItemLinkedChild(item, actor)) return false;
-    return true;
-  });
+function getItemResourceBonusTotals(actor, options = {}) {
+  const filteredItems = Array.isArray(options?.items)
+    ? options.items.filter(Boolean)
+    : getVisibleActorItems(actor);
   return computeItemResourceBonusTotals({
     items: filteredItems,
     resourceBonusItemTypes: ITEM_RESOURCE_BONUS_ITEM_TYPES
@@ -7955,7 +7965,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const showSimpleAttackReroll = shouldShowItemReroll(SIMPLE_ATTACK_REROLL_ID);
     const hasPortraitImage = !isMissingTokenImage(String(data.actor?.img || "").trim());
 
-    const itemBonuses = getItemBonusTotals(this.actor);
+    const visibleActorItems = getVisibleActorItems(this.actor);
+    const itemBonuses = getItemBonusTotals(this.actor, { items: visibleActorItems });
     const characteristics = CHARACTERISTICS.map(c => {
       const label = t(c.labelKey) || c.key;
       const base = Number(data.actor.system.characteristics?.[c.key]?.base || 0);
@@ -8081,7 +8092,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     const canRemoveAmmoLine = canManageAmmoLines && ammoLines.length > 1;
     const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
-    const visibleActorItems = this.actor.items.filter(item => !isActorItemLinkedChild(item, this.actor));
     const itemBuckets = buildTypedItemBuckets(visibleActorItems);
 
     const powerUseState = this.getPowerUseState();
@@ -8118,9 +8128,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       return dataItem;
     });
     const activePowerIds = new Set(
-      (this.actor?.items || [])
-        .filter(item => getItemRuntimeType(item) === "pouvoir")
-        .map(item => String(item.id || "").trim())
+      itemBuckets.pouvoir
+        .map(item => String(item.id || item._id || "").trim())
         .filter(Boolean)
     );
     for (const key of [...powerUseState]) {
@@ -8284,7 +8293,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const objectColumnOneItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_ONE] || []).map(buildCarryDisplayItem);
     const objectColumnTwoItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_TWO] || []).map(buildCarryDisplayItem);
     const bagItems = (carriedColumnState.columns[CARRY_COLUMN_BAG] || []).map(buildCarryDisplayItem);
-    const carriedItemsCount = this.actor.items
+    const carriedItemsCount = carriedItems
       .filter(item => isCarriedItemCountedForBag(item, this.actor))
       .length;
 
