@@ -56,6 +56,9 @@ export function buildActorUpdateSanitizer({
 
   function sanitizeActorUpdateForRole(updateData, role, options = {}) {
     const sanitized = cloneUpdateData(updateData, deepClone);
+    const basicPlayer = typeof isBasicPlayerRole === "function"
+      ? Boolean(isBasicPlayerRole(role))
+      : false;
     const allowCharacteristicBase = Boolean(options.allowCharacteristicBase);
     const allowVitalResourceUpdate = Boolean(options.allowVitalResourceUpdate);
     const allowAmmoUpdate = Boolean(options.allowAmmoUpdate);
@@ -73,7 +76,11 @@ export function buildActorUpdateSanitizer({
 
     applyActorUpdateRestrictionPlan(sanitized, restrictionPlan);
     if (typeof normalizeActorAmmoUpdateData === "function") {
-      normalizeActorAmmoUpdateData(options.actor || null, sanitized);
+      normalizeActorAmmoUpdateData(options.actor || null, sanitized, {
+        allowUpdate: !restrictionPlan.stripAmmoUpdates,
+        allowStockIncrease: !basicPlayer,
+        allowMagazineEdit: !basicPlayer
+      });
     }
     if (typeof normalizeCharacteristicXpUpdates === "function") {
       normalizeCharacteristicXpUpdates(sanitized, options.actor || null);

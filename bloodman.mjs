@@ -2638,7 +2638,9 @@ const AMMO_UPDATE_PATHS = [
   "system.ammo.type",
   "system.ammo.stock",
   "system.ammo.magazine",
-  "system.ammo.value"
+  "system.ammo.value",
+  "system.ammoPool",
+  "system.ammoActiveIndex"
 ];
 
 const itemTypeFlagRules = createItemTypeFlagRules({
@@ -2961,10 +2963,16 @@ const ammoStateRules = createAmmoStateRules({
 });
 const {
   buildDefaultAmmo,
+  buildDefaultAmmoLine,
   normalizeAmmoType,
   getActorAmmoCapacityLimit,
+  normalizeAmmoPool,
+  clampAmmoActiveIndex,
   normalizeAmmoState,
+  buildActiveAmmoState,
   areAmmoStatesEqual,
+  areAmmoPoolStatesEqual,
+  hasAmmoUpdatePayload,
   normalizeActorAmmoUpdateData
 } = ammoStateRules;
 const weaponReloadRules = createWeaponReloadRules({
@@ -2976,6 +2984,25 @@ const weaponReloadRules = createWeaponReloadRules({
   getWeaponLoadedAmmo
 });
 const { resolveWeaponReloadPlan } = weaponReloadRules;
+
+function getActorAmmoPoolState(actor) {
+  const capacity = getActorAmmoCapacityLimit(actor);
+  const ammoPool = normalizeAmmoPool(actor?.system?.ammoPool, {
+    fallbackAmmo: actor?.system?.ammo
+  });
+  const ammoActiveIndex = clampAmmoActiveIndex(actor?.system?.ammoActiveIndex, ammoPool, 0);
+  const ammo = buildActiveAmmoState({
+    ammoPool,
+    activeIndex: ammoActiveIndex,
+    currentAmmo: actor?.system?.ammo,
+    capacity
+  });
+  return {
+    ammoPool,
+    ammoActiveIndex,
+    ammo
+  };
+}
 
 function isMissingTokenImage(src) {
   return !src || src === "icons/svg/mystery-man.svg";
@@ -4927,19 +4954,13 @@ Hooks.once("ready", async () => {
       updates["system.profile"] = mergedProfile;
     }
 
-    const legacyAmmo = Array.isArray(actor.system.ammoPool) ? actor.system.ammoPool[0] : null;
-    const fallbackAmmo = legacyAmmo
-      ? {
-        type: legacyAmmo.type || "",
-        stock: Number(legacyAmmo.value) || 0,
-        magazine: Number(legacyAmmo.value) || 0,
-        value: Number(legacyAmmo.value) || 0
-      }
-      : buildDefaultAmmo();
-    const normalizedAmmo = normalizeAmmoState(actor.system?.ammo, {
-      fallback: fallbackAmmo,
-      capacity: getActorAmmoCapacityLimit(actor)
-    });
+    const { ammoPool, ammoActiveIndex, ammo: normalizedAmmo } = getActorAmmoPoolState(actor);
+    if (!Array.isArray(actor.system?.ammoPool) || !areAmmoPoolStatesEqual(actor.system?.ammoPool, ammoPool)) {
+      updates["system.ammoPool"] = ammoPool;
+    }
+    if (toFiniteNumber(actor.system?.ammoActiveIndex, 0) !== ammoActiveIndex) {
+      updates["system.ammoActiveIndex"] = ammoActiveIndex;
+    }
     const hasAmmoShape = actor.system?.ammo
       && actor.system.ammo.stock != null
       && actor.system.ammo.magazine != null
@@ -7833,7 +7854,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   async _updateObject(_event, formData) {
     const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
     const allowVitalResourceUpdate = VITAL_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
-    const allowAmmoUpdate = AMMO_UPDATE_PATHS.some(path => hasUpdatePath(formData, path));
+    const allowAmmoUpdate = hasAmmoUpdatePayload(formData);
     if (this.actor?.isOwner || game.user?.isGM) {
       return this.actor.update(formData, {
         bloodmanAllowCharacteristicBase: allowCharacteristicBase,
@@ -7861,7 +7882,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     const data = super.getData(options);
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const canEditTokenImage = isAssistantOrHigherRole(game.user?.role);
-    const canEditAmmoFields = isAssistantOrHigherRole(game.user?.role);
+    const canManageAmmoLines = Boolean(this.actor?.isOwner || isAssistantOrHigherRole(game.user?.role));
+    const canEditAmmoType = canManageAmmoLines;
+    const canEditAmmoStock = canManageAmmoLines;
+    const ammoStockDecreaseOnly = canEditAmmoStock && !isAssistantOrHigherRole(game.user?.role);
     const characteristicBaseHasBounds = data.actor.type === "personnage"
       && isCharacteristicBaseRangeRestrictedRole(game.user?.role);
     const canEditRestrictedFields = canToggleCharacteristicsEdit;
@@ -8010,14 +8034,24 @@ class BloodmanActorSheet extends BaseActorSheet {
     equipment.monnaiesActuel = normalizeCurrencyCurrentValue(equipment.monnaiesActuel, 0).value;
     const bagSlotsEnabled = Boolean(equipment.bagSlotsEnabled);
     const carriedItemsLimit = bagSlotsEnabled ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
-    const ammoCapacityLimit = getActorAmmoCapacityLimit(this.actor);
-    const ammo = normalizeAmmoState(
-      foundry.utils.mergeObject(buildDefaultAmmo(), data.actor.system.ammo || {}, { inplace: false }),
-      {
-        fallback: buildDefaultAmmo(),
-        capacity: ammoCapacityLimit
-      }
-    );
+    const {
+      ammoPool,
+      ammoActiveIndex,
+      ammo
+    } = getActorAmmoPoolState(this.actor);
+    const ammoLines = ammoPool.map((line, index) => {
+      const stock = Math.max(0, Math.floor(toFiniteNumber(line?.stock, 0)));
+      const isActive = index === ammoActiveIndex;
+      return {
+        index,
+        type: String(line?.type || ""),
+        stock,
+        isActive,
+        showEmptyState: isActive && stock <= 0,
+        stockInputMax: ammoStockDecreaseOnly ? stock : null
+      };
+    });
+    const canRemoveAmmoLine = canManageAmmoLines && ammoLines.length > 1;
     const transportNpcs = buildTransportNpcDisplayData(this.actor);
 
     const visibleActorItems = this.actor.items.filter(item => !isActorItemLinkedChild(item, this.actor));
@@ -8236,7 +8270,11 @@ class BloodmanActorSheet extends BaseActorSheet {
       canEditRestrictedFields,
       canEditXpChecks,
       canEditTokenImage,
-      canEditAmmoFields,
+      canManageAmmoLines,
+      canEditAmmoType,
+      canEditAmmoStock,
+      ammoStockDecreaseOnly,
+      canRemoveAmmoLine,
       canOpenItemSheets,
       canResetMoveGauge,
       moveResetLabel,
@@ -8270,6 +8308,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       pouvoirs,
       itemLinkAcceptedTypes: ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES,
       ammo,
+      ammoLines,
+      ammoActiveIndex,
       transportNpcs,
       aptitudesThreeColumns,
       pouvoirsThreeColumns
@@ -8487,6 +8527,25 @@ class BloodmanActorSheet extends BaseActorSheet {
       ev.preventDefault();
       ev.stopPropagation();
       await this.rollSimpleAttack();
+    });
+
+    html.find(".ammo-line-add").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      await this.addAmmoLine();
+    });
+
+    html.find(".ammo-line-remove").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      await this.removeActiveAmmoLine();
+    });
+
+    html.find(".ammo-line-select").click(async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const index = Number(ev.currentTarget?.dataset?.index);
+      await this.selectAmmoLine(index);
     });
 
     html.find(".weapon-reload").click(async ev => {
@@ -9515,6 +9574,52 @@ class BloodmanActorSheet extends BaseActorSheet {
       result.context.itemType = String(item.type || "arme");
       this.markItemReroll(item.id, result.context);
     }
+    this.render(false);
+  }
+
+  getAmmoPoolState() {
+    return getActorAmmoPoolState(this.actor);
+  }
+
+  async addAmmoLine() {
+    if (!this.actor || !Boolean(this.actor?.isOwner || isAssistantOrHigherRole(game.user?.role))) return;
+    const { ammoPool, ammoActiveIndex } = this.getAmmoPoolState();
+    const nextAmmoPool = [...ammoPool, buildDefaultAmmoLine()];
+    await this.applyActorUpdate(
+      {
+        "system.ammoPool": nextAmmoPool,
+        "system.ammoActiveIndex": ammoActiveIndex
+      },
+      { bloodmanAllowAmmoUpdate: true }
+    );
+    this.render(false);
+  }
+
+  async removeActiveAmmoLine() {
+    if (!this.actor || !Boolean(this.actor?.isOwner || isAssistantOrHigherRole(game.user?.role))) return;
+    const { ammoPool, ammoActiveIndex } = this.getAmmoPoolState();
+    if (ammoPool.length <= 1) return;
+    const nextAmmoPool = ammoPool.filter((_, index) => index !== ammoActiveIndex);
+    const nextAmmoActiveIndex = Math.max(0, Math.min(ammoActiveIndex, nextAmmoPool.length - 1));
+    await this.applyActorUpdate(
+      {
+        "system.ammoPool": nextAmmoPool,
+        "system.ammoActiveIndex": nextAmmoActiveIndex
+      },
+      { bloodmanAllowAmmoUpdate: true }
+    );
+    this.render(false);
+  }
+
+  async selectAmmoLine(index) {
+    if (!this.actor || !Number.isInteger(index) || index < 0) return;
+    const { ammoPool, ammoActiveIndex } = this.getAmmoPoolState();
+    const nextAmmoActiveIndex = clampAmmoActiveIndex(index, ammoPool, ammoActiveIndex);
+    if (nextAmmoActiveIndex === ammoActiveIndex) return;
+    await this.applyActorUpdate(
+      { "system.ammoActiveIndex": nextAmmoActiveIndex },
+      { bloodmanAllowAmmoUpdate: true }
+    );
     this.render(false);
   }
 

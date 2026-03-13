@@ -96,6 +96,10 @@
       "AmmoStockLabel": "Stock",
       "AmmoMagazineLabel": "Mag.",
       "AmmoStockPlaceholder": "Stock",
+      "AmmoAddLine": "Ajouter une ligne",
+      "AmmoRemoveLine": "Supprimer la ligne active",
+      "AmmoActiveLine": "Selectionner cette ligne de munitions",
+      "AmmoEmptyActive": "Plus de munitions sur la ligne active.",
       "AmmoMagazinePlaceholder": "Magasin",
       "WeaponType": {
         "Label": "TYPE D'ARME :",

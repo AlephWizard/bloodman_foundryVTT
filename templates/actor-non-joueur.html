@@ -350,20 +350,65 @@
             </div>
 
             <div class="equip-block">
-              <div class="equip-title"><i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}</div>
-              <div class="ammo-row">
-                <textarea
-                  class="bm-autogrow-field equip-autogrow-field"
-                  name="system.ammo.type"
-                  rows="1"
-                  data-autogrow="true"
-                  data-autogrow-min-rows="1"
-                  data-autogrow-max-rows="6"
-                  placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}"
-                  {{#unless canEditAmmoFields}}readonly{{/unless}}
-                >{{ammo.type}}</textarea>
-                <span class="ammo-inline-label">{{localize "BLOODMAN.Equipment.AmmoStockLabel"}}</span>
-                <input type="number" name="system.ammo.stock" min="0" step="1" value="{{ammo.stock}}" placeholder="{{localize 'BLOODMAN.Equipment.AmmoStockPlaceholder'}}" {{#unless canEditAmmoFields}}readonly{{/unless}} />
+              <div class="equip-title equip-title-row">
+                <span class="equip-title-label">
+                  <i class="fa-solid fa-bullseye"></i> {{localize "BLOODMAN.Equipment.Ammunition"}}
+                </span>
+                {{#if canManageAmmoLines}}
+                  <span class="ammo-line-toolbar">
+                    <button
+                      type="button"
+                      class="ammo-line-toolbar-button ammo-line-add"
+                      title="{{localize 'BLOODMAN.Equipment.AmmoAddLine'}}"
+                      aria-label="{{localize 'BLOODMAN.Equipment.AmmoAddLine'}}"
+                    >+</button>
+                    <button
+                      type="button"
+                      class="ammo-line-toolbar-button ammo-line-remove"
+                      title="{{localize 'BLOODMAN.Equipment.AmmoRemoveLine'}}"
+                      aria-label="{{localize 'BLOODMAN.Equipment.AmmoRemoveLine'}}"
+                      {{#unless canRemoveAmmoLine}}disabled{{/unless}}
+                    >-</button>
+                  </span>
+                {{/if}}
+              </div>
+              <div class="ammo-lines">
+                {{#each ammoLines}}
+                  <div class="ammo-row ammo-line {{#if this.isActive}}is-active{{/if}} {{#if this.showEmptyState}}is-empty{{/if}}">
+                    <button
+                      type="button"
+                      class="ammo-line-select {{#if this.isActive}}is-active{{/if}}"
+                      data-index="{{this.index}}"
+                      title="{{localize 'BLOODMAN.Equipment.AmmoActiveLine'}}"
+                      aria-label="{{localize 'BLOODMAN.Equipment.AmmoActiveLine'}}"
+                      {{#unless ../canManageAmmoLines}}disabled{{/unless}}
+                    ></button>
+                    <textarea
+                      class="bm-autogrow-field equip-autogrow-field"
+                      name="system.ammoPool.{{this.index}}.type"
+                      rows="1"
+                      data-autogrow="true"
+                      data-autogrow-min-rows="1"
+                      data-autogrow-max-rows="6"
+                      placeholder="{{localize 'BLOODMAN.Equipment.AmmoTypePlaceholder'}}"
+                      {{#unless ../canEditAmmoType}}readonly{{/unless}}
+                    >{{this.type}}</textarea>
+                    <span class="ammo-inline-label">{{localize "BLOODMAN.Equipment.AmmoStockLabel"}}</span>
+                    <input
+                      type="number"
+                      name="system.ammoPool.{{this.index}}.stock"
+                      min="0"
+                      step="1"
+                      value="{{this.stock}}"
+                      placeholder="{{localize 'BLOODMAN.Equipment.AmmoStockPlaceholder'}}"
+                      {{#if ../ammoStockDecreaseOnly}}max="{{this.stockInputMax}}"{{/if}}
+                      {{#unless ../canEditAmmoStock}}readonly{{/unless}}
+                    />
+                  </div>
+                  {{#if this.showEmptyState}}
+                    <div class="ammo-line-empty">{{localize "BLOODMAN.Equipment.AmmoEmptyActive"}}</div>
+                  {{/if}}
+                {{/each}}
               </div>
             </div>
 

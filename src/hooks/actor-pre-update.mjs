@@ -66,6 +66,7 @@ export function buildActorPreUpdateHooks({
     const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
     const allowVitalResourceUpdate = Boolean(options?.bloodmanAllowVitalResourceUpdate);
     const allowAmmoUpdate = Boolean(options?.bloodmanAllowAmmoUpdate);
+    const basicPlayerUpdater = isBasicPlayerRole(updaterRole);
     const restrictionPlan = planActorUpdateRestrictionByRole({
       updaterRole,
       allowCharacteristicBase,
@@ -76,7 +77,11 @@ export function buildActorPreUpdateHooks({
     });
     applyActorUpdateRestrictionPlan(updateData, restrictionPlan);
 
-    normalizeActorAmmoUpdateData(actor, updateData);
+    normalizeActorAmmoUpdateData(actor, updateData, {
+      allowUpdate: !restrictionPlan.stripAmmoUpdates,
+      allowStockIncrease: !basicPlayerUpdater,
+      allowMagazineEdit: !basicPlayerUpdater
+    });
     const currencyNormalization = normalizeActorEquipmentCurrencyUpdateData(actor, updateData);
     if (currencyNormalization.invalid) {
       ui.notifications?.error(currencyNormalization.message || buildInvalidCurrencyCurrentMessage());
