@@ -182,14 +182,21 @@
 
     <section class="tab" data-group="primary" data-tab="identite">
       <section class="card identity-card">
-        <div class="card-header">
-          <span class="card-title"><i class="fa-solid fa-id-card"></i> {{localize "BLOODMAN.Identity.Title"}}</span>
+        <div class="identity-hero">
+          <div class="identity-token-preview {{#if hasPortraitImage}}has-image{{else}}is-empty{{/if}}" aria-hidden="true">
+            <img src="{{actor.img}}" alt="" class="identity-token-image" />
+          </div>
+          <div class="identity-hero-main">
+            <div class="card-header identity-header-inline">
+              <span class="card-title"><i class="fa-solid fa-id-card"></i> {{localize "BLOODMAN.Identity.Title"}}</span>
+            </div>
+            <div class="field field-inline name-inline">
+              <label>{{localize "BLOODMAN.Identity.Fields.Name"}}</label>
+              <input type="text" name="name" value="{{actor.name}}" />
+            </div>
+          </div>
         </div>
         <div class="identity-grid">
-          <div class="field field-inline name-inline">
-            <label>{{localize "BLOODMAN.Identity.Fields.Name"}}</label>
-            <input type="text" name="name" value="{{actor.name}}" />
-          </div>
           <div class="field-row identity-main-row">
             <div class="field origin-field">
               <label>{{localize "BLOODMAN.Identity.Fields.Origin"}}</label>

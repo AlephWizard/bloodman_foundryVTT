@@ -1579,6 +1579,54 @@
   gap: 5px;
 }
 
+.identity-hero {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.identity-hero-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.identity-header-inline {
+  margin-bottom: 0;
+  padding-top: 6px;
+}
+
+.identity-token-preview {
+  width: 94px;
+  height: 94px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 2px solid #111111;
+  background: linear-gradient(180deg, #f1f1f1 0%, #dddddd 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.identity-token-preview.is-empty {
+  opacity: 0.55;
+}
+
+.identity-token-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.identity-hero .field.field-inline.name-inline {
+  margin-bottom: 0;
+}
+
 .identity-grid > .field {
   margin-bottom: 0;
 }
@@ -1799,6 +1847,11 @@
     grid-template-columns: 1fr;
   }
 
+  .identity-hero {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
   .identity-main-row,
   .identity-stats-row {
     grid-template-columns: 1fr;
@@ -1959,7 +2012,8 @@
 
 .bloodman-sheet button.luck-roll-header i {
   font-size: 18px;
-  color: #ffffff;
+  color: #4da64d;
+  transform: translateX(12px);
 }
 
 .bloodman-sheet button.luck-roll-header:hover,
@@ -2552,6 +2606,12 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
   box-shadow: none;
+  transform-origin: center;
+}
+
+.bloodman-sheet .char-row:has(.char-icon:hover) .char-score .char-effective,
+.bloodman-sheet .char-row:has(.char-roll:hover) .char-score .char-effective {
+  animation: bm-char-effective-pulse 1.9s ease-in-out infinite;
 }
 
 .bloodman-sheet .char-max {
@@ -2579,6 +2639,26 @@
 .npc-sheet .char-name {
   flex-wrap: wrap;
   row-gap: 2px;
+}
+
+@keyframes bm-char-effective-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    color: #111111;
+    text-shadow: none;
+    filter: none;
+  }
+  50% {
+    transform: scale(1.16);
+    opacity: 1;
+    color: #8b1f1f;
+    text-shadow:
+      0 0 14px rgba(199, 45, 45, 0.55),
+      0 0 30px rgba(199, 45, 45, 0.32);
+    filter: saturate(1.15);
+  }
 }
 
 .npc-sheet .char-hidden-roll-toggle {
@@ -2664,6 +2744,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bloodman-sheet .char-row:has(.char-icon:hover) .char-score .char-effective,
+  .bloodman-sheet .char-row:has(.char-roll:hover) .char-score .char-effective {
+    animation: none !important;
+  }
+
   .resource-circle.pv::before,
   .resource-circle.pp::before {
     animation: none !important;
