@@ -10010,15 +10010,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       this.render(false);
       return;
     }
-    const itemBonuses = getItemBonusTotals(this.actor);
     const base = toFiniteNumber(this.actor.system.characteristics?.[key]?.base, 0);
-    const archetypeBonus = getActorArchetypeBonus(this.actor, key);
     const effective = computeGrowthEffectiveScore({
-      base,
-      modifierAll: this.actor?.system?.modifiers?.all,
-      modifierKey: this.actor?.system?.modifiers?.[key],
-      itemBonus: itemBonuses?.[key],
-      archetypeBonus
+      base
     });
 
     const roll = await new Roll("1d100").evaluate();

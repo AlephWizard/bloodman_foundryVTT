@@ -1723,9 +1723,9 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
 }
 
 export async function doGrowthRoll(actor, key) {
-  const effective = getEffectiveCharacteristic(actor, key);
-  const characteristicLabel = getCharacteristicDisplayLabel(key);
   const base = Number(actor.system.characteristics?.[key]?.base || 0);
+  const effective = base;
+  const characteristicLabel = getCharacteristicDisplayLabel(key);
 
   const roll = await new Roll("1d100").evaluate();
   const rollTotal = Number(roll.total) || 0;

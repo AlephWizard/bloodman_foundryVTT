@@ -17,7 +17,7 @@ async function run() {
       itemBonus: 1,
       archetypeBonus: 4
     }),
-    30
+    20
   );
   assert.equal(
     rules.computeGrowthEffectiveScore({
@@ -27,7 +27,17 @@ async function run() {
       itemBonus: null,
       archetypeBonus: 1
     }),
-    3
+    0
+  );
+  assert.equal(
+    rules.computeGrowthEffectiveScore({
+      base: 55,
+      modifierAll: -30,
+      modifierKey: -10,
+      itemBonus: 12,
+      archetypeBonus: 8
+    }),
+    55
   );
 
   assert.deepEqual(

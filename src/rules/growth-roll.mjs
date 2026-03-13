@@ -17,11 +17,8 @@ export function createGrowthRollRules({
     itemBonus = 0,
     archetypeBonus = 0
   } = {}) {
-    return toFinite(base, 0)
-      + toFinite(modifierAll, 0)
-      + toFinite(modifierKey, 0)
-      + toFinite(itemBonus, 0)
-      + toFinite(archetypeBonus, 0);
+    // Experience rolls must use the raw characteristic only.
+    return toFinite(base, 0);
   }
 
   function resolveGrowthOutcome({
