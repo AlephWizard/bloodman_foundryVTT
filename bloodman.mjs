@@ -125,6 +125,12 @@ function tl(key, fallback, data = null) {
   return localized && localized !== key ? localized : fallback;
 }
 
+const SIMPLE_ATTACK_REROLL_ID = "__bloodman-simple-attack__";
+
+function getSimpleAttackRerollLabel() {
+  return tl("BLOODMAN.Common.SimpleAttack", "Attaque simple");
+}
+
 const CHAT_ROLL_TYPES = Object.freeze({
   GENERIC: "generic",
   CHARACTERISTIC: "characteristic",
@@ -4189,6 +4195,7 @@ const {
   isItemRerollContextValid,
   shouldBlockByRerollWindow,
   resolveItemRerollTargets,
+  resolveItemRerollSource: resolveItemRerollSourceState,
   resolveItemRerollResourcePlan
 } = itemRerollFlowRules;
 const itemRerollExecutionRules = createItemRerollExecutionRules({
@@ -7624,6 +7631,25 @@ class BloodmanActorSheet extends BaseActorSheet {
     return this.actor?.items?.get(itemId) || null;
   }
 
+  getRerollItemIdFromEvent(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const trigger = eventLike?.currentTarget || nativeEvent?.target || null;
+    const explicitItemId = String(trigger?.dataset?.itemId || "").trim();
+    if (explicitItemId) return explicitItemId;
+    const li = trigger?.closest?.(".item") || null;
+    return String(li?.dataset?.itemId || "").trim();
+  }
+
+  resolveRerollSourceForItemId(itemId) {
+    return resolveItemRerollSourceState({
+      itemId,
+      actorItems: this.actor?.items,
+      simpleAttackItemId: SIMPLE_ATTACK_REROLL_ID,
+      simpleAttackName: getSimpleAttackRerollLabel(),
+      resolveItemType: item => getItemRuntimeType(item) || String(item?.type || "").trim().toLowerCase()
+    });
+  }
+
   async resolveDroppedItemDocument(data) {
     const itemDocumentClass = Item?.implementation?.fromDropData
       ? Item.implementation
@@ -7926,6 +7952,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!canUseItemReroll) return false;
       return itemId === lastItemRerollId;
     };
+    const showSimpleAttackReroll = shouldShowItemReroll(SIMPLE_ATTACK_REROLL_ID);
     const hasPortraitImage = !isMissingTokenImage(String(data.actor?.img || "").trim());
 
     const itemBonuses = getItemBonusTotals(this.actor);
@@ -8278,6 +8305,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       canOpenItemSheets,
       canResetMoveGauge,
       moveResetLabel,
+      simpleAttackRerollId: SIMPLE_ATTACK_REROLL_ID,
+      showSimpleAttackReroll,
       characteristicsEditEnabled,
       characteristics,
       totalPoints,
@@ -8717,16 +8746,14 @@ class BloodmanActorSheet extends BaseActorSheet {
     html.find(".item-reroll").click(ev => {
       ev.preventDefault();
       ev.stopPropagation();
-      const li = ev.currentTarget.closest(".item");
-      const itemId = li?.dataset?.itemId;
+      const itemId = this.getRerollItemIdFromEvent(ev);
       this.rerollItemRoll(itemId);
     });
 
     html.find(".item-reroll-clear").click(ev => {
       ev.preventDefault();
       ev.stopPropagation();
-      const li = ev.currentTarget.closest(".item");
-      const itemId = li?.dataset?.itemId;
+      const itemId = this.getRerollItemIdFromEvent(ev);
       this.clearItemReroll(itemId);
     });
 
@@ -9659,7 +9686,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async rollSimpleAttack() {
     if (!this.actor) return;
-    const sourceName = tl("BLOODMAN.Common.SimpleAttack", "Attaque simple");
+    const sourceName = getSimpleAttackRerollLabel();
     const damageDialog = {
       variant: "simple-attack",
       rememberConfig: false
@@ -9669,11 +9696,19 @@ class BloodmanActorSheet extends BaseActorSheet {
       damageDialog.lockFormula = true;
     }
     const result = await doDirectDamageRoll(this.actor, "1d4", sourceName, {
+      itemId: SIMPLE_ATTACK_REROLL_ID,
       itemType: "arme",
       itemName: sourceName,
       damageDialog
     });
     if (!result) return;
+    if (result?.context) {
+      result.context.kind = "item-damage";
+      result.context.itemId = String(result.context.itemId || SIMPLE_ATTACK_REROLL_ID);
+      result.context.itemType = "arme";
+      result.context.itemName = String(result.context.itemName || sourceName);
+      this.markItemReroll(SIMPLE_ATTACK_REROLL_ID, result.context);
+    }
     this.render(false);
   }
 
@@ -9870,14 +9905,13 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async rerollItemRoll(itemId) {
-    if (!itemId) return;
-    const item = this.actor.items.get(itemId);
-    if (!item) return;
-    const runtimeType = getItemRuntimeType(item) || String(item.type || "").trim().toLowerCase();
+    const rerollSource = this.resolveRerollSourceForItemId(itemId);
+    if (!rerollSource) return;
+    const { itemId: rerollItemId, itemName, itemType: runtimeType } = rerollSource;
     if (!isDamageRerollItemType(runtimeType)) return;
     const state = this.getItemRerollState();
     const context = normalizeItemRerollContext(state?.damage, runtimeType);
-    if (!context || state?.itemId !== itemId) return;
+    if (!context || state?.itemId !== rerollItemId) return;
     if (!isItemRerollContextValid(context)) return;
     if (shouldBlockByRerollWindow(this.actor?.type, this.isRerollWindowActive(state?.at))) return;
     const targetResolution = resolveItemRerollTargets({
@@ -9899,7 +9933,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const validationMeta = {
       rollId: context.rollId,
-      itemId,
+      itemId: rerollItemId,
       itemType: context.itemType
     };
 
@@ -9975,16 +10009,16 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!game.user.isGM && hasActiveGM) {
       await relayItemRerollToGMs({
         context,
-        itemId,
+        itemId: rerollItemId,
         itemType: runtimeType,
-        itemName: item.name,
+        itemName: itemName || String(context.itemName || ""),
         actorId: this.actor.id,
         attackerUserId: game.user?.id || "",
         totalDamage,
         rollResults,
         allocations
       });
-      this.markItemReroll(itemId, context);
+      this.markItemReroll(rerollItemId, context);
       this.render(false);
       return;
     }
@@ -9995,7 +10029,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       validationMeta,
       defaultTargetName: "Cible"
     });
-    this.markItemReroll(itemId, context);
+    this.markItemReroll(rerollItemId, context);
     this.render(false);
   }
 
@@ -10074,15 +10108,19 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   markItemReroll(itemId, damageContext = null) {
-    if (!itemId) return;
+    const normalizedItemId = String(itemId || "").trim();
+    if (!normalizedItemId) return;
+    const rerollSource = this.resolveRerollSourceForItemId(normalizedItemId);
     const damage = damageContext || this.actor?._lastDamageReroll || null;
     if (damage) {
+      if (!damage.itemId) damage.itemId = normalizedItemId;
       damage.kind = String(damage.kind || "item-damage");
-      damage.itemType = String(damage.itemType || this.actor?.items?.get(itemId)?.type || "").toLowerCase();
+      damage.itemType = String(damage.itemType || rerollSource?.itemType || "").toLowerCase();
+      if (!damage.itemName && rerollSource?.itemName) damage.itemName = rerollSource.itemName;
       if (damage.kind !== "item-damage" || !isDamageRerollItemType(damage.itemType)) return;
     }
     if (this.actor && damage) this.actor._lastDamageReroll = damage;
-    this.setItemRerollState({ itemId, at: Date.now(), damage });
+    this.setItemRerollState({ itemId: normalizedItemId, at: Date.now(), damage });
     this.scheduleRerollExpiry("item");
   }
 

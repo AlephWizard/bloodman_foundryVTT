@@ -61,6 +61,43 @@ async function run() {
     { targets: [], fallbackUsed: false }
   );
 
+  const weaponItem = { id: "weapon-1", type: "arme", name: "Pistolet" };
+  assert.deepEqual(
+    rules.resolveItemRerollSource({
+      itemId: "weapon-1",
+      actorItems: new Map([["weapon-1", weaponItem]])
+    }),
+    {
+      itemId: "weapon-1",
+      item: weaponItem,
+      itemType: "arme",
+      itemName: "Pistolet"
+    }
+  );
+
+  assert.deepEqual(
+    rules.resolveItemRerollSource({
+      itemId: "__simple-attack__",
+      actorItems: new Map([["weapon-1", weaponItem]]),
+      simpleAttackItemId: "__simple-attack__",
+      simpleAttackName: "Attaque simple"
+    }),
+    {
+      itemId: "__simple-attack__",
+      item: null,
+      itemType: "arme",
+      itemName: "Attaque simple"
+    }
+  );
+
+  assert.equal(
+    rules.resolveItemRerollSource({
+      itemId: "missing-item",
+      actorItems: new Map()
+    }),
+    null
+  );
+
   assert.equal(rules.resolveItemRerollActorMode("personnage"), "player");
   assert.equal(rules.resolveItemRerollActorMode("personnage-non-joueur"), "npc");
   assert.equal(rules.resolveItemRerollActorMode("other"), "");

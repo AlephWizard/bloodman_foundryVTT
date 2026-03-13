@@ -55,6 +55,42 @@ export function createItemRerollFlowRules({
     };
   }
 
+  function resolveItemRerollSource({
+    itemId = "",
+    actorItems = null,
+    simpleAttackItemId = "",
+    simpleAttackName = "",
+    resolveItemType = null
+  } = {}) {
+    const normalizedItemId = String(itemId || "").trim();
+    if (!normalizedItemId) return null;
+
+    const normalizedSimpleAttackId = String(simpleAttackItemId || "").trim();
+    if (normalizedSimpleAttackId && normalizedItemId === normalizedSimpleAttackId) {
+      return {
+        itemId: normalizedItemId,
+        item: null,
+        itemType: "arme",
+        itemName: String(simpleAttackName || "").trim()
+      };
+    }
+
+    const item = actorItems?.get?.(normalizedItemId) || null;
+    if (!item) return null;
+
+    const itemTypeResolver = typeof resolveItemType === "function"
+      ? resolveItemType
+      : candidate => String(candidate?.type || "").trim().toLowerCase();
+    const resolvedItemType = String(itemTypeResolver(item) || item?.type || "").trim().toLowerCase();
+
+    return {
+      itemId: normalizedItemId,
+      item,
+      itemType: resolvedItemType,
+      itemName: String(item?.name || "").trim()
+    };
+  }
+
   function resolveItemRerollActorMode(actorType) {
     const normalized = String(actorType || "").trim().toLowerCase();
     if (normalized === "personnage") return "player";
@@ -127,6 +163,7 @@ export function createItemRerollFlowRules({
     isItemRerollContextValid,
     shouldBlockByRerollWindow,
     resolveItemRerollTargets,
+    resolveItemRerollSource,
     resolveItemRerollActorMode,
     resolveItemRerollResourcePlan
   };

@@ -751,6 +751,14 @@
   align-items: center;
 }
 
+.weapon-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
 .equipment-card textarea.equip-autogrow-field[data-autogrow="true"] {
   width: 100%;
   min-height: 26px;

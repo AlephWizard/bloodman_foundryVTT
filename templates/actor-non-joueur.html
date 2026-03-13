@@ -288,7 +288,21 @@
                   data-autogrow-min-rows="1"
                   data-autogrow-max-rows="6"
                 >{{equipment.armes}}</textarea>
-                <button type="button" class="weapon-simple-attack">{{localize "BLOODMAN.Common.SimpleAttack"}}</button>
+                <div class="weapon-header-actions">
+                  <button type="button" class="weapon-simple-attack">{{localize "BLOODMAN.Common.SimpleAttack"}}</button>
+                  {{#if showSimpleAttackReroll}}
+                    <button type="button" class="item-reroll" data-item-id="{{simpleAttackRerollId}}">
+                      <i class="fa-solid fa-rotate-right"></i> {{localize "BLOODMAN.Common.Reroll"}}
+                    </button>
+                    <button
+                      type="button"
+                      class="item-reroll-clear"
+                      data-item-id="{{simpleAttackRerollId}}"
+                      title="{{localize 'BLOODMAN.Common.Cancel'}}"
+                      aria-label="{{localize 'BLOODMAN.Common.Cancel'}}"
+                    >&times;</button>
+                  {{/if}}
+                </div>
               </div>
               <ol class="item-list weapon-list" data-carry-column="equipment" data-reorder-scope="carry-column" data-accepted-types="arme">
                 {{#each weapons}}
