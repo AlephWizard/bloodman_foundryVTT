@@ -997,7 +997,7 @@
   --bm-sheet-control-sm: max(46px, calc(42px * var(--bm-sheet-scale)));
   --bm-sheet-control-md: max(50px, calc(46px * var(--bm-sheet-scale)));
   --bm-sheet-control-lg: max(54px, calc(50px * var(--bm-sheet-scale)));
-  --bm-sheet-image: max(52px, calc(48px * var(--bm-sheet-scale)));
+  --bm-sheet-image: max(96px, calc(92px * var(--bm-sheet-scale)));
   gap: var(--bm-sheet-space-1);
   padding: var(--bm-sheet-space-2);
   align-content: start;
@@ -1408,6 +1408,11 @@
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-top,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-top {
   grid-template-columns: 1fr;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"],
+.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] {
+  --bm-sheet-image: max(82px, calc(78px * var(--bm-sheet-scale)));
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-img,
