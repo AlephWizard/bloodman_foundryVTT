@@ -10,11 +10,6 @@
         <input class="bm-item-input" name="name" value="{{item.name}}" />
       </div>
 
-      <div class="bm-item-row bm-item-row-note">
-        <div class="bm-item-tag">{{localize "BLOODMAN.Common.Note"}}</div>
-        <textarea class="bm-item-textarea" name="{{itemNoteFieldPath}}">{{itemNoteValue}}</textarea>
-      </div>
-
       <div class="bm-item-row bm-item-row-audio">
         <div class="bm-item-tag">{{localize "BLOODMAN.Items.AudioFileLabel"}}</div>
         <div class="bm-item-audio-field">
@@ -27,14 +22,22 @@
     </div>
   </div>
 
+  <section class="bm-item-note-panel">
+    <div class="bm-item-note-head">{{localize "BLOODMAN.Common.Note"}}</div>
+    <textarea
+      class="bm-item-textarea bm-item-note-textarea"
+      name="{{itemNoteFieldPath}}"
+      rows="4"
+      data-autogrow="true"
+      data-autogrow-min-rows="4"
+      data-autogrow-max-rows="200"
+    >{{itemNoteValue}}</textarea>
+  </section>
+
   <div class="bm-item-unified-grid">
-    <section class="bm-item-unified-section bm-item-unified-section-pricing">
+    <section class="bm-item-unified-section bm-item-unified-section-economy">
       <div class="bm-item-unified-section-head">
-        <h3 class="bm-item-unified-section-title">
-          <i class="fa-solid fa-wallet"></i>
-          {{localize "BLOODMAN.Items.SectionPricingTitle"}}
-        </h3>
-        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionPricingHint"}}</p>
+        <h3 class="bm-item-unified-section-title">{{localize "BLOODMAN.Items.SectionEconomyTitle"}}</h3>
       </div>
 
       <div class="bm-item-unified-field bm-item-unified-field-price">
@@ -47,181 +50,77 @@
         <input class="bm-item-input" type="text" name="system.salePrice" value="{{item.system.salePrice}}" data-price-sale />
       </div>
 
-      <div class="bm-item-unified-field bm-item-unified-field-usable">
-        <label class="inline-label">{{localize "BLOODMAN.Items.UsableLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="{{itemUsableFieldPath}}" value="true" data-dtype="Boolean" {{#if itemUsableValue}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="{{itemUsableFieldPath}}" value="false" data-dtype="Boolean" {{#unless itemUsableValue}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
-          </label>
-        </div>
-      </div>
-
-      <div class="bm-item-unified-field bm-item-unified-field-single-use">
-        <label class="inline-label">{{localize "BLOODMAN.Items.SingleUseLabel"}}</label>
-        <div class="bm-item-single-use-controls">
-          <div class="toggle-group">
-            <label class="toggle-option">
-              <input type="radio" name="system.singleUseEnabled" value="true" data-dtype="Boolean" {{#if item.system.singleUseEnabled}}checked{{/if}} />
-              {{localize "BLOODMAN.Common.Yes"}}
-            </label>
-            <label class="toggle-option">
-              <input type="radio" name="system.singleUseEnabled" value="false" data-dtype="Boolean" {{#unless item.system.singleUseEnabled}}checked{{/unless}} />
-              {{localize "BLOODMAN.Common.No"}}
-            </label>
-          </div>
-          <div class="bm-item-single-use-count">
-            <label class="inline-label bm-item-inline-sub-label">{{localize "BLOODMAN.Items.SingleUseCountLabel"}}</label>
-            <input
-              class="bm-item-input bm-item-input-narrow"
-              type="number"
-              min="1"
-              step="1"
-              name="system.singleUseCount"
-              value="{{item.system.singleUseCount}}"
-              data-dtype="Number"
-              {{#if singleUseCountInputDisabled}}disabled{{/if}}
-            />
-          </div>
-        </div>
-      </div>
-
       <p class="bm-price-error bm-item-unified-price-error" data-price-error>{{itemPriceError}}</p>
+    </section>
+
+    <section class="bm-item-unified-section bm-item-unified-section-usage">
+      <div class="bm-item-unified-section-head">
+        <h3 class="bm-item-unified-section-title">{{localize "BLOODMAN.Items.SectionUsageTitle"}}</h3>
+      </div>
+
+      <div class="bm-item-unified-field bm-item-unified-row-usage">
+        <label class="inline-label">{{localize "BLOODMAN.Items.UsableLabel"}}</label>
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.UsableLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="{{itemUsableFieldPath}}" data-dtype="Boolean" {{checked itemUsableValue}} aria-label="{{localize 'BLOODMAN.Items.UsableLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <label class="inline-label">{{localize "BLOODMAN.Items.SingleUseLabel"}}</label>
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.SingleUseLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.singleUseEnabled" data-dtype="Boolean" {{checked item.system.singleUseEnabled}} aria-label="{{localize 'BLOODMAN.Items.SingleUseLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <label class="inline-label bm-item-inline-sub-label">{{localize "BLOODMAN.Items.SingleUseCountLabel"}}</label>
+        <input
+          class="bm-item-input bm-item-input-narrow"
+          type="number"
+          min="1"
+          step="1"
+          name="system.singleUseCount"
+          value="{{item.system.singleUseCount}}"
+          data-dtype="Number"
+          {{#if singleUseCountInputDisabled}}disabled{{/if}}
+        />
+      </div>
     </section>
 
     <section class="bm-item-unified-section bm-item-unified-section-costs">
       <div class="bm-item-unified-section-head">
-        <h3 class="bm-item-unified-section-title">
-          <i class="fa-solid fa-bolt"></i>
-          {{localize "BLOODMAN.Items.SectionCostsTitle"}}
-        </h3>
-        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionCostsHint"}}</p>
+        <h3 class="bm-item-unified-section-title">{{localize "BLOODMAN.Items.SectionCostsTitle"}}</h3>
       </div>
 
-      <div class="bm-item-unified-field bm-item-unified-field-xp-cost">
+      <div class="bm-item-unified-field bm-item-unified-row-costs">
         <label class="inline-label">{{localize "BLOODMAN.Items.VoyageXPCostLabel"}}</label>
-        <input class="bm-item-input" type="number" min="0" step="1" name="system.xpVoyageCost" value="{{item.system.xpVoyageCost}}" data-dtype="Number" />
-      </div>
+        <input class="bm-item-input bm-item-input-narrow" type="number" min="0" step="1" name="system.xpVoyageCost" value="{{item.system.xpVoyageCost}}" data-dtype="Number" />
 
-      <div class="bm-item-unified-field bm-item-unified-field-power-toggle">
         <label class="inline-label">{{localize "BLOODMAN.Powers.PowerCostLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.powerCostEnabled" value="true" data-dtype="Boolean" {{#if item.system.powerCostEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.powerCostEnabled" value="false" data-dtype="Boolean" {{#unless item.system.powerCostEnabled}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Powers.PowerCostLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.powerCostEnabled" data-dtype="Boolean" {{checked item.system.powerCostEnabled}} aria-label="{{localize 'BLOODMAN.Powers.PowerCostLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
           </label>
         </div>
-      </div>
-
-      <div class="bm-item-unified-field bm-item-unified-field-power-amount">
-        <label class="inline-label">PP</label>
-        <input class="bm-item-input" type="number" min="0" step="1" name="system.powerCost" value="{{item.system.powerCost}}" data-dtype="Number" {{#if powerCostInputDisabled}}disabled{{/if}} />
+        <input class="bm-item-input bm-item-input-narrow" type="number" min="0" step="1" name="system.powerCost" value="{{item.system.powerCost}}" data-dtype="Number" {{#if powerCostInputDisabled}}disabled{{/if}} />
+        <span class="bm-item-inline-unit">PP</span>
       </div>
     </section>
 
-    {{#if itemLinkSupported}}
-      <section class="bm-item-unified-section bm-item-unified-section-links">
-        <div class="bm-item-unified-section-head">
-          <h3 class="bm-item-unified-section-title">
-            <i class="fa-solid fa-link"></i>
-            {{localize "BLOODMAN.Items.SectionLinksTitle"}}
-          </h3>
-          <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionLinksHint"}}</p>
-        </div>
-
-        <div class="bm-item-unified-field bm-item-unified-field-equip-with-toggle">
-          <label class="inline-label">{{localize "BLOODMAN.Items.EquipWithLabel"}}</label>
-          {{#if itemLinkSupportsEquiperAvec}}
-            <div class="toggle-group">
-              <label class="toggle-option">
-                <input type="radio" name="system.link.equiperAvecEnabled" value="true" data-dtype="Boolean" {{#if item.system.link.equiperAvecEnabled}}checked{{/if}} />
-                {{localize "BLOODMAN.Common.Yes"}}
-              </label>
-              <label class="toggle-option">
-                <input type="radio" name="system.link.equiperAvecEnabled" value="false" data-dtype="Boolean" {{#unless item.system.link.equiperAvecEnabled}}checked{{/unless}} />
-                {{localize "BLOODMAN.Common.No"}}
-              </label>
-            </div>
-          {{else}}
-            <p class="bm-item-inline-hint">{{localize "BLOODMAN.Items.EquipWithChildHint"}}</p>
-          {{/if}}
-        </div>
-
-        {{#if itemLinkSupportsBagCount}}
-          <div class="bm-item-unified-field bm-item-unified-field-bag-count">
-            <label class="inline-label">{{localize "BLOODMAN.Items.CountForBagLabel"}}</label>
-            <div class="toggle-group">
-              <label class="toggle-option">
-                <input type="radio" name="system.link.containerCountsForBag" value="true" data-dtype="Boolean" {{#if item.system.link.containerCountsForBag}}checked{{/if}} />
-                {{localize "BLOODMAN.Common.Yes"}}
-              </label>
-              <label class="toggle-option">
-                <input type="radio" name="system.link.containerCountsForBag" value="false" data-dtype="Boolean" {{#unless item.system.link.containerCountsForBag}}checked{{/unless}} />
-                {{localize "BLOODMAN.Common.No"}}
-              </label>
-            </div>
-          </div>
-        {{/if}}
-
-        {{#if itemLinkSupportsEquiperAvec}}
-          <div
-            class="bm-item-unified-field bm-item-equiper-avec-builder {{#unless item.system.link.equiperAvecEnabled}}is-disabled{{/unless}}"
-            data-item-equiper-avec-drop="true"
-            data-accepted-types="{{itemLinkAcceptedTypes}}"
-          >
-            <label class="inline-label">{{localize "BLOODMAN.Items.EquipWithTitle"}}</label>
-            <ul class="bm-item-equiper-avec-list">
-              {{#if itemLinkHasEquiperAvecTemplates}}
-                {{#each itemLinkEquiperAvecTemplates}}
-                  <li class="bm-item-equiper-avec-entry" data-template-index="{{this.index}}">
-                    <button type="button" class="bm-item-equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
-                    <img class="bm-item-equiper-avec-icon" src="{{this.img}}" />
-                    <div class="bm-item-equiper-avec-body">
-                      <span class="bm-item-equiper-avec-name {{#if this.sourceUuid}}bm-item-equiper-avec-open{{/if}}" data-source-uuid="{{this.sourceUuid}}">{{this.name}}</span>
-                      <span class="bm-item-equiper-avec-type">{{this.typeLabel}}</span>
-                      {{#if this.shortNoteHtml}}<div class="bm-item-equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
-                    </div>
-                  </li>
-                {{/each}}
-              {{else}}
-                <li class="bm-item-equiper-avec-empty">
-                  <i class="fa-solid fa-down-long" aria-hidden="true"></i>
-                  <span>{{localize "BLOODMAN.Items.EquipWithDropHint"}}</span>
-                </li>
-              {{/if}}
-            </ul>
-          </div>
-        {{/if}}
-      </section>
-    {{/if}}
-
     <section class="bm-item-unified-section bm-item-unified-section-combat">
       <div class="bm-item-unified-section-head">
-        <h3 class="bm-item-unified-section-title">
-          <i class="fa-solid fa-shield-halved"></i>
-          {{localize "BLOODMAN.Items.SectionCombatTitle"}}
-        </h3>
-        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionCombatHint"}}</p>
+        <h3 class="bm-item-unified-section-title">{{localize "BLOODMAN.Items.SectionCombatTitle"}}</h3>
       </div>
 
       <div class="bm-item-unified-card bm-item-unified-card-damage">
         <label class="inline-label">{{localize "BLOODMAN.Items.DamageDieLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.damageEnabled" value="true" data-dtype="Boolean" {{#if item.system.damageEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.damageEnabled" value="false" data-dtype="Boolean" {{#unless item.system.damageEnabled}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.DamageDieLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.damageEnabled" data-dtype="Boolean" {{checked item.system.damageEnabled}} aria-label="{{localize 'BLOODMAN.Items.DamageDieLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
           </label>
         </div>
         <input class="bm-item-input damage-die-input" type="text" name="system.damageDie" value="{{item.system.damageDie}}" placeholder="/r 1d6+2" {{#if damageInputDisabled}}disabled{{/if}} />
@@ -243,14 +142,10 @@
 
       <div class="bm-item-unified-card bm-item-unified-card-ammo">
         <label class="inline-label">{{localize "BLOODMAN.Items.InfiniteAmmoLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.infiniteAmmo" value="true" data-dtype="Boolean" {{#if item.system.infiniteAmmo}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.infiniteAmmo" value="false" data-dtype="Boolean" {{#unless item.system.infiniteAmmo}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.InfiniteAmmoLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.infiniteAmmo" data-dtype="Boolean" {{checked item.system.infiniteAmmo}} aria-label="{{localize 'BLOODMAN.Items.InfiniteAmmoLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
           </label>
         </div>
 
@@ -271,59 +166,40 @@
 
       <div class="bm-item-unified-card bm-item-unified-card-protection">
         <label class="inline-label">{{localize "TYPES.Item.protection"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.protectionEnabled" value="true" data-dtype="Boolean" {{#if item.system.protectionEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.protectionEnabled" value="false" data-dtype="Boolean" {{#unless item.system.protectionEnabled}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'TYPES.Item.protection'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.protectionEnabled" data-dtype="Boolean" {{checked item.system.protectionEnabled}} aria-label="{{localize 'TYPES.Item.protection'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
           </label>
         </div>
 
         <label class="inline-label">PA</label>
         <input class="bm-item-input bm-item-input-narrow" type="number" name="system.pa" value="{{item.system.pa}}" data-dtype="Number" step="1" {{#if protectionInputDisabled}}disabled{{/if}} />
       </div>
+
+      <div class="bm-item-unified-card bm-item-unified-card-heal">
+        <label class="inline-label">{{localize "BLOODMAN.Items.HealLabel"}}</label>
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.HealLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.healEnabled" data-dtype="Boolean" {{checked item.system.healEnabled}} aria-label="{{localize 'BLOODMAN.Items.HealLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <input class="bm-item-input heal-die-input" type="text" name="system.healDie" value="{{item.system.healDie}}" placeholder="/r 1d8+2" {{#if healInputDisabled}}disabled{{/if}} />
+      </div>
     </section>
 
     <section class="bm-item-unified-section bm-item-unified-section-bonuses">
       <div class="bm-item-unified-section-head">
-        <h3 class="bm-item-unified-section-title">
-          <i class="fa-solid fa-chart-line"></i>
-          {{localize "BLOODMAN.Items.SectionBonusesTitle"}}
-        </h3>
-        <p class="bm-item-unified-section-hint">{{localize "BLOODMAN.Items.SectionBonusesHint"}}</p>
-      </div>
-
-      <div class="bm-item-unified-card bm-item-unified-card-raw">
-        <label class="inline-label">{{localize "BLOODMAN.Items.RawBonusLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.rawBonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.rawBonusEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.rawBonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.rawBonusEnabled}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
-          </label>
-        </div>
-        <div class="bonus-grid bonus-grid-compact {{#if rawBonusInputDisabled}}is-disabled{{/if}}">
-          <label><span>PV</span><input type="number" name="system.rawBonuses.pv" value="{{item.system.rawBonuses.pv}}" data-dtype="Number" step="1" {{#if rawBonusInputDisabled}}disabled{{/if}} /></label>
-          <label><span>PP</span><input type="number" name="system.rawBonuses.pp" value="{{item.system.rawBonuses.pp}}" data-dtype="Number" step="1" {{#if rawBonusInputDisabled}}disabled{{/if}} /></label>
-        </div>
+        <h3 class="bm-item-unified-section-title">{{localize "BLOODMAN.Items.SectionBonusesTitle"}}</h3>
       </div>
 
       <div class="bm-item-unified-card bm-item-unified-card-characteristics">
         <label class="inline-label">{{localize "BLOODMAN.Items.BonusLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.characteristicBonusEnabled" value="true" data-dtype="Boolean" {{#if item.system.characteristicBonusEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.characteristicBonusEnabled" value="false" data-dtype="Boolean" {{#unless item.system.characteristicBonusEnabled}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.BonusLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.characteristicBonusEnabled" data-dtype="Boolean" {{checked item.system.characteristicBonusEnabled}} aria-label="{{localize 'BLOODMAN.Items.BonusLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
           </label>
         </div>
 
@@ -340,20 +216,77 @@
         </div>
       </div>
 
-      <div class="bm-item-unified-card bm-item-unified-card-heal">
-        <label class="inline-label">{{localize "BLOODMAN.Items.HealDieLabel"}}</label>
-        <div class="toggle-group">
-          <label class="toggle-option">
-            <input type="radio" name="system.healEnabled" value="true" data-dtype="Boolean" {{#if item.system.healEnabled}}checked{{/if}} />
-            {{localize "BLOODMAN.Common.Yes"}}
-          </label>
-          <label class="toggle-option">
-            <input type="radio" name="system.healEnabled" value="false" data-dtype="Boolean" {{#unless item.system.healEnabled}}checked{{/unless}} />
-            {{localize "BLOODMAN.Common.No"}}
+      <div class="bm-item-unified-card bm-item-unified-card-raw">
+        <label class="inline-label">{{localize "BLOODMAN.Items.RawBonusLabel"}}</label>
+        <div class="toggle-group bm-switch-group">
+          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.RawBonusLabel'}}">
+            <input class="bm-switch-input" type="checkbox" name="system.rawBonusEnabled" data-dtype="Boolean" {{checked item.system.rawBonusEnabled}} aria-label="{{localize 'BLOODMAN.Items.RawBonusLabel'}}" />
+            <span class="bm-switch-track" aria-hidden="true"></span>
           </label>
         </div>
-        <input class="bm-item-input heal-die-input" type="text" name="system.healDie" value="{{item.system.healDie}}" placeholder="/r 1d8+2" {{#if healInputDisabled}}disabled{{/if}} />
+        <div class="bonus-grid bonus-grid-compact {{#if rawBonusInputDisabled}}is-disabled{{/if}}">
+          <label><span>PV</span><input type="number" name="system.rawBonuses.pv" value="{{item.system.rawBonuses.pv}}" data-dtype="Number" step="1" {{#if rawBonusInputDisabled}}disabled{{/if}} /></label>
+          <label><span>PP</span><input type="number" name="system.rawBonuses.pp" value="{{item.system.rawBonuses.pp}}" data-dtype="Number" step="1" {{#if rawBonusInputDisabled}}disabled{{/if}} /></label>
+        </div>
       </div>
     </section>
+
+    {{#if itemLinkSupported}}
+      <section class="bm-item-unified-section bm-item-unified-section-links">
+        <div class="bm-item-unified-section-head bm-item-unified-section-head-links">
+          <h3 class="bm-item-unified-section-title">{{localize "BLOODMAN.Items.SectionLinksTitle"}}</h3>
+          {{#if itemLinkSupportsEquiperAvec}}
+            <div class="toggle-group bm-switch-group bm-item-unified-section-head-toggle">
+              <label class="bm-switch" title="{{localize 'BLOODMAN.Items.EquipWithLabel'}}">
+                <input class="bm-switch-input" type="checkbox" name="system.link.equiperAvecEnabled" data-dtype="Boolean" {{checked item.system.link.equiperAvecEnabled}} aria-label="{{localize 'BLOODMAN.Items.EquipWithLabel'}}" />
+                <span class="bm-switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          {{/if}}
+        </div>
+
+        {{#if itemLinkSupportsBagCount}}
+          <div class="bm-item-unified-field bm-item-unified-field-bag-count">
+            <label class="inline-label">{{localize "BLOODMAN.Items.CountForBagLabel"}}</label>
+            <div class="toggle-group bm-switch-group">
+              <label class="bm-switch" title="{{localize 'BLOODMAN.Items.CountForBagLabel'}}">
+                <input class="bm-switch-input" type="checkbox" name="system.link.containerCountsForBag" data-dtype="Boolean" {{checked item.system.link.containerCountsForBag}} aria-label="{{localize 'BLOODMAN.Items.CountForBagLabel'}}" />
+                <span class="bm-switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+          </div>
+        {{/if}}
+
+        {{#if itemLinkSupportsEquiperAvec}}
+          <div
+            class="bm-item-unified-field bm-item-equiper-avec-builder {{#unless item.system.link.equiperAvecEnabled}}is-disabled{{/unless}}"
+            data-item-equiper-avec-drop="true"
+            data-accepted-types="{{itemLinkAcceptedTypes}}"
+          >
+            <ul class="bm-item-equiper-avec-list">
+              {{#if itemLinkHasEquiperAvecTemplates}}
+                {{#each itemLinkEquiperAvecTemplates}}
+                  <li class="bm-item-equiper-avec-entry" data-template-index="{{this.index}}">
+                    <button type="button" class="bm-item-equiper-avec-remove" title="{{localize 'BLOODMAN.Common.Delete'}}" aria-label="{{localize 'BLOODMAN.Common.Delete'}}">&times;</button>
+                    <img class="bm-item-equiper-avec-icon" src="{{this.img}}" />
+                    <div class="bm-item-equiper-avec-body">
+                      <span class="bm-item-equiper-avec-name {{#if this.sourceUuid}}bm-item-equiper-avec-open{{/if}}" data-source-uuid="{{this.sourceUuid}}">{{this.name}}</span>
+                      <span class="bm-item-equiper-avec-type">{{this.typeLabel}}</span>
+                      {{#if this.shortNoteHtml}}<div class="bm-item-equiper-avec-note">{{{this.shortNoteHtml}}}</div>{{/if}}
+                    </div>
+                  </li>
+                {{/each}}
+              {{else}}
+                <li class="bm-item-equiper-avec-empty">
+                  <span>{{localize "BLOODMAN.Items.EquipWithDropHint"}}</span>
+                </li>
+              {{/if}}
+            </ul>
+          </div>
+        {{else}}
+          <p class="bm-item-inline-hint bm-item-unified-link-child-hint">{{localize "BLOODMAN.Items.EquipWithChildHint"}}</p>
+        {{/if}}
+      </section>
+    {{/if}}
   </div>
 </form>

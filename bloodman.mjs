@@ -10279,6 +10279,25 @@ class BloodmanItemSheet extends BaseItemSheet {
     return "systems/bloodman/templates/item-unified.html";
   }
 
+  static getResponsiveSheetSize() {
+    const viewportWidth = Math.max(
+      Number(globalThis?.innerWidth) || 0,
+      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
+      0
+    );
+    const viewportHeight = Math.max(
+      Number(globalThis?.innerHeight) || 0,
+      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
+      0
+    );
+    const safeWidth = viewportWidth > 0 ? viewportWidth : 1280;
+    const safeHeight = viewportHeight > 0 ? viewportHeight : 900;
+    return {
+      width: Math.round(Math.min(safeWidth - 40, Math.max(920, Math.min(1200, safeWidth * 0.52)))),
+      height: Math.round(Math.min(safeHeight - 56, Math.max(560, Math.min(800, safeHeight * 0.56))))
+    };
+  }
+
   async getData(options) {
     const data = await super.getData(options);
     const itemType = String(this.item.type || "").trim().toLowerCase();
@@ -10420,18 +10439,252 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   static get defaultOptions() {
+    const responsiveSize = this.getResponsiveSheetSize();
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "item"],
-      width: 860,
-      height: 500,
+      width: responsiveSize.width,
+      height: responsiveSize.height,
       resizable: true,
       submitOnChange: true
     });
   }
 
+  render(force, options = {}) {
+    const now = Number(globalThis?.performance?.now?.() ?? Date.now());
+    const suppressUntil = Number(this._suppressItemSheetRenderUntil || 0);
+    if (!force && suppressUntil > now) {
+      this.updateResponsiveSheetScale();
+      return this;
+    }
+    return super.render(force, options);
+  }
+
+  setPosition(options = {}) {
+    const viewportWidth = Math.max(
+      Number(globalThis?.innerWidth) || 0,
+      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
+      0
+    );
+    const viewportHeight = Math.max(
+      Number(globalThis?.innerHeight) || 0,
+      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
+      0
+    );
+    const maxWidth = Math.max(320, viewportWidth - 24);
+    const maxHeight = Math.max(320, viewportHeight - 32);
+    const nextPosition = { ...options };
+    const candidateWidth = Number(nextPosition.width ?? this.position?.width ?? this.options?.width);
+    const candidateHeight = Number(nextPosition.height ?? this.position?.height ?? this.options?.height);
+    const candidateLeft = Number(nextPosition.left ?? this.position?.left);
+    const candidateTop = Number(nextPosition.top ?? this.position?.top);
+
+    if (Number.isFinite(candidateWidth)) nextPosition.width = Math.min(candidateWidth, maxWidth);
+    if (Number.isFinite(candidateHeight)) nextPosition.height = Math.min(candidateHeight, maxHeight);
+    if (Number.isFinite(candidateLeft) && Number.isFinite(nextPosition.width)) {
+      nextPosition.left = Math.max(12, Math.min(candidateLeft, viewportWidth - nextPosition.width - 12));
+    }
+    if (Number.isFinite(candidateTop) && Number.isFinite(nextPosition.height)) {
+      nextPosition.top = Math.max(12, Math.min(candidateTop, viewportHeight - nextPosition.height - 12));
+    }
+
+    const position = super.setPosition(nextPosition);
+    this.updateResponsiveSheetScale();
+    return position;
+  }
+
   async close(options = {}) {
     this.clearQueuedPricePreviewRefresh();
+    this.clearQueuedItemSheetAutoGrowRefresh();
+    this.disconnectResponsiveSheetScaleObserver();
     return super.close(options);
+  }
+
+  getResponsiveSheetScaleTarget(rootLike = null) {
+    const root = rootLike?.find ? rootLike[0] : rootLike;
+    const elementRoot = root instanceof HTMLElement
+      ? root
+      : (this.element?.[0] instanceof HTMLElement ? this.element[0] : null);
+    if (!elementRoot) return null;
+    const sheetRoot = elementRoot.matches?.(".bm-item-unified")
+      ? elementRoot
+      : elementRoot.querySelector?.(".bm-item-unified");
+    return sheetRoot instanceof HTMLElement ? sheetRoot : null;
+  }
+
+  getResponsiveSheetObserverTarget(rootLike = null) {
+    const root = rootLike?.find ? rootLike[0] : rootLike;
+    const elementRoot = root instanceof HTMLElement
+      ? root
+      : (this.element?.[0] instanceof HTMLElement ? this.element[0] : null);
+    if (!elementRoot) return null;
+    return elementRoot.closest?.(".app.window-app") || elementRoot;
+  }
+
+  resolveResponsiveItemSheetLayoutState(width = 0, height = 0) {
+    const safeWidth = Math.max(320, Math.round(Number(width) || 0));
+    const safeHeight = Math.max(320, Math.round(Number(height) || 0));
+    let layoutMode = "wide";
+    if (safeWidth < 640) layoutMode = "stacked";
+    else if (safeWidth < 860) layoutMode = "narrow";
+    else if (safeWidth < 1080) layoutMode = "compact";
+
+    let heightMode = "tall";
+    if (safeHeight < 520) heightMode = "short";
+    else if (safeHeight < 680) heightMode = "medium";
+
+    const useNoteScroll = layoutMode === "stacked" || heightMode === "short";
+    const noteMaxHeight = useNoteScroll
+      ? Math.max(120, Math.min(260, Math.round(safeHeight * 0.34)))
+      : 0;
+
+    return {
+      layoutMode,
+      heightMode,
+      useNoteScroll,
+      noteMaxHeight
+    };
+  }
+
+  applyResponsiveItemSheetLayoutState(rootLike = null, metrics = {}) {
+    const sheetRoot = this.getResponsiveSheetScaleTarget(rootLike);
+    if (!sheetRoot) return null;
+    const width = Math.max(320, Math.round(Number(metrics?.width) || 0));
+    const height = Math.max(320, Math.round(Number(metrics?.height) || 0));
+    const state = this.resolveResponsiveItemSheetLayoutState(width, height);
+    sheetRoot.dataset.bmLayout = state.layoutMode;
+    sheetRoot.dataset.bmHeight = state.heightMode;
+    sheetRoot.dataset.bmNoteScroll = state.useNoteScroll ? "true" : "false";
+
+    const noteField = sheetRoot.querySelector(".bm-item-note-textarea");
+    if (noteField instanceof HTMLTextAreaElement) {
+      if (state.noteMaxHeight > 0) {
+        noteField.dataset.autogrowMaxHeightPx = String(state.noteMaxHeight);
+      } else {
+        delete noteField.dataset.autogrowMaxHeightPx;
+      }
+    }
+
+    return state;
+  }
+
+  updateResponsiveSheetScale(rootLike = null) {
+    const sheetRoot = this.getResponsiveSheetScaleTarget(rootLike);
+    if (!sheetRoot) return 1;
+    const rect = sheetRoot.getBoundingClientRect();
+    const positionWidth = Number(this.position?.width);
+    const positionHeight = Number(this.position?.height);
+    const width = Number.isFinite(positionWidth) && positionWidth > 0
+      ? Math.max(positionWidth, 320)
+      : Math.max(Number(sheetRoot.clientWidth) || rect.width || 0, 320);
+    const height = Number.isFinite(positionHeight) && positionHeight > 0
+      ? Math.max(positionHeight - 40, 320)
+      : Math.max(Number(sheetRoot.clientHeight) || rect.height || 0, 320);
+    const viewportWidth = Math.max(
+      Number(globalThis?.innerWidth) || 0,
+      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
+      1280
+    );
+    const viewportHeight = Math.max(
+      Number(globalThis?.innerHeight) || 0,
+      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
+      720
+    );
+    const widthScale = width / 1180;
+    const heightScale = height / 760;
+    const viewportScaleBoost = Math.min(
+      1.16,
+      Math.max(1, Math.sqrt((viewportWidth / 1920) * (viewportHeight / 1080)))
+    );
+    const baseScale = Math.sqrt(widthScale * heightScale);
+    const scale = Math.min(1.7, Math.max(0.9, baseScale * viewportScaleBoost));
+    sheetRoot.style.setProperty("--bm-sheet-scale", scale.toFixed(3));
+    sheetRoot.style.setProperty("--bm-sheet-width", `${Math.round(width)}px`);
+    sheetRoot.style.setProperty("--bm-sheet-height", `${Math.round(height)}px`);
+    const responsiveState = this.applyResponsiveItemSheetLayoutState(sheetRoot, { width, height });
+    const layoutKey = [
+      Math.round(width),
+      Math.round(height),
+      responsiveState?.layoutMode || "",
+      responsiveState?.heightMode || "",
+      responsiveState?.noteMaxHeight || 0,
+      scale.toFixed(3)
+    ].join("|");
+    if (layoutKey !== this._lastResponsiveItemSheetLayoutKey) {
+      this._lastResponsiveItemSheetLayoutKey = layoutKey;
+      this.queueItemSheetAutoGrowTextareaRefresh(sheetRoot);
+    }
+    return scale;
+  }
+
+  connectResponsiveSheetScaleObserver(html) {
+    this.disconnectResponsiveSheetScaleObserver();
+    const observerTarget = this.getResponsiveSheetObserverTarget(html);
+    if (!observerTarget) return;
+    this.updateResponsiveSheetScale(observerTarget);
+    if (typeof ResizeObserver !== "function") return;
+    this._responsiveItemSheetScaleObserver = new ResizeObserver(() => {
+      this.updateResponsiveSheetScale(observerTarget);
+    });
+    this._responsiveItemSheetScaleObserver.observe(observerTarget);
+  }
+
+  disconnectResponsiveSheetScaleObserver() {
+    this._responsiveItemSheetScaleObserver?.disconnect?.();
+    this._responsiveItemSheetScaleObserver = null;
+  }
+
+  clearQueuedItemSheetAutoGrowRefresh() {
+    clearUiMicrotask(this._itemSheetAutoGrowRefreshTaskId);
+    this._itemSheetAutoGrowRefreshTaskId = null;
+    this._queuedItemSheetAutoGrowRoot = null;
+  }
+
+  resizeItemSheetAutoGrowTextarea(textarea) {
+    if (!textarea || String(textarea.tagName || "").toUpperCase() !== "TEXTAREA") return;
+    textarea.style.maxHeight = "";
+    textarea.style.height = "auto";
+    const computedStyle = window.getComputedStyle ? window.getComputedStyle(textarea) : null;
+    const layout = resolveTextareaAutoGrowState({
+      style: computedStyle,
+      rows: textarea.getAttribute("rows"),
+      minRows: textarea.dataset?.autogrowMinRows,
+      maxRows: textarea.dataset?.autogrowMaxRows,
+      scrollHeight: textarea.scrollHeight
+    });
+    const requestedMaxHeight = Number(textarea.dataset?.autogrowMaxHeightPx);
+    const maxHeightPx = Number.isFinite(requestedMaxHeight) && requestedMaxHeight > 0
+      ? Math.max(layout.minHeight, Math.round(requestedMaxHeight))
+      : 0;
+    const nextHeight = maxHeightPx > 0
+      ? Math.min(layout.nextHeight, maxHeightPx)
+      : layout.nextHeight;
+    const overflowY = maxHeightPx > 0 && layout.contentHeight > nextHeight
+      ? "auto"
+      : layout.overflowY;
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.maxHeight = maxHeightPx > 0 ? `${maxHeightPx}px` : "";
+    textarea.style.overflowY = overflowY;
+  }
+
+  refreshItemSheetAutoGrowTextareas(htmlLike = null) {
+    const root = htmlLike?.find ? htmlLike : this.element;
+    if (!root?.length) return;
+    const fields = root.find("textarea[data-autogrow='true']");
+    if (!fields.length) return;
+    fields.each((_index, textarea) => {
+      this.resizeItemSheetAutoGrowTextarea(textarea);
+    });
+  }
+
+  queueItemSheetAutoGrowTextareaRefresh(rootLike = null) {
+    this._queuedItemSheetAutoGrowRoot = resolveDeferredRoot(this._queuedItemSheetAutoGrowRoot, rootLike);
+    if (this._itemSheetAutoGrowRefreshTaskId != null) return;
+    this._itemSheetAutoGrowRefreshTaskId = queueUiMicrotask(() => {
+      this._itemSheetAutoGrowRefreshTaskId = null;
+      const root = this._queuedItemSheetAutoGrowRoot?.find ? this._queuedItemSheetAutoGrowRoot : this.element;
+      this._queuedItemSheetAutoGrowRoot = null;
+      this.refreshItemSheetAutoGrowTextareas(root);
+    });
   }
 
   clearQueuedPricePreviewRefresh() {
@@ -10466,6 +10719,13 @@ class BloodmanItemSheet extends BaseItemSheet {
   activateListeners(html) {
     super.activateListeners(html);
     this.activatePricePreviewListeners(html);
+    this.connectResponsiveSheetScaleObserver(html);
+    this.refreshItemSheetAutoGrowTextareas(html);
+    this.queueItemSheetAutoGrowTextareaRefresh(html);
+
+    html.on("input change", "textarea[data-autogrow='true']", ev => {
+      this.resizeItemSheetAutoGrowTextarea(ev.currentTarget);
+    });
 
     html.on("dragover", "[data-item-equiper-avec-drop='true']", ev => {
       const nativeEvent = ev.originalEvent || ev;
@@ -10511,6 +10771,96 @@ class BloodmanItemSheet extends BaseItemSheet {
     html.find(".damage-roll").click(() => {
       this.rollAbilityDamage();
     });
+  }
+
+  async _onChangeInput(event) {
+    const target = event?.currentTarget instanceof HTMLElement
+      ? event.currentTarget
+      : (event?.target instanceof HTMLElement ? event.target : null);
+    if (!(target instanceof HTMLInputElement) || !target.classList.contains("bm-switch-input")) {
+      return super._onChangeInput(event);
+    }
+
+    const fieldName = String(target.name || "").trim();
+    if (!fieldName) return;
+
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    const nextValue = Boolean(target.checked);
+    let updateData = { [fieldName]: nextValue };
+    try {
+      if (typeof this._getSubmitData === "function") {
+        const fullSubmitData = this._getSubmitData({ [fieldName]: nextValue });
+        if (fullSubmitData && typeof fullSubmitData === "object") {
+          updateData = fullSubmitData;
+        }
+      }
+    } catch (_error) {
+      // Fallback to the switch-only update when submit data extraction fails.
+    }
+    this._suppressItemSheetRenderUntil = Number(globalThis?.performance?.now?.() ?? Date.now()) + 400;
+
+    try {
+      if (typeof this.item?.updateSource === "function") {
+        this.item.updateSource(foundry.utils.expandObject(updateData));
+      }
+    } catch (_error) {
+      // Non-fatal optimistic local update.
+    }
+
+    await this.item.update(updateData, { render: false });
+    this.syncItemSheetSwitchDependentUi(fieldName, nextValue);
+    this.updateResponsiveSheetScale();
+  }
+
+  syncItemSheetSwitchDependentUi(changedField = "", nextValue = false, htmlLike = null) {
+    const root = htmlLike?.find ? htmlLike : this.element;
+    if (!root?.length) return;
+    const setDisabled = (selector, disabled) => {
+      root.find(selector).prop("disabled", Boolean(disabled));
+    };
+    const toggleClass = (selector, className, enabled) => {
+      root.find(selector).toggleClass(className, Boolean(enabled));
+    };
+
+    switch (String(changedField || "").trim()) {
+      case "system.singleUseEnabled":
+        setDisabled("input[name='system.singleUseCount']", !nextValue);
+        break;
+      case "system.powerCostEnabled":
+        setDisabled("input[name='system.powerCost']", !nextValue);
+        break;
+      case "system.damageEnabled":
+        setDisabled("input[name='system.damageDie']", !nextValue);
+        break;
+      case "system.protectionEnabled":
+        setDisabled("input[name='system.pa']", !nextValue);
+        break;
+      case "system.healEnabled":
+        setDisabled("input[name='system.healDie']", !nextValue);
+        break;
+      case "system.characteristicBonusEnabled":
+        setDisabled("input[name^='system.characteristicBonuses.']", !nextValue);
+        toggleClass(".bonus-grid-characteristics", "is-disabled", !nextValue);
+        break;
+      case "system.rawBonusEnabled":
+        setDisabled("input[name^='system.rawBonuses.']", !nextValue);
+        toggleClass(".bonus-grid-compact", "is-disabled", !nextValue);
+        break;
+      case "system.infiniteAmmo": {
+        const weaponType = String(root.find("input[name='system.weaponType']:checked").val() || "").trim().toLowerCase();
+        const magazineCapacity = normalizeNonNegativeInteger(root.find("input[name='system.magazineCapacity']").val(), 0);
+        const usesMagazine = weaponType === "distance" && !nextValue && magazineCapacity > 0;
+        setDisabled("input[name='system.loadedAmmo']", !usesMagazine);
+        break;
+      }
+      case "system.link.equiperAvecEnabled":
+        toggleClass(".bm-item-equiper-avec-builder", "is-disabled", !nextValue);
+        break;
+      default:
+        break;
+    }
   }
 
   getItemSheetEquiperAvecDropContainerFromEvent(eventLike) {

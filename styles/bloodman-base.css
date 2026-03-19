@@ -396,6 +396,93 @@
   box-shadow: 0 0 0 2px var(--bm-item-accent-glow);
 }
 
+.bloodman-item.bm-item-sheet .bm-switch-group {
+  min-height: 0;
+}
+
+.bloodman-item.bm-item-sheet .bm-switch {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: calc(34px * var(--bm-sheet-scale, 1));
+  height: calc(20px * var(--bm-sheet-scale, 1));
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 0;
+  user-select: none;
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #7d838c 0%, #5f6670 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 2px rgba(77, 158, 240, 0),
+    0 1px 1px rgba(255, 255, 255, 0.08);
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-track::after {
+  content: "";
+  position: absolute;
+  top: calc(2px * var(--bm-sheet-scale, 1));
+  left: calc(2px * var(--bm-sheet-scale, 1));
+  width: calc(14px * var(--bm-sheet-scale, 1));
+  height: calc(14px * var(--bm-sheet-scale, 1));
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff 0%, #dfe5ea 100%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  transition: transform 140ms ease;
+  will-change: transform;
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-input:checked + .bm-switch-track {
+  border-color: rgba(104, 171, 243, 0.8);
+  background: linear-gradient(180deg, #4d9ef0 0%, #2d6ebd 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 2px rgba(77, 158, 240, 0.16),
+    0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-input:checked + .bm-switch-track::after {
+  transform: translateX(calc(14px * var(--bm-sheet-scale, 1)));
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-input:focus-visible + .bm-switch-track {
+  border-color: rgba(104, 171, 243, 0.92);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 2px rgba(77, 158, 240, 0.22),
+    0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-input:disabled {
+  cursor: not-allowed;
+}
+
+.bloodman-item.bm-item-sheet .bm-switch-input:disabled + .bm-switch-track {
+  opacity: 0.56;
+}
+
 .bloodman-item.bm-item-sheet select:disabled,
 .bloodman-item.bm-item-sheet input:disabled,
 .bloodman-item.bm-item-sheet textarea:disabled {
