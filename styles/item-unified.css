@@ -298,9 +298,11 @@
   box-shadow: 0 0 0 1px var(--bm-item-accent-glow);
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified .toggle-option:has(input:checked) {
-  border-color: var(--bm-item-accent);
-  background: rgba(198, 78, 64, 0.2);
+@supports selector(:has(*)) {
+  .bloodman-item.bm-item-sheet.bm-item-unified .toggle-option:has(input:checked) {
+    border-color: var(--bm-item-accent);
+    background: rgba(198, 78, 64, 0.2);
+  }
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-card:focus-within,

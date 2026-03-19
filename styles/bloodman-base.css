@@ -1219,6 +1219,41 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
   cursor: default;
 }
 
+@supports not (color: color-mix(in srgb, black 50%, white)) {
+  .bm-damage-config .bm-damage-config-shell {
+    background:
+      radial-gradient(circle at 92% -10%, rgba(255, 255, 255, 0.12), transparent 38%),
+      linear-gradient(160deg, var(--bm-damage-bg-soft), var(--bm-damage-bg));
+  }
+
+  .bm-damage-config .bm-damage-config-icon-ring,
+  .bm-damage-config .bm-damage-config-stat,
+  .bm-damage-split .bm-damage-split-summary-card,
+  .bm-damage-split .bm-damage-split-row {
+    border-color: var(--bm-damage-border);
+    background: var(--bm-damage-field);
+  }
+
+  .bm-damage-config .bm-damage-config-hint-sync,
+  .bm-damage-config .bm-damage-config-help {
+    border-color: var(--bm-damage-border);
+    background: var(--bm-damage-field);
+  }
+
+  .bm-damage-config .bm-damage-config-help code {
+    border-color: var(--bm-damage-border);
+    background: var(--bm-damage-bg-soft);
+  }
+
+  .bm-damage-config .bm-damage-config-stepper-btn {
+    background: var(--bm-damage-field);
+  }
+
+  .bm-damage-config.bm-damage-config--simple-attack input[name="degats"]:disabled {
+    color: var(--bm-damage-muted);
+  }
+}
+
 .window-app.bloodman-growth-dialog,
 .window-app.dialog.bloodman-growth-dialog {
   --bm-growth-bg: #121915;

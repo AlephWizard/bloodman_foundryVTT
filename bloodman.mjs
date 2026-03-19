@@ -1862,7 +1862,7 @@ function configureTokenHudEnhancements(hud, htmlLike) {
   if (!root) return;
 
   void ensureTokenHudLocalSvgIcons({ copyMissing: false });
-  refreshTokenHudStatusEffectIconPaths({ bumpCache: true });
+  refreshTokenHudStatusEffectIconPaths({ bumpCache: false });
 
   root.classList.add("bm-token-hud");
   root.dataset.bmTokenHudEnhanced = "true";
@@ -2231,23 +2231,52 @@ if (!globalThis.__bmSyncZeroPvStatusForToken) {
 function getTokenDocumentsForActor(actor) {
   const actorId = actor?.id;
   if (!actorId) return [];
+  const caches = getResolvedActorDocumentCaches();
+  const cachedDocs = caches.tokenDocsByActorId.get(actorId);
+  if (Array.isArray(cachedDocs)) return cachedDocs;
   const docs = [];
   for (const scene of game.scenes || []) {
     for (const tokenDoc of scene.tokens || []) {
       if (tokenDoc.actorId === actorId) docs.push(tokenDoc);
     }
   }
+  caches.tokenDocsByActorId.set(actorId, docs);
   return docs;
+}
+
+function getActorDocumentInstanceKey(actorDoc) {
+  if (!actorDoc) return "";
+  return String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+}
+
+const RESOLVED_ACTOR_DOCUMENT_CACHES = {
+  tokenDocsByActorId: new Map(),
+  actorInstancesById: new Map(),
+  ownedCharacterActorInstances: null
+};
+
+function getResolvedActorDocumentCaches() {
+  return RESOLVED_ACTOR_DOCUMENT_CACHES;
+}
+
+function clearResolvedActorDocumentCaches() {
+  const caches = RESOLVED_ACTOR_DOCUMENT_CACHES;
+  caches.tokenDocsByActorId.clear();
+  caches.actorInstancesById.clear();
+  caches.ownedCharacterActorInstances = null;
 }
 
 function getActorInstancesById(actorId) {
   const id = String(actorId || "");
   if (!id) return [];
+  const caches = getResolvedActorDocumentCaches();
+  const cachedInstances = caches.actorInstancesById.get(id);
+  if (Array.isArray(cachedInstances)) return cachedInstances;
   const instances = [];
   const seen = new Set();
   const addInstance = actorDoc => {
     if (!actorDoc) return;
-    const key = String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+    const key = getActorDocumentInstanceKey(actorDoc);
     if (seen.has(key)) return;
     seen.add(key);
     instances.push(actorDoc);
@@ -2260,17 +2289,20 @@ function getActorInstancesById(actorId) {
       addInstance(tokenDoc.actor || null);
     }
   }
+  caches.actorInstancesById.set(id, instances);
   return instances;
 }
 
 function getOwnedCharacterActorInstances() {
+  const caches = getResolvedActorDocumentCaches();
+  if (Array.isArray(caches.ownedCharacterActorInstances)) return caches.ownedCharacterActorInstances;
   const instances = [];
   const seen = new Set();
   const addInstance = actorDoc => {
     if (!actorDoc || !actorDoc.isOwner) return;
     const type = String(actorDoc.type || "");
     if (type !== "personnage" && type !== "personnage-non-joueur") return;
-    const key = String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+    const key = getActorDocumentInstanceKey(actorDoc);
     if (seen.has(key)) return;
     seen.add(key);
     instances.push(actorDoc);
@@ -2280,6 +2312,7 @@ function getOwnedCharacterActorInstances() {
   for (const scene of game.scenes || []) {
     for (const tokenDoc of scene.tokens || []) addInstance(tokenDoc.actor || null);
   }
+  caches.ownedCharacterActorInstances = instances;
   return instances;
 }
 
@@ -2291,7 +2324,7 @@ function getOpenSheetActorInstances() {
     if (!actorDoc) continue;
     const type = String(actorDoc.type || "");
     if (type !== "personnage" && type !== "personnage-non-joueur") continue;
-    const key = String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+    const key = getActorDocumentInstanceKey(actorDoc);
     if (seen.has(key)) continue;
     seen.add(key);
     instances.push(actorDoc);
@@ -2309,7 +2342,7 @@ function resolveAttackerActorInstancesForDamageApplied(data) {
   const deduped = [];
   const seen = new Set();
   for (const actor of candidates) {
-    const key = String(actor.uuid || `${actor.id}:${actor.parent?.uuid || actor.parent?.id || "world"}`);
+    const key = getActorDocumentInstanceKey(actor);
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(actor);
@@ -5423,7 +5456,9 @@ function ensureChaosDiceUI() {
   positionChaosDiceUI();
 
   if (!window.__bmChaosDiceObserver) {
-    const observer = new ResizeObserver(() => positionChaosDiceUI());
+    const observer = typeof ResizeObserver === "function"
+      ? new ResizeObserver(() => positionChaosDiceUI())
+      : null;
     const leftUi = document.getElementById("ui-left");
     const controls = document.getElementById("controls");
     const navigation = document.getElementById("navigation");
@@ -5432,14 +5467,14 @@ function ensureChaosDiceUI() {
     const tabs = document.getElementById("sidebar-tabs");
     const chatForm = document.getElementById("chat-form");
     const hotbar = document.getElementById("hotbar");
-    if (leftUi) observer.observe(leftUi);
-    if (controls) observer.observe(controls);
-    if (navigation) observer.observe(navigation);
-    if (players) observer.observe(players);
-    if (sidebar) observer.observe(sidebar);
-    if (tabs) observer.observe(tabs);
-    if (chatForm) observer.observe(chatForm);
-    if (hotbar) observer.observe(hotbar);
+    if (leftUi && observer) observer.observe(leftUi);
+    if (controls && observer) observer.observe(controls);
+    if (navigation && observer) observer.observe(navigation);
+    if (players && observer) observer.observe(players);
+    if (sidebar && observer) observer.observe(sidebar);
+    if (tabs && observer) observer.observe(tabs);
+    if (chatForm && observer) observer.observe(chatForm);
+    if (hotbar && observer) observer.observe(hotbar);
     window.addEventListener("resize", positionChaosDiceUI);
 
     const mutationTargets = [leftUi, controls, navigation, players, sidebar].filter(Boolean);
@@ -5450,7 +5485,7 @@ function ensureChaosDiceUI() {
       }
       window.__bmChaosDiceMutation = mutation;
     }
-    window.__bmChaosDiceObserver = observer;
+    window.__bmChaosDiceObserver = observer || { disconnect: () => {} };
   }
 }
 
@@ -6084,7 +6119,7 @@ function buildTransportNpcDisplayData(actor) {
     seen.add(ref);
     const npc = resolveTransportNpcSync(ref);
     if (!npc) {
-      const fallbackName = String(ref || "").trim().split(".").at(-1) || "PNJ";
+      const fallbackName = String(ref || "").trim().split(".").slice(-1)[0] || "PNJ";
       transportNpcs.push({
         ref,
         id: ref,
@@ -6145,6 +6180,9 @@ Hooks.on("drawToken", tokenCombatHooks.onDrawToken);
 Hooks.on("refreshToken", tokenCombatHooks.onRefreshToken);
 Hooks.on("createToken", tokenCombatHooks.onCreateToken);
 Hooks.on("deleteToken", tokenCombatHooks.onDeleteToken);
+Hooks.on("createToken", clearResolvedActorDocumentCaches);
+Hooks.on("updateToken", clearResolvedActorDocumentCaches);
+Hooks.on("deleteToken", clearResolvedActorDocumentCaches);
 Hooks.on("preCreateCombatant", tokenCombatHooks.onPreCreateCombatant);
 Hooks.on("updateCombat", tokenCombatHooks.onUpdateCombat);
 Hooks.on("combatTurnChange", tokenCombatHooks.onCombatTurnChange);
@@ -6194,8 +6232,14 @@ const actorUpdateHooks = buildActorUpdateHooks({
 });
 
 Hooks.on("updateActor", async (actor, changes, options, userId) => {
+  clearResolvedActorDocumentCaches();
   await actorUpdateHooks.onUpdateActor(actor, changes, options, userId);
 });
+Hooks.on("createActor", clearResolvedActorDocumentCaches);
+Hooks.on("deleteActor", clearResolvedActorDocumentCaches);
+Hooks.on("createScene", clearResolvedActorDocumentCaches);
+Hooks.on("updateScene", clearResolvedActorDocumentCaches);
+Hooks.on("deleteScene", clearResolvedActorDocumentCaches);
 
 Hooks.on("preUpdateToken", tokenCombatHooks.onPreUpdateToken);
 Hooks.on("updateToken", tokenCombatHooks.onUpdateToken);
@@ -7305,7 +7349,7 @@ class BloodmanActorSheet extends BaseActorSheet {
           if (leftSort !== rightSort) return leftSort - rightSort;
           return String(left?.id || "").localeCompare(String(right?.id || ""));
         })
-        .at(-1) || null;
+        .slice(-1)[0] || null;
       sortBefore = false;
     } else {
       const columns = this.getItemListColumnCountFromElement(list);
@@ -7579,7 +7623,7 @@ class BloodmanActorSheet extends BaseActorSheet {
             if (leftSort !== rightSort) return leftSort - rightSort;
             return String(left?.id || "").localeCompare(String(right?.id || ""));
           })
-          .at(-1);
+          .slice(-1)[0];
         targetItem = fallbackTarget || null;
         sortBefore = false;
       } else {
@@ -10630,6 +10674,11 @@ class BloodmanItemSheet extends BaseItemSheet {
     const observerTarget = this.getResponsiveSheetObserverTarget(html);
     if (!observerTarget) return;
     this.updateResponsiveSheetScale(observerTarget);
+    const windowResizeHandler = () => {
+      this.updateResponsiveSheetScale(observerTarget);
+    };
+    this._responsiveItemSheetScaleWindowResize = windowResizeHandler;
+    globalThis?.addEventListener?.("resize", windowResizeHandler);
     if (typeof ResizeObserver !== "function") return;
     this._responsiveItemSheetScaleObserver = new ResizeObserver(() => {
       this.updateResponsiveSheetScale(observerTarget);
@@ -10640,6 +10689,10 @@ class BloodmanItemSheet extends BaseItemSheet {
   disconnectResponsiveSheetScaleObserver() {
     this._responsiveItemSheetScaleObserver?.disconnect?.();
     this._responsiveItemSheetScaleObserver = null;
+    if (this._responsiveItemSheetScaleWindowResize) {
+      globalThis?.removeEventListener?.("resize", this._responsiveItemSheetScaleWindowResize);
+      this._responsiveItemSheetScaleWindowResize = null;
+    }
   }
 
   clearQueuedItemSheetAutoGrowRefresh() {

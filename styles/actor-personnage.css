@@ -2609,8 +2609,15 @@
   transform-origin: center;
 }
 
-.bloodman-sheet .char-row:has(.char-icon:hover) .char-score .char-effective,
-.bloodman-sheet .char-row:has(.char-roll:hover) .char-score .char-effective {
+@supports selector(:has(*)) {
+  .bloodman-sheet .char-row:has(.char-icon:hover) .char-score .char-effective,
+  .bloodman-sheet .char-row:has(.char-roll:hover) .char-score .char-effective {
+    animation: bm-char-effective-pulse 1.9s ease-in-out infinite;
+  }
+}
+
+.bloodman-sheet .char-row .char-icon:hover ~ .char-score .char-effective,
+.bloodman-sheet .char-row .char-name:hover ~ .char-score .char-effective {
   animation: bm-char-effective-pulse 1.9s ease-in-out infinite;
 }
 
@@ -2744,9 +2751,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bloodman-sheet .char-row:has(.char-icon:hover) .char-score .char-effective,
-  .bloodman-sheet .char-row:has(.char-roll:hover) .char-score .char-effective {
+  .bloodman-sheet .char-row .char-icon:hover ~ .char-score .char-effective,
+  .bloodman-sheet .char-row .char-name:hover ~ .char-score .char-effective {
     animation: none !important;
+  }
+
+  @supports selector(:has(*)) {
+    .bloodman-sheet .char-row:has(.char-icon:hover) .char-score .char-effective,
+    .bloodman-sheet .char-row:has(.char-roll:hover) .char-score .char-effective {
+      animation: none !important;
+    }
   }
 
   .resource-circle.pv::before,
@@ -2897,6 +2911,13 @@
     linear-gradient(180deg, rgba(0, 0, 0, 0.96) 0%, rgba(17, 17, 17, 0.94) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(3px);
+}
+
+@supports not ((backdrop-filter: blur(3px)) or (-webkit-backdrop-filter: blur(3px))) {
+  .bloodman-sheet .sheet-header {
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.985) 0%, rgba(17, 17, 17, 0.97) 100%);
+  }
 }
 
 .bloodman-sheet .sheet-header::after {
