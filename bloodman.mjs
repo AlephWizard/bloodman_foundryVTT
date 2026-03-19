@@ -101,6 +101,10 @@ import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
 import { createActorSheetLayoutRules } from "./src/ui/actor-sheet-layout.mjs";
 import { createItemSheetPricePreviewRules } from "./src/ui/item-sheet-price-preview.mjs";
 import {
+  buildBloodmanSupplementalStatusEffects,
+  registerBloodmanSupplementalStatusEffects
+} from "./src/rules/status-effects.mjs";
+import {
   parseLooseNumericInput as ruleParseLooseNumericInput,
   parseSimpleArithmeticInput as ruleParseSimpleArithmeticInput,
   normalizeSignedModifierInput as ruleNormalizeSignedModifierInput,
@@ -4740,6 +4744,11 @@ Hooks.once("init", () => {
   });
   installTokenEffectBackgroundPatch();
   installTokenHudRenderPatch();
+
+  registerBloodmanSupplementalStatusEffects(
+    CONFIG.statusEffects,
+    buildBloodmanSupplementalStatusEffects({ systemRootPath: SYSTEM_ROOT_PATH })
+  );
 
   game.settings.register("bloodman", "chaosDice", {
     name: t("BLOODMAN.Settings.ChaosDiceName"),
