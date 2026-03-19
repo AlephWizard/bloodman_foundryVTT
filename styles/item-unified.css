@@ -876,10 +876,6 @@
   grid-column: 1 / -1;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-links .bm-item-unified-field-bag-count {
-  display: none;
-}
-
 @media (max-width: 680px) {
   .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-grid {
     grid-template-columns: 1fr;
