@@ -177,11 +177,22 @@ function getActorPlayerViewerIds(actor) {
     .filter(Boolean);
 }
 
+const MULTILINE_TEXT_HTML_CACHE_MAX = 400;
+const MULTILINE_TEXT_HTML_CACHE = new Map();
+
 function formatMultilineTextToHtml(value) {
   const raw = String(value || "");
   if (!raw.trim()) return "";
+  const cached = MULTILINE_TEXT_HTML_CACHE.get(raw);
+  if (typeof cached === "string") return cached;
   const escaped = foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(raw) : raw;
-  return escaped.replace(/\r\n|\r|\n/g, "<br>");
+  const html = escaped.replace(/\r\n|\r|\n/g, "<br>");
+  if (MULTILINE_TEXT_HTML_CACHE.size >= MULTILINE_TEXT_HTML_CACHE_MAX) {
+    const oldestKey = MULTILINE_TEXT_HTML_CACHE.keys().next().value;
+    if (oldestKey !== undefined) MULTILINE_TEXT_HTML_CACHE.delete(oldestKey);
+  }
+  MULTILINE_TEXT_HTML_CACHE.set(raw, html);
+  return html;
 }
 
 const ACTOR_CREATE_TYPE_ICONS = {
@@ -6316,10 +6327,18 @@ class BloodmanActorSheet extends BaseActorSheet {
     return super.render(force, options);
   }
 
+  setPosition(options = {}) {
+    const position = super.setPosition(options);
+    this.applyResponsiveActorSheetLayoutState();
+    return position;
+  }
+
   async close(options = {}) {
     this.clearRerollDisplayState();
     this.clearPowerUseState();
     this.clearDeferredSheetUiTasks();
+    this.disconnectResponsiveActorSheetLayoutObserver();
+    this._responsiveActorSheetLayoutState = null;
     this._resourceBubbleRuntimeMap = null;
     clearUiMicrotask(this._pvGaugePulseTimer);
     clearUiMicrotask(this._ppGaugePulseTimer);
@@ -6341,6 +6360,166 @@ class BloodmanActorSheet extends BaseActorSheet {
     this._queuedAutoResizeForce = false;
     this._queuedAutoGrowRoot = null;
     this._queuedResourceGaugeRoot = null;
+  }
+
+  getResponsiveActorSheetRoot(rootLike = null) {
+    const root = rootLike?.find ? rootLike[0] : rootLike;
+    const elementRoot = root instanceof HTMLElement
+      ? root
+      : (this.element?.[0] instanceof HTMLElement ? this.element[0] : null);
+    if (!elementRoot) return null;
+    const sheetRoot = elementRoot.matches?.(".bloodman-sheet")
+      ? elementRoot
+      : elementRoot.querySelector?.(".bloodman-sheet");
+    return sheetRoot instanceof HTMLElement ? sheetRoot : null;
+  }
+
+  getResponsiveActorSheetObserverTarget(rootLike = null) {
+    const sheetRoot = this.getResponsiveActorSheetRoot(rootLike);
+    if (!sheetRoot) return null;
+    return sheetRoot.closest?.(".app.window-app") || sheetRoot;
+  }
+
+  resolveResponsiveActorSheetLayoutMode({
+    width = 0,
+    height = 0,
+    activeTab = ""
+  } = {}) {
+    const safeWidth = Math.max(0, Math.round(Number(width) || 0));
+    const safeHeight = Math.max(0, Math.round(Number(height) || 0));
+    const tab = String(activeTab || "").trim().toLowerCase();
+    if (safeWidth < 980) return "narrow";
+    if (safeWidth < 1260 || safeHeight < 680) return "compact";
+    if ((tab === "pouvoirs" || tab === "equipement") && safeWidth < 1420) return "compact";
+    return "wide";
+  }
+
+  applyResponsiveActorSheetLayoutState(rootLike = null) {
+    const sheetRoot = this.getResponsiveActorSheetRoot(rootLike);
+    const observerTarget = this.getResponsiveActorSheetObserverTarget(rootLike);
+    if (!sheetRoot || !observerTarget) return null;
+    const width = Math.max(
+      Number(observerTarget.clientWidth) || 0,
+      Math.round(Number(observerTarget.getBoundingClientRect?.().width) || 0),
+      Number(this.position?.width) || 0,
+      0
+    );
+    const height = Math.max(
+      Number(observerTarget.clientHeight) || 0,
+      Math.round(Number(observerTarget.getBoundingClientRect?.().height) || 0),
+      Number(this.position?.height) || 0,
+      0
+    );
+    const activeTab = this.getActivePrimaryTabId();
+    const layoutMode = this.resolveResponsiveActorSheetLayoutMode({ width, height, activeTab });
+    const measureElementHeight = element => Math.round(
+      Math.max(
+        Number(element?.getBoundingClientRect?.().height) || 0,
+        Number(element?.scrollHeight) || 0,
+        Number(element?.offsetHeight) || 0
+      )
+    );
+    const parseCssMetric = value => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const measureStackedChildrenHeight = container => {
+      if (!(container instanceof HTMLElement)) return 0;
+      const computed = globalThis.getComputedStyle?.(container) || null;
+      let total = 0;
+      total += parseCssMetric(computed?.paddingTop);
+      total += parseCssMetric(computed?.paddingBottom);
+      total += parseCssMetric(computed?.borderTopWidth);
+      total += parseCssMetric(computed?.borderBottomWidth);
+      const children = Array.from(container.children || []);
+      for (const child of children) {
+        if (!(child instanceof HTMLElement)) continue;
+        const childComputed = globalThis.getComputedStyle?.(child) || null;
+        total += Math.max(
+          Number(child.scrollHeight) || 0,
+          Number(child.offsetHeight) || 0,
+          Math.round(Number(child.getBoundingClientRect?.().height) || 0)
+        );
+        total += parseCssMetric(childComputed?.marginTop);
+        total += parseCssMetric(childComputed?.marginBottom);
+      }
+      return Math.round(total);
+    };
+    const activeCharacterTab = activeTab === "carac"
+      ? sheetRoot.querySelector?.('.tab[data-tab="carac"].active')
+      : null;
+    const characteristicsCard = activeCharacterTab?.querySelector?.(".characteristics-card");
+    const characterSidebar = activeCharacterTab?.querySelector?.(".sidebar");
+    const characterPortraitFrame = activeCharacterTab?.querySelector?.(".portrait-frame");
+    const characterResourceBadges = activeCharacterTab?.querySelector?.(".resource-badges");
+    const characteristicsCardNaturalHeight = characteristicsCard instanceof HTMLElement
+      ? Math.max(
+        measureElementHeight(characteristicsCard),
+        measureStackedChildrenHeight(characteristicsCard),
+        measureElementHeight(characteristicsCard.querySelector?.(".characteristics-table")),
+        measureElementHeight(characteristicsCard.querySelector?.(".card-header"))
+      )
+      : 0;
+    const characteristicsCardHeight = characteristicsCardNaturalHeight;
+    sheetRoot.dataset.bmSheetLayout = layoutMode;
+    sheetRoot.dataset.bmActiveTab = activeTab;
+    sheetRoot.style.setProperty("--bm-sheet-window-width", `${Math.round(width)}px`);
+    sheetRoot.style.setProperty("--bm-sheet-window-height", `${Math.round(height)}px`);
+    if (characteristicsCardHeight > 0) {
+      sheetRoot.style.setProperty("--bm-carac-card-height", `${characteristicsCardHeight}px`);
+    } else {
+      sheetRoot.style.removeProperty("--bm-carac-card-height");
+    }
+    const syncedCharacterPanelHeightTargets = [
+      characterSidebar,
+      characterPortraitFrame,
+      characterResourceBadges,
+    ];
+    if (characteristicsCardHeight > 0 && activeTab === "carac") {
+      const heightValue = `${characteristicsCardHeight}px`;
+      for (const target of syncedCharacterPanelHeightTargets) {
+        if (!(target instanceof HTMLElement)) continue;
+        target.style.setProperty("height", heightValue);
+        target.style.setProperty("min-height", heightValue);
+        target.style.setProperty("max-height", heightValue);
+      }
+    } else {
+      for (const target of syncedCharacterPanelHeightTargets) {
+        if (!(target instanceof HTMLElement)) continue;
+        target.style.removeProperty("height");
+        target.style.removeProperty("min-height");
+        target.style.removeProperty("max-height");
+      }
+    }
+    const state = { layoutMode, width, height, activeTab };
+    this._responsiveActorSheetLayoutState = state;
+    return state;
+  }
+
+  connectResponsiveActorSheetLayoutObserver(html) {
+    this.disconnectResponsiveActorSheetLayoutObserver();
+    const observerTarget = this.getResponsiveActorSheetObserverTarget(html);
+    if (!observerTarget) return;
+    this.applyResponsiveActorSheetLayoutState(html);
+    const windowResizeHandler = () => {
+      this.applyResponsiveActorSheetLayoutState(observerTarget);
+    };
+    this._responsiveActorSheetWindowResize = windowResizeHandler;
+    globalThis?.addEventListener?.("resize", windowResizeHandler);
+    if (typeof ResizeObserver !== "function") return;
+    this._responsiveActorSheetLayoutObserver = new ResizeObserver(() => {
+      this.applyResponsiveActorSheetLayoutState(observerTarget);
+    });
+    this._responsiveActorSheetLayoutObserver.observe(observerTarget);
+  }
+
+  disconnectResponsiveActorSheetLayoutObserver() {
+    this._responsiveActorSheetLayoutObserver?.disconnect?.();
+    this._responsiveActorSheetLayoutObserver = null;
+    if (this._responsiveActorSheetWindowResize) {
+      globalThis?.removeEventListener?.("resize", this._responsiveActorSheetWindowResize);
+      this._responsiveActorSheetWindowResize = null;
+    }
   }
 
   queueAutoResizeToContent(force = false) {
@@ -8455,8 +8634,13 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!root?.length) return;
     const app = root.closest(".window-app");
     if (!app?.length) return;
+    const responsiveState = this.applyResponsiveActorSheetLayoutState(root);
     const resizeKey = this.getAutoResizeKey();
     if (!force && resizeKey && resizeKey === this._lastAutoResizeKey) return;
+    if (responsiveState?.layoutMode && responsiveState.layoutMode !== "wide") {
+      if (resizeKey) this._lastAutoResizeKey = resizeKey;
+      return;
+    }
     const formEl = root.get(0);
     if (!formEl) return;
     const headerEl = app.find(".window-header").get(0);
@@ -8523,9 +8707,11 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.queueResourceGaugeRefresh(html);
     this.refreshAutoGrowTextareas(html);
     this.queueAutoGrowTextareaRefresh(html);
+    this.connectResponsiveActorSheetLayoutObserver(html);
     this.queueAutoResizeToContent(true);
 
     html.find(".sheet-tabs .item").on("click", () => {
+      queueUiMicrotask(() => this.applyResponsiveActorSheetLayoutState(html));
       this.queueAutoGrowTextareaRefresh(html);
       this.queueAutoResizeToContent(true);
     });

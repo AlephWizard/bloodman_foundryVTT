@@ -2377,11 +2377,13 @@
 }
 
 .column.center {
-  height: 100%;
+  height: auto;
+  min-height: 0;
 }
 
 .characteristics-card {
-  height: 100%;
+  height: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border-color: transparent;
@@ -2875,6 +2877,7 @@
   padding: 0;
   border: 0;
   border-radius: 0 0 13px 13px;
+  overflow: hidden;
   background:
     radial-gradient(circle at 100% 0, rgba(255, 255, 255, 0.24), transparent 38%),
     linear-gradient(180deg, #191919 0%, #0d0d0d 56%, #151515 100%);
@@ -2894,7 +2897,8 @@
 }
 
 .bloodman-sheet {
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   border-radius: 0 0 10px 10px;
@@ -2982,20 +2986,39 @@
 }
 
 .bloodman-sheet .sheet-body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 12px 14px 14px;
   background: linear-gradient(180deg, #f3f3f3 0%, #e7e7e7 100%);
 }
 
 .bloodman-sheet .tab-grid {
-  grid-template-columns: clamp(196px, 23vw, 258px) clamp(92px, 9vw, 116px) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 14px;
+  align-items: stretch;
+}
+
+.bloodman-sheet .sidebar {
+  align-self: stretch;
+  min-height: 0;
+  width: min(100%, clamp(190px, calc(var(--bm-carac-card-height, 560px) * 0.62), 320px));
+  height: var(--bm-carac-card-height, auto);
+  justify-self: start;
+  display: flex;
 }
 
 .bloodman-sheet .portrait-frame {
+  width: 100%;
+  height: 100%;
+  max-height: var(--bm-carac-card-height, 560px);
   border-radius: 18px;
   border: 0 !important;
   box-shadow: none;
+  overflow: hidden;
+  align-self: stretch;
 }
 
 .portrait-frame,
@@ -3004,13 +3027,28 @@
   border: 0 !important;
 }
 
+.bloodman-sheet .portrait {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center top;
+}
+
 .bloodman-sheet .resource-badges {
   gap: 10px;
+  width: max-content;
+  justify-self: start;
+  align-self: stretch;
+  height: var(--bm-carac-card-height, auto);
+  justify-content: stretch;
 }
 
 .bloodman-sheet .resource-circle {
   border: 2px solid #101010;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .bloodman-sheet .card {
@@ -3081,4 +3119,324 @@
   .bloodman-sheet .sheet-tabs {
     max-width: 100%;
   }
+}
+
+@supports (content-visibility: auto) {
+  .bloodman-sheet .item.item--stacked,
+  .bloodman-sheet .equiper-avec-block,
+  .bloodman-sheet .equiper-avec-item {
+    content-visibility: auto;
+    contain: layout paint style;
+  }
+
+  .bloodman-sheet .item.item--stacked {
+    contain-intrinsic-size: 96px;
+  }
+
+  .bloodman-sheet .equiper-avec-block {
+    contain-intrinsic-size: 156px;
+  }
+
+  .bloodman-sheet .equiper-avec-item {
+    contain-intrinsic-size: 54px;
+  }
+}
+
+.tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns,
+.tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 4px 14px;
+  align-items: start;
+}
+
+.tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns > .item,
+.tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns > .item {
+  margin-bottom: 0;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-header,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-header {
+  padding: 8px 10px 7px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-logo,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-logo {
+  height: 26px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-title,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-title {
+  font-size: 28px;
+  letter-spacing: 0.9px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-tabs,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  max-width: 100%;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-tabs .item,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-tabs .item {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  transform: none;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-tabs .item:hover,
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-tabs .item:focus-visible,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-tabs .item:hover,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-tabs .item:focus-visible {
+  transform: none;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .sheet-body,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sheet-body {
+  padding: 10px 11px 12px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .card,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.58) inset,
+    0 4px 8px rgba(0, 0, 0, 0.04);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .resource-circle,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .resource-circle {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab-grid {
+  grid-template-columns: max-content max-content minmax(0, 1.05fr);
+  column-gap: 8px;
+  row-gap: 10px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .identity-hero {
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .identity-token-preview {
+  width: 78px;
+  height: 78px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="pouvoirs"] .abilities-powers-layout {
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 8px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="pouvoirs"] .abilities-powers-layout > .card {
+  padding: 3px 8px 2px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="pouvoirs"] .abilities-powers-layout > .aptitudes-card {
+  padding-right: 10px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="pouvoirs"] .abilities-powers-layout > .powers-card {
+  padding-left: 10px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns,
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="wide"] .tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns,
+.bloodman-sheet[data-bm-sheet-layout="wide"] .tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .item.item--stacked,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .item.item--stacked {
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 3px 6px;
+  padding: 3px 2px 3px 16px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .item-icon,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .item-icon {
+  width: 42px;
+  height: 42px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .item--stacked .item-name,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .item--stacked .item-name {
+  font-size: 11px;
+  line-height: 1.18;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .item--stacked .item-actions,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .item--stacked .item-actions {
+  gap: 3px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .item--stacked .item-notes,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .item--stacked .item-notes {
+  font-size: 11px;
+  line-height: 1.28;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .equiper-avec-note,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .equiper-avec-note {
+  font-size: 10px;
+  line-height: 1.25;
+  overflow: visible;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .equiper-avec-block,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .equiper-avec-block {
+  padding: 4px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .equiper-avec-list,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .equiper-avec-list {
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .equiper-avec-item,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .equiper-avec-item {
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 2px 5px;
+  padding: 2px 2px 2px 15px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .equiper-avec-icon,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .equiper-avec-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .identity-hero,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="pouvoirs"] .abilities-powers-layout {
+  grid-template-columns: 1fr;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab-grid {
+  grid-template-columns: clamp(150px, 24vw, 220px) max-content minmax(470px, 1fr);
+  column-gap: 6px;
+  row-gap: 10px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sidebar,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .portrait-frame,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .resource-badges {
+  justify-self: start;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .sidebar {
+  width: clamp(150px, 24vw, 220px);
+  height: var(--bm-carac-card-height, auto);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .resource-badges {
+  width: max-content;
+  height: var(--bm-carac-card-height, auto);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .portrait-frame {
+  width: 100%;
+  height: 100%;
+  max-height: var(--bm-carac-card-height, 560px);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .portrait {
+  object-position: center top;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="pouvoirs"] .abilities-powers-layout > .aptitudes-card,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="pouvoirs"] .abilities-powers-layout > .powers-card {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="pouvoirs"] .abilities-powers-layout > .powers-card {
+  border-left: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.35);
+  padding-top: 10px;
+}
+
+/* Strict top-row layout for the character tab:
+   portrait left, PV/PP center, characteristics right, with equal heights. */
+.bloodman-sheet .tab[data-tab="carac"] .tab-grid {
+  grid-template-columns:
+    clamp(235px, calc(var(--bm-sheet-window-width, 1200px) * 0.245), 330px)
+    76px
+    minmax(560px, 1fr);
+  column-gap: 10px;
+  row-gap: 10px;
+  align-items: start;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .sidebar {
+  width: clamp(235px, calc(var(--bm-sheet-window-width, 1200px) * 0.245), 330px);
+  min-height: 0;
+  align-self: start;
+  justify-self: start;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .portrait-frame {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  align-self: stretch;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .resource-badges {
+  width: 76px;
+  min-height: 0;
+  gap: 10px;
+  align-self: start;
+  justify-self: start;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .resource-circle {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 0;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .column.center {
+  min-width: 560px;
+  align-self: start;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .tab-grid,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .tab-grid {
+  grid-template-columns:
+    clamp(210px, calc(var(--bm-sheet-window-width, 980px) * 0.225), 285px)
+    72px
+    minmax(520px, 1fr);
+  column-gap: 8px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .sidebar,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .sidebar {
+  width: clamp(210px, calc(var(--bm-sheet-window-width, 980px) * 0.225), 285px);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .resource-badges,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .resource-badges {
+  width: 72px;
+  gap: 8px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .column.center,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .column.center {
+  min-width: 520px;
 }
