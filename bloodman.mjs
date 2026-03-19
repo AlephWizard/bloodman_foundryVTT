@@ -11014,11 +11014,6 @@ class BloodmanItemSheet extends BaseItemSheet {
       sourceItem?.sheet?.render?.(true);
     });
 
-    if (this.item.type !== "aptitude" && this.item.type !== "pouvoir") return;
-
-    html.find(".damage-roll").click(() => {
-      this.rollAbilityDamage();
-    });
   }
 
   async _onChangeInput(event) {
