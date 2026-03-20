@@ -43,6 +43,7 @@ import { buildChatRelayHelpers } from "./src/hooks/chat-relay.mjs";
 import { buildChatRollDecorationHooks } from "./src/hooks/chat-roll-decoration.mjs";
 import { buildChatMessageRoutingHooks } from "./src/hooks/chat-message-routing.mjs";
 import { buildTokenCombatHooks } from "./src/hooks/token-combat.mjs";
+import { buildDamageRollFlavorMarkup } from "./src/ui/damage-chat.mjs";
 import {
   toFiniteNumber as ruleToFiniteNumber,
   normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
@@ -9939,10 +9940,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       variant: "simple-attack",
       rememberConfig: false
     };
-    if (!game.user?.isGM) {
-      damageDialog.fixedFormula = "1d4";
-      damageDialog.lockFormula = true;
-    }
     const result = await doDirectDamageRoll(this.actor, "1d4", sourceName, {
       itemId: SIMPLE_ATTACK_REROLL_ID,
       itemType: "arme",
@@ -10242,15 +10239,24 @@ class BloodmanActorSheet extends BaseActorSheet {
     const allocations = buildRerollAllocations(context, totalDamage);
     const penetrationValue = Math.max(0, Number(context.penetration || 0));
     const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
+    const rerollTargetNames = allocations
+      .map(entry => String(entry?.targetName || "").trim())
+      .filter(Boolean);
 
-    const damageLabel = context.degats || context.formula || "";
+    const flavorTag = [modeTag, t("BLOODMAN.Common.Reroll")].filter(Boolean).join(" | ");
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: `${t("BLOODMAN.Rolls.Damage.Deal", {
-        name: this.actor.name,
-        amount: totalDamage,
-        source: context.itemName ? ` (${context.itemName})` : ""
-      })}<br><small>${damageLabel} + ${context.bonusBrut} | PEN ${context.penetration}${modeTag ? ` | ${modeTag}` : ""} | ${t("BLOODMAN.Common.Reroll")}</small>`,
+      flavor: buildDamageRollFlavorMarkup({
+        attackerName: this.actor?.name || tl("BLOODMAN.Common.Name", "Attaquant"),
+        targetNames: rerollTargetNames,
+        formula: String(context?.formula || "").trim() || "1d4",
+        rollResults,
+        bonusBrut: context?.bonusBrut,
+        penetration: context?.penetration,
+        totalDamage,
+        sourceName: itemName || String(context?.itemName || ""),
+        modeTag: flavorTag
+      }),
       flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE, { chatRollReroll: true })
     });
 
@@ -10274,6 +10280,14 @@ class BloodmanActorSheet extends BaseActorSheet {
     await applyLocalItemRerollTargets({
       allocations,
       penetrationValue,
+      damageContext: {
+        attackerName: this.actor?.name || "",
+        sourceName: itemName || String(context?.itemName || ""),
+        formula: String(context?.formula || "").trim() || "1d4",
+        rollResults,
+        bonusBrut: context?.bonusBrut,
+        totalDamage
+      },
       validationMeta,
       defaultTargetName: "Cible"
     });

@@ -136,9 +136,10 @@ export function buildDamageRerollHooks({
     if (requestId) rememberRerollRequest(requestId);
     const kind = String(data.kind || "item-damage");
     if (kind !== "item-damage") return;
+    const attackerActor = currentGame.actors?.get(String(data.attackerId || "")) || null;
     let itemType = String(data.itemType || "").toLowerCase();
     if (!isDamageRerollItemType(itemType)) {
-      const attacker = currentGame.actors?.get(String(data.attackerId || ""));
+      const attacker = attackerActor;
       const item = attacker?.items?.get(String(data.itemId || ""));
       itemType = String(item?.type || itemType).toLowerCase();
     }
@@ -153,6 +154,12 @@ export function buildDamageRerollHooks({
     const targets = normalizeRerollTargets(data.targets);
     if (!targets.length) return;
     const penetration = Math.max(0, Math.floor(toFiniteNumber(data.penetration, 0)));
+    const attackerName = String(data.attackerName || attackerActor?.name || "").trim();
+    const sourceName = String(data.itemName || "").trim();
+    const formula = String(data.damageFormula || "").trim() || "1d4";
+    const rollResults = Array.isArray(data.rollResults) ? data.rollResults : [];
+    const bonusBrut = Math.max(0, Math.floor(toFiniteNumber(data.bonusBrut ?? data.bonus_brut, 0)));
+    const rolledTotalDamage = Number.isFinite(Number(data.totalDamage)) ? Number(data.totalDamage) : 0;
     bmLog.debug("reroll:recv", {
       attackerUserId: data.attackerUserId,
       attackerId: data.attackerId,
@@ -235,19 +242,24 @@ export function buildDamageRerollHooks({
           pa: 0
         };
       } else if (tokenIsLinked && targetActor) {
-        result = await applyDamageToActor(targetActor, share, { targetName, penetration });
+        result = await applyDamageToActor(targetActor, share, {
+          targetName,
+          penetration,
+          speakerAlias: attackerName || targetName,
+          attackerName,
+          formula,
+          rollResults,
+          bonusBrut,
+          rolledTotalDamage,
+          assignedDamage: share,
+          sourceName
+        });
       } else if (tokenDoc && Number.isFinite(hpBefore)) {
         const paInitial = getProtectionPA(tokenDoc.actor || null);
         const paEffective = Math.max(0, paInitial - penetration);
         const finalDamage = Math.max(0, share - paEffective);
         const nextValue = Math.max(0, hpBefore - finalDamage);
         await tokenDoc.update({ "delta.system.resources.pv.current": nextValue });
-        await postDamageTakenChatMessage({
-          name: targetName,
-          amount: finalDamage,
-          pa: paEffective,
-          speakerAlias: targetName
-        });
         result = {
           hpBefore,
           hpAfter: nextValue,
@@ -257,6 +269,25 @@ export function buildDamageRerollHooks({
           paEffective,
           pa: paEffective
         };
+        await postDamageTakenChatMessage({
+          name: targetName,
+          amount: result.finalDamage,
+          pa: result.paEffective,
+          speakerAlias: attackerName || targetName,
+          attackerName,
+          formula,
+          rollResults,
+          bonusBrut,
+          penetration: result.penetration,
+          rolledTotalDamage,
+          assignedDamage: share,
+          paInitial: result.paInitial,
+          paEffective: result.paEffective,
+          finalDamage: result.finalDamage,
+          hpBefore: result.hpBefore,
+          hpAfter: result.hpAfter,
+          sourceName
+        });
       }
       const expectedHpAfter = result
         ? Math.max(0, Number(hpBefore) - Math.max(0, Number(result.finalDamage || 0)))

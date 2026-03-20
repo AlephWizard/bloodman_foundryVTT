@@ -132,6 +132,10 @@ export function buildChatMessageRoutingHooks({
       hideRelayMessage(htmlLike);
       return;
     }
+    const root = htmlLike?.[0] || htmlLike;
+    if (readProperty(message, "flags.bloodman.gmDamageSummary") === true) {
+      root?.classList?.add?.("bm-chat-gm-damage");
+    }
     try {
       decorateChatRollMessage(message, htmlLike);
     } catch (error) {

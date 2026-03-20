@@ -37,24 +37,32 @@ async function withContext(callback) {
     CONST: globalThis.CONST,
     foundry: globalThis.foundry
   };
+  const createdMessages = [];
 
   globalThis.game = {
     user: { isGM: false, active: true, role: 1 },
-    users: []
+    users: [{ id: "gm1", isGM: true, active: true, role: 4 }]
   };
-  globalThis.ChatMessage = { create: async () => null };
+  globalThis.ChatMessage = {
+    create: async data => {
+      createdMessages.push(data);
+      return data;
+    }
+  };
   globalThis.CONST = { USER_ROLES: { ASSISTANT: 3 } };
   globalThis.foundry = {
     utils: {
       flattenObject: source => {
         if (!source || typeof source !== "object") return {};
         return source;
-      }
+      },
+      getProperty: () => undefined,
+      escapeHTML: value => String(value ?? "")
     }
   };
 
   try {
-    await callback();
+    await callback(createdMessages);
   } finally {
     globalThis.game = previous.game;
     globalThis.ChatMessage = previous.ChatMessage;
@@ -64,7 +72,7 @@ async function withContext(callback) {
 }
 
 async function run() {
-  await withContext(async () => {
+  await withContext(async createdMessages => {
     const playerActor = buildActor({
       id: "player-1",
       name: "Joueur",
@@ -82,6 +90,8 @@ async function run() {
     assert.equal(playerResult?.finalDamage, 4);
     assert.equal(playerResult?.paInitial, 2);
     assert.equal(playerResult?.paEffective, 1);
+    assert.equal(createdMessages.length, 1);
+    assert.equal(createdMessages[0].whisper.includes("gm1"), true);
 
     const npcActor = buildActor({
       id: "npc-1",
@@ -100,6 +110,7 @@ async function run() {
     assert.equal(npcResult?.finalDamage, 3);
     assert.equal(npcResult?.paInitial, 0);
     assert.equal(npcResult?.paEffective, 0);
+    assert.equal(createdMessages.length, 2);
   });
 }
 

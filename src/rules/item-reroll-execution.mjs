@@ -160,9 +160,18 @@ export function createItemRerollExecutionRules({
   async function applyLocalItemRerollTargets({
     allocations = [],
     penetrationValue = 0,
+    damageContext = {},
     validationMeta = {},
     defaultTargetName = "Cible"
   } = {}) {
+    const attackerName = String(damageContext?.attackerName || "").trim();
+    const sourceName = String(damageContext?.sourceName || "").trim();
+    const formula = String(damageContext?.formula || "").trim() || "1d4";
+    const rollResults = Array.isArray(damageContext?.rollResults) ? damageContext.rollResults : [];
+    const bonusBrut = Math.max(0, Math.floor(Number(damageContext?.bonusBrut) || 0));
+    const rolledTotalDamage = Number.isFinite(Number(damageContext?.totalDamage))
+      ? Number(damageContext.totalDamage)
+      : 0;
     for (const rawTarget of allocations) {
       const target = normalizeTarget(rawTarget);
       const tokenDoc = await resolveTokenDocument(target);
@@ -230,7 +239,18 @@ export function createItemRerollExecutionRules({
 
       let result = null;
       if (tokenIsLinked && targetActor) {
-        result = await applyActorDamage(targetActor, share, { targetName, penetration: penetrationValue });
+        result = await applyActorDamage(targetActor, share, {
+          targetName,
+          penetration: penetrationValue,
+          speakerAlias: attackerName || targetName,
+          attackerName,
+          formula,
+          rollResults,
+          bonusBrut,
+          rolledTotalDamage,
+          assignedDamage: share,
+          sourceName
+        });
       } else if (tokenDoc && Number.isFinite(hpBefore)) {
         result = buildLocalResult({
           hpBefore,
@@ -244,7 +264,20 @@ export function createItemRerollExecutionRules({
           name: targetName,
           amount: result.finalDamage,
           pa: result.paEffective,
-          speakerAlias: targetName
+          speakerAlias: attackerName || targetName,
+          attackerName,
+          formula,
+          rollResults,
+          bonusBrut,
+          penetration: result.penetration,
+          rolledTotalDamage,
+          assignedDamage: share,
+          paInitial: result.paInitial,
+          paEffective: result.paEffective,
+          finalDamage: result.finalDamage,
+          hpBefore: result.hpBefore,
+          hpAfter: result.hpAfter,
+          sourceName
         });
       }
 

@@ -34,6 +34,34 @@ export function buildDamageRequestHooks({
       tokenActor?.name || uuidActor?.name || worldActor?.name,
       "Cible"
     );
+    const attackerName = String(data.attackerName || "").trim();
+    const sourceName = String(data.itemName || data.sourceName || "").trim();
+    const formula = String(data.damageFormula || data.formula || "").trim() || "1d4";
+    const rollResults = Array.isArray(data.rollResults) ? data.rollResults : [];
+    const bonusBrut = Math.max(0, Math.floor(toFiniteNumber(data.bonus_brut ?? data.bonusBrut, 0)));
+    const rolledTotalDamage = Number.isFinite(Number(data.totalDamage)) ? Number(data.totalDamage) : share;
+    const postDamageSummary = async (result, targetName, assignedDamage) => {
+      if (!result) return;
+      await postDamageTakenChatMessage({
+        name: targetName,
+        amount: result.finalDamage,
+        pa: result.paEffective,
+        speakerAlias: attackerName || targetName,
+        attackerName,
+        formula,
+        rollResults,
+        bonusBrut,
+        penetration: result.penetration,
+        rolledTotalDamage,
+        assignedDamage,
+        paInitial: result.paInitial,
+        paEffective: result.paEffective,
+        finalDamage: result.finalDamage,
+        hpBefore: result.hpBefore,
+        hpAfter: result.hpAfter,
+        sourceName
+      });
+    };
 
     if (tokenDoc && !tokenIsLinked) {
       const current = resolveDamageCurrent(tokenDoc, tokenActor, fallbackCurrent);
@@ -48,12 +76,6 @@ export function buildDamageRequestHooks({
       } catch (error) {
         bmLog.error("damage:update tokenDoc failed", { error });
       }
-      await postDamageTakenChatMessage({
-        name: fallbackName,
-        amount: finalDamage,
-        pa: paEffective,
-        speakerAlias: fallbackName
-      });
       const result = {
         finalDamage,
         penetration,
@@ -62,6 +84,7 @@ export function buildDamageRequestHooks({
         hpBefore: current,
         hpAfter: nextValue
       };
+      await postDamageSummary(result, fallbackName, share);
       emitDamageAppliedMessage(data, result, tokenDoc, share);
       bmLog.debug("damage:output", {
         degats_selectionnes: String(data.degats || data.damageLabel || data.damageFormula || "").toUpperCase(),
@@ -81,7 +104,18 @@ export function buildDamageRequestHooks({
 
     if (tokenActor) {
       bmLog.debug("damage:apply token-actor", { share, actorId: tokenActor.id, actorName: tokenActor.name });
-      const result = await applyDamageToActor(tokenActor, share, { targetName: fallbackName, penetration });
+      const result = await applyDamageToActor(tokenActor, share, {
+        targetName: fallbackName,
+        penetration,
+        speakerAlias: attackerName || fallbackName,
+        attackerName,
+        formula,
+        rollResults,
+        bonusBrut,
+        rolledTotalDamage,
+        assignedDamage: share,
+        sourceName
+      });
       if (result) {
         emitDamageAppliedMessage(data, result, tokenDoc, share);
         bmLog.debug("damage:output", {
@@ -102,26 +136,55 @@ export function buildDamageRequestHooks({
     }
     if (uuidActor) {
       bmLog.debug("damage:apply uuid-actor", { share, actorId: uuidActor.id, actorName: uuidActor.name });
-      const result = await applyDamageToActor(uuidActor, share, { targetName: fallbackName, penetration });
-      if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
+      const result = await applyDamageToActor(uuidActor, share, {
+        targetName: fallbackName,
+        penetration,
+        speakerAlias: attackerName || fallbackName,
+        attackerName,
+        formula,
+        rollResults,
+        bonusBrut,
+        rolledTotalDamage,
+        assignedDamage: share,
+        sourceName
+      });
+      if (result) {
+        emitDamageAppliedMessage(data, result, tokenDoc, share);
+      }
       return;
     }
     if (worldActor) {
       bmLog.debug("damage:apply world-actor", { share, actorId: worldActor.id, actorName: worldActor.name });
-      const result = await applyDamageToActor(worldActor, share, { targetName: fallbackName, penetration });
-      if (result) emitDamageAppliedMessage(data, result, tokenDoc, share);
+      const result = await applyDamageToActor(worldActor, share, {
+        targetName: fallbackName,
+        penetration,
+        speakerAlias: attackerName || fallbackName,
+        attackerName,
+        formula,
+        rollResults,
+        bonusBrut,
+        rolledTotalDamage,
+        assignedDamage: share,
+        sourceName
+      });
+      if (result) {
+        emitDamageAppliedMessage(data, result, tokenDoc, share);
+      }
       return;
     }
     if (Number.isFinite(fallbackCurrent)) {
       const paInitial = Number.isFinite(fallbackPA) ? fallbackPA : 0;
       const paEffective = Math.max(0, paInitial - penetration);
       const finalDamage = Math.max(0, share - paEffective);
-      await postDamageTakenChatMessage({
-        name: fallbackName,
-        amount: finalDamage,
-        pa: paEffective,
-        speakerAlias: fallbackName
-      });
+      const result = {
+        finalDamage,
+        penetration,
+        paInitial,
+        paEffective,
+        hpBefore: fallbackCurrent,
+        hpAfter: Math.max(0, fallbackCurrent - finalDamage)
+      };
+      await postDamageSummary(result, fallbackName, share);
       return;
     }
     safeWarn(t("BLOODMAN.Notifications.DamageTargetResolveFailed"));

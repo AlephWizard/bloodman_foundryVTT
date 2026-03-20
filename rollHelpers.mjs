@@ -21,6 +21,10 @@ import {
   normalizeDamageSplitAllocations,
   resolveDamageSplitAllocatedState
 } from "./src/ui/damage-split-dialog.mjs";
+import {
+  buildDamageRollFlavorMarkup,
+  buildGmDamageSummaryMarkup
+} from "./src/ui/damage-chat.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
@@ -234,22 +238,67 @@ function getDamageChatRecipientIds() {
   return { gmAssistantIds: getActivePrivilegedOperatorIds() };
 }
 
-export async function postDamageTakenChatMessage({ name = "Cible", amount = 0, pa = 0, speakerAlias = "" } = {}) {
+export async function postDamageTakenChatMessage({
+  name = "Cible",
+  amount = 0,
+  pa = 0,
+  speakerAlias = "",
+  attackerName = "",
+  formula = "",
+  rollResults = [],
+  bonusBrut = 0,
+  penetration = 0,
+  rolledTotalDamage = 0,
+  assignedDamage = 0,
+  paInitial = 0,
+  paEffective = null,
+  finalDamage = null,
+  hpBefore = Number.NaN,
+  hpAfter = Number.NaN,
+  sourceName = ""
+} = {}) {
   if (typeof ChatMessage?.create !== "function") return;
   const safeName = String(name || "Cible").trim() || "Cible";
   const safeAmount = toNonNegativeInt(amount, 0);
   const safePa = toNonNegativeInt(pa, 0);
-  if (safeAmount <= 0) return;
-  const alias = String(speakerAlias || safeName).trim() || safeName;
+  const hasDetailedSummary = Boolean(
+    String(attackerName || "").trim()
+    || String(formula || "").trim()
+    || (Array.isArray(rollResults) && rollResults.length)
+    || bonusBrut != null
+    || rolledTotalDamage != null
+    || finalDamage != null
+  );
+  if (safeAmount <= 0 && !hasDetailedSummary) return;
+  const alias = String(speakerAlias || attackerName || safeName).trim() || safeName;
   const speaker = { alias };
   const { gmAssistantIds } = getDamageChatRecipientIds();
 
   if (!gmAssistantIds.length) return;
   try {
+    const content = hasDetailedSummary
+      ? buildGmDamageSummaryMarkup({
+        attackerName: String(attackerName || alias).trim() || alias,
+        targetName: safeName,
+        formula: String(formula || "").trim() || "1d4",
+        rollResults: Array.isArray(rollResults) ? rollResults : [],
+        bonusBrut,
+        penetration,
+        rolledTotalDamage,
+        assignedDamage,
+        paInitial,
+        paEffective: paEffective ?? safePa,
+        finalDamage: finalDamage ?? safeAmount,
+        hpBefore,
+        hpAfter,
+        sourceName: String(sourceName || "").trim()
+      })
+      : t("BLOODMAN.Rolls.Damage.Take", { name: safeName, amount: safeAmount, pa: safePa });
     await ChatMessage.create({
       speaker,
       whisper: gmAssistantIds,
-      content: t("BLOODMAN.Rolls.Damage.Take", { name: safeName, amount: safeAmount, pa: safePa })
+      content,
+      flags: hasDetailedSummary ? { bloodman: { gmDamageSummary: true } } : undefined
     });
   } catch (error) {
     bmLog.error("damage:chat armor detail failed", { error });
@@ -990,6 +1039,24 @@ function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
   return fallback;
 }
 
+function getCurrentDamageTargetNames() {
+  const names = [];
+  const seen = new Set();
+  for (const target of Array.from(game.user?.targets || [])) {
+    const tokenDoc = getTokenDocument(target);
+    const targetActor = getTokenActor(target);
+    const targetName = resolveCombatTargetName(
+      tokenDoc?.name || target?.name,
+      targetActor?.name,
+      "Cible"
+    );
+    if (!targetName || seen.has(targetName)) continue;
+    seen.add(targetName);
+    names.push(targetName);
+  }
+  return names;
+}
+
 function buildDamageRequestPayload(token, damage, options = {}) {
   const tokenDocument = getTokenDocument(token);
   const targetActor = getTokenActor(token);
@@ -1212,7 +1279,20 @@ export async function applyDamageToActor(targetActor, damage, options = {}) {
     name: displayName,
     amount: finalDamage,
     pa: paEffective,
-    speakerAlias: displayName
+    speakerAlias: String(options?.speakerAlias || options?.attackerName || displayName).trim() || displayName,
+    attackerName: String(options?.attackerName || "").trim(),
+    formula: String(options?.formula || "").trim(),
+    rollResults: Array.isArray(options?.rollResults) ? options.rollResults : [],
+    bonusBrut: options?.bonusBrut,
+    penetration,
+    rolledTotalDamage: options?.rolledTotalDamage ?? share,
+    assignedDamage: options?.assignedDamage ?? share,
+    paInitial,
+    paEffective,
+    finalDamage,
+    hpBefore: current,
+    hpAfter: nextValue,
+    sourceName: String(options?.sourceName || "").trim()
   });
 
   return {
@@ -1226,10 +1306,18 @@ export async function applyDamageToActor(targetActor, damage, options = {}) {
   };
 }
 
-function buildDamageFlavor(actor, amount, config, sourceName = "", tag = "") {
-  const source = sourceName ? ` (${sourceName})` : "";
-  const note = tag ? ` | ${tag}` : "";
-  return `${t("BLOODMAN.Rolls.Damage.Deal", { name: actor.name, amount, source })}<br><small>${config.degats} + ${config.bonusBrut} | PEN ${config.penetration}${note}</small>`;
+function buildDamageFlavor(actor, amount, config, sourceName = "", tag = "", options = {}) {
+  return buildDamageRollFlavorMarkup({
+    attackerName: actor?.name || tl("BLOODMAN.Common.Name", "Attaquant"),
+    targetNames: Array.isArray(options?.targetNames) ? options.targetNames : [],
+    formula: String(config?.formula || "").trim() || "1d4",
+    rollResults: Array.isArray(options?.rollResults) ? options.rollResults : [],
+    bonusBrut: config?.bonusBrut,
+    penetration: config?.penetration,
+    totalDamage: amount,
+    sourceName,
+    modeTag: tag
+  });
 }
 
 function buildDamageContextTargetEntry(token, targetActor, share, options = {}) {
@@ -1451,7 +1539,18 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
       targetActor?.name,
       "Cible"
     );
-    const result = await applyDamageToActor(targetActor, share, { targetName, penetration });
+    const result = await applyDamageToActor(targetActor, share, {
+      targetName,
+      penetration,
+      speakerAlias: sourceActor?.name || targetName,
+      attackerName: sourceActor?.name || "",
+      formula: String(options?.formula || "").trim() || "1d4",
+      rollResults: Array.isArray(options?.rollResults) ? options.rollResults : [],
+      bonusBrut: options?.bonusBrut,
+      rolledTotalDamage: options?.totalDamage ?? share,
+      assignedDamage: share,
+      sourceName: String(options?.sourceName || options?.itemName || "").trim()
+    });
     if (!result) {
       safeWarn(tl("BLOODMAN.Notifications.DamageApplyFailed", "Impossible d'appliquer les degats a la cible."));
       continue;
@@ -1553,6 +1652,7 @@ export async function doDamageRoll(actor, item) {
   const roll = damageOutcome.roll;
   const totalDamage = damageOutcome.totalDamage;
   const sourceName = item?.name || "";
+  const targetNames = getCurrentDamageTargetNames();
 
   if (consumesAmmo) {
     if (usesDirectStock) {
@@ -1584,7 +1684,10 @@ export async function doDamageRoll(actor, item) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, damageOutcome.modeTag),
+    flavor: buildDamageFlavor(actor, totalDamage, config, sourceName, damageOutcome.modeTag, {
+      targetNames,
+      rollResults: damageOutcome.rollResults
+    }),
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE)
   });
 
@@ -1688,10 +1791,14 @@ export async function doDirectDamageRoll(actor, formula, sourceName = "", option
   const roll = damageOutcome.roll;
   const totalDamage = damageOutcome.totalDamage;
   const resolvedSource = sourceName || "";
+  const targetNames = getCurrentDamageTargetNames();
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, damageOutcome.modeTag),
+    flavor: buildDamageFlavor(actor, totalDamage, config, resolvedSource, damageOutcome.modeTag, {
+      targetNames,
+      rollResults: damageOutcome.rollResults
+    }),
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.DAMAGE)
   });
 

@@ -69,6 +69,17 @@ async function run() {
   hooks.onRenderChatMessage({ relay: false }, {});
   assert.equal(calls.includes("decorate"), true);
 
+  const gmRoot = {
+    classList: {
+      values: [],
+      add(...classes) {
+        this.values.push(...classes);
+      }
+    }
+  };
+  hooks.onRenderChatMessage({ relay: false, flags: { bloodman: { gmDamageSummary: true } } }, gmRoot);
+  assert.equal(gmRoot.classList.values.includes("bm-chat-gm-damage"), true);
+
   hooks.onRenderChatMessageHTML({ relay: false, throwDecorate: true }, {});
   assert.equal(calls.some(entry => entry.startsWith("warn:chat:roll decorate skipped")), true);
 }

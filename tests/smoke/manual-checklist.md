@@ -9,8 +9,11 @@
 - Valeurs PV/PP et jauges visibles.
 - Aucune boucle de rerender apparente.
 5. Creer un item `arme`, lancer un jet de degats avec cible selectionnee.
+- Verifier que `Attaque simple` dans l'equipement permet de modifier librement la formule (`1d6`, `1d8`, etc.) sur fiche joueur et PNJ.
 6. Verifier les messages chat:
 - Affichage normal des jets.
+- Le message de degats affiche attaquant, cible, formule et total de facon lisible.
+- Le recap MJ reste reserve au GM, affiche formule/jet/penetration/armure/perte reelle et reste visuellement distinct.
 - Message de synthese initiative sans HTML non echappe.
 7. Tester drag-and-drop d'un Actor PNJ vers la fiche personnage.
 8. Tester suppression/reordonnancement d'items cote joueur non-GM (fallback socket).
