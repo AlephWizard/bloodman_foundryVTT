@@ -6354,13 +6354,16 @@ class BloodmanActorSheet extends BaseActorSheet {
     clearUiMicrotask(this._autoResizeTaskId);
     clearUiMicrotask(this._autoGrowRefreshTaskId);
     clearUiMicrotask(this._resourceGaugeRefreshTaskId);
+    clearUiMicrotask(this._deferredSheetRenderTaskId);
     this._forceEnableSheetTaskId = null;
     this._autoResizeTaskId = null;
     this._autoGrowRefreshTaskId = null;
     this._resourceGaugeRefreshTaskId = null;
+    this._deferredSheetRenderTaskId = null;
     this._queuedAutoResizeForce = false;
     this._queuedAutoGrowRoot = null;
     this._queuedResourceGaugeRoot = null;
+    this._queuedDeferredSheetRenderForce = false;
   }
 
   getResponsiveActorSheetRoot(rootLike = null) {
@@ -6553,6 +6556,18 @@ class BloodmanActorSheet extends BaseActorSheet {
       const root = this._queuedResourceGaugeRoot?.find ? this._queuedResourceGaugeRoot : this.element;
       this._queuedResourceGaugeRoot = null;
       this.refreshResourceVisuals(root);
+    });
+  }
+
+  queueSheetRender(force = false) {
+    this._queuedDeferredSheetRenderForce = mergeDeferredForce(this._queuedDeferredSheetRenderForce, force);
+    if (this._deferredSheetRenderTaskId != null) return;
+    this._deferredSheetRenderTaskId = queueUiMicrotask(() => {
+      this._deferredSheetRenderTaskId = null;
+      const shouldForce = Boolean(this._queuedDeferredSheetRenderForce);
+      this._queuedDeferredSheetRenderForce = false;
+      if (!this.rendered) return;
+      this.render(shouldForce);
     });
   }
 
@@ -8067,7 +8082,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       const sourceItem = this.actor?.items?.get(String(reorderPayload.itemId || "").trim()) || null;
       if (!sourceItem) return false;
       const linked = await this.linkChildItemToParent(parentItem, sourceItem, { acceptedTypes });
-      if (linked) this.render(false);
+      if (linked) this.queueSheetRender(false);
       return linked;
     }
 
@@ -8082,7 +8097,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         acceptedTypes,
         sourceOriginalType
       });
-      if (linked) this.render(false);
+      if (linked) this.queueSheetRender(false);
       return linked;
     }
 
@@ -8116,7 +8131,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       linkedAny = linkedAny || linked;
     }
-    if (linkedAny) this.render(false);
+    if (linkedAny) this.queueSheetRender(false);
     return linkedAny;
   }
 
@@ -8911,7 +8926,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       const childItem = this.actor?.items?.get(childId) || null;
       if (!parentItem || !childItem) return;
       const unlinked = await this.unlinkChildItemFromParent(parentItem, childItem);
-      if (unlinked) this.render(false);
+      if (!unlinked) return;
+      childRow?.remove?.();
+      this.queueSheetRender(false);
     });
 
     html.find(".equiper-avec-item-use").click(async ev => {
