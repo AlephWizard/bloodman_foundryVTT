@@ -60,6 +60,9 @@ function run() {
   const systemJson = JSON.parse(readText("system.json"));
   const runtimeSource = readText("bloodman.mjs");
   const itemSheetCss = readText("styles/item-unified.css");
+  const playerSheetTemplate = readText("templates/actor-joueur.html");
+  const npcSheetTemplate = readText("templates/actor-non-joueur.html");
+  const itemSheetTemplate = readText("templates/item-unified.html");
 
   const declaredActorTypes = new Set(Object.keys(systemJson?.documentTypes?.Actor || {}));
   const declaredItemTypes = new Set(Object.keys(systemJson?.documentTypes?.Item || {}));
@@ -121,6 +124,24 @@ function run() {
     bagCountHardHiddenPattern.test(itemSheetCss),
     false,
     "Bag count field should not be hard-hidden by CSS"
+  );
+
+  assert.equal(
+    itemSheetTemplate.includes("name=\"system.inventorySlots\""),
+    true,
+    "Unified item sheet should expose the inventory slot field"
+  );
+
+  const bagToggleDisabledPattern = /class="bag-slots-toggle"[^>]*\{\{#if bagSlotsToggleDisabled\}\}disabled\{\{\/if\}\}/;
+  assert.equal(
+    bagToggleDisabledPattern.test(playerSheetTemplate),
+    true,
+    "Player actor sheet should keep the bag toggle visible but disabled when needed"
+  );
+  assert.equal(
+    bagToggleDisabledPattern.test(npcSheetTemplate),
+    true,
+    "NPC actor sheet should keep the bag toggle visible but disabled when needed"
   );
 }
 

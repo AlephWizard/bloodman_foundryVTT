@@ -497,11 +497,11 @@
               <span class="carry-bag-toggle">
                 <i class="fa-solid fa-bag-shopping"></i>
                 <label class="carry-choice">
-                  <input type="checkbox" class="bag-slots-toggle" data-bag-slots="yes" {{#if bagSlotsEnabled}}checked{{/if}} />
+                  <input type="checkbox" class="bag-slots-toggle" data-bag-slots="yes" {{#if bagSlotsEnabled}}checked{{/if}} {{#if bagSlotsToggleDisabled}}disabled{{/if}} />
                   <span>{{localize "BLOODMAN.Common.Yes"}}</span>
                 </label>
                 <label class="carry-choice">
-                  <input type="checkbox" class="bag-slots-toggle" data-bag-slots="no" {{#if bagSlotsDisabled}}checked{{/if}} />
+                  <input type="checkbox" class="bag-slots-toggle" data-bag-slots="no" {{#if bagSlotsDisabled}}checked{{/if}} {{#if bagSlotsToggleDisabled}}disabled{{/if}} />
                   <span>{{localize "BLOODMAN.Common.No"}}</span>
                 </label>
               </span>

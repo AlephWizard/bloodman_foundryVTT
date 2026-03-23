@@ -771,12 +771,12 @@
   letter-spacing: 0.04px;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage > .toggle-group,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage .toggle-group,
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-costs > .toggle-group {
   justify-self: start;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage > .bm-item-inline-sub-label {
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage .bm-item-inline-sub-label {
   justify-self: start;
 }
 
@@ -1160,14 +1160,32 @@
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage {
   display: grid;
-  align-items: center;
-  justify-content: start;
-  grid-template-columns: auto auto auto auto auto minmax(var(--bm-sheet-control-xs), var(--bm-sheet-control-sm));
+  align-items: start;
+  grid-template-columns: repeat(4, max-content);
+  justify-content: space-between;
   gap: var(--bm-sheet-space-1) var(--bm-sheet-space-2);
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage > input {
-  width: var(--bm-sheet-control-sm);
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage > .bm-item-usage-toggle-field,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage > .bm-item-usage-value-field {
+  min-width: 0;
+  display: grid;
+  align-items: start;
+  grid-template-columns: 1fr;
+  gap: var(--bm-sheet-space-1);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage .bm-item-usage-value-field > input {
+  width: min(100%, var(--bm-sheet-control-sm));
+  min-width: 0;
+  justify-self: start;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-usage .inline-label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  line-height: 1.15;
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-row-costs {
@@ -1374,7 +1392,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-usage,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-costs {
   grid-template-columns:
     minmax(0, 1.2fr)
@@ -1384,7 +1401,6 @@
   align-items: center;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-usage .inline-label,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-costs .inline-label,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-inline-unit {
   min-width: 0;
@@ -1393,7 +1409,7 @@
   line-height: 1.15;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-usage > input,
+.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-usage .bm-item-usage-value-field > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-row-costs > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-card-ammo > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="compact"] .bm-item-unified-card-protection > input[name="system.pa"] {
@@ -1439,16 +1455,18 @@
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-usage,
+.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-usage {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-costs,
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-usage,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-costs {
   grid-template-columns: minmax(0, 1.15fr) minmax(var(--bm-sheet-control-sm), 1fr);
   align-items: center;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-usage .inline-label,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-costs .inline-label,
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-usage .inline-label,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-costs .inline-label,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-inline-unit,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-inline-unit {
@@ -1458,9 +1476,9 @@
   line-height: 1.15;
 }
 
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-usage > input,
+.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-usage .bm-item-usage-value-field > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-row-costs > input,
-.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-usage > input,
+.bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-usage .bm-item-usage-value-field > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bm-item-unified-row-costs > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-card-ammo > input,
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="narrow"] .bm-item-unified-card-protection > input[name="system.pa"],

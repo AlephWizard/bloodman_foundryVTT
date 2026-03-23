@@ -76,6 +76,9 @@ export function buildActorPreUpdateHooks({
       isAssistantOrHigherRole
     });
     applyActorUpdateRestrictionPlan(updateData, restrictionPlan);
+    if (basicPlayerUpdater) {
+      stripUpdatePaths(updateData, ["system.equipment.bagSlotsEnabled"]);
+    }
 
     normalizeActorAmmoUpdateData(actor, updateData, {
       allowUpdate: !restrictionPlan.stripAmmoUpdates,

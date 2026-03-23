@@ -59,33 +59,52 @@
       </div>
 
       <div class="bm-item-unified-field bm-item-unified-row-usage">
-        <label class="inline-label">{{localize "BLOODMAN.Items.UsableLabel"}}</label>
-        <div class="toggle-group bm-switch-group">
-          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.UsableLabel'}}">
-            <input class="bm-switch-input" type="checkbox" name="{{itemUsableFieldPath}}" data-dtype="Boolean" {{checked itemUsableValue}} aria-label="{{localize 'BLOODMAN.Items.UsableLabel'}}" />
-            <span class="bm-switch-track" aria-hidden="true"></span>
-          </label>
+        <div class="bm-item-usage-toggle-field">
+          <label class="inline-label">{{localize "BLOODMAN.Items.UsableLabel"}}</label>
+          <div class="toggle-group bm-switch-group">
+            <label class="bm-switch" title="{{localize 'BLOODMAN.Items.UsableLabel'}}">
+              <input class="bm-switch-input" type="checkbox" name="{{itemUsableFieldPath}}" data-dtype="Boolean" {{checked itemUsableValue}} aria-label="{{localize 'BLOODMAN.Items.UsableLabel'}}" />
+              <span class="bm-switch-track" aria-hidden="true"></span>
+            </label>
+          </div>
         </div>
 
-        <label class="inline-label">{{localize "BLOODMAN.Items.SingleUseLabel"}}</label>
-        <div class="toggle-group bm-switch-group">
-          <label class="bm-switch" title="{{localize 'BLOODMAN.Items.SingleUseLabel'}}">
-            <input class="bm-switch-input" type="checkbox" name="system.singleUseEnabled" data-dtype="Boolean" {{checked item.system.singleUseEnabled}} aria-label="{{localize 'BLOODMAN.Items.SingleUseLabel'}}" />
-            <span class="bm-switch-track" aria-hidden="true"></span>
-          </label>
+        <div class="bm-item-usage-toggle-field">
+          <label class="inline-label">{{localize "BLOODMAN.Items.SingleUseLabel"}}</label>
+          <div class="toggle-group bm-switch-group">
+            <label class="bm-switch" title="{{localize 'BLOODMAN.Items.SingleUseLabel'}}">
+              <input class="bm-switch-input" type="checkbox" name="system.singleUseEnabled" data-dtype="Boolean" {{checked item.system.singleUseEnabled}} aria-label="{{localize 'BLOODMAN.Items.SingleUseLabel'}}" />
+              <span class="bm-switch-track" aria-hidden="true"></span>
+            </label>
+          </div>
         </div>
 
-        <label class="inline-label bm-item-inline-sub-label">{{localize "BLOODMAN.Items.SingleUseCountLabel"}}</label>
-        <input
-          class="bm-item-input bm-item-input-narrow"
-          type="number"
-          min="1"
-          step="1"
-          name="system.singleUseCount"
-          value="{{item.system.singleUseCount}}"
-          data-dtype="Number"
-          {{#if singleUseCountInputDisabled}}disabled{{/if}}
-        />
+        <div class="bm-item-usage-value-field">
+          <label class="inline-label bm-item-inline-sub-label">{{localize "BLOODMAN.Items.SingleUseCountLabel"}}</label>
+          <input
+            class="bm-item-input bm-item-input-narrow"
+            type="number"
+            min="1"
+            step="1"
+            name="system.singleUseCount"
+            value="{{item.system.singleUseCount}}"
+            data-dtype="Number"
+            {{#if singleUseCountInputDisabled}}disabled{{/if}}
+          />
+        </div>
+
+        <div class="bm-item-usage-value-field">
+          <label class="inline-label bm-item-inline-sub-label">{{localize "BLOODMAN.Items.InventorySlotsLabel"}}</label>
+          <input
+            class="bm-item-input bm-item-input-narrow"
+            type="number"
+            min="1"
+            step="1"
+            name="system.inventorySlots"
+            value="{{item.system.inventorySlots}}"
+            data-dtype="Number"
+          />
+        </div>
       </div>
     </section>
 

@@ -192,6 +192,21 @@ function run() {
     assert.equal(updateData.name, "Nouveau nom");
     assert.deepEqual(notificationErrors, []);
   });
+
+  withGlobals(({ notificationErrors }) => {
+    const hooks = buildHooks({
+      stripUpdatePaths: (updateData, paths = []) => {
+        for (const path of paths) delete updateData[path];
+        return true;
+      }
+    });
+    const updateData = {
+      "system.equipment.bagSlotsEnabled": true
+    };
+    hooks.onPreUpdateActor(buildActor("personnage"), updateData, {}, "u1");
+    assert.equal(getProperty(updateData, "system.equipment.bagSlotsEnabled"), undefined);
+    assert.deepEqual(notificationErrors, []);
+  });
 }
 
 run();

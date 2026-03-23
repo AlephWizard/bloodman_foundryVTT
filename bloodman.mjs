@@ -99,6 +99,11 @@ import { createItemRerollExecutionRules } from "./src/rules/item-reroll-executio
 import { createItemUseFlowRules } from "./src/rules/item-use-flow.mjs";
 import { createGrowthRollRules } from "./src/rules/growth-roll.mjs";
 import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
+import {
+  getCarriedItemInventorySlots,
+  normalizeCarriedItemInventorySlots,
+  sumCarriedItemInventorySlots
+} from "./src/rules/carried-item-slots.mjs";
 import { createActorSheetLayoutRules } from "./src/ui/actor-sheet-layout.mjs";
 import { createItemSheetPricePreviewRules } from "./src/ui/item-sheet-price-preview.mjs";
 import {
@@ -2955,7 +2960,8 @@ const dropEvaluationRules = createDropEvaluationRules({
   getDropItemQuantity: resolveDropItemQuantity,
   getDroppedItemUnitPrice: resolveDroppedItemUnitPrice,
   carriedItemTypes: CARRIED_ITEM_TYPES,
-  shouldCountCarriedItem: item => isCarriedItemCountedForBag(item)
+  shouldCountCarriedItem: item => isCarriedItemCountedForBag(item),
+  getCarriedItemSlots: item => getCarriedItemInventorySlots(item)
 });
 const {
   resolveActorTransferEntries: resolveActorTransferEntriesFromDrop,
@@ -5538,6 +5544,7 @@ const ITEM_ROLL_FORMULA_FIELDS = Object.freeze({
 });
 const ITEM_SINGLE_USE_ENABLED_PATH = "system.singleUseEnabled";
 const ITEM_SINGLE_USE_COUNT_PATH = "system.singleUseCount";
+const ITEM_INVENTORY_SLOTS_PATH = "system.inventorySlots";
 
 function normalizeSingleUseCountValue(value, { enabled = false, fallbackEnabled = 1 } = {}) {
   const fallback = Math.max(1, normalizeNonNegativeInteger(fallbackEnabled, 1));
@@ -5626,6 +5633,38 @@ function normalizeItemSingleUseUpdate(item, updateData = null, options = {}) {
     changed,
     enabled: normalizedEnabled,
     count: normalizedCount
+  };
+}
+
+function normalizeItemInventorySlotsUpdate(item, updateData = null, options = {}) {
+  const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
+  const hasInventorySlotsUpdate = updateData ? hasUpdatePath(updateData, ITEM_INVENTORY_SLOTS_PATH) : false;
+  if (!includeSourceWhenMissing && !hasInventorySlotsUpdate) return { changed: false };
+
+  const rawInventorySlots = hasInventorySlotsUpdate
+    ? getUpdatedPathValue(updateData, ITEM_INVENTORY_SLOTS_PATH, undefined)
+    : item?.system?.inventorySlots;
+  const normalizedInventorySlots = normalizeCarriedItemInventorySlots(rawInventorySlots, 1);
+
+  let changed = false;
+  if (updateData) {
+    if (!hasInventorySlotsUpdate || Number(rawInventorySlots) !== normalizedInventorySlots) {
+      foundry.utils.setProperty(updateData, ITEM_INVENTORY_SLOTS_PATH, normalizedInventorySlots);
+      changed = true;
+    }
+  } else if (item?.updateSource) {
+    const sourceInventorySlots = normalizeCarriedItemInventorySlots(item?.system?.inventorySlots, 1);
+    if (sourceInventorySlots !== normalizedInventorySlots) {
+      item.updateSource({
+        [ITEM_INVENTORY_SLOTS_PATH]: normalizedInventorySlots
+      });
+      changed = true;
+    }
+  }
+
+  return {
+    changed,
+    inventorySlots: normalizedInventorySlots
   };
 }
 
@@ -5749,6 +5788,7 @@ Hooks.on("preCreateItem", (item, createData, options) => {
   const normalizedWeaponAmmo = normalizeWeaponMagazineCapacityUpdate(item, createData);
   if (!normalizedWeaponAmmo) normalizeWeaponMagazineCapacityUpdate(item);
   normalizeItemSingleUseUpdate(item, createData, { includeSourceWhenMissing: true });
+  normalizeItemInventorySlotsUpdate(item, createData, { includeSourceWhenMissing: true });
   normalizeCharacteristicBonusItemUpdate(item, createData);
   const normalizedRollFormula = normalizeItemRollFormulaFields(item, createData, { includeSourceWhenMissing: true });
   if (normalizedRollFormula.invalid) {
@@ -5803,6 +5843,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
   normalizeItemPriceUpdate(item, updateData);
   normalizeWeaponMagazineCapacityUpdate(item, updateData);
   normalizeItemSingleUseUpdate(item, updateData, { includeSourceWhenMissing: false });
+  normalizeItemInventorySlotsUpdate(item, updateData, { includeSourceWhenMissing: false });
   normalizeCharacteristicBonusItemUpdate(item, updateData);
   const normalizedRollFormula = normalizeItemRollFormulaFields(item, updateData, { includeSourceWhenMissing: false });
   if (normalizedRollFormula.invalid) {
@@ -6917,6 +6958,14 @@ class BloodmanActorSheet extends BaseActorSheet {
     const currentColumn = this.getItemCarryColumn(item);
     const currentInBag = this.isItemInBag(item);
     if (currentColumn === nextColumn && currentInBag === nextInBag) return true;
+    const targetCapacity = this.getCarryColumnCapacity(nextColumn, { bagEnabledOverride: bagEnabled });
+    if (Number.isFinite(targetCapacity) && targetCapacity > 0) {
+      const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+      const currentTargetItems = (state.columns[nextColumn] || [])
+        .filter(entry => String(entry?.id || "").trim() !== itemId);
+      const targetSlots = sumCarriedItemInventorySlots(currentTargetItems) + getCarriedItemInventorySlots(item);
+      if (targetSlots > targetCapacity) return false;
+    }
 
     const carryFlagPath = `flags.${SYSTEM_ID}.${CARRY_COLUMN_FLAG_KEY}`;
     const bagFlagPath = `flags.${SYSTEM_ID}.${BAG_ZONE_FLAG_KEY}`;
@@ -7004,6 +7053,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       [CARRY_COLUMN_OBJECTS_TWO]: [],
       [CARRY_COLUMN_BAG]: []
     };
+    const columnUsage = {
+      [CARRY_COLUMN_EQUIPMENT]: 0,
+      [CARRY_COLUMN_OBJECTS_ONE]: 0,
+      [CARRY_COLUMN_OBJECTS_TWO]: 0,
+      [CARRY_COLUMN_BAG]: 0
+    };
     const byId = {};
     const deferredItems = [];
     const placeInColumn = (item, requestedColumn) => {
@@ -7013,8 +7068,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       const itemType = String(item?.type || "").trim().toLowerCase();
       if (!this.isCarryColumnAllowedForItemType(column, itemType, { bagEnabledOverride: bagEnabled })) return false;
       const capacity = this.getCarryColumnCapacity(column, { bagEnabledOverride: bagEnabled });
-      if (Number.isFinite(capacity) && columns[column].length >= capacity) return false;
+      const itemSlots = getCarriedItemInventorySlots(item);
+      if (Number.isFinite(capacity) && (columnUsage[column] + itemSlots) > capacity) return false;
       columns[column].push(item);
+      columnUsage[column] += itemSlots;
       byId[itemId] = column;
       return true;
     };
@@ -7042,7 +7099,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         continue;
       }
 
-      const orderedObjectColumns = [...CARRY_OBJECT_COLUMNS].sort((left, right) => columns[left].length - columns[right].length);
+      const orderedObjectColumns = [...CARRY_OBJECT_COLUMNS].sort((left, right) => columnUsage[left] - columnUsage[right]);
       let placed = false;
       for (const column of orderedObjectColumns) {
         if (placeInColumn(item, column)) {
@@ -7187,8 +7244,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (mainSlotLimit <= 0) return false;
 
     const outsideItems = this.getCarriedOutsideBagItems();
-    const overflowCount = outsideItems.length - mainSlotLimit;
-    if (overflowCount <= 0) return false;
+    const overflowSlots = sumCarriedItemInventorySlots(outsideItems) - mainSlotLimit;
+    if (overflowSlots <= 0) return false;
 
     const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
     const movableOverflowCandidates = outsideItems.filter(item => {
@@ -7213,7 +7270,13 @@ class BloodmanActorSheet extends BaseActorSheet {
         if (leftSort !== rightSort) return rightSort - leftSort;
         return String(right?.id || "").localeCompare(String(left?.id || ""));
       });
-    const overflowItems = [...preferredItems, ...remainingItems].slice(0, overflowCount);
+    const overflowItems = [];
+    let movedSlotTarget = 0;
+    for (const item of [...preferredItems, ...remainingItems]) {
+      if (movedSlotTarget >= overflowSlots) break;
+      overflowItems.push(item);
+      movedSlotTarget += getCarriedItemInventorySlots(item);
+    }
     if (!overflowItems.length) return false;
 
     let movedAny = false;
@@ -7498,10 +7561,11 @@ class BloodmanActorSheet extends BaseActorSheet {
       && Number.isFinite(destinationCapacity)
       && destinationCapacity > 0
     ) {
-      const destinationCount = (stateBefore.columns[destinationColumn] || [])
-        .filter(entry => String(entry?.id || "").trim() !== sourceId)
-        .length;
-      if (destinationCount >= destinationCapacity) {
+      const destinationCount = sumCarriedItemInventorySlots(
+        (stateBefore.columns[destinationColumn] || [])
+          .filter(entry => String(entry?.id || "").trim() !== sourceId)
+      );
+      if ((destinationCount + getCarriedItemInventorySlots(sourceItem)) > destinationCapacity) {
         ui.notifications?.warn("Colonne pleine.");
         this.clearItemReorderVisualState();
         return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
@@ -7646,10 +7710,12 @@ class BloodmanActorSheet extends BaseActorSheet {
         && Number.isFinite(capacity)
         && capacity > 0
       ) {
-        const currentCount = (state.columns[carryColumn] || [])
-          .filter(entry => String(entry?.id || "").trim() !== String(payload.itemId || "").trim())
-          .length;
-        if (currentCount >= capacity) {
+        const currentCount = sumCarriedItemInventorySlots(
+          (state.columns[carryColumn] || [])
+            .filter(entry => String(entry?.id || "").trim() !== String(payload.itemId || "").trim())
+        );
+        const sourceSlots = sourceItem ? getCarriedItemInventorySlots(sourceItem) : 1;
+        if ((currentCount + sourceSlots) > capacity) {
           this.clearItemReorderVisualState();
           return;
         }
@@ -7761,7 +7827,10 @@ class BloodmanActorSheet extends BaseActorSheet {
         bagZone === "no"
         && this.isBagZoneSupportedItemType(sourceType)
         && this.isItemInBag(sourceItem)
-        && this.getCarriedOutsideBagItems().length >= CARRIED_ITEM_LIMIT_BASE
+        && (
+          sumCarriedItemInventorySlots(this.getCarriedOutsideBagItems())
+          + (isCarriedItemCountedForBag(sourceItem, this.actor) ? getCarriedItemInventorySlots(sourceItem) : 0)
+        ) > CARRIED_ITEM_LIMIT_BASE
       ) {
         this.clearItemReorderVisualState();
         ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: CARRIED_ITEM_LIMIT_BASE }));
@@ -8541,9 +8610,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     const objectColumnOneItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_ONE] || []).map(buildCarryDisplayItem);
     const objectColumnTwoItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_TWO] || []).map(buildCarryDisplayItem);
     const bagItems = (carriedColumnState.columns[CARRY_COLUMN_BAG] || []).map(buildCarryDisplayItem);
-    const carriedItemsCount = carriedItems
-      .filter(item => isCarriedItemCountedForBag(item, this.actor))
-      .length;
+    const carriedItemsCount = sumCarriedItemInventorySlots(
+      carriedItems.filter(item => isCarriedItemCountedForBag(item, this.actor))
+    );
 
     return {
       ...data,
@@ -8583,6 +8652,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       showBagSlotsToggle: isCarriedItemLimitedActorType(this.actor?.type),
       bagSlotsEnabled,
       bagSlotsDisabled: !bagSlotsEnabled,
+      bagSlotsToggleDisabled: isBasicPlayerRole(game.user?.role),
       carriedItemsCount,
       carriedItemsLimit,
       weapons,
@@ -8700,6 +8770,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!root?.length) return;
       if (basicPlayer) {
         root.find("input, textarea, select, button").prop("disabled", false);
+        root.find(".bag-slots-toggle").prop("disabled", true);
       }
       if (canToggleCharacteristicsEdit) {
         root.find(".char-edit-toggle").prop("disabled", false);
@@ -9049,6 +9120,12 @@ class BloodmanActorSheet extends BaseActorSheet {
     html.find(".bag-slots-toggle").change(async ev => {
       ev.preventDefault();
       ev.stopPropagation();
+      if (basicPlayer) {
+        const currentBagSlotsEnabled = this.isActorBagSlotsEnabled();
+        html.find(".bag-slots-toggle[data-bag-slots='yes']").prop("checked", currentBagSlotsEnabled);
+        html.find(".bag-slots-toggle[data-bag-slots='no']").prop("checked", !currentBagSlotsEnabled);
+        return;
+      }
       const input = ev.currentTarget;
       const choice = String(input?.dataset?.bagSlots || "").toLowerCase();
       if (choice !== "yes" && choice !== "no") return;
@@ -9700,7 +9777,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     const carriedCount = this.actor.items
       .filter(item => isCarriedItemCountedForBag(item, this.actor))
-      .length;
+      .reduce((total, item) => total + getCarriedItemInventorySlots(item), 0);
     const carriedItemsLimit = getActorCarriedItemsLimit(this.actor);
     if (!isCarriedItemsLimitExceeded({
       currentCarriedCount: carriedCount,
@@ -10658,6 +10735,7 @@ class BloodmanItemSheet extends BaseItemSheet {
       enabled: systemData.singleUseEnabled,
       fallbackEnabled: 1
     });
+    systemData.inventorySlots = normalizeCarriedItemInventorySlots(this.item.system?.inventorySlots, 1);
     data.singleUseCountInputDisabled = !systemData.singleUseEnabled;
 
     systemData.rawBonusEnabled = toCheckboxBoolean(this.item.system?.rawBonusEnabled, false);

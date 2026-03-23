@@ -127,6 +127,7 @@
       "InfiniteAmmoLabel": "MUNITIONS INFINIES :",
       "SingleUseLabel": "USAGE UNIQUE :",
       "SingleUseCountLabel": "NB USAGES :",
+      "InventorySlotsLabel": "NBR INVENTAIRE :",
       "MagazineCapacityLabel": "CAPACITÉ MAGASIN :",
       "AmmoTypeLabel": "TYPE DE MUNITION :",
       "LoadedAmmoLabel": "BALLE(S) CHARGÉE(S) :",

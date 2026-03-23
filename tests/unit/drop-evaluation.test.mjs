@@ -11,7 +11,7 @@ function createResolver(table) {
 
 async function run() {
   const droppedTable = {
-    a: { id: "a", type: "arme", actor: { id: "source-1" }, system: { price: "10" } },
+    a: { id: "a", type: "arme", actor: { id: "source-1" }, system: { price: "10", inventorySlots: 3 } },
     b: { id: "b", type: "objet", actor: null, permission: 2, system: { price: "5" } },
     c: { id: "c", type: "ration", actor: { id: "target" }, system: { price: "1" } },
     d: { id: "d", type: "soin", actor: null, pack: "world.pack", permission: 0, system: { price: "3" } },
@@ -34,8 +34,9 @@ async function run() {
       if (!Number.isFinite(value) || value < 0) return { ok: false, value: 0 };
       return { ok: true, value };
     },
-    carriedItemTypes: new Set(["arme", "objet", "ration", "soin"]),
-    shouldCountCarriedItem: item => item?.id !== "b"
+    carriedItemTypes: new Set(["arme", "objet", "ration", "soin", "protection"]),
+    shouldCountCarriedItem: item => item?.id !== "b",
+    getCarriedItemSlots: item => Number(item?.system?.inventorySlots || 1)
   });
 
   const transfers = await rules.resolveActorTransferEntries({
@@ -112,7 +113,7 @@ async function run() {
     entries: [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "e" }],
     targetActorId: "target"
   });
-  assert.equal(incomingCarried, 1);
+  assert.equal(incomingCarried, 4);
 }
 
 run()

@@ -4,7 +4,8 @@ export function createDropEvaluationRules({
   getDropItemQuantity,
   getDroppedItemUnitPrice,
   carriedItemTypes,
-  shouldCountCarriedItem
+  shouldCountCarriedItem,
+  getCarriedItemSlots
 } = {}) {
   const resolveDropData = typeof fromDropData === "function"
     ? fromDropData
@@ -24,6 +25,9 @@ export function createDropEvaluationRules({
   const shouldCountCarried = typeof shouldCountCarriedItem === "function"
     ? shouldCountCarriedItem
     : () => true;
+  const resolveCarriedItemSlots = typeof getCarriedItemSlots === "function"
+    ? getCarriedItemSlots
+    : () => 1;
 
   async function resolveActorTransferEntries({
     entries = [],
@@ -109,7 +113,7 @@ export function createDropEvaluationRules({
       if (!shouldCountCarried(droppedItem)) continue;
       const sourceActor = droppedItem.actor;
       if (sourceActor?.id === targetActorId) continue;
-      incomingCarriedItemCount += 1;
+      incomingCarriedItemCount += Math.max(1, Math.floor(Number(resolveCarriedItemSlots(droppedItem)) || 1));
     }
     return incomingCarriedItemCount;
   }
