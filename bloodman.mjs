@@ -2730,7 +2730,9 @@ async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
 }
 
 const ACTOR_TOKEN_IMAGE_UPDATE_PATHS = [
+  "img",
   "prototypeToken.texture.src",
+  "prototypeToken.img",
   "token.img"
 ];
 const TOKEN_IMAGE_UPDATE_PATHS = [
@@ -6861,6 +6863,29 @@ class BloodmanActorSheet extends BaseActorSheet {
     return sent;
   }
 
+  openActorImageFilePicker(fieldPath = "img") {
+    if (!this.actor || !isAssistantOrHigherRole(game.user?.role)) return false;
+    const field = String(fieldPath || "img").trim() || "img";
+    const FilePickerClass = getFilePickerClass();
+    if (typeof FilePickerClass !== "function") {
+      safeWarn("Selection d'image impossible: FilePicker indisponible.");
+      return false;
+    }
+
+    const current = String(foundry.utils.getProperty(this.actor, field) || "").trim();
+    const picker = new FilePickerClass({
+      type: "image",
+      current,
+      callback: async path => {
+        const nextPath = String(path || "").trim();
+        if (!nextPath || nextPath === current) return;
+        await this.applyActorUpdate({ [field]: nextPath });
+      }
+    });
+    picker.render(true);
+    return true;
+  }
+
   async deleteActorItem(item) {
     if (!item) return false;
     const itemId = String(item.id || "").trim();
@@ -9073,6 +9098,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       const stateId = String(ev.currentTarget?.dataset?.stateId || "").trim();
       if (!stateId) return;
       await this.toggleStatePreset(stateId);
+    });
+
+    html.on("click", "img.portrait[data-edit='img']", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.openActorImageFilePicker(ev.currentTarget?.dataset?.edit || "img");
     });
 
     html.on("change", VITAL_RESOURCE_INPUT_SELECTOR, async ev => {
