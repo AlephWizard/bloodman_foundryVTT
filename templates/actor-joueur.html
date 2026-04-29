@@ -230,11 +230,9 @@
                   name="system.profile.archetypeBonusCharacteristic"
                 >
                   <option value=""></option>
-                  {{#select profile.archetypeBonusCharacteristic}}
-                    {{#each archetypeCharacteristicOptions}}
-                      <option value="{{this.key}}">{{this.label}}</option>
-                    {{/each}}
-                  {{/select}}
+                  {{#each archetypeCharacteristicOptions}}
+                    <option value="{{this.key}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+                  {{/each}}
                 </select>
               </div>
             </div>

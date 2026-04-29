@@ -39,7 +39,7 @@ export function buildDamageSplitPopupHooks({
   const toSafeHtml = typeof escapeHtml === "function"
     ? escapeHtml
     : value => String(value || "");
-  const popupDialogClass = dialogClass || globalThis.Dialog;
+  const popupDialogClass = dialogClass || globalThis.foundry?.appv1?.api?.Dialog || globalThis.Dialog;
   const wasProcessed = typeof wasDamageSplitPopupRequestProcessed === "function"
     ? wasDamageSplitPopupRequestProcessed
     : () => false;

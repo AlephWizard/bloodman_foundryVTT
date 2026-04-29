@@ -18,6 +18,50 @@ function getPropertyCompat(source, path, fallback = undefined) {
   return cursor === undefined ? fallback : cursor;
 }
 
+function getFoundryNamespace() {
+  return globalThis.foundry || {};
+}
+
+export function getRollClass() {
+  const foundryNamespace = getFoundryNamespace();
+  return foundryNamespace.dice?.Roll ?? globalThis.Roll ?? null;
+}
+
+export function createRoll(formula, options = undefined) {
+  const RollClass = getRollClass();
+  if (typeof RollClass !== "function") {
+    throw new Error("Foundry Roll API is not available.");
+  }
+  return options === undefined ? new RollClass(formula) : new RollClass(formula, options);
+}
+
+export function getDialogClass() {
+  const foundryNamespace = getFoundryNamespace();
+  return foundryNamespace.appv1?.api?.Dialog ?? globalThis.Dialog ?? null;
+}
+
+export function getAudioHelper() {
+  const foundryNamespace = getFoundryNamespace();
+  return foundryNamespace.audio?.AudioHelper ?? globalThis.AudioHelper ?? null;
+}
+
+export function getLegacyApplicationClass(className) {
+  const normalized = asString(className);
+  if (!normalized) return null;
+  const foundryNamespace = getFoundryNamespace();
+  return foundryNamespace.appv1?.sheets?.[normalized]
+    ?? foundryNamespace.appv1?.api?.[normalized]
+    ?? globalThis[normalized]
+    ?? null;
+}
+
+export function getDocumentCollectionClass(collectionName) {
+  const normalized = asString(collectionName);
+  if (!normalized) return null;
+  const foundryNamespace = getFoundryNamespace();
+  return foundryNamespace.documents?.collections?.[normalized] ?? globalThis[normalized] ?? null;
+}
+
 export async function compatFromUuid(uuid) {
   const normalized = asString(uuid);
   if (!normalized) return null;
@@ -73,9 +117,13 @@ export async function updateDocument(document, updateData, options = {}) {
   return document.update(updateData, options);
 }
 
+function getTextEditorImplementation() {
+  return globalThis.foundry?.applications?.ux?.TextEditor?.implementation ?? globalThis.TextEditor ?? null;
+}
+
 export async function compatEnrichHTML(content, options = {}) {
   const source = String(content ?? "");
-  const textEditor = globalThis.TextEditor;
+  const textEditor = getTextEditorImplementation();
   if (!textEditor || typeof textEditor.enrichHTML !== "function") return source;
   try {
     return await textEditor.enrichHTML(source, options);
@@ -89,7 +137,7 @@ export async function enrichHTML(content, options = {}) {
 }
 
 export function getDragEventData(event) {
-  const textEditor = globalThis.TextEditor;
+  const textEditor = getTextEditorImplementation();
   if (textEditor && typeof textEditor.getDragEventData === "function") {
     try {
       return textEditor.getDragEventData(event) || {};

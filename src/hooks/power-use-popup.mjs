@@ -50,7 +50,7 @@ export function buildPowerUsePopupHooks({
   const toSafeHtml = typeof escapeHtml === "function"
     ? escapeHtml
     : value => String(value || "");
-  const renderDialogClass = dialogClass || globalThis.Dialog;
+  const renderDialogClass = dialogClass || globalThis.foundry?.appv1?.api?.Dialog || globalThis.Dialog;
   const canAssistantRole = typeof isAssistantOrHigherRole === "function"
     ? isAssistantOrHigherRole
     : () => false;

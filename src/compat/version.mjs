@@ -47,3 +47,6 @@ export function isV13Plus() {
   return isGenerationOrHigher(13);
 }
 
+export function isV14Plus() {
+  return isGenerationOrHigher(14);
+}

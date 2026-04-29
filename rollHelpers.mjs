@@ -7,6 +7,8 @@ import {
   isCurrentUserPrimaryPrivilegedOperator
 } from "./utils/privileged-users.mjs";
 import {
+  createRoll,
+  getDialogClass,
   hasSocket,
   socketEmit,
   updateDocument
@@ -59,6 +61,12 @@ const CHAT_ROLL_TYPES = Object.freeze({
   HEAL: "heal",
   EXPERIENCE: "experience"
 });
+
+function createDialog(config, options = undefined) {
+  const DialogClass = getDialogClass();
+  if (typeof DialogClass !== "function") return null;
+  return options === undefined ? new DialogClass(config) : new DialogClass(config, options);
+}
 
 function t(key, data = null) {
   if (!globalThis.game?.i18n) return key;
@@ -607,7 +615,7 @@ function getRollValues(roll) {
 
 async function evaluateDamageRoll(config = {}) {
   const formula = normalizeDamageFormula(config?.formula) || "1d4";
-  const roll = await new Roll(formula).evaluate();
+  const roll = await createRoll(formula).evaluate();
   return {
     roll,
     rollResults: getRollValues(roll),
@@ -868,7 +876,7 @@ async function promptDamageConfiguration({
       resolve(value);
     };
 
-    new Dialog(
+    createDialog(
       {
         title: `${titleLabel}${titleSource}`,
         content,
@@ -1160,7 +1168,7 @@ export async function doCharacteristicRoll(actor, key, options = {}) {
   const effective = getEffectiveCharacteristic(actor, key);
   const characteristicLabel = getCharacteristicDisplayLabel(key);
 
-  const r = await new Roll("1d100").evaluate();
+  const r = await createRoll("1d100").evaluate();
   const rollTotal = Number(r.total) || 0;
   const isCritSuccess = rollTotal >= 1 && rollTotal <= 5;
   const isCritFailure = rollTotal >= 96 && rollTotal <= 100;
@@ -1463,7 +1471,7 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
         resolve(value);
       };
 
-      new Dialog({
+      createDialog({
         title: titleLabel,
         content: buildContent(defaults),
         buttons: {
@@ -1724,7 +1732,7 @@ export async function doHealRoll(actor, item, options = {}) {
   if (!resolvedTargetActor) return null;
   const rawFormula = String(options?.formula || item.system?.healDie || "d4");
   const formula = normalizeDamageFormula(rawFormula) || "1d4";
-  const roll = await new Roll(formula).evaluate();
+  const roll = await createRoll(formula).evaluate();
 
   const current = Number(resolvedTargetActor.system.resources?.pv?.current || 0);
   const max = Number(resolvedTargetActor.system.resources?.pv?.max || 0);
@@ -1834,7 +1842,7 @@ export async function doGrowthRoll(actor, key) {
   const effective = base;
   const characteristicLabel = getCharacteristicDisplayLabel(key);
 
-  const roll = await new Roll("1d100").evaluate();
+  const roll = await createRoll("1d100").evaluate();
   const rollTotal = Number(roll.total) || 0;
   const success = rollTotal > effective;
   const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");

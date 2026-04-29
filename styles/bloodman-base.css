@@ -13,6 +13,7 @@
 
 .bloodman.sheet.actor,
 .bloodman.sheet.item,
+.application.bloodman.sheet.actor .window-content,
 .bloodman.sheet.actor .window-content,
 .bloodman.sheet.item .window-content {
   background: var(--bm-white);

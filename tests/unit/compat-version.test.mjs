@@ -5,7 +5,8 @@ import {
   isV10Plus,
   isV11Plus,
   isV12Plus,
-  isV13Plus
+  isV13Plus,
+  isV14Plus
 } from "../../src/compat/version.mjs";
 
 function withGameMock(gameMock, fn) {
@@ -26,6 +27,14 @@ function run() {
     assert.equal(isV11Plus(), true);
     assert.equal(isV12Plus(), true);
     assert.equal(isV13Plus(), true);
+    assert.equal(isV14Plus(), false);
+  });
+
+  withGameMock({ release: { version: "14.360", generation: 14 } }, () => {
+    assert.equal(foundryVersion(), "14.360");
+    assert.equal(getFoundryGeneration(), 14);
+    assert.equal(isV13Plus(), true);
+    assert.equal(isV14Plus(), true);
   });
 
   withGameMock({ version: "11.315" }, () => {
@@ -35,6 +44,7 @@ function run() {
     assert.equal(isV11Plus(), true);
     assert.equal(isV12Plus(), false);
     assert.equal(isV13Plus(), false);
+    assert.equal(isV14Plus(), false);
   });
 
   withGameMock({}, () => {
@@ -45,4 +55,3 @@ function run() {
 
 run();
 console.log("compat-version.test.mjs: OK");
-

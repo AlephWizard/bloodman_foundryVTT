@@ -4,7 +4,8 @@ export {
   isV10Plus,
   isV11Plus,
   isV12Plus,
-  isV13Plus
+  isV13Plus,
+  isV14Plus
 } from "./version.mjs";
 
 export {
@@ -14,6 +15,12 @@ export {
   fromUuidSync,
   compatGetDocumentClass,
   getDocumentClass,
+  getRollClass,
+  createRoll,
+  getDialogClass,
+  getAudioHelper,
+  getLegacyApplicationClass,
+  getDocumentCollectionClass,
   updateDocument,
   compatEnrichHTML,
   enrichHTML,

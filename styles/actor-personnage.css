@@ -2495,13 +2495,14 @@
 .bloodman-sheet .char-base {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .bloodman-sheet .char-name {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding-left: 4px;
 }
 
 .bloodman-sheet .char-name .move-slot {
@@ -2627,7 +2628,7 @@
   font-size: 10px;
   font-weight: 700;
   opacity: 0.7;
-  margin-right: 4px;
+  margin-right: 8px;
 }
 
 .npc-sheet .char-row {
@@ -2865,7 +2866,8 @@
 }
 
 /* Window mockup pass: PJ / PNJ */
-.window-app.bloodman.sheet.actor {
+.window-app.bloodman.sheet.actor,
+.application.bloodman.sheet.actor {
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid #000000;
@@ -2873,6 +2875,7 @@
 }
 
 .window-app.bloodman.sheet.actor .window-content,
+.application.bloodman.sheet.actor .window-content,
 .bloodman.sheet.actor .window-content {
   padding: 0;
   border: 0;
@@ -2884,6 +2887,7 @@
 }
 
 .window-app.bloodman.sheet.actor .window-header,
+.application.bloodman.sheet.actor .window-header,
 .bloodman.sheet.actor .window-header {
   background: linear-gradient(180deg, #171717 0%, #080808 100%);
   border-top-left-radius: 13px;
@@ -3439,4 +3443,104 @@
 .bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .column.center,
 .bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .column.center {
   min-width: 520px;
+}
+
+/* Foundry v14 ApplicationV2 applies stronger default form styling than V1.
+   Keep Bloodman sheet values visually neutral and restore the custom XP boxes. */
+.bloodman-sheet .state-field input[type="number"],
+.bloodman-sheet .card-total input[type="number"],
+.bloodman-sheet .char-base input[type="number"],
+.bloodman-sheet .move-box,
+.bloodman-sheet .resource-circle input[type="number"] {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  box-shadow: none !important;
+}
+
+.bloodman-sheet .state-field.is-negative input[type="number"],
+.bloodman-sheet .char-modifier.negative {
+  color: #b83228 !important;
+  -webkit-text-fill-color: #b83228 !important;
+}
+
+.bloodman-sheet .state-field.is-positive input[type="number"],
+.bloodman-sheet .char-modifier.positive {
+  color: #2f8a42 !important;
+  -webkit-text-fill-color: #2f8a42 !important;
+}
+
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid #000000 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  accent-color: #000000 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"]:checked {
+  background: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"]::before,
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"]::after {
+  content: none !important;
+  display: none !important;
+}
+
+.bloodman-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="image"]),
+.bloodman-sheet textarea,
+.bloodman-sheet select {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet input::placeholder,
+.bloodman-sheet textarea::placeholder {
+  color: #6b6258 !important;
+  -webkit-text-fill-color: #6b6258 !important;
+  opacity: 1 !important;
+}
+
+.bloodman-sheet .voyage-input {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet .sheet-tabs .item {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet .sheet-tabs .item.active {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.bloodman-sheet .resource-circle input[type="number"],
+.bloodman-sheet .resource-circle .value,
+.bloodman-sheet .resource-circle .value span {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.bloodman-sheet .resource-circle .value input[type="number"]:not([type="checkbox"]):not([type="radio"]):not([type="image"]) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.bloodman-sheet .ammo-line-toolbar-button {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
 }

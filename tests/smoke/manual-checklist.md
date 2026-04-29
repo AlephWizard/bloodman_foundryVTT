@@ -4,10 +4,12 @@
 2. Verifier la console:
 - Absence d'erreur au chargement.
 - Presence d'un log `compat:init` avec version/generation Foundry.
+- En v14, verifier que les avertissements restants concernent uniquement des API depreciees (`appv1`) et pas des erreurs bloquantes.
 3. Creer un actor `personnage` et un actor `personnage-non-joueur`.
 4. Ouvrir les sheets, verifier:
 - Valeurs PV/PP et jauges visibles.
 - Aucune boucle de rerender apparente.
+- En v14, verifier que les fiches PJ/PNJ utilisent les controles natifs ApplicationV2, avec le menu d'actions en haut a droite et l'action de detachement de fenetre.
 5. Creer un item `arme`, lancer un jet de degats avec cible selectionnee.
 - Verifier que `Attaque simple` dans l'equipement permet de modifier librement la formule (`1d6`, `1d8`, etc.) sur fiche joueur et PNJ.
 6. Verifier les messages chat:
@@ -25,3 +27,10 @@
 11. Perf UI Sheets:
 - Ouvrir une fiche personnage, modifier rapidement PV/PP et notes textarea: verifier absence de saccades majeures et resize de fenetre stable.
 - Ouvrir une fiche item avec prix/vente, saisir rapidement dans les deux champs: verifier preview fluide sans cloture/reouverture de sheet.
+12. Modules Bloodman v14:
+- `bm-gestion-image`: clic droit/partage d'image depuis une fiche, affichage cote joueur et accuse socket.
+- `bm-horloge`: ouverture de l'horloge, changement des ratios, pop-up lever/coucher du soleil.
+- `bm-lampe-torche`: bouton de HUD token et remise a zero des presets lumiere.
+- `bm-oracle-destin`: macro GM creee, jet du destin et carte chat.
+- `bm-redimensionnement-token` / `bm-resize-token`: champs de cadrage et echelle sur fiche/token, persistance apres rechargement.
+- `bm-ui-joueur`: masquage/ajustements UI joueur sans masquer les controles GM.

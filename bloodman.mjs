@@ -15,6 +15,12 @@ import {
   foundryVersion,
   getFoundryGeneration,
   getDragEventData,
+  getAudioHelper,
+  getDialogClass,
+  getDocumentCollectionClass,
+  getLegacyApplicationClass,
+  getRollClass,
+  createRoll,
   hasSocket,
   socketEmit,
   socketOn,
@@ -120,10 +126,59 @@ import {
   planActorUpdateRestrictionByRole,
 } from "./src/rules/actor-updates.mjs";
 
-const BaseActorSheet = foundry?.appv1?.sheets?.ActorSheet ?? ActorSheet;
-const BaseItemSheet = foundry?.appv1?.sheets?.ItemSheet ?? ItemSheet;
-const ActorsCollection = foundry?.documents?.collections?.Actors ?? Actors;
-const ItemsCollection = foundry?.documents?.collections?.Items ?? Items;
+const BaseActorSheet = getLegacyApplicationClass("ActorSheet");
+const BaseItemSheet = getLegacyApplicationClass("ItemSheet");
+const ActorsCollection = getDocumentCollectionClass("Actors");
+const ItemsCollection = getDocumentCollectionClass("Items");
+
+function getHandlebarsActorSheetV2Base() {
+  const actorSheetV2 = globalThis.foundry?.applications?.sheets?.ActorSheetV2;
+  const handlebarsMixin = globalThis.foundry?.applications?.api?.HandlebarsApplicationMixin;
+  if (typeof actorSheetV2 !== "function" || typeof handlebarsMixin !== "function") return null;
+  return handlebarsMixin(actorSheetV2);
+}
+
+function getSheetElementWrapper(sheet) {
+  const element = sheet?._bloodmanElementWrapper || sheet?.element || null;
+  if (element?.find) return element;
+  const jq = globalThis.jQuery || globalThis.$;
+  if (typeof jq === "function" && typeof HTMLElement !== "undefined" && element instanceof HTMLElement) return jq(element);
+  return element;
+}
+
+function getSheetHTMLElement(sheet) {
+  const element = sheet?.element || null;
+  if (typeof HTMLElement === "undefined") return null;
+  if (element instanceof HTMLElement) return element;
+  if (element?.[0] instanceof HTMLElement) return element[0];
+  return null;
+}
+
+function buildActorSheetBaseData(sheet, options = {}) {
+  const actor = sheet?.actor || sheet?.document || sheet?.object || null;
+  const system = actor?.system || {};
+  const items = actor?.items?.contents || Array.from(actor?.items || []);
+  const editable = Boolean(sheet?.isEditable);
+  return {
+    actor,
+    data: actor,
+    document: actor,
+    object: actor,
+    system,
+    items,
+    owner: Boolean(actor?.isOwner),
+    limited: Boolean(actor?.limited),
+    editable,
+    cssClass: editable ? "editable" : "locked",
+    options: sheet?.options || options
+  };
+}
+
+function callPrototypeMethod(prototype, receiver, methodName, args = []) {
+  const method = prototype?.[methodName];
+  if (typeof method !== "function") return undefined;
+  return method.apply(receiver, args);
+}
 
 function t(key, data = null) {
   if (!globalThis.game?.i18n) return key;
@@ -133,6 +188,55 @@ function t(key, data = null) {
 function tl(key, fallback, data = null) {
   const localized = t(key, data);
   return localized && localized !== key ? localized : fallback;
+}
+
+function createBloodmanDialog(config, options = undefined) {
+  const DialogClass = getDialogClass();
+  if (typeof DialogClass !== "function") return null;
+  return options === undefined ? new DialogClass(config) : new DialogClass(config, options);
+}
+
+function getFilePickerClass() {
+  const namespaced = foundry?.applications?.apps?.FilePicker?.implementation;
+  if (typeof namespaced === "function") return namespaced;
+  if (typeof globalThis.FilePicker === "function") return globalThis.FilePicker;
+  return null;
+}
+
+function isFoundryDocumentLike(value) {
+  if (!value || typeof value !== "object") return false;
+  const constructorName = String(value.constructor?.name || "");
+  return Boolean(
+    value.documentName
+    || constructorName.endsWith("Document")
+    || (typeof value.update === "function" && typeof value.toObject === "function")
+  );
+}
+
+function sanitizeRenderOptions(options = {}) {
+  if (!options || typeof options !== "object") return {};
+  const sanitized = { ...options };
+  for (const [key, value] of Object.entries(sanitized)) {
+    if (isFoundryDocumentLike(value)) delete sanitized[key];
+  }
+  return sanitized;
+}
+
+function getDocumentUuidOrId(documentLike) {
+  return String(documentLike?.uuid || documentLike?.id || documentLike?._id || "").trim();
+}
+
+function registerBloodmanHandlebarsHelpers() {
+  const handlebars = globalThis.Handlebars;
+  if (!handlebars || typeof handlebars.registerHelper !== "function") return;
+  const helpers = {
+    lt: (left, right) => Number(left) < Number(right),
+    gt: (left, right) => Number(left) > Number(right)
+  };
+  for (const [name, helper] of Object.entries(helpers)) {
+    if (typeof handlebars.helpers?.[name] === "function") continue;
+    handlebars.registerHelper(name, helper);
+  }
 }
 
 const SIMPLE_ATTACK_REROLL_ID = "__bloodman-simple-attack__";
@@ -1313,7 +1417,9 @@ function collectTokenHudSvgStatusSources() {
 
 async function listTokenHudLocalSvgIconNames() {
   try {
-    const browseResult = await FilePicker.browse("data", getTokenHudLocalIconDirectoryPath());
+    const FilePickerClass = getFilePickerClass();
+    if (typeof FilePickerClass?.browse !== "function") return new Set();
+    const browseResult = await FilePickerClass.browse("data", getTokenHudLocalIconDirectoryPath());
     const names = new Set();
     for (const filePath of Array.isArray(browseResult?.files) ? browseResult.files : []) {
       if (!isSvgAssetPath(filePath)) continue;
@@ -1334,7 +1440,9 @@ async function copyTokenHudSvgIconToLocalFolder(fileName, sourcePath) {
     const content = await response.text();
     if (!/<svg[\s>]/i.test(content)) return false;
     const file = new File([content], fileName, { type: "image/svg+xml" });
-    await FilePicker.upload("data", getTokenHudLocalIconDirectoryPath(), file, {}, { notify: false });
+    const FilePickerClass = getFilePickerClass();
+    if (typeof FilePickerClass?.upload !== "function") return false;
+    await FilePickerClass.upload("data", getTokenHudLocalIconDirectoryPath(), file, {}, { notify: false });
     return true;
   } catch (_error) {
     return false;
@@ -2928,7 +3036,10 @@ const itemAudioPlaybackRules = createItemAudioPlaybackRules({
   waitMs,
   translate: t,
   notifyError: message => ui.notifications?.error(message),
-  getPlayAudio: () => (typeof AudioHelper?.play === "function" ? (...args) => AudioHelper.play(...args) : null),
+  getPlayAudio: () => {
+    const audioHelper = getAudioHelper();
+    return typeof audioHelper?.play === "function" ? (...args) => audioHelper.play(...args) : null;
+  },
   logError: (...args) => bmLog.error(...args),
   defaultDelayMs: ITEM_AUDIO_POST_ROLL_DELAY_MS
 });
@@ -3090,14 +3201,50 @@ function getActorArchetypeBonus(actor, characteristicKey) {
 }
 
 const TOKEN_TEXTURE_VALIDITY_CACHE = new Map();
+const IMAGE_ELEMENT_LOAD_TIMEOUT_MS = 5000;
+
+function canCheckImageElementSource(src) {
+  if (!src || String(src).startsWith("#")) return false;
+  return typeof globalThis.Image === "function";
+}
+
+async function canLoadImageElementSource(src) {
+  if (!canCheckImageElementSource(src)) return null;
+  return new Promise(resolve => {
+    const image = new globalThis.Image();
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      image.onload = null;
+      image.onerror = null;
+      resolve(value);
+    };
+    const timeoutId = setTimeout(() => finish(false), IMAGE_ELEMENT_LOAD_TIMEOUT_MS);
+    image.onload = () => finish(true);
+    image.onerror = () => finish(false);
+    image.src = src;
+  });
+}
 
 async function canLoadTextureSource(src) {
   if (!src) return false;
   const key = String(src).trim();
   if (!key) return false;
   if (TOKEN_TEXTURE_VALIDITY_CACHE.has(key)) return TOKEN_TEXTURE_VALIDITY_CACHE.get(key);
+  const imageElementResult = await canLoadImageElementSource(key);
+  if (imageElementResult !== null) {
+    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, imageElementResult);
+    return imageElementResult;
+  }
+  const textureLoader = foundry?.canvas?.loadTexture ?? globalThis.loadTexture;
+  if (typeof textureLoader !== "function") {
+    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, false);
+    return false;
+  }
   try {
-    await loadTexture(key);
+    await textureLoader(key);
     TOKEN_TEXTURE_VALIDITY_CACHE.set(key, true);
     return true;
   } catch (_error) {
@@ -4214,7 +4361,7 @@ const damageRerollUtils = buildDamageRerollUtils({
   getCanvas: () => canvas,
   toFiniteNumber,
   normalizeRollDieFormula,
-  evaluateRoll: formula => new Roll(formula).evaluate()
+  evaluateRoll: formula => createRoll(formula).evaluate()
 });
 const {
   normalizeRerollTarget,
@@ -4307,7 +4454,7 @@ const damageConfigPopupHooks = buildDamageConfigPopupHooks({
   getUsersCollection: () => game.users,
   isAssistantOrHigherRole,
   escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
-  dialogClass: Dialog,
+  dialogClass: getDialogClass(),
   wasDamageConfigPopupRequestProcessed,
   rememberDamageConfigPopupRequest,
   logWarn: (...args) => bmLog.warn(...args)
@@ -4321,7 +4468,7 @@ const damageSplitPopupHooks = buildDamageSplitPopupHooks({
   getUsersCollection: () => game.users,
   isAssistantOrHigherRole,
   escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
-  dialogClass: Dialog,
+  dialogClass: getDialogClass(),
   wasDamageSplitPopupRequestProcessed,
   rememberDamageSplitPopupRequest,
   logWarn: (...args) => bmLog.warn(...args)
@@ -4344,7 +4491,7 @@ const powerUsePopupHooks = buildPowerUsePopupHooks({
   isAssistantOrHigherRole,
   formatMultilineTextToHtml,
   escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
-  dialogClass: Dialog,
+  dialogClass: getDialogClass(),
   wasPowerUsePopupRequestProcessed,
   rememberPowerUsePopupRequest,
   logWarn: (...args) => bmLog.warn(...args),
@@ -4787,6 +4934,7 @@ Hooks.once("ready", () => {
 Hooks.once("init", () => {
   registerBloodmanCoreSettings();
   registerBloodmanMigrationSettings();
+  registerBloodmanHandlebarsHelpers();
   registerPrivilegedUsersCacheHooks();
   initializeBloodmanLoggerFromSettings();
   bmLog.info("compat:init", {
@@ -4810,17 +4958,20 @@ Hooks.once("init", () => {
     onChange: value => {
       updateChaosDiceUI(typeof value === "number" ? value : Number(value));
       for (const app of Object.values(ui.windows || {})) {
-        if (app instanceof BloodmanNpcSheet) app.render(false);
+        if (app instanceof BloodmanNpcSheet || app instanceof BloodmanNpcSheetV2) app.render(false);
       }
     }
   });
 
+  const actorSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanActorSheetV2 : BloodmanActorSheet;
+  const npcSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanNpcSheetV2 : BloodmanNpcSheet;
+
   ActorsCollection.unregisterSheet("core", BaseActorSheet);
-  ActorsCollection.registerSheet("bloodman", BloodmanActorSheet, {
+  ActorsCollection.registerSheet("bloodman", actorSheetClass, {
     types: ["personnage"],
     makeDefault: true
   });
-  ActorsCollection.registerSheet("bloodman", BloodmanNpcSheet, {
+  ActorsCollection.registerSheet("bloodman", npcSheetClass, {
     types: ["personnage-non-joueur"],
     makeDefault: true
   });
@@ -4846,7 +4997,8 @@ Hooks.once("init", () => {
     };
 
     combatantDoc.prototype.getInitiativeRoll = function (formula) {
-      const RollClass = foundry?.dice?.Roll || Roll;
+      const RollClass = getRollClass();
+      if (typeof RollClass !== "function") return null;
       const actor = getCombatantActor(this);
       if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
         return new RollClass(getInitiativeFormulaForActor(actor));
@@ -5246,7 +5398,7 @@ function positionChaosDiceUI() {
 
 function showSelectedVoyageXpGrantDialog() {
   if (!game.user?.isGM) return;
-  if (typeof Dialog !== "function") return;
+  if (typeof getDialogClass() !== "function") return;
   const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
   const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
   const promptText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Prompt", "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.");
@@ -5260,7 +5412,7 @@ function showSelectedVoyageXpGrantDialog() {
       <input id="bm-voyage-xp-amount" type="number" name="voyageXpAmount" min="0" step="1" value="0" />
     </div>
   </form>`;
-  const dialog = new Dialog(
+  const dialog = createBloodmanDialog(
     {
       title: titleText,
       content,
@@ -5290,7 +5442,7 @@ function showSelectedVoyageXpGrantDialog() {
 
 function showSelectedFullPpRestoreConfirmDialog() {
   if (!game.user?.isGM) return;
-  if (typeof Dialog !== "function") return;
+  if (typeof getDialogClass() !== "function") return;
 
   const selectedTokens = [...(globalThis.canvas?.tokens?.controlled || [])];
   const selectedCount = Array.isArray(selectedTokens) ? selectedTokens.length : 0;
@@ -5318,7 +5470,7 @@ function showSelectedFullPpRestoreConfirmDialog() {
     <p><small>${escapeHtml(selectionHint)}</small></p>
   </form>`;
 
-  const dialog = new Dialog(
+  const dialog = createBloodmanDialog(
     {
       title: titleText,
       content,
@@ -5346,7 +5498,7 @@ function showSelectedFullPpRestoreConfirmDialog() {
 
 function showSelectedFullPvRestoreConfirmDialog() {
   if (!game.user?.isGM) return;
-  if (typeof Dialog !== "function") return;
+  if (typeof getDialogClass() !== "function") return;
 
   const selectedTokens = [...(globalThis.canvas?.tokens?.controlled || [])];
   const selectedCount = Array.isArray(selectedTokens) ? selectedTokens.length : 0;
@@ -5374,7 +5526,7 @@ function showSelectedFullPvRestoreConfirmDialog() {
     <p><small>${escapeHtml(selectionHint)}</small></p>
   </form>`;
 
-  const dialog = new Dialog(
+  const dialog = createBloodmanDialog(
     {
       title: titleText,
       content,
@@ -5886,9 +6038,11 @@ Hooks.on("createChatMessage", async (message) => {
   await chatMessageRoutingHooks.onCreateChatMessage(message);
 });
 
-Hooks.on("renderChatMessage", chatMessageRoutingHooks.onRenderChatMessage);
-
-Hooks.on("renderChatMessageHTML", chatMessageRoutingHooks.onRenderChatMessageHTML);
+if (getFoundryGeneration() >= 14) {
+  Hooks.on("renderChatMessageHTML", chatMessageRoutingHooks.onRenderChatMessageHTML);
+} else {
+  Hooks.on("renderChatMessage", chatMessageRoutingHooks.onRenderChatMessage);
+}
 
 Hooks.on("renderHotbar", () => {
   positionChaosDiceUI();
@@ -6304,17 +6458,47 @@ Hooks.on("updateActiveEffect", async effectDoc => {
 });
 
 class BloodmanActorSheet extends BaseActorSheet {
+  constructor(object, options = {}) {
+    super(object, options);
+    this.captureTokenDocumentReference(options?.token || object?.token || null);
+    this.sanitizeStoredSheetOptions();
+  }
+
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
       template: "systems/bloodman/templates/actor-joueur.html",
       width: 1070,
       height: 630,
+      popOut: true,
       minimizable: true,
       resizable: true,
       submitOnChange: true,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "carac" }]
     });
+  }
+
+  get token() {
+    return this._bloodmanTokenDocument || super.token;
+  }
+
+  _getHeaderButtons() {
+    return super._getHeaderButtons();
+  }
+
+  captureTokenDocumentReference(candidate) {
+    if (isFoundryDocumentLike(candidate)) this._bloodmanTokenDocument = candidate;
+  }
+
+  sanitizeStoredSheetOptions() {
+    if (!this.options || typeof this.options !== "object") return;
+    for (const [key, value] of Object.entries(this.options)) {
+      if (!isFoundryDocumentLike(value)) continue;
+      if (key === "token") this.captureTokenDocumentReference(value);
+      const ref = getDocumentUuidOrId(value);
+      if (ref) this.options[`${key}Uuid`] = ref;
+      delete this.options[key];
+    }
   }
 
   get isEditable() {
@@ -6362,15 +6546,56 @@ class BloodmanActorSheet extends BaseActorSheet {
     else state.delete(key);
   }
 
+  _render(force, options = {}) {
+    registerBloodmanHandlebarsHelpers();
+    return super._render(force, sanitizeRenderOptions(options));
+  }
+
   render(force, options = {}) {
+    registerBloodmanHandlebarsHelpers();
     if (options?.bloodmanResetRerollState === true) {
       this.clearRerollDisplayState();
     }
-    return super.render(force, options);
+    this.captureTokenDocumentReference(options?.token || null);
+    this.sanitizeStoredSheetOptions();
+    return super.render(force, sanitizeRenderOptions(options));
   }
 
   setPosition(options = {}) {
-    const position = super.setPosition(options);
+    const viewportWidth = Math.max(
+      Number(globalThis?.innerWidth) || 0,
+      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
+      0
+    );
+    const viewportHeight = Math.max(
+      Number(globalThis?.innerHeight) || 0,
+      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
+      0
+    );
+    const minWidth = 320;
+    const minHeight = 420;
+    const maxWidth = Math.max(minWidth, viewportWidth - 24);
+    const maxHeight = Math.max(minHeight, viewportHeight - 32);
+    const nextPosition = { ...options };
+    const candidateWidth = Number(nextPosition.width ?? this.position?.width ?? this.options?.width);
+    const candidateHeight = Number(nextPosition.height ?? this.position?.height ?? this.options?.height);
+    const candidateLeft = Number(nextPosition.left ?? this.position?.left);
+    const candidateTop = Number(nextPosition.top ?? this.position?.top);
+
+    if (Number.isFinite(candidateWidth)) {
+      nextPosition.width = Math.min(Math.max(candidateWidth, minWidth), maxWidth);
+    }
+    if (Number.isFinite(candidateHeight)) {
+      nextPosition.height = Math.min(Math.max(candidateHeight, minHeight), maxHeight);
+    }
+    if (Number.isFinite(candidateLeft) && Number.isFinite(nextPosition.width)) {
+      nextPosition.left = Math.max(12, Math.min(candidateLeft, viewportWidth - nextPosition.width - 12));
+    }
+    if (Number.isFinite(candidateTop) && Number.isFinite(nextPosition.height)) {
+      nextPosition.top = Math.max(12, Math.min(candidateTop, viewportHeight - nextPosition.height - 12));
+    }
+
+    const position = super.setPosition(nextPosition);
     this.applyResponsiveActorSheetLayoutState();
     return position;
   }
@@ -6409,14 +6634,14 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   getResponsiveActorSheetRoot(rootLike = null) {
     const root = rootLike?.find ? rootLike[0] : rootLike;
-    const elementRoot = root instanceof HTMLElement
+    const elementRoot = typeof HTMLElement !== "undefined" && root instanceof HTMLElement
       ? root
-      : (this.element?.[0] instanceof HTMLElement ? this.element[0] : null);
+      : getSheetHTMLElement(this);
     if (!elementRoot) return null;
     const sheetRoot = elementRoot.matches?.(".bloodman-sheet")
       ? elementRoot
       : elementRoot.querySelector?.(".bloodman-sheet");
-    return sheetRoot instanceof HTMLElement ? sheetRoot : null;
+    return typeof HTMLElement !== "undefined" && sheetRoot instanceof HTMLElement ? sheetRoot : null;
   }
 
   getResponsiveActorSheetObserverTarget(rootLike = null) {
@@ -6583,7 +6808,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (this._autoGrowRefreshTaskId != null) return;
     this._autoGrowRefreshTaskId = queueUiMicrotask(() => {
       this._autoGrowRefreshTaskId = null;
-      const root = this._queuedAutoGrowRoot?.find ? this._queuedAutoGrowRoot : this.element;
+      const root = this._queuedAutoGrowRoot?.find ? this._queuedAutoGrowRoot : getSheetElementWrapper(this);
       this._queuedAutoGrowRoot = null;
       this.refreshAutoGrowTextareas(root);
     });
@@ -6594,7 +6819,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (this._resourceGaugeRefreshTaskId != null) return;
     this._resourceGaugeRefreshTaskId = queueUiMicrotask(() => {
       this._resourceGaugeRefreshTaskId = null;
-      const root = this._queuedResourceGaugeRoot?.find ? this._queuedResourceGaugeRoot : this.element;
+      const root = this._queuedResourceGaugeRoot?.find ? this._queuedResourceGaugeRoot : getSheetElementWrapper(this);
       this._queuedResourceGaugeRoot = null;
       this.refreshResourceVisuals(root);
     });
@@ -7346,7 +7571,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   getActiveItemReorderPayloadFromDom() {
-    const root = this.element;
+    const root = getSheetElementWrapper(this);
     if (!root?.length) return null;
     const draggingNode = root.find("li.item[data-item-id].is-reorder-dragging").first();
     if (!draggingNode.length) return null;
@@ -7405,7 +7630,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   clearItemReorderVisualState(rootLike = null) {
-    const root = rootLike?.find ? rootLike : this.element;
+    const root = rootLike?.find ? rootLike : getSheetElementWrapper(this);
     if (!root?.length) return;
     root.find(".item-list.is-reorder-target").removeClass("is-reorder-target");
     root.find(".item.is-reorder-drop-before").removeClass("is-reorder-drop-before");
@@ -8233,6 +8458,10 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   getData(options = {}) {
     const data = super.getData(options);
+    return this.prepareBloodmanActorSheetData(data, options);
+  }
+
+  prepareBloodmanActorSheetData(data, _options = {}) {
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const canEditTokenImage = isAssistantOrHigherRole(game.user?.role);
     const canManageAmmoLines = Boolean(this.actor?.isOwner || isAssistantOrHigherRole(game.user?.role));
@@ -8380,7 +8609,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     profile.archetypeBonusCharacteristic = profileBonusCharacteristic;
     const archetypeCharacteristicOptions = CHARACTERISTICS.map(characteristic => ({
       key: characteristic.key,
-      label: t(characteristic.labelKey) || characteristic.key
+      label: t(characteristic.labelKey) || characteristic.key,
+      selected: profileBonusCharacteristic === characteristic.key
     }));
     const equipment = foundry.utils.mergeObject(buildDefaultEquipment(), data.actor.system.equipment || {}, {
       inplace: false
@@ -8673,7 +8903,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   getAutoResizeKey() {
-    const root = this.element;
+    const root = getSheetElementWrapper(this);
     const activeTab = String(
       root?.find?.(".sheet-body .tab.active")?.first?.()?.data?.("tab")
       || root?.find?.(".sheet-tabs .item.active")?.first?.()?.data?.("tab")
@@ -8705,7 +8935,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   refreshAutoGrowTextareas(htmlLike = null) {
-    const root = htmlLike?.find ? htmlLike : this.element;
+    const root = htmlLike?.find ? htmlLike : getSheetElementWrapper(this);
     if (!root?.length) return;
     const fields = root.find("textarea[data-autogrow='true']");
     if (!fields.length) return;
@@ -8716,7 +8946,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   autoResizeToContent(force = false) {
     if (this._minimized) return;
-    const root = this.element;
+    const root = getSheetElementWrapper(this);
     if (!root?.length) return;
     const app = root.closest(".window-app");
     if (!app?.length) return;
@@ -8762,11 +8992,29 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    this.activateBloodmanActorListeners(html);
+  }
 
+  activateBloodmanActorListeners(html) {
     const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
     const basicPlayer = isBasicPlayerRole(game.user?.role);
+    const activatePrimaryTab = tabId => {
+      const tab = String(tabId || this._bloodmanActivePrimaryTab || "carac").trim() || "carac";
+      this._bloodmanActivePrimaryTab = tab;
+      html.find(".sheet-tabs .item").removeClass("active");
+      html.find(`.sheet-tabs .item[data-tab='${tab}']`).addClass("active");
+      html.find(".sheet-body .tab").removeClass("active");
+      html.find(`.sheet-body .tab[data-tab='${tab}']`).addClass("active");
+    };
+    const currentActiveTab = String(
+      html.find(".sheet-tabs .item.active").first().data("tab")
+      || html.find(".sheet-body .tab.active").first().data("tab")
+      || this._bloodmanActivePrimaryTab
+      || "carac"
+    ).trim();
+    activatePrimaryTab(currentActiveTab);
     const forceEnableSheetUi = () => {
-      const root = this.element;
+      const root = html?.find ? html : getSheetElementWrapper(this);
       if (!root?.length) return;
       if (basicPlayer) {
         root.find("input, textarea, select, button").prop("disabled", false);
@@ -8797,7 +9045,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.connectResponsiveActorSheetLayoutObserver(html);
     this.queueAutoResizeToContent(true);
 
-    html.find(".sheet-tabs .item").on("click", () => {
+    html.find(".sheet-tabs .item").on("click", ev => {
+      const tabId = String(ev?.currentTarget?.dataset?.tab || "").trim();
+      if (tabId) activatePrimaryTab(tabId);
       queueUiMicrotask(() => this.applyResponsiveActorSheetLayoutState(html));
       this.queueAutoGrowTextareaRefresh(html);
       this.queueAutoResizeToContent(true);
@@ -9341,7 +9591,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   refreshResourceVisuals(html) {
-    const root = html?.find ? html : this.element;
+    const root = html?.find ? html : getSheetElementWrapper(this);
     if (!root?.length) return;
     const updateGauge = (kind, currentPath, maxPath) => {
       const currentInput = root.find(`input[name='${currentPath}']`).first();
@@ -9392,6 +9642,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       const handled = await this._onDropTransportNpc(event, data);
       if (handled) return;
     }
+    return this.callBaseOnDrop(event);
+  }
+
+  callBaseOnDrop(event) {
     return super._onDrop(event);
   }
 
@@ -9475,7 +9729,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async promptDropDecision(preview) {
-    if (!preview || typeof Dialog !== "function") return "fermer";
+    if (!preview || typeof getDialogClass() !== "function") return "fermer";
     const escapeHtml = value => (
       foundry.utils?.escapeHTML
         ? foundry.utils.escapeHTML(String(value ?? ""))
@@ -9516,7 +9770,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         resolve(String(value || "fermer"));
       };
 
-      new Dialog(
+      createBloodmanDialog(
         {
           title,
           content,
@@ -9559,7 +9813,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const purchase = await this.resolveDropPurchaseSummary(data);
     const preview = await this.buildDropDecisionPreview(data, purchase);
     if (!preview) {
-      return super._onDropItem(event, data);
+      return this.callBaseOnDropItem(event, data);
     }
     const selectedAction = await this.promptDropDecision(preview);
     if (isDropDecisionClosed(selectedAction)) return null;
@@ -9600,7 +9854,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     try {
       const dropped = hasOnlyActorTransfers
         ? await this.applyActorToActorItemTransfer(actorTransferEntries, { createItemOptions })
-        : await this.withDropItemCreateOptions(createItemOptions, () => super._onDropItem(event, data));
+        : await this.withDropItemCreateOptions(createItemOptions, () => this.callBaseOnDropItem(event, data));
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
       }
@@ -9617,6 +9871,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       throw error;
     }
+  }
+
+  callBaseOnDropItem(event, data) {
+    return super._onDropItem(event, data);
   }
 
   async withDropItemCreateOptions(createItemOptions, callback) {
@@ -9639,7 +9897,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   getActivePrimaryTabId() {
-    const root = this.element;
+    const root = getSheetElementWrapper(this);
     const activeTab = String(
       root?.find?.(".sheet-body .tab.active")?.first?.()?.data?.("tab")
       || root?.find?.(".sheet-tabs .item.active")?.first?.()?.data?.("tab")
@@ -9758,12 +10016,16 @@ class BloodmanActorSheet extends BaseActorSheet {
       return this.createDroppedItemsWithTemplateChildren(source, createItemOptions);
     }
     if (!createItemOptions) {
-      return super._onDropItemCreate(Array.isArray(normalizedItemData) ? source : source[0]);
+      return this.callBaseOnDropItemCreate(Array.isArray(normalizedItemData) ? source : source[0]);
     }
     const payload = Array.isArray(normalizedItemData)
       ? source
       : [source[0]];
     return this.actor?.createEmbeddedDocuments?.("Item", payload, createItemOptions);
+  }
+
+  callBaseOnDropItemCreate(itemData) {
+    return super._onDropItemCreate(itemData);
   }
 
   async _reachedCarriedItemsLimit(data) {
@@ -9813,7 +10075,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   async rollLuck() {
     if (this.actor.type !== "personnage") return;
 
-    const roll = await new Roll("2d100").evaluate();
+    const roll = await createRoll("2d100").evaluate();
     const results = getRollValuesFromRoll(roll);
     const chanceValue = Number(results[0] || 0);
     const luckValue = Number(results[1] || 0);
@@ -9852,7 +10114,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     const characteristicKey = String(key || "").trim();
     if (!characteristicKey) return false;
     const selector = `input[name='system.characteristics.${characteristicKey}.hiddenRoll']`;
-    const checkbox = this.element?.find ? this.element.find(selector) : null;
+    const root = getSheetElementWrapper(this);
+    const checkbox = root?.find ? root.find(selector) : null;
     if (checkbox?.length) return checkbox.first().is(":checked");
     return toCheckboxBoolean(this.actor?.system?.characteristics?.[characteristicKey]?.hiddenRoll, false);
   }
@@ -10514,7 +10777,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       base
     });
 
-    const roll = await new Roll("1d100").evaluate();
+    const roll = await createRoll("1d100").evaluate();
     const outcomeState = resolveGrowthOutcome({
       rollTotal: Number(roll.total || 0),
       effectiveScore: effective
@@ -10576,7 +10839,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         </div>
       </div>
     </form>`;
-    new Dialog(
+    createBloodmanDialog(
       {
         title: t("BLOODMAN.Dialogs.Growth.Title"),
         content,
@@ -10608,7 +10871,10 @@ class BloodmanNpcSheet extends BloodmanActorSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    this.activateBloodmanNpcListeners(html);
+  }
 
+  activateBloodmanNpcListeners(html) {
     html.find(".npc-role-toggle").change(ev => {
       const input = ev.currentTarget;
       const role = input.dataset.role || "";
@@ -10620,6 +10886,236 @@ class BloodmanNpcSheet extends BloodmanActorSheet {
     });
   }
 }
+
+const ResolvedBloodmanActorSheetV2Base = getHandlebarsActorSheetV2Base();
+const BloodmanActorSheetV2Base = ResolvedBloodmanActorSheetV2Base || class {};
+
+class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
+  constructor(options = {}, ...args) {
+    const firstArgIsActor = options?.documentName === "Actor" || options?.constructor?.documentName === "Actor";
+    const optionData = firstArgIsActor ? (args[0] || {}) : options;
+    const document = firstArgIsActor ? options : (optionData?.document || optionData?.object || optionData?.actor || null);
+    const normalizedOptions = document
+      ? { ...optionData, document }
+      : optionData;
+    super(normalizedOptions, ...(firstArgIsActor ? args.slice(1) : args));
+    this.captureTokenDocumentReference(optionData?.token || document?.token || null);
+    this.sanitizeStoredSheetOptions();
+  }
+
+  static DEFAULT_OPTIONS = foundry.utils.mergeObject(BloodmanActorSheetV2Base.DEFAULT_OPTIONS || {}, {
+    id: "bloodman-actor-{id}",
+    classes: ["bloodman", "sheet", "actor"],
+    tag: "div",
+    position: {
+      width: 1070,
+      height: 630
+    },
+    window: {
+      contentTag: "form",
+      contentClasses: ["bloodman-sheet", "pj-sheet"],
+      resizable: true,
+      minimizable: true
+    },
+    form: {
+      submitOnChange: true,
+      closeOnSubmit: false
+    }
+  }, { inplace: false });
+
+  static PARTS = {
+    sheet: {
+      template: "systems/bloodman/templates/actor-joueur.html",
+      root: true
+    }
+  };
+
+  get actor() {
+    return this.document;
+  }
+
+  get token() {
+    return this._bloodmanTokenDocument || this.document?.token || null;
+  }
+
+  get isEditable() {
+    if (this.actor?.type === "personnage") return true;
+    return Boolean(super.isEditable);
+  }
+
+  sanitizeStoredSheetOptions() {
+    if (Object.isFrozen(this.options)) return;
+    return BloodmanActorSheet.prototype.sanitizeStoredSheetOptions.call(this);
+  }
+
+  async _prepareContext(options = {}) {
+    registerBloodmanHandlebarsHelpers();
+    const context = typeof super._prepareContext === "function"
+      ? await super._prepareContext(options)
+      : {};
+    const data = {
+      ...buildActorSheetBaseData(this, options),
+      ...context,
+      actor: this.actor,
+      data: this.actor,
+      document: this.actor,
+      system: this.actor?.system || {}
+    };
+    return this.prepareBloodmanActorSheetData(data, options);
+  }
+
+  async _onRender(context, options) {
+    const documentSheetV2 = globalThis.foundry?.applications?.api?.DocumentSheetV2;
+    if (documentSheetV2?.prototype?._onRender) {
+      await documentSheetV2.prototype._onRender.call(this, context, options);
+    } else if (typeof super._onRender === "function") {
+      await super._onRender(context, options);
+    }
+    const jq = globalThis.jQuery || globalThis.$;
+    const formElement = this.form || this.element;
+    this._bloodmanElementWrapper = typeof jq === "function" ? jq(formElement) : formElement;
+    this.activateBloodmanActorListeners(this._bloodmanElementWrapper);
+  }
+
+  _prepareSubmitData(event, form, formData, updateData) {
+    const submitData = this._processFormData(event, form, formData);
+    if (updateData) {
+      foundry.utils.mergeObject(submitData, updateData, { applyOperators: true });
+      foundry.utils.mergeObject(submitData, updateData, { applyOperators: false });
+    }
+    return submitData;
+  }
+
+  async _processSubmitData(event, _form, submitData, options = {}) {
+    return this._updateObject(event, submitData, options);
+  }
+
+  render(forceOrOptions = {}, maybeOptions = {}) {
+    registerBloodmanHandlebarsHelpers();
+    const legacyOptions = typeof forceOrOptions === "boolean" ? maybeOptions : forceOrOptions;
+    const options = typeof forceOrOptions === "boolean"
+      ? { ...(maybeOptions || {}), force: forceOrOptions }
+      : { ...(forceOrOptions || {}) };
+    if (legacyOptions?.bloodmanResetRerollState === true) this.clearRerollDisplayState();
+    this.captureTokenDocumentReference(legacyOptions?.token || null);
+    this.sanitizeStoredSheetOptions();
+    return super.render(sanitizeRenderOptions(options));
+  }
+
+  setPosition(options = {}) {
+    const viewportWidth = Math.max(
+      Number(globalThis?.innerWidth) || 0,
+      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
+      0
+    );
+    const viewportHeight = Math.max(
+      Number(globalThis?.innerHeight) || 0,
+      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
+      0
+    );
+    const minWidth = 320;
+    const minHeight = 420;
+    const maxWidth = Math.max(minWidth, viewportWidth - 24);
+    const maxHeight = Math.max(minHeight, viewportHeight - 32);
+    const nextPosition = { ...options };
+    const candidateWidth = Number(nextPosition.width ?? this.position?.width ?? this.options?.position?.width);
+    const candidateHeight = Number(nextPosition.height ?? this.position?.height ?? this.options?.position?.height);
+    const candidateLeft = Number(nextPosition.left ?? this.position?.left);
+    const candidateTop = Number(nextPosition.top ?? this.position?.top);
+
+    if (Number.isFinite(candidateWidth)) nextPosition.width = Math.min(Math.max(candidateWidth, minWidth), maxWidth);
+    if (Number.isFinite(candidateHeight)) nextPosition.height = Math.min(Math.max(candidateHeight, minHeight), maxHeight);
+    if (Number.isFinite(candidateLeft) && Number.isFinite(nextPosition.width)) {
+      nextPosition.left = Math.max(12, Math.min(candidateLeft, viewportWidth - nextPosition.width - 12));
+    }
+    if (Number.isFinite(candidateTop) && Number.isFinite(nextPosition.height)) {
+      nextPosition.top = Math.max(12, Math.min(candidateTop, viewportHeight - nextPosition.height - 12));
+    }
+
+    const position = super.setPosition(nextPosition);
+    this.applyResponsiveActorSheetLayoutState();
+    return position;
+  }
+
+  async close(options = {}) {
+    this.clearRerollDisplayState();
+    this.clearPowerUseState();
+    this.clearDeferredSheetUiTasks();
+    this.disconnectResponsiveActorSheetLayoutObserver();
+    this._responsiveActorSheetLayoutState = null;
+    this._resourceBubbleRuntimeMap = null;
+    clearUiMicrotask(this._pvGaugePulseTimer);
+    clearUiMicrotask(this._ppGaugePulseTimer);
+    this._pvGaugePulseTimer = null;
+    this._ppGaugePulseTimer = null;
+    this._lastAutoResizeKey = "";
+    this._bloodmanElementWrapper = null;
+    return super.close(options);
+  }
+
+  callBaseOnDrop(event) {
+    return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDrop", [event]);
+  }
+
+  callBaseOnDropItem(event, data) {
+    return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDropItem", [event, data]);
+  }
+
+  callBaseOnDropItemCreate(itemData) {
+    return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDropItemCreate", [itemData]);
+  }
+}
+
+class BloodmanNpcSheetV2 extends BloodmanActorSheetV2 {
+  static DEFAULT_OPTIONS = foundry.utils.mergeObject(BloodmanActorSheetV2.DEFAULT_OPTIONS, {
+    id: "bloodman-npc-{id}",
+    window: {
+      contentClasses: ["bloodman-sheet", "npc-sheet"]
+    }
+  }, { inplace: false });
+
+  static PARTS = {
+    sheet: {
+      template: "systems/bloodman/templates/actor-non-joueur.html",
+      root: true
+    }
+  };
+
+  async _onRender(context, options) {
+    await super._onRender(context, options);
+    this.activateBloodmanNpcListeners(this._bloodmanElementWrapper || getSheetElementWrapper(this));
+  }
+}
+
+function copyActorSheetBehaviorToV2() {
+  const excluded = new Set([
+    "constructor",
+    "_getHeaderButtons",
+    "_render",
+    "render",
+    "setPosition",
+    "close",
+    "getData",
+    "activateListeners",
+    "callBaseOnDrop",
+    "callBaseOnDropItem",
+    "callBaseOnDropItemCreate"
+  ]);
+  for (const name of Object.getOwnPropertyNames(BloodmanActorSheet.prototype)) {
+    if (excluded.has(name)) continue;
+    if (Object.prototype.hasOwnProperty.call(BloodmanActorSheetV2.prototype, name)) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(BloodmanActorSheet.prototype, name);
+    if (descriptor) Object.defineProperty(BloodmanActorSheetV2.prototype, name, descriptor);
+  }
+  for (const name of Object.getOwnPropertyNames(BloodmanNpcSheet.prototype)) {
+    if (name === "constructor" || name === "activateListeners") continue;
+    if (Object.prototype.hasOwnProperty.call(BloodmanNpcSheetV2.prototype, name)) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(BloodmanNpcSheet.prototype, name);
+    if (descriptor) Object.defineProperty(BloodmanNpcSheetV2.prototype, name, descriptor);
+  }
+}
+
+copyActorSheetBehaviorToV2();
 
 class BloodmanItemSheet extends BaseItemSheet {
   get template() {

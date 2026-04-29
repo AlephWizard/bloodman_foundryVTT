@@ -16,7 +16,11 @@ function defaultNormalizeRollDieFormula(value, fallback = "d4") {
 }
 
 async function defaultEvaluateRoll(formula) {
-  return new Roll(formula).evaluate();
+  const RollClass = globalThis.foundry?.dice?.Roll ?? globalThis.Roll ?? null;
+  if (typeof RollClass !== "function") {
+    throw new Error("Foundry Roll API is not available.");
+  }
+  return new RollClass(formula).evaluate();
 }
 
 export function buildDamageRerollUtils({

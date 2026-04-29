@@ -2,11 +2,11 @@
   "id": "bloodman",
   "title": "Bloodman",
   "description": "One game to rule them all",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "compatibility": {
-    "minimum": "13",
-    "verified": "13",
-    "maximum": "13"
+    "minimum": "14",
+    "verified": "14.360",
+    "maximum": "14"
   },
   "authors": [
     {
