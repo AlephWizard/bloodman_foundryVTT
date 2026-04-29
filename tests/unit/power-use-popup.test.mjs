@@ -5,6 +5,7 @@ async function run() {
   const emits = [];
   const chats = [];
   const logs = [];
+  const dialogs = [];
   const remembered = new Set();
   const currentUser = { id: "u1", name: "Player", isGM: false, role: 2 };
 
@@ -36,6 +37,7 @@ async function run() {
       constructor(config, options) {
         this.config = config;
         this.options = options;
+        dialogs.push(this);
       }
       render(_value) {
         logs.push("rendered");
@@ -76,7 +78,7 @@ async function run() {
   assert.equal(cannotReceive, true);
 
   const shown = hooks.showPowerUsePopup({
-    actorName: "Hero",
+    actorName: "Hero<",
     requesterUserName: "Player",
     itemType: "pouvoir",
     itemName: "Boule",
@@ -87,6 +89,8 @@ async function run() {
     damageFormula: "d6"
   });
   assert.equal(shown, true);
+  assert.equal(dialogs.length, 1);
+  assert.equal(dialogs[0].config.title.includes("Hero&lt;"), true);
 
   const handledOnce = await hooks.handlePowerUsePopupMessage({
     eventId: "evt-1",

@@ -493,8 +493,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border-radius: 4px;
   border: 1px solid #6f2dbd;
@@ -549,8 +550,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 4px;
   border: 1px solid var(--bm-line);
@@ -1463,7 +1465,7 @@
 
 .ammo-row {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto 90px;
+  grid-template-columns: 22px minmax(0, 1fr) auto 90px;
   gap: 4px;
   margin-top: 4px;
   align-items: center;
@@ -1503,8 +1505,8 @@
 }
 
 .ammo-line-select {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: 1px solid #1b1b1b;
   border-radius: 999px;
@@ -1990,11 +1992,11 @@
 }
 
 .bloodman-sheet button.luck-roll-header {
-  width: auto;
-  height: auto;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border: 0;
-  border-radius: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
   background: transparent;
   display: inline-flex;
   align-items: center;
@@ -2002,24 +2004,28 @@
   cursor: pointer;
   margin-left: 0;
   box-shadow: none;
-  min-width: 0;
-  min-height: 0;
+  min-width: 32px;
+  min-height: 32px;
   line-height: 1;
   appearance: none;
   -webkit-appearance: none;
   outline: none;
+  position: relative;
+  z-index: 1;
 }
 
 .bloodman-sheet button.luck-roll-header i {
   font-size: 18px;
   color: #4da64d;
-  transform: translateX(12px);
+  pointer-events: none;
 }
 
 .bloodman-sheet button.luck-roll-header:hover,
 .bloodman-sheet button.luck-roll-header:focus-visible {
   opacity: 0.85;
   outline: none;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .bloodman-sheet .sheet-tabs {
@@ -2485,17 +2491,18 @@
 
 /* Layout tweak: move base value column between icon and name */
 .bloodman-sheet .char-row {
-  grid-template-columns: 24px 64px 1fr 92px 100px;
+  grid-template-columns: 24px 84px 1fr 92px 100px;
 }
 
 .bloodman-sheet .char-row.move-row {
-  grid-template-columns: 24px 64px 1fr 92px 100px;
+  grid-template-columns: 24px 84px 1fr 92px 100px;
 }
 
 .bloodman-sheet .char-base {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  min-width: 0;
 }
 
 .bloodman-sheet .char-name {
@@ -2525,7 +2532,7 @@
 
 .bloodman-sheet .char-edit-row {
   display: grid;
-  grid-template-columns: 24px 64px 1fr 92px 100px;
+  grid-template-columns: 24px 84px 1fr 92px 100px;
   align-items: center;
   gap: 6px;
   padding-top: 2px;
@@ -2628,15 +2635,17 @@
   font-size: 10px;
   font-weight: 700;
   opacity: 0.7;
-  margin-right: 8px;
+  flex: 0 0 auto;
+  margin-right: 10px;
+  white-space: nowrap;
 }
 
 .npc-sheet .char-row {
-  grid-template-columns: 24px 98px 64px 1fr 92px;
+  grid-template-columns: 24px 100px 84px 1fr 92px;
 }
 
 .npc-sheet .char-row.move-row {
-  grid-template-columns: 24px 98px 64px 1fr 92px;
+  grid-template-columns: 24px 100px 84px 1fr 92px;
 }
 
 .npc-sheet .char-hidden-roll-cell {
@@ -2689,9 +2698,22 @@
 }
 
 .npc-sheet .char-hidden-roll-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
   margin: 0;
-  width: 11px;
-  height: 11px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #000000;
+  border-radius: 4px;
+  background: #ffffff;
+  accent-color: #000000;
+  box-shadow: none;
+}
+
+.npc-sheet .char-hidden-roll-toggle input:checked {
+  background: #000000;
+  border-color: #000000;
 }
 
 @keyframes bm-bubble-rise {
@@ -3499,6 +3521,40 @@
   display: none !important;
 }
 
+.bloodman-sheet .carry-choice input.bag-slots-toggle,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid #000000 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  accent-color: #000000 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.bloodman-sheet .carry-choice input.bag-slots-toggle:checked,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]:checked {
+  background: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.bloodman-sheet .carry-choice input.bag-slots-toggle::before,
+.bloodman-sheet .carry-choice input.bag-slots-toggle::after,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]::before,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]::after {
+  content: none !important;
+  display: none !important;
+}
+
 .bloodman-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="image"]),
 .bloodman-sheet textarea,
 .bloodman-sheet select {
@@ -3543,4 +3599,12 @@
 .bloodman-sheet .ammo-line-toolbar-button {
   color: #111111 !important;
   -webkit-text-fill-color: #111111 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #e7e7e7 100%) !important;
+  background-color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+.bloodman-sheet .ammo-line-toolbar-button.ammo-line-add {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
 }

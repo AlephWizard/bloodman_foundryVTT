@@ -295,7 +295,7 @@ function formatMultilineTextToHtml(value) {
   if (!raw.trim()) return "";
   const cached = MULTILINE_TEXT_HTML_CACHE.get(raw);
   if (typeof cached === "string") return cached;
-  const escaped = foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(raw) : raw;
+  const escaped = escapeChatMarkup(raw);
   const html = escaped.replace(/\r\n|\r|\n/g, "<br>");
   if (MULTILINE_TEXT_HTML_CACHE.size >= MULTILINE_TEXT_HTML_CACHE_MAX) {
     const oldestKey = MULTILINE_TEXT_HTML_CACHE.keys().next().value;
@@ -3577,7 +3577,7 @@ async function grantVoyageXpToSelectedPlayers(rawAmount, options = {}) {
 
 async function postVoyageXpGrantSummary(result) {
   if (!result) return false;
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
   const lines = [];
 
@@ -3777,7 +3777,7 @@ async function restoreFullPvToSelectedPlayers(options = {}) {
 
 async function postFullPpRestoreSummary(result) {
   if (!result) return false;
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.FullPPRestore.Title", "Restauration PP");
   const lines = [];
 
@@ -3811,7 +3811,7 @@ async function postFullPpRestoreSummary(result) {
 
 async function postFullPvRestoreSummary(result) {
   if (!result) return false;
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV");
   const lines = [];
 
@@ -4453,7 +4453,7 @@ const damageConfigPopupHooks = buildDamageConfigPopupHooks({
   getCurrentUser: () => game.user,
   getUsersCollection: () => game.users,
   isAssistantOrHigherRole,
-  escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
+  escapeHtml: escapeChatMarkup,
   dialogClass: getDialogClass(),
   wasDamageConfigPopupRequestProcessed,
   rememberDamageConfigPopupRequest,
@@ -4467,7 +4467,7 @@ const damageSplitPopupHooks = buildDamageSplitPopupHooks({
   getCurrentUser: () => game.user,
   getUsersCollection: () => game.users,
   isAssistantOrHigherRole,
-  escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
+  escapeHtml: escapeChatMarkup,
   dialogClass: getDialogClass(),
   wasDamageSplitPopupRequestProcessed,
   rememberDamageSplitPopupRequest,
@@ -4490,7 +4490,7 @@ const powerUsePopupHooks = buildPowerUsePopupHooks({
   powerUsePopupChatMarkup: POWER_USE_POPUP_CHAT_MARKUP,
   isAssistantOrHigherRole,
   formatMultilineTextToHtml,
-  escapeHtml: value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || "")),
+  escapeHtml: escapeChatMarkup,
   dialogClass: getDialogClass(),
   wasPowerUsePopupRequestProcessed,
   rememberPowerUsePopupRequest,
@@ -5399,7 +5399,7 @@ function positionChaosDiceUI() {
 function showSelectedVoyageXpGrantDialog() {
   if (!game.user?.isGM) return;
   if (typeof getDialogClass() !== "function") return;
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
   const promptText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Prompt", "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.");
   const labelText = tl("BLOODMAN.Dialogs.VoyageXPGrant.ValueLabel", "XP voyage");
@@ -5452,7 +5452,7 @@ function showSelectedFullPpRestoreConfirmDialog() {
     return;
   }
 
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.FullPPRestore.Title", "Restauration PP");
   const promptText = tl(
     "BLOODMAN.Dialogs.FullPPRestore.Prompt",
@@ -5508,7 +5508,7 @@ function showSelectedFullPvRestoreConfirmDialog() {
     return;
   }
 
-  const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value || "")) : String(value || ""));
+  const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV");
   const promptText = tl(
     "BLOODMAN.Dialogs.FullPVRestore.Prompt",
@@ -8977,7 +8977,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       || 0
     );
     const targetHeight = resolveSheetWindowTargetHeight({
-      configuredMinHeight: this.options?.height,
+      configuredMinHeight: this.options?.height ?? this.options?.position?.height,
       formNaturalHeight,
       headerHeight
     });
@@ -9730,11 +9730,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async promptDropDecision(preview) {
     if (!preview || typeof getDialogClass() !== "function") return "fermer";
-    const escapeHtml = value => (
-      foundry.utils?.escapeHTML
-        ? foundry.utils.escapeHTML(String(value ?? ""))
-        : String(value ?? "")
-    );
+    const escapeHtml = escapeChatMarkup;
     const eyebrow = tl(
       "BLOODMAN.Dialogs.DropDecision.Eyebrow",
       "Deplacement d'objet"
@@ -10083,7 +10079,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     const outcome = t(success ? "BLOODMAN.Rolls.Success" : "BLOODMAN.Rolls.Failure");
     const luckLabel = t("BLOODMAN.Common.LuckRoll");
     const actorName = String(this.actor.name || "").trim() || t("BLOODMAN.Common.Name");
-    const content = `<p><strong>${actorName}</strong> - ${luckLabel} : <strong>${outcome}</strong></p><p><small>D1: <strong>${chanceValue}</strong> | D2: <strong>${luckValue}</strong></small></p>`;
+    const safeActorName = escapeChatMarkup(actorName);
+    const safeLuckLabel = escapeChatMarkup(luckLabel);
+    const safeOutcome = escapeChatMarkup(outcome);
+    const content = `<p><strong>${safeActorName}</strong> - ${safeLuckLabel} : <strong>${safeOutcome}</strong></p><p><small>D1: <strong>${chanceValue}</strong> | D2: <strong>${luckValue}</strong></small></p>`;
     let usedDice3d = false;
     try {
       if (game?.dice3d && typeof game.dice3d.showForRoll === "function") {
@@ -10257,9 +10256,10 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async reloadWeapon(item) {
+    const ammoState = this.getAmmoPoolState();
     const reloadPlan = resolveWeaponReloadPlan({
       item,
-      actorAmmoData: this.actor?.system?.ammo
+      actorAmmoData: ammoState?.ammo || this.actor?.system?.ammo
     });
     if (!reloadPlan.ok) {
       if (reloadPlan.reason === "no-ammo") {
@@ -10815,11 +10815,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (this.actor.type !== "personnage") return;
     const labelKey = CHARACTERISTICS.find(c => c.key === key)?.labelKey || "";
     const label = labelKey ? t(labelKey) : key;
-    const escapeHtml = value => (
-      foundry.utils?.escapeHTML
-        ? foundry.utils.escapeHTML(String(value ?? ""))
-        : String(value ?? "")
-    );
+    const escapeHtml = escapeChatMarkup;
     const fallbackPrompt = `Lancer un jet d'experience pour ${label} ?`;
     const localizedPrompt = tl("BLOODMAN.Dialogs.Growth.Prompt", fallbackPrompt, { label });
     const promptText = String(localizedPrompt || fallbackPrompt)

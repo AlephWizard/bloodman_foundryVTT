@@ -9,9 +9,14 @@
 4. Ouvrir les sheets, verifier:
 - Valeurs PV/PP et jauges visibles.
 - Aucune boucle de rerender apparente.
+- Sur fiche joueur, le bouton Chance dans l'en-tete se clique facilement sur toute sa zone et poste un message de chat.
+- Sur fiches joueur et PNJ, les caracteristiques gardent un espacement lisible entre la valeur, `/100` et le nom.
+- Sur fiche PNJ, les cases `JET CACHE` sont visibles, cliquables et alignees avec les caracteristiques.
 - En v14, verifier que les fiches PJ/PNJ utilisent les controles natifs ApplicationV2, avec le menu d'actions en haut a droite et l'action de detachement de fenetre.
 5. Creer un item `arme`, lancer un jet de degats avec cible selectionnee.
 - Verifier que `Attaque simple` dans l'equipement permet de modifier librement la formule (`1d6`, `1d8`, etc.) sur fiche joueur et PNJ.
+- Verifier dans l'onglet equipement que le bouton `+` des munitions est noir, que la selection de ligne est facile a cliquer, et que recharger consomme la ligne active.
+- Verifier que la bascule de sac `Oui/Non` se comporte comme un choix exclusif et reste lisible sur fiches joueur et PNJ.
 6. Verifier les messages chat:
 - Affichage normal des jets.
 - Le message de degats affiche attaquant, cible, formule et total de facon lisible.

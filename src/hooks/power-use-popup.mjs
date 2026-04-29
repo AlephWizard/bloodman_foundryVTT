@@ -179,7 +179,7 @@ export function buildPowerUsePopupHooks({
     const itemLabel = toSafeHtml(popupItemLabel);
     const damageLabel = toSafeHtml(damageText);
     const costLabel = toSafeHtml(costText);
-    const title = `${popupItemLabel} utilise - ${actorName || requesterUserName || "Joueur"}`;
+    const title = `${toSafeHtml(popupItemLabel)} utilise - ${toSafeHtml(actorName || requesterUserName || "Joueur")}`;
     const content = `<div class="bm-power-use-popup">
     <p><strong>Joueur :</strong> ${requesterLabel}</p>
     <p><strong>Personnage :</strong> ${actorLabel}</p>

@@ -71,7 +71,7 @@ async function run() {
   const shown = hooks.showDamageConfigObserverPopup({
     requestId: "req-1",
     requesterUserId: "u2",
-    actorName: "Actor",
+    actorName: "Actor<",
     sourceName: "Source",
     config: {
       formula: "1d6",
@@ -84,6 +84,7 @@ async function run() {
   assert.equal(shown, true);
   assert.equal(FakeDialog.instances.length, 1);
   assert.equal(FakeDialog.renderedCount, 1);
+  assert.equal(FakeDialog.instances[0].config.title.includes("Actor&lt;"), true);
   assert.equal(FakeDialog.instances[0].config.content.includes("Degats bruts +"), true);
 
   const updated = hooks.showDamageConfigObserverPopup({

@@ -60,7 +60,7 @@ export function buildDamageConfigPopupHooks({
       penetration,
       actorDisplay,
       sourceDisplay,
-      title: `Jet de degats - ${actorDisplay}`
+      title: `Jet de degats - ${toSafeHtml(actorDisplay)}`
     };
   }
 

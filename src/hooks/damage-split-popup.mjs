@@ -60,6 +60,8 @@ export function buildDamageSplitPopupHooks({
     const totalDamage = Math.max(0, Math.floor(parseFiniteNumber(data?.totalDamage, 0)));
     const actorDisplay = actorName || requesterName || translateWithFallback("BLOODMAN.Common.Name", "Attaquant");
     const sourceDisplay = sourceName || translateWithFallback("BLOODMAN.Common.SimpleAttack", "Attaque");
+    const titleLabel = toSafeHtml(translateWithFallback("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats"));
+    const actorTitleLabel = toSafeHtml(actorDisplay);
     return {
       allocations,
       totalDamage,
@@ -67,7 +69,7 @@ export function buildDamageSplitPopupHooks({
       targetCount: allocations.length,
       actorDisplay,
       sourceDisplay,
-      title: `${translateWithFallback("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats")} - ${actorDisplay}`
+      title: `${titleLabel} - ${actorTitleLabel}`
     };
   }
 

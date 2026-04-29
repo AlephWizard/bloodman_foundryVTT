@@ -81,6 +81,19 @@ function tl(key, fallback, data = null) {
   return localized;
 }
 
+function escapeHtml(value) {
+  const raw = String(value ?? "");
+  if (typeof globalThis.foundry?.utils?.escapeHTML === "function") {
+    return globalThis.foundry.utils.escapeHTML(raw);
+  }
+  return raw
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function buildChatRollFlags(chatRollType, extraBloodman = null) {
   const type = String(chatRollType || "").trim().toLowerCase() || "generic";
   const bloodmanFlags = { chatRollType: type };
@@ -1370,7 +1383,6 @@ async function applyDamageToTargets(sourceActor, total, options = {}) {
     if (targetTokens.length <= 1) return null;
     const base = Math.floor(totalDamage / targetTokens.length);
     const remainder = totalDamage - base * targetTokens.length;
-    const escapeHtml = value => (foundry.utils?.escapeHTML ? foundry.utils.escapeHTML(String(value ?? "")) : String(value ?? ""));
     const titleLabel = tl("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats");
     const eyebrowLabel = tl("BLOODMAN.Dialogs.DamageSplit.Eyebrow", "Repartition");
     const sourceLabel = String(options?.sourceName || "").trim() || tl("BLOODMAN.Common.SimpleAttack", "Attaque");
