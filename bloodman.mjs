@@ -14,6 +14,7 @@ import {
   compatGetDocumentClass,
   foundryVersion,
   getFoundryGeneration,
+  isV14Plus,
   getDragEventData,
   getAudioHelper,
   getDialogClass,
@@ -919,7 +920,10 @@ function normalizeStatusValue(value) {
 
 function getStatusEffectIds(effectDef, { normalized = false } = {}) {
   if (!effectDef) return [];
-  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])]
+  const rawStatuses = effectDef.statuses instanceof Set
+    ? [...effectDef.statuses]
+    : (Array.isArray(effectDef.statuses) ? effectDef.statuses : []);
+  const ids = [effectDef.id, ...rawStatuses]
     .map(value => String(value || "").trim())
     .filter(Boolean);
   const output = [];
@@ -1634,19 +1638,48 @@ async function cleanupTokenHudOrphanCounterEffects(actor) {
 }
 
 function buildTokenHudTurnDurationData(turns) {
-  const duration = { rounds: clampTokenHudTurnValue(turns), turns: 0 };
-  const combat = game.combat || null;
-  if (combat) {
-    duration.startRound = Math.max(0, Math.floor(Number(combat.round ?? 0)));
-    duration.startTurn = Math.max(0, Math.floor(Number(combat.turn ?? 0)));
-  }
-  return duration;
+  return {
+    value: null,
+    units: "seconds",
+    expiry: null
+  };
+}
+
+function buildTokenHudCounterDurationData() {
+  return {
+    value: null,
+    units: "seconds",
+    expiry: null
+  };
+}
+
+function buildTokenHudCounterIconPath(path, statusId, roundCount) {
+  const source = String(path || "").trim();
+  if (!source) return source;
+  const separator = source.includes("?") ? "&" : "?";
+  const status = encodeURIComponent(normalizeStatusValue(statusId) || "status");
+  const round = encodeURIComponent(String(roundCount || TOKEN_HUD_TURN_MIN));
+  return `${source}${separator}bmCounter=${status}-${round}`;
+}
+
+function resolveTokenHudEffectOrigin(tokenDoc) {
+  const uuid = String(tokenDoc?.uuid || "").trim();
+  return uuid ? uuid : null;
+}
+
+function buildTokenHudEmptyEffectChangesData() {
+  const data = { changes: [] };
+  if (isV14Plus()) data.system = { changes: [] };
+  return data;
 }
 
 async function setTokenHudEffectDuration(effectDoc, turns) {
   if (!effectDoc) return false;
   const duration = buildTokenHudTurnDurationData(turns);
-  await effectDoc.update({ duration }).catch(() => null);
+  await effectDoc.update({
+    duration,
+    showIcon: globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.NEVER ?? 0
+  }).catch(() => null);
   return true;
 }
 
@@ -1664,7 +1697,6 @@ function getTokenHudPrimaryStatusEffectDocument(actor, statusId) {
 
 function buildTokenHudTurnCounterEffectPayloads({ statusId, turns, primaryEffect, tokenDoc }) {
   const totalTurns = clampTokenHudTurnValue(turns);
-  if (totalTurns <= TOKEN_HUD_TURN_MIN) return [];
   const statusDef = findStatusEffect([statusId]) || null;
   const statusNameKey = String(statusDef?.name ?? statusDef?.label ?? "").trim();
   const statusName = statusNameKey
@@ -1673,17 +1705,18 @@ function buildTokenHudTurnCounterEffectPayloads({ statusId, turns, primaryEffect
   const rawStatusImg = String(statusDef?.img || statusDef?.icon || primaryEffect?.img || "icons/svg/aura.svg").trim();
   const statusImg = resolveTokenHudLocalSvgIconPath(rawStatusImg) || rawStatusImg;
   const normalizedStatusId = normalizeStatusValue(statusId);
-  const tokenRef = String(tokenDoc?.uuid || tokenDoc?.id || "").trim();
+  const tokenRef = resolveTokenHudEffectOrigin(tokenDoc);
   const payloads = [];
 
-  for (let roundCount = TOKEN_HUD_TURN_MIN; roundCount < totalTurns; roundCount += 1) {
+  for (let roundCount = TOKEN_HUD_TURN_MIN; roundCount <= totalTurns; roundCount += 1) {
     payloads.push({
       name: `${statusName} (${roundCount})`,
-      img: statusImg,
-      origin: tokenRef || null,
+      img: buildTokenHudCounterIconPath(statusImg, normalizedStatusId, roundCount),
+      ...(tokenRef ? { origin: tokenRef } : {}),
       statuses: [],
-      changes: [],
-      duration: buildTokenHudTurnDurationData(roundCount),
+      ...buildTokenHudEmptyEffectChangesData(),
+      duration: buildTokenHudCounterDurationData(),
+      showIcon: globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2,
       flags: {
         [SYSTEM_ID]: {
           [TOKEN_HUD_COUNTER_FLAG_KEY]: {
@@ -1725,18 +1758,16 @@ async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, 
   const totalTurns = clampTokenHudTurnValue(turns);
   await setTokenHudEffectDuration(primaryEffect, totalTurns);
 
-  if (totalTurns > TOKEN_HUD_TURN_MIN) {
-    const payloads = buildTokenHudTurnCounterEffectPayloads({
-      statusId: normalizedStatusId,
-      turns: totalTurns,
-      primaryEffect,
-      tokenDoc
+  const payloads = buildTokenHudTurnCounterEffectPayloads({
+    statusId: normalizedStatusId,
+    turns: totalTurns,
+    primaryEffect,
+    tokenDoc
+  });
+  if (payloads.length) {
+    await actor.createEmbeddedDocuments("ActiveEffect", payloads).catch(error => {
+      bmLog.warn("[bloodman] token HUD counter effects creation failed", { statusId: normalizedStatusId, error });
     });
-    if (payloads.length) {
-      await actor.createEmbeddedDocuments("ActiveEffect", payloads).catch(error => {
-        bmLog.warn("[bloodman] token HUD counter effects creation failed", { statusId: normalizedStatusId, error });
-      });
-    }
   }
 
   await cleanupTokenHudOrphanCounterEffects(actor);
@@ -1823,10 +1854,14 @@ function buildTokenHudTurnControlContent(wrapper) {
   return wrapper;
 }
 
-function ensureTokenHudTurnControl(root, hud) {
-  const topRow = ensureTokenHudLayoutContainer(root, "bm-token-hud-top-row");
-  if (!(topRow instanceof HTMLElement)) return null;
+function positionTokenHudTurnControl(root, wrapper) {
+  if (!(root instanceof HTMLElement) || !(wrapper instanceof HTMLElement)) return;
+  wrapper.style.left = "50%";
+  wrapper.style.top = "calc(-1 * var(--control-size) - 16px)";
+  wrapper.style.transform = "translateX(-50%)";
+}
 
+function ensureTokenHudTurnControl(root, hud) {
   const effectsPalette = resolveTokenHudEffectsPalette(root);
   const effectsButton = resolveTokenHudEffectsButton(root);
   const anchorButton = effectsButton instanceof HTMLElement
@@ -1834,7 +1869,7 @@ function ensureTokenHudTurnControl(root, hud) {
     : (effectsPalette?.previousElementSibling instanceof HTMLElement ? effectsPalette.previousElementSibling : null);
   if (!(anchorButton instanceof HTMLElement)) return null;
 
-  let wrapper = topRow.querySelector(".bm-token-hud-turn-control");
+  let wrapper = root.querySelector(".bm-token-hud-turn-control");
   if (!(wrapper instanceof HTMLElement)) {
     wrapper = document.createElement("div");
     wrapper.className = "bm-token-hud-turn-control";
@@ -1850,14 +1885,9 @@ function ensureTokenHudTurnControl(root, hud) {
   const legacySelect = wrapper.querySelector(".bm-token-hud-turn-select");
   if (legacySelect instanceof HTMLElement) legacySelect.remove();
 
-  if (effectsPalette?.parentElement === topRow) {
-    topRow.insertBefore(wrapper, effectsPalette);
-  } else if (anchorButton.parentElement === topRow) {
-    topRow.insertBefore(wrapper, anchorButton.nextSibling);
-  } else if (wrapper.parentElement !== topRow) {
-    topRow.appendChild(wrapper);
-  }
+  if (wrapper.parentElement !== root) root.appendChild(wrapper);
   wrapper.classList.add("is-visible");
+  positionTokenHudTurnControl(root, wrapper);
 
   const turnField = wrapper;
 
@@ -1876,15 +1906,7 @@ function syncTokenHudTurnControlUi(root) {
   const wrapper = root.querySelector(".bm-token-hud-turn-control");
   if (!(wrapper instanceof HTMLElement)) return;
   wrapper.classList.add("is-visible");
-  wrapper.style.top = "";
-
-  const effectsPalette = resolveTokenHudEffectsPalette(root);
-  if (effectsPalette instanceof HTMLElement) {
-    effectsPalette.style.top = "";
-    effectsPalette.style.bottom = "";
-    effectsPalette.style.left = "";
-    effectsPalette.style.right = "";
-  }
+  positionTokenHudTurnControl(root, wrapper);
 }
 
 function bindTokenHudTurnControlEvents(root, hud, turnField) {
@@ -1991,7 +2013,6 @@ function configureTokenHudEnhancements(hud, htmlLike) {
 
   root.classList.add("bm-token-hud");
   root.dataset.bmTokenHudEnhanced = "true";
-  arrangeTokenHudControlLayout(root);
 
   const turnField = ensureTokenHudTurnControl(root, hud);
   if (!(turnField instanceof HTMLElement)) return;
@@ -2194,6 +2215,7 @@ function shouldResetTokenScale(scaleValue) {
 }
 
 function shouldResetTokenOffset(offsetValue) {
+  if (offsetValue == null) return false;
   const numeric = Number(offsetValue);
   if (!Number.isFinite(numeric)) return true;
   return Math.abs(numeric) > 0.0001;
@@ -4778,15 +4800,10 @@ async function decrementTokenHudCountersForActorTurn(actor) {
     const removed = await deleteStatusEffectDocuments([counters[0]]);
     changed = changed || removed;
 
-    const primaryEffect = getTokenHudPrimaryStatusEffectDocument(actor, statusId);
-    if (!primaryEffect) continue;
-    const currentRounds = clampTokenHudTurnValue(
-      foundry.utils.getProperty(primaryEffect, "duration.rounds")
-    );
-    const nextRounds = Math.max(TOKEN_HUD_TURN_MIN, currentRounds - 1);
-    if (nextRounds === currentRounds) continue;
-    const updated = await setTokenHudEffectDuration(primaryEffect, nextRounds);
-    changed = changed || updated;
+    const remainingCounters = getTokenHudCounterEffects(actor, statusId);
+    if (remainingCounters.length) continue;
+    const cleared = await clearActorStatusFamily(actor, [statusId]);
+    changed = changed || cleared;
   }
 
   if (changed) await cleanupTokenHudOrphanCounterEffects(actor);
@@ -4802,7 +4819,7 @@ async function decrementActiveCombatantTokenHudCounters(combat) {
 
   const activeCombatant = getActiveCombatant(combat);
   const actor = getCombatantActor(activeCombatant);
-  if (!actor || actor.type !== "personnage") return;
+  if (!actor || (actor.type !== "personnage" && actor.type !== "personnage-non-joueur")) return;
 
   await decrementTokenHudCountersForActorTurn(actor);
 }
@@ -7654,6 +7671,30 @@ class BloodmanActorSheet extends BaseActorSheet {
     return this.getActiveItemReorderPayloadFromDom();
   }
 
+  buildFoundryItemDragPayload(item) {
+    if (!item) return null;
+    const uuid = String(item.uuid || "").trim();
+    const itemId = String(item.id || item._id || "").trim();
+    if (!uuid && !itemId) return null;
+    return {
+      type: "Item",
+      uuid,
+      id: itemId,
+      actorId: String(this.actor?.id || ""),
+      actorUuid: String(this.actor?.uuid || "")
+    };
+  }
+
+  setDragTransferData(dataTransfer, mimeType, payload) {
+    if (!dataTransfer || !payload) return false;
+    try {
+      dataTransfer.setData(mimeType, JSON.stringify(payload));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   clearItemReorderVisualState(rootLike = null) {
     const root = rootLike?.find ? rootLike : getSheetElementWrapper(this);
     if (!root?.length) return;
@@ -7916,11 +7957,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       this._itemReorderPayloadClearTimer = null;
     }
     this._activeItemReorderPayload = payload;
+    this.setDragTransferData(nativeEvent.dataTransfer, "application/x-bloodman-item-reorder", payload);
+    const foundryPayload = this.buildFoundryItemDragPayload(item);
+    this.setDragTransferData(nativeEvent.dataTransfer, "text/plain", foundryPayload);
+    this.setDragTransferData(nativeEvent.dataTransfer, "application/json", foundryPayload);
     try {
-      nativeEvent.dataTransfer.setData("application/x-bloodman-item-reorder", JSON.stringify(payload));
       nativeEvent.dataTransfer.effectAllowed = "move";
     } catch (_error) {
-      // Keep in-memory payload fallback for browsers that refuse custom MIME types.
+      // Keep in-memory payload fallback for browsers that refuse drag metadata.
     }
     li.classList.add("is-reorder-dragging");
   }
@@ -8026,11 +8070,78 @@ class BloodmanActorSheet extends BaseActorSheet {
     list.querySelectorAll(".is-reorder-drop-after").forEach(node => node.classList.remove("is-reorder-drop-after"));
   }
 
+  async onExternalItemListDrop(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const data = getDragEventData(nativeEvent);
+    const dataType = String(data?.type || "").trim().toLowerCase();
+    if (dataType !== "item") return null;
+
+    const list = eventLike?.currentTarget instanceof HTMLElement
+      ? eventLike.currentTarget
+      : nativeEvent?.target?.closest?.("ol.item-list");
+    if (!(list instanceof HTMLElement)) return null;
+
+    const carryColumn = this.getItemListCarryColumnFromElement(list);
+    const bagZone = this.getItemListBagZoneFromElement(list);
+    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
+    const droppedItem = await this.resolveDroppedItemDocument(data);
+    const droppedType = String(droppedItem?.type || "").trim().toLowerCase();
+    if (acceptedTypes && droppedType && !acceptedTypes.has(droppedType)) {
+      this.clearItemReorderVisualState();
+      return this.buildCarryDropErrorResult("type non autorise");
+    }
+    if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
+      ui.notifications?.warn("Le sac n'est pas actif.");
+      this.clearItemReorderVisualState();
+      return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
+    }
+
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
+    else nativeEvent?.stopPropagation?.();
+
+    const beforeIds = new Set((this.actor?.items || [])
+      .map(item => String(item?.id || "").trim())
+      .filter(Boolean));
+    const dropped = await this._onDropItem(eventLike, data);
+    if (!dropped) {
+      this.clearItemReorderVisualState();
+      return null;
+    }
+
+    const createdIds = this.getDropResultItemIds(dropped);
+    const candidateIds = createdIds.length
+      ? createdIds
+      : (this.actor?.items || [])
+        .map(item => String(item?.id || "").trim())
+        .filter(itemId => itemId && !beforeIds.has(itemId));
+    let movedAny = false;
+    for (const itemId of candidateIds) {
+      const item = this.actor?.items?.get(itemId) || null;
+      if (!item) continue;
+      const type = String(item.type || "").trim().toLowerCase();
+      if (acceptedTypes && !acceptedTypes.has(type)) continue;
+      if (carryColumn && CARRIED_ITEM_TYPES.has(type)) {
+        const moved = await this.setItemCarryColumn(item, carryColumn, {
+          bagEnabledOverride: this.isActorBagSlotsEnabled()
+        });
+        movedAny = movedAny || moved;
+      } else if (bagZone && this.isBagZoneSupportedItemType(type)) {
+        const moved = await this.setItemBagState(item, bagZone === "yes");
+        movedAny = movedAny || moved;
+      }
+    }
+    this.clearItemReorderVisualState();
+    if (movedAny) this.render(false);
+    return dropped;
+  }
+
   async onItemReorderDrop(eventLike) {
     const nativeEvent = eventLike?.originalEvent || eventLike;
     const payload = this.getItemReorderPayloadFromEvent(eventLike);
-    if (!payload) return this.buildCarryDropErrorResult("operation invalide");
-    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.buildCarryDropErrorResult("operation invalide");
+    if (!payload) return this.onExternalItemListDrop(eventLike);
+    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.onExternalItemListDrop(eventLike);
     if (this._itemReorderPayloadClearTimer) {
       clearTimeout(this._itemReorderPayloadClearTimer);
       this._itemReorderPayloadClearTimer = null;
@@ -8038,7 +8149,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     try {
       const sourceItem = this.actor?.items?.get(payload.itemId) || null;
-      if (!sourceItem) return this.buildCarryDropErrorResult("operation invalide");
+      if (!sourceItem) return this.onExternalItemListDrop(eventLike);
       const sourceType = String(sourceItem.type || "").trim().toLowerCase();
 
       const list = eventLike?.currentTarget instanceof HTMLElement
@@ -9668,7 +9779,8 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async _onDrop(event) {
-    const data = getDragEventData(event);
+    const nativeEvent = event?.originalEvent || event;
+    const data = getDragEventData(nativeEvent);
     if (data?.type === "Actor") {
       const handled = await this._onDropTransportNpc(event, data);
       if (handled) return;
@@ -9837,6 +9949,22 @@ class BloodmanActorSheet extends BaseActorSheet {
     const reachedLimit = await this._reachedCarriedItemsLimit(data);
     if (reachedLimit) return null;
 
+    const dropEntries = this.getDropEntries(data);
+    const actorTransferEntries = await this.resolveActorTransferEntries(data);
+    const hasOnlyActorTransfers = shouldUseActorTransferPath(dropEntries, actorTransferEntries);
+    if (hasOnlyActorTransfers) {
+      const dropped = await this.applyActorToActorItemTransfer(actorTransferEntries, {
+        createItemOptions: { [VOYAGE_XP_SKIP_CREATE_OPTION]: true }
+      });
+      if (dropped) {
+        const overflowMoved = await this.enforceMainCarryOverflowToBag({
+          preferredItemIds: this.getDropResultItemIds(dropped)
+        });
+        if (overflowMoved) this.render(false);
+      }
+      return dropped;
+    }
+
     const purchase = await this.resolveDropPurchaseSummary(data);
     const preview = await this.buildDropDecisionPreview(data, purchase);
     if (!preview) {
@@ -9871,17 +9999,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
     }
 
-    const dropEntries = this.getDropEntries(data);
-    const actorTransferEntries = await this.resolveActorTransferEntries(data);
-    const hasOnlyActorTransfers = shouldUseActorTransferPath(dropEntries, actorTransferEntries);
     const createItemOptions = shouldBuy
       ? undefined
       : { [VOYAGE_XP_SKIP_CREATE_OPTION]: true };
 
     try {
-      const dropped = hasOnlyActorTransfers
-        ? await this.applyActorToActorItemTransfer(actorTransferEntries, { createItemOptions })
-        : await this.withDropItemCreateOptions(createItemOptions, () => this.callBaseOnDropItem(event, data));
+      const dropped = await this.withDropItemCreateOptions(createItemOptions, () => this.callBaseOnDropItem(event, data));
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
       }
@@ -11084,12 +11207,27 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDrop", [event]);
   }
 
-  callBaseOnDropItem(event, data) {
-    return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDropItem", [event, data]);
+  async callBaseOnDropItem(event, data) {
+    const item = data?.documentName === "Item"
+      ? data
+      : await this.resolveDroppedItemDocument(data);
+    if (!item) return null;
+    if (!this.actor?.isOwner) return null;
+    if (this.actor?.uuid === item.parent?.uuid) {
+      return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDropItem", [event, item]);
+    }
+    const keepId = !this.actor?.items?.has?.(item.id);
+    const itemData = item.inCompendium && game.items?.fromCompendium
+      ? game.items.fromCompendium(item, { clearFolder: true, keepId })
+      : item.toObject();
+    const created = await this._onDropItemCreate(itemData);
+    if (Array.isArray(created)) return created[0] || null;
+    return created || null;
   }
 
   callBaseOnDropItemCreate(itemData) {
-    return callPrototypeMethod(BloodmanActorSheetV2Base.prototype, this, "_onDropItemCreate", [itemData]);
+    const payload = Array.isArray(itemData) ? itemData : [itemData];
+    return this.actor?.createEmbeddedDocuments?.("Item", payload) || null;
   }
 }
 

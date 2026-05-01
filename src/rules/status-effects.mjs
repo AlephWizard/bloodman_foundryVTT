@@ -4,7 +4,10 @@ function normalizeStatusEffectId(value) {
 
 function getStatusEffectIds(effectDef) {
   if (!effectDef || typeof effectDef !== "object") return [];
-  const ids = [effectDef.id, ...(Array.isArray(effectDef.statuses) ? effectDef.statuses : [])];
+  const rawStatuses = effectDef.statuses instanceof Set
+    ? [...effectDef.statuses]
+    : (Array.isArray(effectDef.statuses) ? effectDef.statuses : []);
+  const ids = [effectDef.id, ...rawStatuses];
   const seen = new Set();
   const output = [];
   for (const raw of ids) {

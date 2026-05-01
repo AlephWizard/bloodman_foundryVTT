@@ -2281,22 +2281,6 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 /* ---------------------------------------- */
 /* Token HUD (Bloodman)                     */
 /* ---------------------------------------- */
-#token-hud.bm-token-hud .col.left,
-#token-hud.bm-token-hud .col.right {
-  top: 0;
-  height: auto;
-  justify-content: flex-start;
-  gap: 8px;
-}
-
-#token-hud.bm-token-hud .col.left {
-  align-items: flex-end;
-}
-
-#token-hud.bm-token-hud .col.right {
-  align-items: flex-start;
-}
-
 #token-hud {
   overflow: visible !important;
 }
@@ -2304,27 +2288,6 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 #token-hud .col.left,
 #token-hud .col.right {
   overflow: visible !important;
-}
-
-#token-hud.bm-token-hud .bm-token-hud-top-row {
-  position: absolute;
-  top: calc(-1 * var(--control-size) - 16px);
-  left: 0;
-  transform: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  z-index: 5;
-  pointer-events: all;
-  overflow: visible;
-}
-
-#token-hud.bm-token-hud .bm-token-hud-top-row .palette.status-effects,
-#token-hud.bm-token-hud .bm-token-hud-top-row .palette[data-palette="effects"] {
-  top: auto !important;
-  bottom: calc(100% + 12px) !important;
-  left: 0 !important;
-  right: auto !important;
 }
 
 #token-hud.bm-token-hud .palette.status-effects .effect-control,
@@ -2391,63 +2354,8 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   border-radius: 0 !important;
 }
 
-#token-hud.bm-token-hud .bm-token-hud-bottom-row {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 6px;
-  z-index: 4;
-  pointer-events: all;
-}
-
-#token-hud.bm-token-hud .bm-token-hud-bottom-sort {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-#token-hud.bm-token-hud .bm-token-hud-bottom-row .control-icon[data-action="config"] {
-  flex-basis: calc(var(--control-size) - 6px);
-  width: calc(var(--control-size) - 6px);
-  height: calc(var(--control-size) - 6px);
-  min-width: calc(var(--control-size) - 6px);
-  min-height: calc(var(--control-size) - 6px);
-  padding: 3px;
-}
-
-#token-hud.bm-token-hud .bm-token-hud-bottom-row .attribute.elevation {
-  width: 96px;
-  min-width: 96px;
-  flex-basis: 96px;
-  flex-shrink: 0;
-}
-
-#token-hud.bm-token-hud .bm-token-hud-bottom-row .attribute.elevation input {
-  height: calc(var(--control-size) + 8px);
-  line-height: calc(var(--control-size) + 8px);
-  font-size: var(--font-size-34);
-}
-
-#token-hud.bm-token-hud .bm-token-hud-bottom-row .attribute.elevation > i.fas {
-  top: -7px;
-  left: -6px;
-  font-size: var(--font-size-18);
-}
-
-#token-hud.bm-token-hud .bm-token-hud-bottom-sort .control-icon[data-action="sort"] {
-  flex-basis: calc(var(--control-size) - 16px);
-  width: calc(var(--control-size) - 16px);
-  height: calc(var(--control-size) - 16px);
-  min-width: calc(var(--control-size) - 16px);
-  min-height: calc(var(--control-size) - 16px);
-  padding: 2px;
-}
-
 #token-hud .bm-token-hud-turn-control {
-  position: relative;
+  position: absolute;
   display: none;
   align-items: center;
   z-index: 7;
