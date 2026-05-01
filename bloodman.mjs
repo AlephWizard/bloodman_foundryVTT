@@ -1104,6 +1104,18 @@ function getActorEffectDocuments(actor) {
   return [];
 }
 
+function isLiveActorEffectDocument(effectDoc) {
+  if (!effectDoc?.id) return false;
+  const parent = effectDoc.parent || null;
+  const effects = parent?.effects || null;
+  if (!effects) return Boolean(parent);
+  if (typeof effects.get === "function") return effects.get(effectDoc.id) === effectDoc;
+  if (Array.isArray(effects)) return effects.includes(effectDoc);
+  if (Array.isArray(effects.contents)) return effects.contents.includes(effectDoc);
+  if (typeof effects.values === "function") return [...effects.values()].includes(effectDoc);
+  return Boolean(parent);
+}
+
 function normalizeStatusIdList(ids = []) {
   return [...new Set(
     (Array.isArray(ids) ? ids : [])
@@ -1124,6 +1136,7 @@ function getActorStatusEffectDocumentsByFamily(actor, familyIds = []) {
   if (!actor || !family.size) return [];
   const docs = [];
   for (const effectDoc of getActorEffectDocuments(actor)) {
+    if (!isLiveActorEffectDocument(effectDoc)) continue;
     const ids = getActiveEffectStatusIds(effectDoc);
     if (ids.some(id => family.has(id))) docs.push(effectDoc);
   }
@@ -1133,8 +1146,10 @@ function getActorStatusEffectDocumentsByFamily(actor, familyIds = []) {
 async function deleteStatusEffectDocuments(effectDocs = []) {
   if (!Array.isArray(effectDocs) || !effectDocs.length) return false;
   let changed = false;
+  const seen = new Set();
   for (const effectDoc of effectDocs) {
-    if (!effectDoc) continue;
+    if (!isLiveActorEffectDocument(effectDoc) || seen.has(effectDoc.uuid || effectDoc.id)) continue;
+    seen.add(effectDoc.uuid || effectDoc.id);
     try {
       await effectDoc.delete();
       changed = true;
@@ -1150,7 +1165,7 @@ async function showStatusEffectDocuments(effectDocs = []) {
   const showIcon = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2;
   let changed = false;
   for (const effectDoc of effectDocs) {
-    if (!effectDoc || effectDoc.showIcon === showIcon || typeof effectDoc.update !== "function") continue;
+    if (!isLiveActorEffectDocument(effectDoc) || effectDoc.showIcon === showIcon || typeof effectDoc.update !== "function") continue;
     try {
       await effectDoc.update({ showIcon });
       changed = true;
@@ -1210,6 +1225,31 @@ function tokenHasStatusEffect(tokenDoc, effectDef, familyIds = []) {
   return tokenHasStatusInFamily(tokenDoc, buildStatusFamilyIds(effectDef, familyIds));
 }
 
+const STATUS_EFFECT_SYNC_LOCKS = new Map();
+
+function getStatusEffectSyncLockKey(tokenDoc, actor, familyIds = []) {
+  const ownerRef = String(actor?.uuid || actor?.id || tokenDoc?.uuid || tokenDoc?.id || "").trim();
+  const familyRef = normalizeStatusIdList(familyIds).join("|");
+  return `${ownerRef || "unknown"}::${familyRef || "status"}`;
+}
+
+async function runStatusEffectSyncLocked(lockKey, operation) {
+  const key = String(lockKey || "").trim();
+  if (!key) return operation();
+  const previous = STATUS_EFFECT_SYNC_LOCKS.get(key) || Promise.resolve();
+  let release;
+  const current = new Promise(resolve => { release = resolve; });
+  const chained = previous.then(() => current, () => current);
+  STATUS_EFFECT_SYNC_LOCKS.set(key, chained);
+  try {
+    await previous.catch(() => null);
+    return await operation();
+  } finally {
+    release();
+    if (STATUS_EFFECT_SYNC_LOCKS.get(key) === chained) STATUS_EFFECT_SYNC_LOCKS.delete(key);
+  }
+}
+
 async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = []) {
   if (!tokenDoc || !effectDef) return false;
   const primaryId = resolvePrimaryStatusId(effectDef) || getStatusEffectIds(effectDef)[0] || "";
@@ -1218,6 +1258,11 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = [])
   const actor = tokenDoc.actorLink === true
     ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
     : tokenDoc.actor || null;
+  const lockKey = getStatusEffectSyncLockKey(tokenDoc, actor, family);
+  return runStatusEffectSyncLocked(lockKey, async () => setTokenStatusEffectUnlocked(tokenDoc, effectDef, active, family, primaryId, actor));
+}
+
+async function setTokenStatusEffectUnlocked(tokenDoc, effectDef, active, family, primaryId, actor) {
   const currentStatuses = getTokenStatusesList(tokenDoc, { normalized: false });
   const familySet = new Set(family);
   const hasTokenOverrides = currentStatuses.some(id => familySet.has(normalizeStatusValue(id)));
