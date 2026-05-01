@@ -58,6 +58,22 @@ function createHooks(overrides = {}) {
 
 async function run() {
   await withGlobals({
+    gameValue: { user: { isGM: true, id: "u1" }, actors: { get: () => null } },
+    foundryValue: { utils: { getProperty } }
+  }, async () => {
+    let updateSourceData = null;
+    const hooks = createHooks({
+      getTokenActorType: () => "personnage"
+    });
+    hooks.onPreCreateToken({
+      actor: { img: "actor-token.webp" },
+      texture: { src: "icons/svg/mystery-man.svg" },
+      updateSource: data => { updateSourceData = data; }
+    });
+    assert.deepEqual(updateSourceData, { "texture.src": "actor-token.webp", actorLink: true });
+  });
+
+  await withGlobals({
     gameValue: { user: { isGM: true, id: "u1" } },
     foundryValue: { utils: { getProperty } }
   }, async () => {

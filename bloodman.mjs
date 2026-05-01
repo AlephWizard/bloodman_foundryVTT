@@ -3538,7 +3538,7 @@ async function syncSceneTokenImagesFromActorImage(actor, options = {}) {
     if (currentTokenSrc === nextTokenSrc) continue;
     try {
       await tokenDoc.update(
-        { "texture.src": nextTokenSrc, "img": nextTokenSrc },
+        { "texture.src": nextTokenSrc },
         { bloodmanSkipActorImageSync: true }
       );
       updatedCount += 1;

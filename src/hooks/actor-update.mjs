@@ -122,7 +122,7 @@ export function buildActorUpdateHooks({
       const previousTokenPrototypeImage = String(options?.bloodmanPreviousPrototypeImage || "").trim();
       if (tokenDoc?.update) {
         await tokenDoc.update(
-          { "texture.src": nextTokenImage, "img": nextTokenImage },
+          { "texture.src": nextTokenImage },
           { bloodmanSkipActorImageSync: true }
         ).catch(() => null);
       }

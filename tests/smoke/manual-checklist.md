@@ -17,22 +17,27 @@
 - Verifier que `Attaque simple` dans l'equipement permet de modifier librement la formule (`1d6`, `1d8`, etc.) sur fiche joueur et PNJ.
 - Verifier dans l'onglet equipement que le bouton `+` des munitions est noir, que la selection de ligne est facile a cliquer, et que recharger consomme la ligne active.
 - Verifier que la bascule de sac `Oui/Non` se comporte comme un choix exclusif et reste lisible sur fiches joueur et PNJ.
-6. Verifier les messages chat:
+6. Tester les PV et statuts critiques:
+- PJ a `0 PV`: le token affiche le statut saignement, sans erreur console `ActiveEffect ... does not exist`.
+- PJ remonte au-dessus de `0 PV`: le statut saignement disparait sans message rouge.
+- PNJ a `0 PV`: le token affiche le statut mort, sans statut saignement concurrent.
+- PNJ remonte au-dessus de `0 PV`: le statut mort disparait sans message rouge.
+7. Verifier les messages chat:
 - Affichage normal des jets.
 - Le message de degats affiche attaquant, cible, formule et total de facon lisible.
 - Le recap MJ reste reserve au GM, affiche formule/jet/penetration/armure/perte reelle et reste visuellement distinct.
 - Message de synthese initiative sans HTML non echappe.
-7. Tester drag-and-drop d'un Actor PNJ vers la fiche personnage.
-8. Tester suppression/reordonnancement d'items cote joueur non-GM (fallback socket).
-9. Redemarrer la world:
+8. Tester drag-and-drop d'un Actor PNJ vers la fiche personnage.
+9. Tester suppression/reordonnancement d'items cote joueur non-GM (fallback socket).
+10. Redemarrer la world:
 - Verifier que la migration `schemaVersion` n'est pas rejouee inutilement.
-10. Migration (GM):
+11. Migration (GM):
 - Verifier dans les settings world que `bloodman.lastMigrationReport` contient un JSON valide apres chargement.
 - Optionnel: activer `bloodman.includeCompendiumMigrations`, relancer la world, puis verifier que le report indique `includeCompendiums: true`.
-11. Perf UI Sheets:
+12. Perf UI Sheets:
 - Ouvrir une fiche personnage, modifier rapidement PV/PP et notes textarea: verifier absence de saccades majeures et resize de fenetre stable.
 - Ouvrir une fiche item avec prix/vente, saisir rapidement dans les deux champs: verifier preview fluide sans cloture/reouverture de sheet.
-12. Modules Bloodman v14:
+13. Modules Bloodman v14:
 - `bm-gestion-image`: clic droit/partage d'image depuis une fiche, affichage cote joueur et accuse socket.
 - `bm-horloge`: ouverture de l'horloge, changement des ratios, pop-up lever/coucher du soleil.
 - `bm-lampe-torche`: bouton de HUD token et remise a zero des presets lumiere.

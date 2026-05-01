@@ -71,13 +71,11 @@ export function buildTokenCombatHooks({
     if (isCharacterTokenType && actorImg) {
       if (tokenSrc !== actorImg) {
         sourceUpdates["texture.src"] = actorImg;
-        sourceUpdates.img = actorImg;
       }
     } else if (isMissingTokenImage(tokenSrc)) {
       const fallbackSrc = getSafeTokenTextureFallback(doc);
       if (fallbackSrc && fallbackSrc !== tokenSrc) {
         sourceUpdates["texture.src"] = fallbackSrc;
-        sourceUpdates.img = fallbackSrc;
       }
     }
     if (Object.keys(sourceUpdates).length) doc.updateSource(sourceUpdates);
