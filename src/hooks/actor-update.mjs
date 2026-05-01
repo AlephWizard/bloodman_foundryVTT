@@ -20,6 +20,8 @@ export function buildActorUpdateHooks({
   syncZeroPvBodyStateForActor,
   syncZeroPvStatusForToken,
   syncZeroPvStatusForActor,
+  syncInjuredStateStatusForActor,
+  resolveInjuredStateActive,
   tokenTextureValidityCache,
   resolveWorldActorFromTokenDocument,
   syncSceneTokenImagesFromActorImage,
@@ -91,6 +93,17 @@ export function buildActorUpdateHooks({
       return;
     }
     await syncZeroPvStatusForActor(actor);
+  }
+
+  async function handleUpdateActorInjuredStateStatus(actor, changes) {
+    if (!isCharacterLikeActor(actor)) return;
+    if (!game.user.isGM) return;
+    if (typeof syncInjuredStateStatusForActor !== "function") return;
+    if (typeof resolveInjuredStateActive !== "function") return;
+    const hasStateLabelChange = foundry.utils.getProperty(changes, "system.modifiers.label") != null;
+    if (!hasStateLabelChange) return;
+    const active = Boolean(resolveInjuredStateActive(actor.system?.modifiers?.label || ""));
+    await syncInjuredStateStatusForActor(actor, active);
   }
 
   async function handleUpdateActorImageSync(actor, changes, options) {
@@ -174,12 +187,14 @@ export function buildActorUpdateHooks({
   async function onUpdateActor(actor, changes, options, userId) {
     await runUpdateActorSubhandler("derived-resources", handleUpdateActorDerivedResources, actor, changes, options, userId);
     await runUpdateActorSubhandler("zero-pv-sync", handleUpdateActorZeroPvSync, actor, changes, options, userId);
+    await runUpdateActorSubhandler("injured-state-status", handleUpdateActorInjuredStateStatus, actor, changes, options, userId);
     await runUpdateActorSubhandler("image-sync", handleUpdateActorImageSync, actor, changes, options, userId);
   }
 
   return {
     handleUpdateActorDerivedResources,
     handleUpdateActorZeroPvSync,
+    handleUpdateActorInjuredStateStatus,
     handleUpdateActorImageSync,
     runUpdateActorSubhandler,
     onUpdateActor

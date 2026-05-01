@@ -1001,7 +1001,7 @@ function buildBleedingFallbackStatusEffect() {
     id: "bleeding",
     statuses: ["bleeding"],
     name: "Bleeding",
-    img: "icons/svg/blood.svg"
+    img: `${SYSTEM_ROOT_PATH}/images/blood.svg`
   };
 }
 
@@ -1014,21 +1014,36 @@ function buildDeadFallbackStatusEffect() {
     id,
     statuses,
     name: "Dead",
-    img: "icons/svg/skull.svg"
+    img: `${SYSTEM_ROOT_PATH}/images/skull.svg`
   };
 }
 
+function forceStatusEffectIcon(effectDef, img) {
+  if (!effectDef || typeof effectDef !== "object") return effectDef;
+  const iconPath = String(img || "").trim();
+  if (!iconPath) return effectDef;
+  try {
+    effectDef.img = iconPath;
+    effectDef.icon = iconPath;
+  } catch (_error) {
+    // Some Foundry-provided definitions may be immutable; the fallback remains usable.
+  }
+  return effectDef;
+}
+
 function getBleedingStatusEffect() {
-  return findStatusEffect(PLAYER_ZERO_PV_STATUS_CANDIDATES, ["bleed", "saign"])
+  const effect = findStatusEffect(PLAYER_ZERO_PV_STATUS_CANDIDATES, ["bleed", "saign"])
     || ensureStatusEffectDefinition(buildBleedingFallbackStatusEffect());
+  return forceStatusEffectIcon(effect, `${SYSTEM_ROOT_PATH}/images/blood.svg`);
 }
 
 function getDeadStatusEffect() {
   const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
   const defeated = normalizeStatusValue(defeatedRaw);
   const candidates = defeated ? [defeated, ...NPC_ZERO_PV_STATUS_CANDIDATES] : NPC_ZERO_PV_STATUS_CANDIDATES;
-  return findStatusEffect(candidates, ["dead", "mort", "defeat"])
+  const effect = findStatusEffect(candidates, ["dead", "mort", "defeat"])
     || ensureStatusEffectDefinition(buildDeadFallbackStatusEffect());
+  return forceStatusEffectIcon(effect, `${SYSTEM_ROOT_PATH}/images/skull.svg`);
 }
 
 function getNpcDeadStatusFamilyIds(deadEffect = null) {
@@ -1130,6 +1145,22 @@ async function deleteStatusEffectDocuments(effectDocs = []) {
   return changed;
 }
 
+async function showStatusEffectDocuments(effectDocs = []) {
+  if (!Array.isArray(effectDocs) || !effectDocs.length) return false;
+  const showIcon = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2;
+  let changed = false;
+  for (const effectDoc of effectDocs) {
+    if (!effectDoc || effectDoc.showIcon === showIcon || typeof effectDoc.update !== "function") continue;
+    try {
+      await effectDoc.update({ showIcon });
+      changed = true;
+    } catch (_error) {
+      // Status synchronization should remain best-effort.
+    }
+  }
+  return changed;
+}
+
 function actorHasStatusInFamily(actor, familyIds = []) {
   const family = normalizeStatusIdList(familyIds);
   if (!actor || !family.length) return false;
@@ -1194,7 +1225,10 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = [])
   if (actor && !hasTokenOverrides) {
     const actorDocs = getActorStatusEffectDocumentsByFamily(actor, family);
     const actorHas = actorHasStatusInFamily(actor, family);
-    if (actorHas === active && actorDocs.length <= 1) return true;
+    if (actorHas === active && actorDocs.length <= 1) {
+      if (active) await showStatusEffectDocuments(actorDocs);
+      return true;
+    }
   }
 
   if (hasTokenOverrides) await removeTokenStatusOverrides(tokenDoc, family);
@@ -1220,6 +1254,7 @@ async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = [])
         }
       }
     }
+    if (active) await showStatusEffectDocuments(getActorStatusEffectDocumentsByFamily(actor, family));
     const actorMatches = actorHasStatusInFamily(actor, family) === active;
     if (actorMatches) return true;
   }
@@ -2510,6 +2545,43 @@ async function syncZeroPvStatusForActor(actor) {
   }
 }
 
+async function syncInjuredStateStatusForActor(actor, active) {
+  const actorType = actor?.type || "";
+  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return false;
+  const bleeding = getBleedingStatusEffect();
+  const dead = getDeadStatusEffect();
+  const primaryEffect = actorType === "personnage" ? bleeding : dead;
+  const secondaryEffect = actorType === "personnage" ? dead : bleeding;
+  if (!primaryEffect) return false;
+  const bleedingFamily = buildStatusFamilyIds(bleeding, PLAYER_ZERO_PV_STATUS_CANDIDATES);
+  const deadFamily = getNpcDeadStatusFamilyIds(dead);
+  const primaryFamily = actorType === "personnage" ? bleedingFamily : deadFamily;
+  const secondaryFamily = actorType === "personnage" ? deadFamily : bleedingFamily;
+  const tokenDocs = actor.isToken
+    ? [actor.token || actor.parent || null].filter(Boolean)
+    : getTokenDocumentsForActor(actor);
+  let changed = false;
+  const targetDocs = tokenDocs.length ? tokenDocs : [{ actor, actorLink: true, id: actor.id }];
+
+  for (const tokenDoc of targetDocs) {
+    const okPrimary = await setTokenStatusEffect(tokenDoc, primaryEffect, Boolean(active), primaryFamily);
+    changed = changed || okPrimary;
+    if (secondaryEffect) {
+      const okSecondary = await setTokenStatusEffect(tokenDoc, secondaryEffect, false, secondaryFamily);
+      changed = changed || okSecondary;
+    }
+    if (typeof tokenDoc?.object?.drawEffects === "function") {
+      tokenDoc.object.drawEffects();
+      applyTransparentTokenEffectBackground(tokenDoc.object);
+    }
+  }
+  return changed;
+}
+
+function resolveInjuredStateActive(label) {
+  return resolveStatePresetSelection(label).ids.includes(PLAYER_ZERO_PV_STATE_PRESET_ID);
+}
+
 const CHARACTERISTICS = [
   { key: "MEL", labelKey: "BLOODMAN.Characteristics.Keys.MEL", icon: "fa-hand-fist" },
   { key: "VIS", labelKey: "BLOODMAN.Characteristics.Keys.VIS", icon: "fa-crosshairs" },
@@ -2692,6 +2764,16 @@ const {
   buildInvalidStatePresetMessage
 } = statePresetRules;
 
+function stopHandledDropEvent(eventLike) {
+  const nativeEvent = eventLike?.originalEvent || eventLike;
+  if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+  else nativeEvent?.preventDefault?.();
+  if (typeof eventLike?.stopImmediatePropagation === "function") eventLike.stopImmediatePropagation();
+  else nativeEvent?.stopImmediatePropagation?.();
+  if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
+  else nativeEvent?.stopPropagation?.();
+}
+
 async function setActorStatePresetActive(actor, stateId, active) {
   if (!actor) return false;
   const presetId = String(stateId || "").trim();
@@ -2747,7 +2829,7 @@ async function syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess) {
 async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
   if (!actor) return;
   const resolvedActorType = String(actorType || actor.type || "").trim();
-  if (resolvedActorType !== "personnage") return;
+  if (resolvedActorType !== "personnage" && resolvedActorType !== "personnage-non-joueur") return;
   await setActorStatePresetActive(actor, PLAYER_ZERO_PV_STATE_PRESET_ID, isZeroOrLess);
 }
 
@@ -6450,6 +6532,8 @@ const actorUpdateHooks = buildActorUpdateHooks({
   syncZeroPvBodyStateForActor,
   syncZeroPvStatusForToken,
   syncZeroPvStatusForActor,
+  syncInjuredStateStatusForActor,
+  resolveInjuredStateActive,
   tokenTextureValidityCache: TOKEN_TEXTURE_VALIDITY_CACHE,
   resolveWorldActorFromTokenDocument,
   syncSceneTokenImagesFromActorImage,
@@ -6487,8 +6571,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
       template: "systems/bloodman/templates/actor-joueur.html",
-      width: 1070,
-      height: 630,
+      width: 1195,
+      height: 650,
       popOut: true,
       minimizable: true,
       resizable: true,
@@ -6631,6 +6715,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     this._pvGaugePulseTimer = null;
     this._ppGaugePulseTimer = null;
     this._lastAutoResizeKey = "";
+    this._itemDropInFlightKeys = null;
     return super.close(options);
   }
 
@@ -7695,6 +7780,22 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
   }
 
+  getItemDropInFlightKeys() {
+    if (!(this._itemDropInFlightKeys instanceof Set)) this._itemDropInFlightKeys = new Set();
+    return this._itemDropInFlightKeys;
+  }
+
+  buildExternalItemDropKey(data, list = null) {
+    const itemRef = String(data?.uuid || data?.documentUuid || data?.id || data?._id || "").trim();
+    const targetRef = [
+      String(this.actor?.uuid || this.actor?.id || "").trim(),
+      list instanceof HTMLElement ? String(list.dataset?.carryColumn || "") : "",
+      list instanceof HTMLElement ? String(list.dataset?.bagZone || "") : "",
+      list instanceof HTMLElement ? String(list.dataset?.reorderScope || "") : ""
+    ].join("|");
+    return `${targetRef}|${itemRef || JSON.stringify(data || {})}`;
+  }
+
   clearItemReorderVisualState(rootLike = null) {
     const root = rootLike?.find ? rootLike : getSheetElementWrapper(this);
     if (!root?.length) return;
@@ -8075,66 +8176,70 @@ class BloodmanActorSheet extends BaseActorSheet {
     const data = getDragEventData(nativeEvent);
     const dataType = String(data?.type || "").trim().toLowerCase();
     if (dataType !== "item") return null;
+    stopHandledDropEvent(eventLike);
 
     const list = eventLike?.currentTarget instanceof HTMLElement
       ? eventLike.currentTarget
       : nativeEvent?.target?.closest?.("ol.item-list");
     if (!(list instanceof HTMLElement)) return null;
+    const dropKey = this.buildExternalItemDropKey(data, list);
+    const inFlightKeys = this.getItemDropInFlightKeys();
+    if (inFlightKeys.has(dropKey)) return null;
+    inFlightKeys.add(dropKey);
 
-    const carryColumn = this.getItemListCarryColumnFromElement(list);
-    const bagZone = this.getItemListBagZoneFromElement(list);
-    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
-    const droppedItem = await this.resolveDroppedItemDocument(data);
-    const droppedType = String(droppedItem?.type || "").trim().toLowerCase();
-    if (acceptedTypes && droppedType && !acceptedTypes.has(droppedType)) {
-      this.clearItemReorderVisualState();
-      return this.buildCarryDropErrorResult("type non autorise");
-    }
-    if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
-      ui.notifications?.warn("Le sac n'est pas actif.");
-      this.clearItemReorderVisualState();
-      return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
-    }
-
-    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-    else nativeEvent?.preventDefault?.();
-    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
-    else nativeEvent?.stopPropagation?.();
-
-    const beforeIds = new Set((this.actor?.items || [])
-      .map(item => String(item?.id || "").trim())
-      .filter(Boolean));
-    const dropped = await this._onDropItem(eventLike, data);
-    if (!dropped) {
-      this.clearItemReorderVisualState();
-      return null;
-    }
-
-    const createdIds = this.getDropResultItemIds(dropped);
-    const candidateIds = createdIds.length
-      ? createdIds
-      : (this.actor?.items || [])
-        .map(item => String(item?.id || "").trim())
-        .filter(itemId => itemId && !beforeIds.has(itemId));
-    let movedAny = false;
-    for (const itemId of candidateIds) {
-      const item = this.actor?.items?.get(itemId) || null;
-      if (!item) continue;
-      const type = String(item.type || "").trim().toLowerCase();
-      if (acceptedTypes && !acceptedTypes.has(type)) continue;
-      if (carryColumn && CARRIED_ITEM_TYPES.has(type)) {
-        const moved = await this.setItemCarryColumn(item, carryColumn, {
-          bagEnabledOverride: this.isActorBagSlotsEnabled()
-        });
-        movedAny = movedAny || moved;
-      } else if (bagZone && this.isBagZoneSupportedItemType(type)) {
-        const moved = await this.setItemBagState(item, bagZone === "yes");
-        movedAny = movedAny || moved;
+    try {
+      const carryColumn = this.getItemListCarryColumnFromElement(list);
+      const bagZone = this.getItemListBagZoneFromElement(list);
+      const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
+      const droppedItem = await this.resolveDroppedItemDocument(data);
+      const droppedType = String(droppedItem?.type || "").trim().toLowerCase();
+      if (acceptedTypes && droppedType && !acceptedTypes.has(droppedType)) {
+        this.clearItemReorderVisualState();
+        return this.buildCarryDropErrorResult("type non autorise");
       }
+      if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
+        ui.notifications?.warn("Le sac n'est pas actif.");
+        this.clearItemReorderVisualState();
+        return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
+      }
+
+      const beforeIds = new Set((this.actor?.items || [])
+        .map(item => String(item?.id || "").trim())
+        .filter(Boolean));
+      const dropped = await this._onDropItem(eventLike, data);
+      if (!dropped) {
+        this.clearItemReorderVisualState();
+        return null;
+      }
+
+      const createdIds = this.getDropResultItemIds(dropped);
+      const candidateIds = createdIds.length
+        ? createdIds
+        : (this.actor?.items || [])
+          .map(item => String(item?.id || "").trim())
+          .filter(itemId => itemId && !beforeIds.has(itemId));
+      let movedAny = false;
+      for (const itemId of candidateIds) {
+        const item = this.actor?.items?.get(itemId) || null;
+        if (!item) continue;
+        const type = String(item.type || "").trim().toLowerCase();
+        if (acceptedTypes && !acceptedTypes.has(type)) continue;
+        if (carryColumn && CARRIED_ITEM_TYPES.has(type)) {
+          const moved = await this.setItemCarryColumn(item, carryColumn, {
+            bagEnabledOverride: this.isActorBagSlotsEnabled()
+          });
+          movedAny = movedAny || moved;
+        } else if (bagZone && this.isBagZoneSupportedItemType(type)) {
+          const moved = await this.setItemBagState(item, bagZone === "yes");
+          movedAny = movedAny || moved;
+        }
+      }
+      this.clearItemReorderVisualState();
+      if (movedAny) this.render(false);
+      return dropped;
+    } finally {
+      inFlightKeys.delete(dropKey);
     }
-    this.clearItemReorderVisualState();
-    if (movedAny) this.render(false);
-    return dropped;
   }
 
   async onItemReorderDrop(eventLike) {
@@ -8142,6 +8247,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const payload = this.getItemReorderPayloadFromEvent(eventLike);
     if (!payload) return this.onExternalItemListDrop(eventLike);
     if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.onExternalItemListDrop(eventLike);
+    stopHandledDropEvent(eventLike);
     if (this._itemReorderPayloadClearTimer) {
       clearTimeout(this._itemReorderPayloadClearTimer);
       this._itemReorderPayloadClearTimer = null;
@@ -9781,6 +9887,10 @@ class BloodmanActorSheet extends BaseActorSheet {
   async _onDrop(event) {
     const nativeEvent = event?.originalEvent || event;
     const data = getDragEventData(nativeEvent);
+    if (String(data?.type || "").trim().toLowerCase() === "item") {
+      const itemList = nativeEvent?.target?.closest?.("ol.item-list");
+      if (itemList instanceof HTMLElement) return this.onItemReorderDrop(event);
+    }
     if (data?.type === "Actor") {
       const handled = await this._onDropTransportNpc(event, data);
       if (handled) return;
@@ -11015,7 +11125,9 @@ class BloodmanActorSheet extends BaseActorSheet {
 class BloodmanNpcSheet extends BloodmanActorSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      template: "systems/bloodman/templates/actor-non-joueur.html"
+      template: "systems/bloodman/templates/actor-non-joueur.html",
+      width: 1195,
+      height: 815
     });
   }
 
@@ -11058,8 +11170,8 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     classes: ["bloodman", "sheet", "actor"],
     tag: "div",
     position: {
-      width: 1070,
-      height: 630
+      width: 1195,
+      height: 650
     },
     window: {
       contentTag: "form",
@@ -11200,6 +11312,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     this._ppGaugePulseTimer = null;
     this._lastAutoResizeKey = "";
     this._bloodmanElementWrapper = null;
+    this._itemDropInFlightKeys = null;
     return super.close(options);
   }
 
@@ -11234,6 +11347,10 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
 class BloodmanNpcSheetV2 extends BloodmanActorSheetV2 {
   static DEFAULT_OPTIONS = foundry.utils.mergeObject(BloodmanActorSheetV2.DEFAULT_OPTIONS, {
     id: "bloodman-npc-{id}",
+    position: {
+      width: 1195,
+      height: 815
+    },
     window: {
       contentClasses: ["bloodman-sheet", "npc-sheet"]
     }
