@@ -56,6 +56,29 @@ function parseIconKeySet(sourceText, constName) {
   return new Set(keys.filter(Boolean));
 }
 
+function assertAbilitiesPowersDropScopes(templateText, label) {
+  assert.equal(
+    templateText.includes('class="card aptitudes-card" data-item-list-drop-target="true"'),
+    true,
+    `${label} actor sheet should make the aptitude card a drop target`
+  );
+  assert.equal(
+    templateText.includes('class="card powers-card" data-item-list-drop-target="true"'),
+    true,
+    `${label} actor sheet should make the power card a drop target`
+  );
+  assert.equal(
+    /<ol class="item-list \{\{#if aptitudesThreeColumns\}\}item-list-split-columns\{\{\/if\}\}" data-reorder-scope="aptitude" data-accepted-types="aptitude">/.test(templateText),
+    true,
+    `${label} actor sheet should accept aptitude drops only on the aptitude list`
+  );
+  assert.equal(
+    /<ol class="item-list \{\{#if pouvoirsThreeColumns\}\}item-list-split-columns\{\{\/if\}\}" data-reorder-scope="pouvoir" data-accepted-types="pouvoir">/.test(templateText),
+    true,
+    `${label} actor sheet should accept power drops only on the power list`
+  );
+}
+
 function run() {
   const systemJson = JSON.parse(readText("system.json"));
   const runtimeSource = readText("bloodman.mjs");
@@ -142,6 +165,20 @@ function run() {
     bagToggleDisabledPattern.test(npcSheetTemplate),
     true,
     "NPC actor sheet should keep the bag toggle visible but disabled when needed"
+  );
+
+  assertAbilitiesPowersDropScopes(playerSheetTemplate, "Player");
+  assertAbilitiesPowersDropScopes(npcSheetTemplate, "NPC");
+
+  assert.equal(
+    runtimeSource.includes('html.find(".bm-item-top, .bm-item-img-el").attr("draggable", true);'),
+    true,
+    "Unified item sheet should expose a draggable item header/image"
+  );
+  assert.equal(
+    runtimeSource.includes("onItemSheetDragStart(eventLike)"),
+    true,
+    "Unified item sheet should publish item drag data"
   );
 }
 

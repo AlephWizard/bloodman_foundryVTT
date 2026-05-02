@@ -7348,6 +7348,22 @@ class BloodmanActorSheet extends BaseActorSheet {
     return Math.max(1, Math.floor(rawColumns));
   }
 
+  getItemListDropTargetFromEvent(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const currentTarget = eventLike?.currentTarget instanceof HTMLElement
+      ? eventLike.currentTarget
+      : null;
+    if (currentTarget?.matches?.("ol.item-list")) return currentTarget;
+    const currentList = currentTarget?.querySelector?.("ol.item-list");
+    if (currentList instanceof HTMLElement) return currentList;
+    const target = nativeEvent?.target instanceof HTMLElement ? nativeEvent.target : null;
+    const targetList = target?.closest?.("ol.item-list");
+    if (targetList instanceof HTMLElement) return targetList;
+    const dropContainer = target?.closest?.("[data-item-list-drop-target='true']");
+    const containerList = dropContainer?.querySelector?.("ol.item-list");
+    return containerList instanceof HTMLElement ? containerList : null;
+  }
+
   getItemListBagZoneFromElement(element) {
     const list = element?.matches?.(".item-list")
       ? element
@@ -7975,6 +7991,22 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
   }
 
+  getExternalItemDragTypeFromData(data) {
+    const candidates = [
+      data?.itemType,
+      data?.item?.type,
+      data?.data?.type,
+      data?.document?.type,
+      data?.type
+    ];
+    for (const candidate of candidates) {
+      const normalized = String(candidate || "").trim().toLowerCase();
+      if (!normalized || normalized === "item") continue;
+      return normalized;
+    }
+    return "";
+  }
+
   getItemDropInFlightKeys() {
     if (!(this._itemDropInFlightKeys instanceof Set)) this._itemDropInFlightKeys = new Set();
     return this._itemDropInFlightKeys;
@@ -8268,12 +8300,10 @@ class BloodmanActorSheet extends BaseActorSheet {
   onItemReorderDragOver(eventLike) {
     const nativeEvent = eventLike?.originalEvent || eventLike;
     const payload = this.getItemReorderPayloadFromEvent(eventLike);
-    if (!payload) return;
-    if (!this.isItemReorderPayloadForCurrentActor(payload)) return;
+    if (!payload) return this.onExternalItemListDragOver(eventLike);
+    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.onExternalItemListDragOver(eventLike);
 
-    const list = eventLike?.currentTarget instanceof HTMLElement
-      ? eventLike.currentTarget
-      : nativeEvent?.target?.closest?.("ol.item-list");
+    const list = this.getItemListDropTargetFromEvent(eventLike);
     if (!(list instanceof HTMLElement)) return;
     const bagZone = this.getItemListBagZoneFromElement(list);
     const carryColumn = this.getItemListCarryColumnFromElement(list);
@@ -8344,6 +8374,51 @@ class BloodmanActorSheet extends BaseActorSheet {
     targetLi.classList.add(sortBefore ? "is-reorder-drop-before" : "is-reorder-drop-after");
   }
 
+  onExternalItemListDragOver(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const data = getDragEventData(nativeEvent);
+
+    const list = this.getItemListDropTargetFromEvent(eventLike);
+    if (!(list instanceof HTMLElement)) return;
+
+    const dataType = String(data?.type || "").trim().toLowerCase();
+    const itemType = this.getExternalItemDragTypeFromData(data);
+    const carryColumn = this.getItemListCarryColumnFromElement(list);
+    const bagZone = this.getItemListBagZoneFromElement(list);
+    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
+
+    if (dataType && dataType !== "item") return;
+    if (acceptedTypes && itemType && !acceptedTypes.has(itemType)) {
+      this.clearItemReorderVisualState();
+      return;
+    }
+    if (carryColumn) {
+      if (itemType && !CARRIED_ITEM_TYPES.has(itemType)) {
+        this.clearItemReorderVisualState();
+        return;
+      }
+      if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
+        this.clearItemReorderVisualState();
+        return;
+      }
+    }
+    if (bagZone && itemType && !this.isBagZoneSupportedItemType(itemType)) {
+      this.clearItemReorderVisualState();
+      return;
+    }
+
+    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
+    else nativeEvent?.preventDefault?.();
+    if (nativeEvent?.dataTransfer) {
+      nativeEvent.dataTransfer.dropEffect = String(data?.actorId || data?.uuid || "").includes("Actor.")
+        ? "move"
+        : "copy";
+    }
+
+    this.clearItemReorderVisualState();
+    list.classList.add("is-reorder-target");
+  }
+
   onItemReorderDragEnd() {
     if (this._itemReorderPayloadClearTimer) clearTimeout(this._itemReorderPayloadClearTimer);
     this._itemReorderPayloadClearTimer = setTimeout(() => {
@@ -8355,9 +8430,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   onItemReorderDragLeave(eventLike) {
     const nativeEvent = eventLike?.originalEvent || eventLike;
-    const list = eventLike?.currentTarget instanceof HTMLElement
-      ? eventLike.currentTarget
-      : nativeEvent?.target?.closest?.("ol.item-list");
+    const list = this.getItemListDropTargetFromEvent(eventLike);
     if (!(list instanceof HTMLElement)) return;
     const relatedTarget = nativeEvent?.relatedTarget;
     if (relatedTarget instanceof HTMLElement && list.contains(relatedTarget)) return;
@@ -8373,9 +8446,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (dataType !== "item") return null;
     stopHandledDropEvent(eventLike);
 
-    const list = eventLike?.currentTarget instanceof HTMLElement
-      ? eventLike.currentTarget
-      : nativeEvent?.target?.closest?.("ol.item-list");
+    const list = this.getItemListDropTargetFromEvent(eventLike);
     if (!(list instanceof HTMLElement)) return null;
     const dropKey = this.buildExternalItemDropKey(data, list);
     const inFlightKeys = this.getItemDropInFlightKeys();
@@ -8453,9 +8524,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!sourceItem) return this.onExternalItemListDrop(eventLike);
       const sourceType = String(sourceItem.type || "").trim().toLowerCase();
 
-      const list = eventLike?.currentTarget instanceof HTMLElement
-        ? eventLike.currentTarget
-        : nativeEvent?.target?.closest?.("ol.item-list");
+      const list = this.getItemListDropTargetFromEvent(eventLike);
       if (!(list instanceof HTMLElement)) return this.buildCarryDropErrorResult("operation invalide");
       const carryColumn = this.getItemListCarryColumnFromElement(list);
       if (carryColumn) {
@@ -9622,11 +9691,11 @@ class BloodmanActorSheet extends BaseActorSheet {
       this.onItemReorderDragStart(ev);
     });
 
-    html.on("dragover", "ol.item-list", ev => {
+    html.on("dragover", "ol.item-list, [data-item-list-drop-target='true']", ev => {
       this.onItemReorderDragOver(ev);
     });
 
-    html.on("dragleave", "ol.item-list", ev => {
+    html.on("dragleave", "ol.item-list, [data-item-list-drop-target='true']", ev => {
       this.onItemReorderDragLeave(ev);
     });
 
@@ -9634,7 +9703,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       this.onItemReorderDragEnd();
     });
 
-    html.on("drop", "ol.item-list", async ev => {
+    html.on("drop", "ol.item-list, [data-item-list-drop-target='true']", async ev => {
       await this.onItemReorderDrop(ev);
     });
 
@@ -12059,6 +12128,11 @@ class BloodmanItemSheet extends BaseItemSheet {
     this.connectResponsiveSheetScaleObserver(html);
     this.refreshItemSheetAutoGrowTextareas(html);
     this.queueItemSheetAutoGrowTextareaRefresh(html);
+    html.find(".bm-item-top, .bm-item-img-el").attr("draggable", true);
+
+    html.on("dragstart", ".bm-item-top, .bm-item-img-el", ev => {
+      this.onItemSheetDragStart(ev);
+    });
 
     html.on("input change", "textarea[data-autogrow='true']", ev => {
       this.resizeItemSheetAutoGrowTextarea(ev.currentTarget);
@@ -12103,6 +12177,47 @@ class BloodmanItemSheet extends BaseItemSheet {
       sourceItem?.sheet?.render?.(true);
     });
 
+  }
+
+  buildItemSheetDragPayload() {
+    const item = this.item;
+    if (!item) return null;
+    const uuid = String(item.uuid || "").trim();
+    const itemId = String(item.id || item._id || "").trim();
+    if (!uuid && !itemId) return null;
+    return {
+      type: "Item",
+      uuid,
+      id: itemId,
+      itemType: String(item.type || "").trim().toLowerCase(),
+      actorId: String(item.actor?.id || ""),
+      actorUuid: String(item.actor?.uuid || "")
+    };
+  }
+
+  setItemSheetDragTransferData(dataTransfer, mimeType, payload) {
+    if (!dataTransfer || !payload) return false;
+    try {
+      dataTransfer.setData(mimeType, JSON.stringify(payload));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  onItemSheetDragStart(eventLike) {
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const target = nativeEvent?.target;
+    if (target?.closest?.("input, textarea, select, button, a")) return;
+    const payload = this.buildItemSheetDragPayload();
+    if (!payload || !nativeEvent?.dataTransfer) return;
+    this.setItemSheetDragTransferData(nativeEvent.dataTransfer, "text/plain", payload);
+    this.setItemSheetDragTransferData(nativeEvent.dataTransfer, "application/json", payload);
+    try {
+      nativeEvent.dataTransfer.effectAllowed = "copyMove";
+    } catch (_error) {
+      // Some browsers can reject drag metadata changes; the plain payload above is enough.
+    }
   }
 
   async _onChangeInput(event) {

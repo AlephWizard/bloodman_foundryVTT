@@ -1827,6 +1827,7 @@
 .tab[data-tab="pouvoirs"] .aptitudes-card .item-list,
 .tab[data-tab="pouvoirs"] .powers-card .item-list {
   margin-top: 2px;
+  min-height: 72px;
   max-height: none;
   overflow: visible;
   display: flex;
