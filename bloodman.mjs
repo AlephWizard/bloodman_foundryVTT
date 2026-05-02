@@ -1341,6 +1341,54 @@ function getTokenHudStorageKey(tokenDoc) {
   return String(tokenDoc?.uuid || tokenDoc?.id || "").trim();
 }
 
+function getTokenDocumentFromPlaceable(tokenLike) {
+  return tokenLike?.document || tokenLike || null;
+}
+
+function getTokenHudActorForDocument(tokenDoc, fallbackActor = null) {
+  if (!tokenDoc) return fallbackActor || null;
+  if (tokenDoc.actorLink === true) {
+    return tokenDoc.actor
+      || (tokenDoc.actorId ? globalThis.game?.actors?.get?.(tokenDoc.actorId) : null)
+      || fallbackActor
+      || null;
+  }
+  return tokenDoc.actor || fallbackActor || null;
+}
+
+function getTokenHudTargetTokenDocuments(hud) {
+  const hudTokenDoc = getTokenDocumentFromPlaceable(hud?.document || hud?.object);
+  const hudKey = getTokenHudStorageKey(hudTokenDoc);
+  const controlled = Array.isArray(globalThis.canvas?.tokens?.controlled)
+    ? globalThis.canvas.tokens.controlled
+    : [];
+  const docs = [];
+  const seen = new Set();
+
+  for (const token of controlled) {
+    const tokenDoc = getTokenDocumentFromPlaceable(token);
+    const key = getTokenHudStorageKey(tokenDoc);
+    if (!tokenDoc || !key || seen.has(key)) continue;
+    docs.push(tokenDoc);
+    seen.add(key);
+  }
+
+  if (docs.length > 1 && hudKey && seen.has(hudKey)) return docs;
+  return hudTokenDoc ? [hudTokenDoc] : docs.slice(0, 1);
+}
+
+function rememberTokenHudStatusSelection(tokenDocs = [], statusId = "", turns = TOKEN_HUD_TURN_MIN) {
+  const normalizedStatusId = normalizeStatusValue(statusId);
+  if (!normalizedStatusId) return;
+  const selectedTurns = clampTokenHudTurnValue(turns);
+  for (const tokenDoc of tokenDocs) {
+    const tokenKey = getTokenHudStorageKey(tokenDoc);
+    if (!tokenKey) continue;
+    TOKEN_HUD_TURN_SELECTION_BY_TOKEN.set(tokenKey, selectedTurns);
+    TOKEN_HUD_LAST_STATUS_BY_TOKEN.set(tokenKey, normalizedStatusId);
+  }
+}
+
 function clampTokenHudTurnValue(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return TOKEN_HUD_TURN_MIN;
@@ -1813,8 +1861,8 @@ function buildTokenHudTurnCounterEffectPayloads({ statusId, turns, primaryEffect
 }
 
 async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, turns = TOKEN_HUD_TURN_MIN, overlay = false } = {}) {
-  const actor = hud?.actor || hud?.document?.actor || null;
-  const tokenDoc = hud?.document || hud?.object?.document || null;
+  const tokenDoc = getTokenDocumentFromPlaceable(hud?.document || hud?.object);
+  const actor = getTokenHudActorForDocument(tokenDoc, hud?.actor || null);
   const normalizedStatusId = normalizeStatusValue(statusId);
   if (!actor || !normalizedStatusId || typeof actor.toggleStatusEffect !== "function") return false;
 
@@ -1852,6 +1900,26 @@ async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, 
 
   await cleanupTokenHudOrphanCounterEffects(actor);
   return true;
+}
+
+async function applyTokenHudStatusTurnSelectionToDocuments(hud, tokenDocs = [], statusId, options = {}) {
+  const docs = Array.isArray(tokenDocs) && tokenDocs.length
+    ? tokenDocs
+    : getTokenHudTargetTokenDocuments(hud);
+  let changed = false;
+
+  for (const tokenDoc of docs) {
+    const actor = getTokenHudActorForDocument(tokenDoc, hud?.actor || null);
+    if (!actor) continue;
+    const applied = await applyTokenHudStatusTurnSelection({
+      actor,
+      document: tokenDoc,
+      object: { document: tokenDoc }
+    }, statusId, options);
+    changed = applied || changed;
+  }
+
+  return changed;
 }
 
 function buildTokenHudTurnLabel(turns) {
@@ -2001,10 +2069,12 @@ function bindTokenHudTurnControlEvents(root, hud, turnField) {
 
       const statusId = String(turnField.dataset.statusId || "").trim();
       if (!statusId) return;
-      const actor = hud?.actor || hud?.document?.actor || null;
-      if (!actor || !actorHasStatusInFamily(actor, [statusId])) return;
+      const tokenDocs = getTokenHudTargetTokenDocuments(hud)
+        .filter(tokenDoc => tokenHasStatusInFamily(tokenDoc, [statusId]));
+      if (!tokenDocs.length) return;
+      rememberTokenHudStatusSelection(tokenDocs, statusId, turns);
 
-      void applyTokenHudStatusTurnSelection(hud, statusId, { active: true, turns, overlay: false });
+      void applyTokenHudStatusTurnSelectionToDocuments(hud, tokenDocs, statusId, { active: true, turns, overlay: false });
     };
 
     const toggle = turnField.querySelector(".bm-token-hud-turn-toggle");
@@ -2058,15 +2128,14 @@ function bindTokenHudTurnControlEvents(root, hud, turnField) {
       const turns = getTokenHudTurnFieldValue(turnField);
       setTokenHudTurnFieldValue(turnField, turns);
       turnField.dataset.statusId = statusId;
-      const tokenKey = getTokenHudStorageKey(hud?.document || hud?.object?.document || null);
-      if (tokenKey) {
-        TOKEN_HUD_TURN_SELECTION_BY_TOKEN.set(tokenKey, turns);
-        TOKEN_HUD_LAST_STATUS_BY_TOKEN.set(tokenKey, statusId);
-      }
+      const tokenDocs = getTokenHudTargetTokenDocuments(hud);
+      rememberTokenHudStatusSelection(tokenDocs, statusId, turns);
 
-      const nextActive = !target.classList.contains("active");
+      const nextActive = tokenDocs.length
+        ? !tokenDocs.every(tokenDoc => tokenHasStatusInFamily(tokenDoc, [statusId]))
+        : !target.classList.contains("active");
       const overlay = event.type === "contextmenu";
-      void applyTokenHudStatusTurnSelection(hud, statusId, { active: nextActive, turns, overlay });
+      void applyTokenHudStatusTurnSelectionToDocuments(hud, tokenDocs, statusId, { active: nextActive, turns, overlay });
     };
 
     effectsPalette.addEventListener("click", handleEffectSelection, true);
@@ -2952,6 +3021,7 @@ const VITAL_RESOURCE_PATH_LIST = Array.from(VITAL_RESOURCE_PATHS);
 const VITAL_RESOURCE_INPUT_SELECTOR = VITAL_RESOURCE_PATH_LIST
   .map(path => `input[name='${path}']`)
   .join(", ");
+const ACTOR_SHEET_NUMERIC_FOCUS_SELECTOR = "input[type='number'][name]";
 const AMMO_UPDATE_PATHS = [
   "system.ammo",
   "system.ammo.type",
@@ -6704,6 +6774,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (options?.bloodmanResetRerollState === true) {
       this.clearRerollDisplayState();
     }
+    this.captureActorSheetNumericFocus();
     this.captureTokenDocumentReference(options?.token || null);
     this.sanitizeStoredSheetOptions();
     return super.render(force, sanitizeRenderOptions(options));
@@ -6761,6 +6832,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     this._ppGaugePulseTimer = null;
     this._lastAutoResizeKey = "";
     this._itemDropInFlightKeys = null;
+    this._actorSheetNumericFocusState = null;
+    clearUiMicrotask(this._numericFocusRestoreTaskId);
+    this._numericFocusRestoreTaskId = null;
     return super.close(options);
   }
 
@@ -6779,6 +6853,82 @@ class BloodmanActorSheet extends BaseActorSheet {
     this._queuedAutoGrowRoot = null;
     this._queuedResourceGaugeRoot = null;
     this._queuedDeferredSheetRenderForce = false;
+    clearUiMicrotask(this._numericFocusRestoreTaskId);
+    this._numericFocusRestoreTaskId = null;
+  }
+
+  isActorSheetNumericFocusInput(element) {
+    if (!(element instanceof HTMLInputElement)) return false;
+    if (String(element.type || "").toLowerCase() !== "number") return false;
+    if (!String(element.name || "").trim()) return false;
+    const sheetRoot = getSheetHTMLElement(this);
+    return !sheetRoot || sheetRoot.contains(element);
+  }
+
+  captureActorSheetNumericFocus(eventOrElement = null) {
+    const candidate = eventOrElement?.currentTarget || eventOrElement || null;
+    const element = this.isActorSheetNumericFocusInput(candidate)
+      ? candidate
+      : (globalThis.document?.activeElement || null);
+    if (!this.isActorSheetNumericFocusInput(element)) return false;
+    let selectionStart = null;
+    let selectionEnd = null;
+    try {
+      selectionStart = element.selectionStart;
+      selectionEnd = element.selectionEnd;
+    } catch (_error) {
+      selectionStart = null;
+      selectionEnd = null;
+    }
+    this._actorSheetNumericFocusState = {
+      name: String(element.name || ""),
+      value: String(element.value ?? ""),
+      selectionStart,
+      selectionEnd,
+      capturedAt: Date.now()
+    };
+    return true;
+  }
+
+  restoreActorSheetNumericFocus(htmlLike = null) {
+    const state = this._actorSheetNumericFocusState;
+    if (!state?.name) return false;
+    if (Date.now() - Number(state.capturedAt || 0) > 5000) {
+      this._actorSheetNumericFocusState = null;
+      return false;
+    }
+
+    const root = htmlLike?.find ? htmlLike : getSheetElementWrapper(this);
+    const field = root?.find?.(`input[type='number'][name='${state.name}']`)?.get?.(0)
+      || getSheetHTMLElement(this)?.querySelector?.(`input[type="number"][name="${state.name}"]`)
+      || null;
+    if (!(field instanceof HTMLInputElement) || field.disabled || field.readOnly) return false;
+
+    const active = globalThis.document?.activeElement || null;
+    const sheetRoot = getSheetHTMLElement(this);
+    if (active instanceof HTMLElement && sheetRoot?.contains(active) && active !== field) return false;
+
+    try {
+      field.focus({ preventScroll: true });
+      if (Number.isInteger(state.selectionStart) && Number.isInteger(state.selectionEnd)) {
+        field.setSelectionRange(state.selectionStart, state.selectionEnd);
+      }
+    } catch (_error) {
+      try {
+        field.focus();
+      } catch (_focusError) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  queueActorSheetNumericFocusRestore(htmlLike = null) {
+    clearUiMicrotask(this._numericFocusRestoreTaskId);
+    this._numericFocusRestoreTaskId = queueUiMicrotask(() => {
+      this._numericFocusRestoreTaskId = null;
+      this.restoreActorSheetNumericFocus(htmlLike);
+    });
   }
 
   getResponsiveActorSheetRoot(rootLike = null) {
@@ -8717,6 +8867,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async _updateObject(_event, formData) {
+    this.captureActorSheetNumericFocus(_event);
     const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
     const allowVitalResourceUpdate = VITAL_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
     const allowAmmoUpdate = hasAmmoUpdatePayload(formData);
@@ -9324,6 +9475,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     forceEnableSheetUi();
     clearUiMicrotask(this._forceEnableSheetTaskId);
     this._forceEnableSheetTaskId = queueUiMicrotask(forceEnableSheetUi);
+    html.on("focusin keydown input change", ACTOR_SHEET_NUMERIC_FOCUS_SELECTOR, ev => {
+      this.captureActorSheetNumericFocus(ev);
+    });
+    this.queueActorSheetNumericFocusRestore(html);
     html.find("li.item[data-item-id]").attr("draggable", true);
     this.refreshResourceVisuals(html);
     this.queueResourceGaugeRefresh(html);
@@ -11304,6 +11459,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       ? { ...(maybeOptions || {}), force: forceOrOptions }
       : { ...(forceOrOptions || {}) };
     if (legacyOptions?.bloodmanResetRerollState === true) this.clearRerollDisplayState();
+    this.captureActorSheetNumericFocus();
     this.captureTokenDocumentReference(legacyOptions?.token || null);
     this.sanitizeStoredSheetOptions();
     return super.render(sanitizeRenderOptions(options));
@@ -11358,6 +11514,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     this._lastAutoResizeKey = "";
     this._bloodmanElementWrapper = null;
     this._itemDropInFlightKeys = null;
+    this._actorSheetNumericFocusState = null;
     return super.close(options);
   }
 
