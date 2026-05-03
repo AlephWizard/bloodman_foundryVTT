@@ -201,7 +201,7 @@ async function run() {
       type: "rerollDamage",
       requestId: "r1",
       kind: "item-damage",
-      rerollUsed: false,
+      rerollUsed: true,
       attackerUserId: "u1",
       attackerId: "a1",
       rollId: "roll-1",

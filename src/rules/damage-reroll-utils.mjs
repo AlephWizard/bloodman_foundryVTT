@@ -288,7 +288,7 @@ export function buildDamageRerollUtils({
       type: "rerollDamage",
       requestId: String(requestId || ""),
       kind: "item-damage",
-      rerollUsed: false,
+      rerollUsed: true,
       attackerUserId: String(attackerUserId || ""),
       attackerId: safeContext.attackerId || attackerId || "",
       rollId: safeContext.rollId,

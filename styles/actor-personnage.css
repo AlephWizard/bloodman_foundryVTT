@@ -2606,10 +2606,22 @@
   appearance: none;
   box-shadow: none !important;
   outline: none !important;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
 }
 
 .bloodman-sheet .char-edit-toggle.is-active {
-  background: #ececec;
+  border-color: #8e241e !important;
+  background: #c8372e !important;
+  color: #ffffff !important;
+  box-shadow:
+    0 0 0 2px rgba(200, 55, 46, 0.22),
+    0 2px 0 rgba(0, 0, 0, 0.28) !important;
+  transform: translateY(-1px);
 }
 
 .bloodman-sheet .char-edit-toggle:hover,
@@ -2617,6 +2629,13 @@
   border-color: #000000;
   background: #ececec;
   color: #000000;
+}
+
+.bloodman-sheet .char-edit-toggle.is-active:hover,
+.bloodman-sheet .char-edit-toggle.is-active:active {
+  border-color: #7a1e19 !important;
+  background: #d3453c !important;
+  color: #ffffff !important;
 }
 
 .bloodman-sheet .char-edit-toggle:focus,
@@ -2629,6 +2648,20 @@
 
 .bloodman-sheet .char-edit-toggle::-moz-focus-inner {
   border: 0;
+}
+
+.bloodman-sheet.characteristics-edit-active .characteristics-card {
+  border-color: #8e241e;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.66) inset,
+    0 0 0 2px rgba(200, 55, 46, 0.14),
+    0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+.bloodman-sheet.characteristics-edit-active .char-base input:not([readonly]) {
+  border-color: #c8372e;
+  background: #fff9f8;
+  box-shadow: 0 0 0 2px rgba(200, 55, 46, 0.16) !important;
 }
 
 .bloodman-sheet .char-score {

@@ -155,6 +155,14 @@ function getSheetHTMLElement(sheet) {
   return null;
 }
 
+function getHTMLElementFromHtmlLike(htmlLike) {
+  if (typeof HTMLElement === "undefined") return null;
+  if (htmlLike instanceof HTMLElement) return htmlLike;
+  if (htmlLike?.[0] instanceof HTMLElement) return htmlLike[0];
+  if (typeof htmlLike?.get === "function" && htmlLike.get(0) instanceof HTMLElement) return htmlLike.get(0);
+  return null;
+}
+
 function buildActorSheetBaseData(sheet, options = {}) {
   const actor = sheet?.actor || sheet?.document || sheet?.object || null;
   const system = actor?.system || {};
@@ -3021,6 +3029,7 @@ const VITAL_RESOURCE_PATH_LIST = Array.from(VITAL_RESOURCE_PATHS);
 const VITAL_RESOURCE_INPUT_SELECTOR = VITAL_RESOURCE_PATH_LIST
   .map(path => `input[name='${path}']`)
   .join(", ");
+const CHARACTERISTIC_BASE_INPUT_SELECTOR = "input[name^='system.characteristics.'][name$='.base']";
 const ACTOR_SHEET_NUMERIC_FOCUS_SELECTOR = "input[type='number'][name]";
 const AMMO_UPDATE_PATHS = [
   "system.ammo",
@@ -6823,6 +6832,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     this.clearRerollDisplayState();
     this.clearPowerUseState();
     this.clearDeferredSheetUiTasks();
+    this.clearActorSheetNativeEditHandlers();
     this.disconnectResponsiveActorSheetLayoutObserver();
     this._responsiveActorSheetLayoutState = null;
     this._resourceBubbleRuntimeMap = null;
@@ -7158,6 +7168,108 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
     }
     return sent;
+  }
+
+  applyActorSheetInteractivePermissions(htmlLike = null) {
+    const root = htmlLike?.find ? htmlLike : getSheetElementWrapper(this);
+    if (!root?.length) return;
+    const basicPlayer = isBasicPlayerRole(game.user?.role);
+    const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
+    const characteristicsUnlocked = canToggleCharacteristicsEdit && Boolean(this._characteristicsEditEnabled);
+    root.toggleClass?.("characteristics-edit-active", this.actor?.type === "personnage" && characteristicsUnlocked);
+
+    if (basicPlayer) {
+      root.find("input, textarea, select, button").prop("disabled", false).removeAttr("disabled");
+      root.find(".bag-slots-toggle").prop("disabled", true).attr("disabled", "disabled");
+    }
+    if (canToggleCharacteristicsEdit) {
+      root.find(".char-edit-toggle").prop("disabled", false).removeAttr("disabled");
+      root
+        .find(VITAL_RESOURCE_INPUT_SELECTOR)
+        .prop("disabled", false)
+        .prop("readonly", false)
+        .removeAttr("disabled")
+        .removeAttr("readonly");
+    }
+
+    if (this.actor?.type === "personnage") {
+      const characteristicInputs = root.find(CHARACTERISTIC_BASE_INPUT_SELECTOR);
+      if (characteristicsUnlocked) {
+        characteristicInputs
+          .prop("disabled", false)
+          .prop("readonly", false)
+          .removeAttr("disabled")
+          .removeAttr("readonly")
+          .removeClass("is-locked");
+        root.find(".char-edit-toggle").addClass("is-active");
+      } else {
+        characteristicInputs
+          .prop("readonly", true)
+          .attr("readonly", "readonly")
+          .addClass("is-locked");
+        root.find(".char-edit-toggle").removeClass("is-active");
+      }
+    }
+  }
+
+  clearActorSheetNativeEditHandlers() {
+    this._actorSheetNativeEditAbortController?.abort?.();
+    this._actorSheetNativeEditAbortController = null;
+  }
+
+  connectActorSheetNativeEditHandlers(htmlLike = null) {
+    const root = getHTMLElementFromHtmlLike(htmlLike) || getSheetHTMLElement(this);
+    if (!root) return;
+    this.clearActorSheetNativeEditHandlers();
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    this._actorSheetNativeEditAbortController = controller;
+    const listenerOptions = controller ? { capture: true, signal: controller.signal } : true;
+
+    root.addEventListener("click", event => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const button = target?.closest?.(".char-edit-toggle");
+      if (!button || !root.contains(button)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      if (!canCurrentUserEditCharacteristics()) return;
+      this._characteristicsEditEnabled = !this._characteristicsEditEnabled;
+      bmLog.debug("sheet:characteristics-edit-toggle", {
+        actorId: this.actor?.id || "",
+        role: game.user?.role,
+        enabled: Boolean(this._characteristicsEditEnabled)
+      });
+      this.applyActorSheetInteractivePermissions(htmlLike);
+      queueUiMicrotask(() => this.applyActorSheetInteractivePermissions(htmlLike));
+    }, listenerOptions);
+
+    root.addEventListener("change", event => {
+      const input = event.target instanceof HTMLInputElement ? event.target : null;
+      if (!input?.matches?.(CHARACTERISTIC_BASE_INPUT_SELECTOR)) return;
+      if (!root.contains(input)) return;
+      if (!canCurrentUserEditCharacteristics()) return;
+      if (!this._characteristicsEditEnabled) return;
+      if (this.actor?.isOwner || game.user?.isGM) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      void this.updateTrustedCharacteristicBaseInput(input);
+    }, listenerOptions);
+  }
+
+  async updateTrustedCharacteristicBaseInput(input) {
+    const path = String(input?.name || "");
+    const match = path.match(/^system\.characteristics\.([^\.]+)\.base$/);
+    if (!match) return false;
+    const characteristicKey = match[1];
+    const fallback = toFiniteNumber(this.actor?.system?.characteristics?.[characteristicKey]?.base, CHARACTERISTIC_BASE_MIN);
+    const nextValue = clampCharacteristicBaseForRole(game.user?.role, input?.value, fallback);
+    input.value = String(nextValue);
+    const updated = await this.applyActorUpdate({ [path]: nextValue }, {
+      bloodmanAllowCharacteristicBase: true
+    });
+    if (updated) foundry.utils.setProperty(this.actor, path, nextValue);
+    return updated;
   }
 
   openActorImageFilePicker(fieldPath = "img") {
@@ -9503,8 +9615,6 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   activateBloodmanActorListeners(html) {
-    const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
-    const basicPlayer = isBasicPlayerRole(game.user?.role);
     const activatePrimaryTab = tabId => {
       const tab = String(tabId || this._bloodmanActivePrimaryTab || "carac").trim() || "carac";
       this._bloodmanActivePrimaryTab = tab;
@@ -9521,27 +9631,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     ).trim();
     activatePrimaryTab(currentActiveTab);
     const forceEnableSheetUi = () => {
-      const root = html?.find ? html : getSheetElementWrapper(this);
-      if (!root?.length) return;
-      if (basicPlayer) {
-        root.find("input, textarea, select, button").prop("disabled", false);
-        root.find(".bag-slots-toggle").prop("disabled", true);
-      }
-      if (canToggleCharacteristicsEdit) {
-        root.find(".char-edit-toggle").prop("disabled", false);
-        root
-          .find(VITAL_RESOURCE_INPUT_SELECTOR)
-          .prop("disabled", false)
-          .prop("readonly", false);
-      }
-      if (this._characteristicsEditEnabled) {
-        root
-          .find("input[name^='system.characteristics.'][name$='.base']")
-          .prop("disabled", false)
-          .prop("readonly", false);
-      }
+      this.applyActorSheetInteractivePermissions(html);
     };
     forceEnableSheetUi();
+    this.connectActorSheetNativeEditHandlers(html);
     clearUiMicrotask(this._forceEnableSheetTaskId);
     this._forceEnableSheetTaskId = queueUiMicrotask(forceEnableSheetUi);
     html.on("focusin keydown input change", ACTOR_SHEET_NUMERIC_FOCUS_SELECTOR, ev => {
@@ -9574,6 +9667,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       ev.stopPropagation();
       if (!canCurrentUserEditCharacteristics()) return;
       this._characteristicsEditEnabled = !this._characteristicsEditEnabled;
+      this.applyActorSheetInteractivePermissions(html);
+      queueUiMicrotask(() => this.applyActorSheetInteractivePermissions(html));
       this.render(false);
     });
 
@@ -9602,6 +9697,15 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!VITAL_RESOURCE_PATHS.has(path)) return;
       const nextValue = Math.max(0, Math.floor(toFiniteNumber(input?.value, 0)));
       requestVitalResourceUpdate(this.actor, path, nextValue);
+    });
+
+    html.on("change", CHARACTERISTIC_BASE_INPUT_SELECTOR, async ev => {
+      if (!canCurrentUserEditCharacteristics()) return;
+      if (!this._characteristicsEditEnabled) return;
+      if (this.actor?.isOwner || game.user?.isGM) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      await this.updateTrustedCharacteristicBaseInput(ev.currentTarget);
     });
 
     html.on("input change", VITAL_RESOURCE_INPUT_SELECTOR, () => {
@@ -11127,6 +11231,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     const totalDamage = Math.max(0, Number(rollEval.rawTotal || 0) + Math.max(0, Number(context.bonusBrut || 0)));
     const modeTag = String(rollEval.modeTag || "");
     const allocations = buildRerollAllocations(context, totalDamage);
+    context.totalDamage = totalDamage;
+    context.rollResults = rollResults;
+    context.targets = allocations;
     const penetrationValue = Math.max(0, Number(context.penetration || 0));
     const hasActiveGM = game.users?.some(user => user.active && user.isGM) || false;
     const rerollTargetNames = allocations
@@ -11573,6 +11680,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     this.clearRerollDisplayState();
     this.clearPowerUseState();
     this.clearDeferredSheetUiTasks();
+    this.clearActorSheetNativeEditHandlers();
     this.disconnectResponsiveActorSheetLayoutObserver();
     this._responsiveActorSheetLayoutState = null;
     this._resourceBubbleRuntimeMap = null;
