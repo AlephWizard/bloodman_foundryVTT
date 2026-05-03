@@ -3018,6 +3018,7 @@ const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]
 const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin", "objet", "ration", "protection"]);
 const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
 const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
+const CHAOS_DICE_PANEL_POSITION_SETTING = "chaosDicePanelPosition";
 const CURRENCY_CURRENT_MAX = 1_000_000;
 const VITAL_RESOURCE_PATHS = new Set([
   "system.resources.pv.current",
@@ -5188,6 +5189,14 @@ Hooks.once("init", () => {
     }
   });
 
+  game.settings.register("bloodman", CHAOS_DICE_PANEL_POSITION_SETTING, {
+    name: "Position du panneau des du chaos",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {}
+  });
+
   const actorSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanActorSheetV2 : BloodmanActorSheet;
   const npcSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanNpcSheetV2 : BloodmanNpcSheet;
 
@@ -5576,13 +5585,26 @@ function getVisibleRect(element) {
   return rect;
 }
 
-function positionChaosDiceUI() {
-  const root = document.getElementById("bm-chaos-dice");
-  if (!root) return;
-  // Keep the widget at document level so fixed coordinates stay viewport-based.
-  if (root.parentElement !== document.body) {
-    document.body.appendChild(root);
-  }
+function clampChaosDicePanelPosition(position, root) {
+  const rect = root?.getBoundingClientRect?.();
+  const width = Math.max(1, Number(rect?.width) || 150);
+  const height = Math.max(1, Number(rect?.height) || 106);
+  const margin = 8;
+  const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || width + margin * 2;
+  const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || height + margin * 2;
+  const maxLeft = Math.max(margin, viewportWidth - width - margin);
+  const maxTop = Math.max(margin, viewportHeight - height - margin);
+  return {
+    left: Math.round(Math.max(margin, Math.min(maxLeft, Number(position?.left) || 0))),
+    top: Math.round(Math.max(margin, Math.min(maxTop, Number(position?.top) || 0)))
+  };
+}
+
+function getDefaultChaosDicePanelPosition(root) {
+  const rect = root?.getBoundingClientRect?.();
+  const width = Math.max(1, Number(rect?.width) || 150);
+  const height = Math.max(1, Number(rect?.height) || 106);
+  const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 720;
   const macroStripRect = getVisibleRect(
     document.querySelector("#hotbar #macro-list")
     || document.querySelector("#hotbar ol#macro-list")
@@ -5592,33 +5614,104 @@ function positionChaosDiceUI() {
     || document.querySelector("#hotbar .action-bar")
   );
   const hotbarRect = getVisibleRect(document.getElementById("hotbar"));
-  const sidebarRect = getVisibleRect(document.getElementById("sidebar"))
-    || getVisibleRect(document.getElementById("ui-right"));
   const anchorRect = macroStripRect || hotbarRect || null;
-  const rootRect = root.getBoundingClientRect();
-  const halfWidth = Math.max(18, (rootRect.width || 60) / 2);
-  const viewportMargin = 8;
-  const sideGap = 72;
-  const bottomOffset = 30;
+  const oldPanelGap = 72;
+  const left = anchorRect ? anchorRect.left - oldPanelGap - width : 18;
+  const top = viewportHeight - height - 30;
+  return clampChaosDicePanelPosition({ left, top }, root);
+}
 
-  // Default to the left edge when hotbar geometry is unavailable.
-  let centerX = Math.round(viewportMargin + halfWidth);
-  if (anchorRect) {
-    centerX = Math.round(anchorRect.left - sideGap - halfWidth);
-  }
+function getSavedChaosDicePanelPosition(root) {
+  const saved = game.settings?.get?.("bloodman", CHAOS_DICE_PANEL_POSITION_SETTING) || {};
+  const left = Number(saved.left);
+  const top = Number(saved.top);
+  if (Number.isFinite(left) && Number.isFinite(top)) return clampChaosDicePanelPosition({ left, top }, root);
+  return getDefaultChaosDicePanelPosition(root);
+}
 
-  const leftBoundary = viewportMargin + halfWidth;
-  const rightBoundary = sidebarRect
-    ? (sidebarRect.left - viewportMargin - halfWidth)
-    : (window.innerWidth - viewportMargin - halfWidth);
-  const maxCenter = Math.max(leftBoundary, rightBoundary);
-  const clampedX = Math.max(leftBoundary, Math.min(maxCenter, centerX));
-
-  root.style.left = `${clampedX}px`;
+function applyChaosDicePanelPosition(root, position) {
+  const next = clampChaosDicePanelPosition(position, root);
+  root.style.left = `${next.left}px`;
+  root.style.top = `${next.top}px`;
   root.style.right = "auto";
-  root.style.bottom = `${bottomOffset}px`;
-  root.style.top = "auto";
-  root.style.transform = "translateX(-50%)";
+  root.style.bottom = "auto";
+  root.style.transform = "none";
+  return next;
+}
+
+function positionChaosDiceUI(position = null) {
+  const root = document.getElementById("bm-chaos-dice");
+  if (!root) return;
+  // Keep the widget at document level so fixed coordinates stay viewport-based.
+  if (root.parentElement !== document.body) {
+    document.body.appendChild(root);
+  }
+  return applyChaosDicePanelPosition(root, position || getSavedChaosDicePanelPosition(root));
+}
+
+function installChaosDicePanelDrag(root) {
+  if (!root || root.dataset.bmChaosDragInstalled === "true") return;
+  root.dataset.bmChaosDragInstalled = "true";
+
+  let dragState = null;
+  const savePosition = async position => {
+    await game.settings.set("bloodman", CHAOS_DICE_PANEL_POSITION_SETTING, {
+      top: Math.round(position.top),
+      left: Math.round(position.left)
+    });
+  };
+
+  const onPointerMove = event => {
+    if (!dragState) return;
+    event.preventDefault();
+    root.classList.add("is-dragging");
+    const next = applyChaosDicePanelPosition(root, {
+      left: dragState.left + event.clientX - dragState.x,
+      top: dragState.top + event.clientY - dragState.y
+    });
+    dragState.lastPosition = next;
+    dragState.moved = true;
+  };
+
+  const onPointerUp = event => {
+    if (!dragState) return;
+    event.preventDefault();
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    root.classList.remove("is-dragging");
+    const lastPosition = dragState.lastPosition || positionChaosDiceUI();
+    const moved = dragState.moved;
+    dragState = null;
+    if (moved && lastPosition) void savePosition(lastPosition);
+  };
+
+  const onPointerDown = event => {
+    if (event.button !== 0) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest?.("button, input, select, textarea")) return;
+    event.preventDefault();
+    const rect = root.getBoundingClientRect();
+    dragState = {
+      left: rect.left,
+      top: rect.top,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+      lastPosition: { left: rect.left, top: rect.top }
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
+
+  root.addEventListener("pointerdown", onPointerDown);
+  window.__bmChaosDiceDrag = {
+    dispose: () => {
+      root.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      root.dataset.bmChaosDragInstalled = "";
+    }
+  };
 }
 
 function showSelectedVoyageXpGrantDialog() {
@@ -5792,19 +5885,25 @@ function ensureChaosDiceUI() {
   const fullPpAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.FullPPRestore.Title", "Restauration PP"));
   const plusAriaLabel = escapeChatMarkup("Augmenter les des du chaos");
   const minusAriaLabel = escapeChatMarkup("Diminuer les des du chaos");
+  const panelTitle = "Bloodman";
   container.innerHTML = `
-    <button type="button" class="bm-chaos-xp-btn" aria-label="${xpAriaLabel}">XP</button>
-    <div class="bm-chaos-row">
-      <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="${plusAriaLabel}">+</button>
-      <div class="bm-chaos-icon" aria-hidden="true">
-        <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
-        <span class="bm-chaos-value">0</span>
-      </div>
-      <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="${minusAriaLabel}">-</button>
+    <div class="bm-chaos-panel-header" title="${panelTitle}">
+      <span>${panelTitle}</span>
     </div>
-    <div class="bm-chaos-full-row">
-      <button type="button" class="bm-chaos-full-pv-btn" aria-label="${fullPvAriaLabel}">FULL PV</button>
-      <button type="button" class="bm-chaos-full-pp-btn" aria-label="${fullPpAriaLabel}">FULL PP</button>
+    <div class="bm-chaos-panel-body">
+      <button type="button" class="bm-chaos-xp-btn" aria-label="${xpAriaLabel}">XP</button>
+      <div class="bm-chaos-row">
+        <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="${plusAriaLabel}">+</button>
+        <div class="bm-chaos-icon" aria-hidden="true">
+          <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
+          <span class="bm-chaos-value">0</span>
+        </div>
+        <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="${minusAriaLabel}">-</button>
+      </div>
+      <div class="bm-chaos-full-row">
+        <button type="button" class="bm-chaos-full-pv-btn" aria-label="${fullPvAriaLabel}">FULL PV</button>
+        <button type="button" class="bm-chaos-full-pp-btn" aria-label="${fullPpAriaLabel}">FULL PP</button>
+      </div>
     </div>
   `;
 
@@ -5849,38 +5948,11 @@ function ensureChaosDiceUI() {
 
   updateChaosDiceUI(getChaosValue());
   positionChaosDiceUI();
+  installChaosDicePanelDrag(container);
 
-  if (!window.__bmChaosDiceObserver) {
-    const observer = typeof ResizeObserver === "function"
-      ? new ResizeObserver(() => positionChaosDiceUI())
-      : null;
-    const leftUi = document.getElementById("ui-left");
-    const controls = document.getElementById("controls");
-    const navigation = document.getElementById("navigation");
-    const players = document.getElementById("players");
-    const sidebar = document.getElementById("sidebar");
-    const tabs = document.getElementById("sidebar-tabs");
-    const chatForm = document.getElementById("chat-form");
-    const hotbar = document.getElementById("hotbar");
-    if (leftUi && observer) observer.observe(leftUi);
-    if (controls && observer) observer.observe(controls);
-    if (navigation && observer) observer.observe(navigation);
-    if (players && observer) observer.observe(players);
-    if (sidebar && observer) observer.observe(sidebar);
-    if (tabs && observer) observer.observe(tabs);
-    if (chatForm && observer) observer.observe(chatForm);
-    if (hotbar && observer) observer.observe(hotbar);
-    window.addEventListener("resize", positionChaosDiceUI);
-
-    const mutationTargets = [leftUi, controls, navigation, players, sidebar].filter(Boolean);
-    if (mutationTargets.length) {
-      const mutation = new MutationObserver(() => positionChaosDiceUI());
-      for (const targetElement of mutationTargets) {
-        mutation.observe(targetElement, { attributes: true, attributeFilter: ["class", "style"] });
-      }
-      window.__bmChaosDiceMutation = mutation;
-    }
-    window.__bmChaosDiceObserver = observer || { disconnect: () => {} };
+  if (!window.__bmChaosDiceResizeHandler) {
+    window.__bmChaosDiceResizeHandler = () => positionChaosDiceUI();
+    window.addEventListener("resize", window.__bmChaosDiceResizeHandler);
   }
 }
 
