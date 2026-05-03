@@ -6263,11 +6263,12 @@ Hooks.on("createChatMessage", async (message) => {
   await chatMessageRoutingHooks.onCreateChatMessage(message);
 });
 
-if (getFoundryGeneration() >= 14) {
-  Hooks.on("renderChatMessageHTML", chatMessageRoutingHooks.onRenderChatMessageHTML);
-} else {
-  Hooks.on("renderChatMessage", chatMessageRoutingHooks.onRenderChatMessage);
-}
+const chatRenderHookName = getFoundryGeneration() >= 14 || globalThis.foundry?.applications?.api?.ApplicationV2
+  ? "renderChatMessageHTML"
+  : "renderChatMessage";
+Hooks.on(chatRenderHookName, chatRenderHookName === "renderChatMessageHTML"
+  ? chatMessageRoutingHooks.onRenderChatMessageHTML
+  : chatMessageRoutingHooks.onRenderChatMessage);
 
 Hooks.on("renderHotbar", () => {
   positionChaosDiceUI();
@@ -12004,6 +12005,28 @@ class BloodmanItemSheet extends BaseItemSheet {
     return super.close(options);
   }
 
+  openItemAudioFilePicker() {
+    if (!this.item) return false;
+    const FilePickerClass = getFilePickerClass();
+    if (typeof FilePickerClass !== "function") {
+      safeWarn("Selection audio impossible: FilePicker indisponible.");
+      return false;
+    }
+
+    const current = String(this.item.system?.audioFile || "").trim();
+    const picker = new FilePickerClass({
+      type: "audio",
+      current,
+      callback: async path => {
+        const nextPath = String(path || "").trim();
+        if (!nextPath || nextPath === current) return;
+        await this.item.update({ "system.audioFile": nextPath });
+      }
+    });
+    picker.render(true);
+    return true;
+  }
+
   getResponsiveSheetScaleTarget(rootLike = null) {
     const root = rootLike?.find ? rootLike[0] : rootLike;
     const elementRoot = root instanceof HTMLElement
@@ -12232,6 +12255,13 @@ class BloodmanItemSheet extends BaseItemSheet {
 
   activateListeners(html) {
     super.activateListeners(html);
+    const audioPickerButtons = html.find(".bm-item-audio-field .file-picker");
+    audioPickerButtons.off("click");
+    audioPickerButtons.on("click", ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.openItemAudioFilePicker();
+    });
     this.activatePricePreviewListeners(html);
     this.connectResponsiveSheetScaleObserver(html);
     this.refreshItemSheetAutoGrowTextareas(html);
