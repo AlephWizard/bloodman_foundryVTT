@@ -3737,3 +3737,93 @@
   color: #000000 !important;
   -webkit-text-fill-color: #000000 !important;
 }
+
+/* UX polish: stronger affordance without changing sheet data or actions. */
+.bloodman-sheet {
+  --bm-actor-focus: #c8372e;
+  --bm-actor-focus-glow: rgba(200, 55, 46, 0.24);
+  --bm-actor-row-focus: rgba(200, 55, 46, 0.1);
+}
+
+.bloodman-sheet.npc-sheet {
+  --bm-actor-focus: #52677c;
+  --bm-actor-focus-glow: rgba(82, 103, 124, 0.26);
+  --bm-actor-row-focus: rgba(82, 103, 124, 0.12);
+}
+
+.bloodman-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="image"]):not([readonly]):not(:disabled):hover,
+.bloodman-sheet textarea:not([readonly]):not(:disabled):hover,
+.bloodman-sheet select:not(:disabled):hover {
+  border-color: var(--bm-actor-focus) !important;
+}
+
+.bloodman-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="image"]):focus-visible,
+.bloodman-sheet textarea:focus-visible,
+.bloodman-sheet select:focus-visible,
+.bloodman-sheet button:focus-visible,
+.bloodman-sheet .sheet-tabs .item:focus-visible,
+.bloodman-sheet .char-roll:focus-visible,
+.bloodman-sheet .item-edit:focus-visible,
+.bloodman-sheet .weapon-roll:focus-visible,
+.bloodman-sheet .ability-roll:focus-visible {
+  outline: 2px solid var(--bm-actor-focus) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px var(--bm-actor-focus-glow) !important;
+}
+
+.bloodman-sheet .item.item--stacked {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.bloodman-sheet .item.item--stacked:focus-within {
+  background: var(--bm-actor-row-focus);
+  border-bottom-color: var(--bm-actor-focus);
+  box-shadow: inset 3px 0 0 var(--bm-actor-focus);
+}
+
+.bloodman-sheet .item-name.item-edit {
+  cursor: pointer;
+}
+
+.bloodman-sheet .item-name.item-edit:hover,
+.bloodman-sheet .item-name.item-edit:focus-visible {
+  color: #000000;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+.bloodman-sheet.characteristics-edit-active .characteristics-card {
+  box-shadow:
+    0 0 0 2px rgba(200, 55, 46, 0.22),
+    0 10px 18px rgba(0, 0, 0, 0.1);
+}
+
+.bloodman-sheet.characteristics-edit-active .char-base-input:not([readonly]) {
+  animation: bm-edit-ready-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes bm-edit-ready-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(200, 55, 46, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px rgba(200, 55, 46, 0.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloodman-sheet *,
+  .bloodman-sheet *::before,
+  .bloodman-sheet *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}

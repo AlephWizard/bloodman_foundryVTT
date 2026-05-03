@@ -1527,3 +1527,69 @@
 .bloodman-item.bm-item-sheet.bm-item-unified[data-bm-layout="stacked"] .bonus-grid-compact {
   grid-template-columns: 1fr;
 }
+
+/* UX polish: item sheets keep their dark identity while making active zones obvious. */
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section::after,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--bm-item-accent);
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:focus-within,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel:focus-within,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry:focus-within {
+  border-color: var(--bm-item-accent);
+  box-shadow:
+    0 0 0 2px var(--bm-item-accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-input:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-textarea:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified input[type="number"]:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified select:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified button:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option input:focus-visible {
+  outline: 2px solid var(--bm-item-accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px var(--bm-item-accent-glow) !important;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title {
+  text-wrap: balance;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-open:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-open:focus-visible {
+  color: var(--bm-item-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloodman-item.bm-item-sheet.bm-item-unified *,
+  .bloodman-item.bm-item-sheet.bm-item-unified *::before,
+  .bloodman-item.bm-item-sheet.bm-item-unified *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
