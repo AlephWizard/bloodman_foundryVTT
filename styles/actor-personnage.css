@@ -660,9 +660,15 @@
 
 .equipment-card .equip-block {
   margin-top: 0;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.equipment-card .equip-block-ammo {
+  gap: 3px;
 }
 
 .equipment-card .weapon-header-row,
@@ -1466,20 +1472,27 @@
 
 .ammo-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto 90px;
+  grid-template-columns: 18px minmax(0, 1fr) auto 52px;
   column-gap: 4px;
   row-gap: 2px;
-  margin-top: 4px;
+  margin-top: 0;
   align-items: center;
+  min-width: 0;
+  width: min(100%, 330px);
+  max-width: 100%;
 }
 
 .ammo-lines {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ammo-line {
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ammo-line-toolbar {
@@ -1487,6 +1500,31 @@
   align-items: center;
   gap: 4px;
   margin-left: auto;
+}
+
+.equip-title .ammo-line-toolbar {
+  gap: 3px;
+}
+
+.equip-block-ammo .equip-title {
+  height: 20px;
+  min-height: 20px;
+  max-height: 20px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 14px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.equip-block-ammo .equip-title-label {
+  min-width: 0;
+  line-height: 14px;
+}
+
+.equip-block-ammo .ammo-line-toolbar {
+  flex: 0 0 auto;
+  height: 12px;
 }
 
 .ammo-line-toolbar-button {
@@ -1501,14 +1539,24 @@
   line-height: 1;
 }
 
+.equip-title .ammo-line-toolbar-button {
+  min-width: 12px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 10px;
+}
+
 .ammo-line-toolbar-button:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
 .ammo-line-select {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   padding: 0;
   border: 1px solid #1b1b1b;
   border-radius: 999px;
@@ -1528,8 +1576,8 @@
   display: inline-flex;
   justify-content: flex-end;
   align-items: center;
-  min-height: 18px;
-  font-size: 11px;
+  min-height: 16px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -1539,6 +1587,7 @@
 
 .ammo-row input,
 .ammo-row textarea {
+  min-width: 0;
   width: 100%;
   position: relative;
   z-index: 1;
@@ -1546,8 +1595,8 @@
 
 .equipment-card .ammo-row textarea.equip-autogrow-field[data-autogrow="true"],
 .equipment-card .ammo-row input {
-  min-height: 23px;
-  height: 23px;
+  min-height: 20px;
+  height: 20px;
   padding-top: 2px;
   padding-bottom: 2px;
   line-height: 1.1;
@@ -1559,10 +1608,11 @@
 }
 
 .ammo-line-empty {
-  margin: 2px 0 0 22px;
-  font-size: 11px;
+  margin: 0 0 0 22px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.2px;
+  line-height: 1.05;
   color: #7d1616;
 }
 
