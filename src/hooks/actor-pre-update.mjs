@@ -59,8 +59,6 @@ export function buildActorPreUpdateHooks({
     if (imageUpdatePlan.applyPrototypeAndTokenImages) {
       const nextActorImage = imageUpdatePlan.nextActorImage;
       foundry.utils.setProperty(updateData, "prototypeToken.texture.src", nextActorImage);
-      foundry.utils.setProperty(updateData, "prototypeToken.img", nextActorImage);
-      foundry.utils.setProperty(updateData, "token.img", nextActorImage);
     }
 
     const allowCharacteristicBase = Boolean(options?.bloodmanAllowCharacteristicBase);
@@ -236,7 +234,7 @@ export function buildActorPreUpdateHooks({
     } else if (voyageUpdatePlan.kind === "remove") {
       const pathsToStrip = Array.isArray(voyageUpdatePlan.pathsToStrip) ? voyageUpdatePlan.pathsToStrip : [];
       if (pathsToStrip.length) stripUpdatePaths(updateData, pathsToStrip);
-      updateData[VOYAGE_RESOURCE_PATHS.remove] = null;
+      foundry.utils.setProperty(updateData, VOYAGE_RESOURCE_PATHS.remove, null);
     }
   }
 

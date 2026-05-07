@@ -2982,18 +2982,17 @@ async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
 
 const ACTOR_TOKEN_IMAGE_UPDATE_PATHS = [
   "img",
-  "prototypeToken.texture.src",
-  "prototypeToken.img",
-  "token.img"
+  "prototypeToken.texture.src"
 ];
 const TOKEN_IMAGE_UPDATE_PATHS = [
-  "texture.src",
-  "img"
+  "texture.src"
 ];
 
 const SYSTEM_ID = "bloodman";
 const SYSTEM_ROOT_PATH = `systems/${SYSTEM_ID}`;
 const SYSTEM_SOCKET = `system.${SYSTEM_ID}`;
+const PLAYER_ACTOR_TYPE = "personnage";
+const NPC_ACTOR_TYPE = "personnage-non-joueur";
 const CHAOS_DICE_ICON_SRC = `${SYSTEM_ROOT_PATH}/images/d20_destin.svg`;
 const CHAOS_DICE_ICON_FALLBACK_SRC = "icons/svg/d20.svg";
 const CARRIED_ITEMS_PER_MAIN_COLUMN = 5;
@@ -3001,7 +3000,7 @@ const CARRIED_MAIN_COLUMN_COUNT = 2;
 const CARRIED_BAG_COLUMN_COUNT = 1;
 const CARRIED_ITEM_LIMIT_BASE = CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_MAIN_COLUMN_COUNT;
 const CARRIED_ITEM_LIMIT_WITH_BAG = CARRIED_ITEM_LIMIT_BASE + (CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_BAG_COLUMN_COUNT);
-const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set(["personnage", "personnage-non-joueur"]);
+const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set([PLAYER_ACTOR_TYPE, NPC_ACTOR_TYPE]);
 const CARRIED_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
 const BAG_ZONE_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
 const ITEM_LINK_SUPPORTED_TYPES = new Set(["arme", "objet", "protection", "ration", "soin", "aptitude", "pouvoir"]);
@@ -3045,6 +3044,10 @@ const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin",
 const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
 const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
 const CHAOS_DICE_PANEL_POSITION_SETTING = "chaosDicePanelPosition";
+const CHAOS_DICE_VALUE_SETTING = "chaosDice";
+const INTERNAL_CANVAS_PATCHES_SETTING = "enableInternalCanvasPatches";
+const STARTUP_NORMALIZATION_SETTING = "startupNormalizationVersion";
+const STARTUP_NORMALIZATION_TARGET_VERSION = 1;
 const CURRENCY_CURRENT_MAX = 1_000_000;
 const VITAL_RESOURCE_PATHS = new Set([
   "system.resources.pv.current",
@@ -3123,6 +3126,77 @@ let TOKEN_HUD_DOM_SYNC_FRAME = null;
 
 function toFiniteNumber(value, fallback = 0) {
   return ruleToFiniteNumber(value, fallback);
+}
+
+function areInternalCanvasPatchesEnabled() {
+  try {
+    return game.settings.get(SYSTEM_ID, INTERNAL_CANVAS_PATCHES_SETTING) !== false;
+  } catch (_error) {
+    return true;
+  }
+}
+
+function getStoredStartupNormalizationVersion() {
+  try {
+    const raw = Number(game.settings.get(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING));
+    if (!Number.isFinite(raw)) return 0;
+    return Math.max(0, Math.floor(raw));
+  } catch (_error) {
+    return 0;
+  }
+}
+
+function shouldRunStartupNormalization() {
+  return getStoredStartupNormalizationVersion() < STARTUP_NORMALIZATION_TARGET_VERSION;
+}
+
+async function markStartupNormalizationCompleted() {
+  try {
+    await game.settings.set(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING, STARTUP_NORMALIZATION_TARGET_VERSION);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function registerBloodmanRuntimeSettings() {
+  game.settings.register(SYSTEM_ID, CHAOS_DICE_VALUE_SETTING, {
+    name: t("BLOODMAN.Settings.ChaosDiceName"),
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0,
+    onChange: value => {
+      updateChaosDiceUI(typeof value === "number" ? value : Number(value));
+      for (const app of Object.values(ui.windows || {})) {
+        if (app instanceof BloodmanNpcSheet || app instanceof BloodmanNpcSheetV2) app.render(false);
+      }
+    }
+  });
+
+  game.settings.register(SYSTEM_ID, CHAOS_DICE_PANEL_POSITION_SETTING, {
+    name: "Position du panneau des du chaos",
+    scope: "client",
+    config: false,
+    type: Object,
+    default: {}
+  });
+
+  game.settings.register(SYSTEM_ID, INTERNAL_CANVAS_PATCHES_SETTING, {
+    name: "Bloodman internal canvas patches",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING, {
+    name: "Bloodman startup normalization version",
+    scope: "world",
+    config: false,
+    type: Number,
+    default: 0
+  });
 }
 
 function normalizeNonNegativeInteger(value, fallback = 0) {
@@ -3380,6 +3454,11 @@ const {
   buildGrowthUpdateData
 } = growthRollRules;
 
+function isCharacterLikeActorType(actorType) {
+  const normalized = String(actorType || "").trim();
+  return normalized === PLAYER_ACTOR_TYPE || normalized === NPC_ACTOR_TYPE;
+}
+
 const ammoStateRules = createAmmoStateRules({
   normalizeNonNegativeInteger,
   toCheckboxBoolean,
@@ -3532,7 +3611,7 @@ function getSafeTokenTextureFallback(tokenDoc) {
 function getTokenTexturePresentationUpdates(tokenDoc) {
   if (!tokenDoc) return {};
   const actorType = getTokenActorType(tokenDoc);
-  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return {};
+  if (!isCharacterLikeActorType(actorType)) return {};
   const updates = {};
   const scaleX = foundry.utils.getProperty(tokenDoc, "texture.scaleX");
   const scaleY = foundry.utils.getProperty(tokenDoc, "texture.scaleY");
@@ -3593,7 +3672,7 @@ async function repairTokenTextureSource(tokenLike) {
 
 async function syncPrototypeTokenImageFromActorImage(actor) {
   if (!game.user?.isGM) return false;
-  if (!actor || (actor.type !== "personnage" && actor.type !== "personnage-non-joueur")) return false;
+  if (!actor || !isCharacterLikeActorType(actor.type)) return false;
   if (actor.isToken) return false;
 
   const actorImg = String(actor.img || "").trim();
@@ -3604,9 +3683,7 @@ async function syncPrototypeTokenImageFromActorImage(actor) {
   try {
     await actor.update(
       {
-        "prototypeToken.texture.src": nextPrototypeSrc,
-        "prototypeToken.img": nextPrototypeSrc,
-        "token.img": nextPrototypeSrc
+        "prototypeToken.texture.src": nextPrototypeSrc
       },
       { bloodmanSkipPrototypeImageSync: true }
     );
@@ -3618,7 +3695,7 @@ async function syncPrototypeTokenImageFromActorImage(actor) {
 
 async function syncSceneTokenImagesFromActorImage(actor, options = {}) {
   if (!game.user?.isGM) return 0;
-  if (!actor || (actor.type !== "personnage" && actor.type !== "personnage-non-joueur")) return 0;
+  if (!actor || !isCharacterLikeActorType(actor.type)) return 0;
   if (actor.isToken) return 0;
 
   const previousActorImage = String(options.previousActorImage || "").trim();
@@ -3668,7 +3745,7 @@ async function syncActorAndPrototypeImageFromTokenImage(tokenDoc) {
   if (!game.user?.isGM) return false;
   const actor = resolveWorldActorFromTokenDocument(tokenDoc);
   if (!actor) return false;
-  if (actor.type !== "personnage" && actor.type !== "personnage-non-joueur") return false;
+  if (!isCharacterLikeActorType(actor.type)) return false;
 
   const tokenSrc = String(
     foundry.utils.getProperty(tokenDoc, "texture.src")
@@ -3679,18 +3756,14 @@ async function syncActorAndPrototypeImageFromTokenImage(tokenDoc) {
 
   const actorImg = String(actor.img || "").trim();
   const protoSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
-  const legacyProtoImg = String(foundry.utils.getProperty(actor, "prototypeToken.img") || "").trim();
-  const legacyTokenImg = String(foundry.utils.getProperty(actor, "token.img") || "").trim();
-  const needsUpdate = actorImg !== tokenSrc || protoSrc !== tokenSrc || legacyProtoImg !== tokenSrc || legacyTokenImg !== tokenSrc;
+  const needsUpdate = actorImg !== tokenSrc || protoSrc !== tokenSrc;
   if (!needsUpdate) return false;
 
   try {
     await actor.update(
       {
         img: tokenSrc,
-        "prototypeToken.texture.src": tokenSrc,
-        "prototypeToken.img": tokenSrc,
-        "token.img": tokenSrc
+        "prototypeToken.texture.src": tokenSrc
       },
       { bloodmanSkipPrototypeImageSync: true, bloodmanSkipSceneTokenImageSync: true }
     );
@@ -5115,33 +5188,24 @@ function injectCreateTypeIconsFromHook(htmlLike, sourceHook = "unknown") {
   }
 }
 
-Hooks.on("renderDialog", (_app, html) => {
-  injectCreateTypeIconsFromHook(html, "renderDialog");
-});
+function registerCreateTypeIconRenderHooks() {
+  const hookBindings = [
+    ["renderDialog", "renderDialog"],
+    ["renderApplication", "renderApplication"],
+    ["renderApplicationV1", "renderApplicationV1"],
+    ["renderApplicationV2", "renderApplicationV2"],
+    ["renderDocumentCreateDialog", "renderDocumentCreateDialog"],
+    ["renderDocumentCreateDialogV1", "renderDocumentCreateDialogV1"],
+    ["renderDocumentCreateDialogV2", "renderDocumentCreateDialogV2"]
+  ];
+  for (const [hookName, sourceHook] of hookBindings) {
+    Hooks.on(hookName, (_app, htmlLike) => {
+      injectCreateTypeIconsFromHook(htmlLike, sourceHook);
+    });
+  }
+}
 
-Hooks.on("renderApplication", (_app, html) => {
-  injectCreateTypeIconsFromHook(html, "renderApplication");
-});
-
-Hooks.on("renderApplicationV1", (_app, html) => {
-  injectCreateTypeIconsFromHook(html, "renderApplicationV1");
-});
-
-Hooks.on("renderApplicationV2", (_app, element) => {
-  injectCreateTypeIconsFromHook(element, "renderApplicationV2");
-});
-
-Hooks.on("renderDocumentCreateDialog", (_app, html) => {
-  injectCreateTypeIconsFromHook(html, "renderDocumentCreateDialog");
-});
-
-Hooks.on("renderDocumentCreateDialogV1", (_app, html) => {
-  injectCreateTypeIconsFromHook(html, "renderDocumentCreateDialogV1");
-});
-
-Hooks.on("renderDocumentCreateDialogV2", (_app, element) => {
-  injectCreateTypeIconsFromHook(element, "renderDocumentCreateDialogV2");
-});
+registerCreateTypeIconRenderHooks();
 
 const canvasReadyHooks = buildCanvasReadyHooks({
   installTokenEffectBackgroundPatch,
@@ -5150,10 +5214,12 @@ const canvasReadyHooks = buildCanvasReadyHooks({
   scheduleTokenHudDomEnhancement,
   applyTransparentTokenEffectBackground,
   refreshBossSoloNpcPvMax,
-  repairTokenTextureSource
+  repairTokenTextureSource,
+  shouldApplyTokenHudPatches: areInternalCanvasPatchesEnabled
 });
 
 Hooks.on("renderTokenHUD", (hud, html) => {
+  if (!areInternalCanvasPatchesEnabled()) return;
   try {
     configureTokenHudEnhancements(hud, html);
   } catch (error) {
@@ -5166,11 +5232,16 @@ Hooks.on("canvasReady", async () => {
 });
 
 Hooks.on("controlToken", () => {
+  if (!areInternalCanvasPatchesEnabled()) return;
   scheduleTokenHudDomEnhancement();
 });
 
 Hooks.once("ready", () => {
   initializeBloodmanLoggerFromSettings();
+  if (!areInternalCanvasPatchesEnabled()) {
+    bmLog.info("HUD patch build disabled by world setting");
+    return;
+  }
   bmLog.info("HUD patch build 2026-02-13-b loaded");
   installTokenEffectBackgroundPatch();
   void ensureTokenHudLocalSvgIcons({ copyMissing: true, force: true }).then(() => {
@@ -5193,35 +5264,12 @@ Hooks.once("init", () => {
     foundryVersion: foundryVersion(),
     generation: getFoundryGeneration()
   });
-  installTokenEffectBackgroundPatch();
-  installTokenHudRenderPatch();
 
   registerBloodmanSupplementalStatusEffects(
     CONFIG.statusEffects,
     buildBloodmanSupplementalStatusEffects({ systemRootPath: SYSTEM_ROOT_PATH })
   );
-
-  game.settings.register("bloodman", "chaosDice", {
-    name: t("BLOODMAN.Settings.ChaosDiceName"),
-    scope: "world",
-    config: false,
-    type: Number,
-    default: 0,
-    onChange: value => {
-      updateChaosDiceUI(typeof value === "number" ? value : Number(value));
-      for (const app of Object.values(ui.windows || {})) {
-        if (app instanceof BloodmanNpcSheet || app instanceof BloodmanNpcSheetV2) app.render(false);
-      }
-    }
-  });
-
-  game.settings.register("bloodman", CHAOS_DICE_PANEL_POSITION_SETTING, {
-    name: "Position du panneau des du chaos",
-    scope: "client",
-    config: false,
-    type: Object,
-    default: {}
-  });
+  registerBloodmanRuntimeSettings();
 
   const actorSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanActorSheetV2 : BloodmanActorSheet;
   const npcSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanNpcSheetV2 : BloodmanNpcSheet;
@@ -5249,7 +5297,7 @@ Hooks.once("init", () => {
 
     combatantDoc.prototype._getInitiativeFormula = function () {
       const actor = getCombatantActor(this);
-      if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
+      if (isCharacterLikeActorType(actor?.type)) {
         return getInitiativeFormulaForActor(actor);
       }
       const fallback = typeof originalGetFormula === "function" ? originalGetFormula.call(this) : "0";
@@ -5260,7 +5308,7 @@ Hooks.once("init", () => {
       const RollClass = getRollClass();
       if (typeof RollClass !== "function") return null;
       const actor = getCombatantActor(this);
-      if (actor?.type === "personnage" || actor?.type === "personnage-non-joueur") {
+      if (isCharacterLikeActorType(actor?.type)) {
         return new RollClass(getInitiativeFormulaForActor(actor));
       }
       if (typeof originalGetInitiativeRoll === "function") {
@@ -5271,6 +5319,272 @@ Hooks.once("init", () => {
     };
   }
 });
+
+async function applyStartupActorNormalization(actor) {
+  if (!actor?.isOwner) return;
+  const isCharacter = actor.type === PLAYER_ACTOR_TYPE;
+  const isNpc = actor.type === NPC_ACTOR_TYPE;
+  if (!isCharacter && !isNpc) return;
+
+  const updates = {};
+
+  if (!actor.system.characteristics) {
+    updates["system.characteristics"] = buildDefaultCharacteristics();
+  } else {
+    for (const characteristicDefinition of CHARACTERISTICS) {
+      const characteristicXp = actor.system.characteristics?.[characteristicDefinition.key]?.xp;
+      if (!Array.isArray(characteristicXp)) {
+        updates[`system.characteristics.${characteristicDefinition.key}.xp`] = [false, false, false];
+      }
+    }
+  }
+
+  if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
+
+  const currentEquipment = foundry.utils.mergeObject(buildDefaultEquipment(), actor.system.equipment || {}, {
+    inplace: false
+  });
+  const normalizedCurrencyCurrent = normalizeCurrencyCurrentValue(currentEquipment.monnaiesActuel, 0);
+  const safeCurrencyCurrent = normalizedCurrencyCurrent.ok ? normalizedCurrencyCurrent.value : 0;
+  const normalizedCurrencyType = String(currentEquipment.monnaies ?? "").trim();
+  if (!actor.system.equipment) {
+    updates["system.equipment"] = {
+      ...currentEquipment,
+      monnaies: normalizedCurrencyType,
+      monnaiesActuel: safeCurrencyCurrent
+    };
+  } else {
+    const storedCurrencyType = String(actor.system.equipment?.monnaies ?? "").trim();
+    const storedCurrencyCurrent = normalizeCurrencyCurrentValue(actor.system.equipment?.monnaiesActuel, 0).value;
+    if (storedCurrencyType !== normalizedCurrencyType) {
+      updates["system.equipment.monnaies"] = normalizedCurrencyType;
+    }
+    if (!validateNumericEquality(storedCurrencyCurrent, safeCurrencyCurrent)) {
+      updates["system.equipment.monnaiesActuel"] = safeCurrencyCurrent;
+    }
+  }
+
+  const actorResources = actor.system.resources || {};
+  const requiresResourceInit = !actor.system.resources
+    || actorResources.move == null
+    || (isCharacter && actorResources.voyage == null);
+  const moveGauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
+  if (requiresResourceInit) {
+    const mergedResources = foundry.utils.mergeObject(
+      buildDefaultResources({ includeVoyage: isCharacter }),
+      actorResources,
+      { inplace: false }
+    );
+    if (isCharacter) {
+      const rawVoyageCurrent = toFiniteNumber(mergedResources.voyage?.current, 0);
+      const rawVoyageTotal = toFiniteNumber(mergedResources.voyage?.total ?? mergedResources.voyage?.max, 0);
+      const normalizedVoyageTotal = normalizeNonNegativeInteger(rawVoyageTotal, 0);
+      const normalizedVoyageCurrent = Math.min(
+        normalizeNonNegativeInteger(rawVoyageCurrent, 0),
+        normalizedVoyageTotal
+      );
+      mergedResources.voyage = {
+        current: normalizedVoyageCurrent,
+        total: normalizedVoyageTotal,
+        max: normalizedVoyageTotal
+      };
+    } else if (mergedResources.voyage != null) {
+      delete mergedResources.voyage;
+    }
+    mergedResources.move = mergedResources.move || {};
+    mergedResources.move.value = moveGauge.value;
+    mergedResources.move.max = moveGauge.max;
+    updates["system.resources"] = mergedResources;
+  } else {
+    const storedMoveValue = Number(actorResources.move?.value);
+    const storedMoveMax = Number(actorResources.move?.max);
+    const hasStoredMoveMax = actorResources.move?.max != null;
+    if (!hasStoredMoveMax || !validateNumericEquality(storedMoveValue, moveGauge.value) || !validateNumericEquality(storedMoveMax, moveGauge.max)) {
+      updates["system.resources.move.value"] = moveGauge.value;
+      updates["system.resources.move.max"] = moveGauge.max;
+    }
+  }
+  if (isCharacter) {
+    const rawVoyageCurrent = toFiniteNumber(actorResources.voyage?.current, 0);
+    const rawVoyageTotal = toFiniteNumber(actorResources.voyage?.total ?? actorResources.voyage?.max, 0);
+    const normalizedVoyageTotal = normalizeNonNegativeInteger(rawVoyageTotal, 0);
+    const normalizedVoyageCurrent = Math.min(
+      normalizeNonNegativeInteger(rawVoyageCurrent, 0),
+      normalizedVoyageTotal
+    );
+    if (
+      actorResources.voyage == null
+      || actorResources.voyage.total == null
+      || actorResources.voyage.max == null
+      || rawVoyageCurrent !== normalizedVoyageCurrent
+      || rawVoyageTotal !== normalizedVoyageTotal
+    ) {
+      updates["system.resources.voyage.current"] = normalizedVoyageCurrent;
+      updates["system.resources.voyage.total"] = normalizedVoyageTotal;
+      updates["system.resources.voyage.max"] = normalizedVoyageTotal;
+    }
+  }
+  if (isNpc && actorResources.voyage != null) {
+    updates["system.resources.voyage"] = null;
+  }
+
+  const mergedProfile = foundry.utils.mergeObject(
+    buildDefaultProfile(),
+    actor.system.profile || {},
+    { inplace: false }
+  );
+  const normalizedArchetypeBonusValue = normalizeArchetypeBonusValue(mergedProfile.archetypeBonusValue, 0);
+  const normalizedArchetypeBonusCharacteristic = normalizeCharacteristicKey(mergedProfile.archetypeBonusCharacteristic);
+  mergedProfile.archetypeBonusValue = Number.isFinite(normalizedArchetypeBonusValue)
+    ? normalizedArchetypeBonusValue
+    : 0;
+  mergedProfile.archetypeBonusCharacteristic = normalizedArchetypeBonusCharacteristic;
+  if (
+    !actor.system.profile
+    || normalizeArchetypeBonusValue(actor.system.profile?.archetypeBonusValue, 0) !== mergedProfile.archetypeBonusValue
+    || normalizeCharacteristicKey(actor.system.profile?.archetypeBonusCharacteristic) !== mergedProfile.archetypeBonusCharacteristic
+  ) {
+    updates["system.profile"] = mergedProfile;
+  }
+
+  const { ammoPool, ammoActiveIndex, ammo: normalizedAmmo } = getActorAmmoPoolState(actor);
+  if (!Array.isArray(actor.system?.ammoPool) || !areAmmoPoolStatesEqual(actor.system?.ammoPool, ammoPool)) {
+    updates["system.ammoPool"] = ammoPool;
+  }
+  if (toFiniteNumber(actor.system?.ammoActiveIndex, 0) !== ammoActiveIndex) {
+    updates["system.ammoActiveIndex"] = ammoActiveIndex;
+  }
+  const hasAmmoShape = actor.system?.ammo
+    && actor.system.ammo.stock != null
+    && actor.system.ammo.magazine != null
+    && actor.system.ammo.value != null;
+  if (!hasAmmoShape || !areAmmoStatesEqual(actor.system?.ammo, normalizedAmmo)) {
+    updates["system.ammo"] = normalizedAmmo;
+  }
+  if (actor.prototypeToken) {
+    if (isCharacter && actor.prototypeToken.actorLink === false) {
+      updates["prototypeToken.actorLink"] = true;
+    }
+    if (isNpc && actor.prototypeToken.actorLink !== false) {
+      updates["prototypeToken.actorLink"] = false;
+    }
+    const protoScaleX = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleX");
+    const protoScaleY = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleY");
+    const protoOffsetX = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetX");
+    const protoOffsetY = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetY");
+    const protoFit = foundry.utils.getProperty(actor.prototypeToken, "texture.fit");
+    if (shouldResetTokenScale(protoScaleX)) updates["prototypeToken.texture.scaleX"] = 1;
+    if (shouldResetTokenScale(protoScaleY)) updates["prototypeToken.texture.scaleY"] = 1;
+    if (shouldResetTokenOffset(protoOffsetX)) updates["prototypeToken.texture.offsetX"] = 0;
+    if (shouldResetTokenOffset(protoOffsetY)) updates["prototypeToken.texture.offsetY"] = 0;
+    if (shouldResetTokenFit(protoFit)) updates["prototypeToken.texture.fit"] = "fill";
+    const protoSrc = foundry.utils.getProperty(actor.prototypeToken, "texture.src");
+    if (await needsTokenImageRepair(protoSrc)) {
+      const actorImgValid = actor.img ? await canLoadTextureSource(actor.img) : false;
+      const nextProtoSrc = actorImgValid ? actor.img : "icons/svg/mystery-man.svg";
+      if (nextProtoSrc && nextProtoSrc !== protoSrc) updates["prototypeToken.texture.src"] = nextProtoSrc;
+    }
+  }
+
+  if (Object.keys(updates).length) await actor.update(updates);
+  await applyItemResourceBonuses(actor);
+  await syncActorDerivedCharacteristicsResources(actor);
+}
+
+async function applyStartupActorItemNormalization(actor) {
+  for (const item of actor.items) {
+    if (isVoyageXPCostItemType(item.type)) {
+      const rawCost = item.system?.xpVoyageCost;
+      const numericCost = Number(rawCost);
+      const normalizedCost = normalizeNonNegativeInteger(rawCost, 0);
+      if (rawCost == null || !Number.isFinite(numericCost) || numericCost !== normalizedCost) {
+        await item.update({ "system.xpVoyageCost": normalizedCost });
+      }
+      continue;
+    }
+    if (item.type !== "arme") continue;
+    const weaponUpdates = {};
+    const normalizedWeaponType = normalizeWeaponType(item.system?.weaponType);
+    if (normalizedWeaponType && normalizedWeaponType !== item.system?.weaponType) {
+      weaponUpdates["system.weaponType"] = normalizedWeaponType;
+    }
+    if (!normalizedWeaponType && !item.system?.weaponType) {
+      weaponUpdates["system.weaponType"] = "distance";
+    }
+    const effectiveWeaponType = normalizeWeaponType(
+      weaponUpdates["system.weaponType"] ?? item.system?.weaponType
+    ) || "distance";
+    const rawMagazineCapacity = Number(item.system?.magazineCapacity);
+    const magazineCapacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
+    if (!Number.isFinite(rawMagazineCapacity) || rawMagazineCapacity < 0 || rawMagazineCapacity !== Math.floor(rawMagazineCapacity)) {
+      weaponUpdates["system.magazineCapacity"] = magazineCapacity;
+    }
+    const infiniteAmmo = toCheckboxBoolean(item.system?.infiniteAmmo, false);
+    const consumesAmmo = getWeaponCategory(effectiveWeaponType) === "distance" && !infiniteAmmo;
+    const usesMagazine = consumesAmmo && magazineCapacity > 0;
+    const normalizedLoadedAmmo = normalizeWeaponLoadedAmmoValue(
+      item.system?.loadedAmmo,
+      actor.system?.ammo?.magazine ?? 0,
+      usesMagazine ? magazineCapacity : 0
+    );
+    const hasStoredLoadedAmmo = foundry.utils.getProperty(item, "system.loadedAmmo") != null;
+    const rawLoadedAmmo = Number(item.system?.loadedAmmo);
+    if (!hasStoredLoadedAmmo || !Number.isFinite(rawLoadedAmmo) || rawLoadedAmmo !== normalizedLoadedAmmo) {
+      weaponUpdates["system.loadedAmmo"] = normalizedLoadedAmmo;
+    }
+    if (Object.keys(weaponUpdates).length) {
+      await item.update(weaponUpdates);
+    }
+  }
+}
+
+async function applyStartupCombatantNameNormalization() {
+  for (const combat of game.combats || []) {
+    for (const combatant of combat.combatants || []) {
+      const name = getCombatantDisplayName(combatant);
+      if (name && name !== combatant.name) {
+        await combatant.update({ name });
+      }
+    }
+  }
+}
+
+async function applyStartupSceneTokenNormalization() {
+  for (const scene of game.scenes) {
+    for (const token of scene.tokens) {
+      const actorType = getTokenActorType(token);
+      const tokenUpdates = {};
+      if (actorType === PLAYER_ACTOR_TYPE && !token.actorLink) tokenUpdates.actorLink = true;
+      if (actorType === NPC_ACTOR_TYPE && token.actorLink) tokenUpdates.actorLink = false;
+      if (isCharacterLikeActorType(actorType)) {
+        const tokenActor = token.actor || game.actors?.get(token.actorId) || null;
+        const tokenSrc = foundry.utils.getProperty(token, "texture.src");
+        if (await needsTokenImageRepair(tokenSrc)) {
+          const actorImg = tokenActor?.img || "";
+          const actorImgValid = actorImg ? await canLoadTextureSource(actorImg) : false;
+          const nextTokenSrc = actorImgValid ? actorImg : "icons/svg/mystery-man.svg";
+          if (nextTokenSrc && nextTokenSrc !== tokenSrc) tokenUpdates["texture.src"] = nextTokenSrc;
+        }
+        if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
+        const pvCurrent = getTokenCurrentPv(token);
+        if (Number.isFinite(pvCurrent)) await syncZeroPvStatusForToken(token, actorType, pvCurrent);
+        continue;
+      }
+      if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
+    }
+  }
+}
+
+async function runStartupNormalizationPass() {
+  for (const actor of game.actors) {
+    await applyStartupActorNormalization(actor);
+    await applyStartupActorItemNormalization(actor);
+  }
+  await applyStartupCombatantNameNormalization();
+  await applyStartupSceneTokenNormalization();
+  await refreshBossSoloNpcPvMax();
+  await markStartupNormalizationCompleted();
+}
 
 Hooks.once("ready", async () => {
   try {
@@ -5307,258 +5621,17 @@ Hooks.once("ready", async () => {
     bmLog.error("migration runner failed", { error });
   }
   if (!game.user?.isGM) return;
-
-  for (const actor of game.actors) {
-    if (!actor.isOwner) continue;
-    const isCharacter = actor.type === "personnage";
-    const isNpc = actor.type === "personnage-non-joueur";
-    if (!isCharacter && !isNpc) continue;
-
-    const updates = {};
-
-    if (!actor.system.characteristics) {
-      updates["system.characteristics"] = buildDefaultCharacteristics();
-    } else {
-      for (const c of CHARACTERISTICS) {
-        const xp = actor.system.characteristics?.[c.key]?.xp;
-        if (!Array.isArray(xp)) updates[`system.characteristics.${c.key}.xp`] = [false, false, false];
-      }
-    }
-
-    if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
-
-    const currentEquipment = foundry.utils.mergeObject(buildDefaultEquipment(), actor.system.equipment || {}, {
-      inplace: false
+  const runStartupNormalization = shouldRunStartupNormalization();
+  if (!runStartupNormalization) {
+    bmLog.info("startup normalization skipped", {
+      storedVersion: getStoredStartupNormalizationVersion(),
+      targetVersion: STARTUP_NORMALIZATION_TARGET_VERSION
     });
-    const normalizedCurrencyCurrent = normalizeCurrencyCurrentValue(currentEquipment.monnaiesActuel, 0);
-    const safeCurrencyCurrent = normalizedCurrencyCurrent.ok ? normalizedCurrencyCurrent.value : 0;
-    const normalizedCurrencyType = String(currentEquipment.monnaies ?? "").trim();
-    if (!actor.system.equipment) {
-      updates["system.equipment"] = {
-        ...currentEquipment,
-        monnaies: normalizedCurrencyType,
-        monnaiesActuel: safeCurrencyCurrent
-      };
-    } else {
-      const storedCurrencyType = String(actor.system.equipment?.monnaies ?? "").trim();
-      const storedCurrencyCurrent = normalizeCurrencyCurrentValue(actor.system.equipment?.monnaiesActuel, 0).value;
-      if (storedCurrencyType !== normalizedCurrencyType) {
-        updates["system.equipment.monnaies"] = normalizedCurrencyType;
-      }
-      if (!validateNumericEquality(storedCurrencyCurrent, safeCurrencyCurrent)) {
-        updates["system.equipment.monnaiesActuel"] = safeCurrencyCurrent;
-      }
-    }
-
-    const actorResources = actor.system.resources || {};
-    const requiresResourceInit = !actor.system.resources
-      || actorResources.move == null
-      || (isCharacter && actorResources.voyage == null);
-    const moveGauge = normalizeActorMoveGauge(actor, { initializeWhenMissing: true });
-    if (requiresResourceInit) {
-      const mergedResources = foundry.utils.mergeObject(
-        buildDefaultResources({ includeVoyage: isCharacter }),
-        actorResources,
-        { inplace: false }
-      );
-      if (isCharacter) {
-        const rawVoyageCurrent = toFiniteNumber(mergedResources.voyage?.current, 0);
-        const rawVoyageTotal = toFiniteNumber(mergedResources.voyage?.total ?? mergedResources.voyage?.max, 0);
-        const normalizedVoyageTotal = normalizeNonNegativeInteger(rawVoyageTotal, 0);
-        const normalizedVoyageCurrent = Math.min(
-          normalizeNonNegativeInteger(rawVoyageCurrent, 0),
-          normalizedVoyageTotal
-        );
-        mergedResources.voyage = {
-          current: normalizedVoyageCurrent,
-          total: normalizedVoyageTotal,
-          max: normalizedVoyageTotal
-        };
-      } else if (mergedResources.voyage != null) {
-        delete mergedResources.voyage;
-      }
-      mergedResources.move = mergedResources.move || {};
-      mergedResources.move.value = moveGauge.value;
-      mergedResources.move.max = moveGauge.max;
-      updates["system.resources"] = mergedResources;
-    } else {
-      const storedMoveValue = Number(actorResources.move?.value);
-      const storedMoveMax = Number(actorResources.move?.max);
-      const hasStoredMoveMax = actorResources.move?.max != null;
-      if (!hasStoredMoveMax || !validateNumericEquality(storedMoveValue, moveGauge.value) || !validateNumericEquality(storedMoveMax, moveGauge.max)) {
-        updates["system.resources.move.value"] = moveGauge.value;
-        updates["system.resources.move.max"] = moveGauge.max;
-      }
-    }
-    if (isCharacter) {
-      const rawVoyageCurrent = toFiniteNumber(actorResources.voyage?.current, 0);
-      const rawVoyageTotal = toFiniteNumber(actorResources.voyage?.total ?? actorResources.voyage?.max, 0);
-      const normalizedVoyageTotal = normalizeNonNegativeInteger(rawVoyageTotal, 0);
-      const normalizedVoyageCurrent = Math.min(
-        normalizeNonNegativeInteger(rawVoyageCurrent, 0),
-        normalizedVoyageTotal
-      );
-      if (
-        actorResources.voyage == null
-        || actorResources.voyage.total == null
-        || actorResources.voyage.max == null
-        || rawVoyageCurrent !== normalizedVoyageCurrent
-        || rawVoyageTotal !== normalizedVoyageTotal
-      ) {
-        updates["system.resources.voyage.current"] = normalizedVoyageCurrent;
-        updates["system.resources.voyage.total"] = normalizedVoyageTotal;
-        updates["system.resources.voyage.max"] = normalizedVoyageTotal;
-      }
-    }
-    if (isNpc && actorResources.voyage != null) {
-      updates["system.resources.-=voyage"] = null;
-    }
-
-    const mergedProfile = foundry.utils.mergeObject(
-      buildDefaultProfile(),
-      actor.system.profile || {},
-      { inplace: false }
-    );
-    const normalizedArchetypeBonusValue = normalizeArchetypeBonusValue(mergedProfile.archetypeBonusValue, 0);
-    const normalizedArchetypeBonusCharacteristic = normalizeCharacteristicKey(mergedProfile.archetypeBonusCharacteristic);
-    mergedProfile.archetypeBonusValue = Number.isFinite(normalizedArchetypeBonusValue)
-      ? normalizedArchetypeBonusValue
-      : 0;
-    mergedProfile.archetypeBonusCharacteristic = normalizedArchetypeBonusCharacteristic;
-    if (
-      !actor.system.profile
-      || normalizeArchetypeBonusValue(actor.system.profile?.archetypeBonusValue, 0) !== mergedProfile.archetypeBonusValue
-      || normalizeCharacteristicKey(actor.system.profile?.archetypeBonusCharacteristic) !== mergedProfile.archetypeBonusCharacteristic
-    ) {
-      updates["system.profile"] = mergedProfile;
-    }
-
-    const { ammoPool, ammoActiveIndex, ammo: normalizedAmmo } = getActorAmmoPoolState(actor);
-    if (!Array.isArray(actor.system?.ammoPool) || !areAmmoPoolStatesEqual(actor.system?.ammoPool, ammoPool)) {
-      updates["system.ammoPool"] = ammoPool;
-    }
-    if (toFiniteNumber(actor.system?.ammoActiveIndex, 0) !== ammoActiveIndex) {
-      updates["system.ammoActiveIndex"] = ammoActiveIndex;
-    }
-    const hasAmmoShape = actor.system?.ammo
-      && actor.system.ammo.stock != null
-      && actor.system.ammo.magazine != null
-      && actor.system.ammo.value != null;
-    if (!hasAmmoShape || !areAmmoStatesEqual(actor.system?.ammo, normalizedAmmo)) {
-      updates["system.ammo"] = normalizedAmmo;
-    }
-    if (actor.prototypeToken) {
-      if (isCharacter && actor.prototypeToken.actorLink === false) {
-        updates["prototypeToken.actorLink"] = true;
-      }
-      if (isNpc && actor.prototypeToken.actorLink !== false) {
-        updates["prototypeToken.actorLink"] = false;
-      }
-      const protoScaleX = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleX");
-      const protoScaleY = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleY");
-      const protoOffsetX = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetX");
-      const protoOffsetY = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetY");
-      const protoFit = foundry.utils.getProperty(actor.prototypeToken, "texture.fit");
-      if (shouldResetTokenScale(protoScaleX)) updates["prototypeToken.texture.scaleX"] = 1;
-      if (shouldResetTokenScale(protoScaleY)) updates["prototypeToken.texture.scaleY"] = 1;
-      if (shouldResetTokenOffset(protoOffsetX)) updates["prototypeToken.texture.offsetX"] = 0;
-      if (shouldResetTokenOffset(protoOffsetY)) updates["prototypeToken.texture.offsetY"] = 0;
-      if (shouldResetTokenFit(protoFit)) updates["prototypeToken.texture.fit"] = "fill";
-      const protoSrc = foundry.utils.getProperty(actor.prototypeToken, "texture.src");
-      if (await needsTokenImageRepair(protoSrc)) {
-        const actorImgValid = actor.img ? await canLoadTextureSource(actor.img) : false;
-        const nextProtoSrc = actorImgValid ? actor.img : "icons/svg/mystery-man.svg";
-        if (nextProtoSrc && nextProtoSrc !== protoSrc) updates["prototypeToken.texture.src"] = nextProtoSrc;
-      }
-    }
-
-    if (Object.keys(updates).length) await actor.update(updates);
-    await applyItemResourceBonuses(actor);
-    await syncActorDerivedCharacteristicsResources(actor);
-
-    for (const item of actor.items) {
-      if (isVoyageXPCostItemType(item.type)) {
-        const rawCost = item.system?.xpVoyageCost;
-        const numericCost = Number(rawCost);
-        const normalizedCost = normalizeNonNegativeInteger(rawCost, 0);
-        if (rawCost == null || !Number.isFinite(numericCost) || numericCost !== normalizedCost) {
-          await item.update({ "system.xpVoyageCost": normalizedCost });
-        }
-        continue;
-      }
-      if (item.type !== "arme") continue;
-      const weaponUpdates = {};
-      const normalizedWeaponType = normalizeWeaponType(item.system?.weaponType);
-      if (normalizedWeaponType && normalizedWeaponType !== item.system?.weaponType) {
-        weaponUpdates["system.weaponType"] = normalizedWeaponType;
-      }
-      if (!normalizedWeaponType && !item.system?.weaponType) {
-        weaponUpdates["system.weaponType"] = "distance";
-      }
-      const effectiveWeaponType = normalizeWeaponType(
-        weaponUpdates["system.weaponType"] ?? item.system?.weaponType
-      ) || "distance";
-      const rawMagazineCapacity = Number(item.system?.magazineCapacity);
-      const magazineCapacity = normalizeNonNegativeInteger(item.system?.magazineCapacity, 0);
-      if (!Number.isFinite(rawMagazineCapacity) || rawMagazineCapacity < 0 || rawMagazineCapacity !== Math.floor(rawMagazineCapacity)) {
-        weaponUpdates["system.magazineCapacity"] = magazineCapacity;
-      }
-      const infiniteAmmo = toCheckboxBoolean(item.system?.infiniteAmmo, false);
-      const consumesAmmo = getWeaponCategory(effectiveWeaponType) === "distance" && !infiniteAmmo;
-      const usesMagazine = consumesAmmo && magazineCapacity > 0;
-      const normalizedLoadedAmmo = normalizeWeaponLoadedAmmoValue(
-        item.system?.loadedAmmo,
-        actor.system?.ammo?.magazine ?? 0,
-        usesMagazine ? magazineCapacity : 0
-      );
-      const hasStoredLoadedAmmo = foundry.utils.getProperty(item, "system.loadedAmmo") != null;
-      const rawLoadedAmmo = Number(item.system?.loadedAmmo);
-      if (!hasStoredLoadedAmmo || !Number.isFinite(rawLoadedAmmo) || rawLoadedAmmo !== normalizedLoadedAmmo) {
-        weaponUpdates["system.loadedAmmo"] = normalizedLoadedAmmo;
-      }
-      if (Object.keys(weaponUpdates).length) {
-        await item.update(weaponUpdates);
-      }
-    }
   }
-
+  if (runStartupNormalization) {
+    await runStartupNormalizationPass();
+  }
   ensureChaosDiceUI();
-
-  if (game.user.isGM) {
-    for (const combat of game.combats || []) {
-      for (const combatant of combat.combatants || []) {
-        const name = getCombatantDisplayName(combatant);
-        if (name && name !== combatant.name) {
-          await combatant.update({ name });
-        }
-      }
-    }
-
-    for (const scene of game.scenes) {
-      for (const token of scene.tokens) {
-        const actorType = getTokenActorType(token);
-        const tokenUpdates = {};
-        if (actorType === "personnage" && !token.actorLink) tokenUpdates.actorLink = true;
-        if (actorType === "personnage-non-joueur" && token.actorLink) tokenUpdates.actorLink = false;
-        if (actorType === "personnage" || actorType === "personnage-non-joueur") {
-          const tokenActor = token.actor || game.actors?.get(token.actorId) || null;
-          const tokenSrc = foundry.utils.getProperty(token, "texture.src");
-          if (await needsTokenImageRepair(tokenSrc)) {
-            const actorImg = tokenActor?.img || "";
-            const actorImgValid = actorImg ? await canLoadTextureSource(actorImg) : false;
-            const nextTokenSrc = actorImgValid ? actorImg : "icons/svg/mystery-man.svg";
-            if (nextTokenSrc && nextTokenSrc !== tokenSrc) tokenUpdates["texture.src"] = nextTokenSrc;
-          }
-          if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
-          const pvCurrent = getTokenCurrentPv(token);
-          if (Number.isFinite(pvCurrent)) await syncZeroPvStatusForToken(token, actorType, pvCurrent);
-          continue;
-        }
-        if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
-      }
-    }
-    await refreshBossSoloNpcPvMax();
-  }
 });
 
 function clampChaosValue(value) {
@@ -5567,13 +5640,13 @@ function clampChaosValue(value) {
 }
 
 function getChaosValue() {
-  return clampChaosValue(Number(game.settings.get("bloodman", "chaosDice")));
+  return clampChaosValue(Number(game.settings.get(SYSTEM_ID, CHAOS_DICE_VALUE_SETTING)));
 }
 
 async function setChaosValue(nextValue) {
   if (!game.user.isGM) return;
   const clamped = clampChaosValue(nextValue);
-  await game.settings.set("bloodman", "chaosDice", clamped);
+  await game.settings.set(SYSTEM_ID, CHAOS_DICE_VALUE_SETTING, clamped);
   updateChaosDiceUI(clamped);
 }
 
@@ -5648,7 +5721,7 @@ function getDefaultChaosDicePanelPosition(root) {
 }
 
 function getSavedChaosDicePanelPosition(root) {
-  const saved = game.settings?.get?.("bloodman", CHAOS_DICE_PANEL_POSITION_SETTING) || {};
+  const saved = game.settings?.get?.(SYSTEM_ID, CHAOS_DICE_PANEL_POSITION_SETTING) || {};
   const left = Number(saved.left);
   const top = Number(saved.top);
   if (Number.isFinite(left) && Number.isFinite(top)) return clampChaosDicePanelPosition({ left, top }, root);
@@ -5681,7 +5754,7 @@ function installChaosDicePanelDrag(root) {
 
   let dragState = null;
   const savePosition = async position => {
-    await game.settings.set("bloodman", CHAOS_DICE_PANEL_POSITION_SETTING, {
+    await game.settings.set(SYSTEM_ID, CHAOS_DICE_PANEL_POSITION_SETTING, {
       top: Math.round(position.top),
       left: Math.round(position.left)
     });

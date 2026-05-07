@@ -39,7 +39,7 @@ export function buildDamageSplitPopupHooks({
   const toSafeHtml = typeof escapeHtml === "function"
     ? escapeHtml
     : value => String(value || "");
-  const popupDialogClass = dialogClass || globalThis.foundry?.appv1?.api?.Dialog || globalThis.Dialog;
+  const popupDialogClass = dialogClass || globalThis.Dialog;
   const wasProcessed = typeof wasDamageSplitPopupRequestProcessed === "function"
     ? wasDamageSplitPopupRequestProcessed
     : () => false;
@@ -47,6 +47,17 @@ export function buildDamageSplitPopupHooks({
     ? rememberDamageSplitPopupRequest
     : () => {};
   const warn = typeof logWarn === "function" ? logWarn : () => {};
+
+  function buildDamageSplitObserverLabels() {
+    return {
+      eyebrow: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.ObserverEyebrow", "Suivi MJ"),
+      title: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats"),
+      rolledTotal: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.RolledTotal", "Jet"),
+      allocatedTotal: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.AllocatedTotal", "Total attribue"),
+      targetCount: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.TargetCount", "Cibles"),
+      freeHint: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.FreeHint", "Le total attribue peut etre libre et depasser le jet.")
+    };
+  }
 
   function buildDamageSplitObserverState(data) {
     const actorName = String(data?.actorName || "").trim();
@@ -79,14 +90,7 @@ export function buildDamageSplitPopupHooks({
       sourceDisplay: state.sourceDisplay,
       totalDamage: state.totalDamage,
       allocations: state.allocations,
-      labels: {
-        eyebrow: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.ObserverEyebrow", "Suivi MJ"),
-        title: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats"),
-        rolledTotal: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.RolledTotal", "Jet"),
-        allocatedTotal: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.AllocatedTotal", "Total attribue"),
-        targetCount: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.TargetCount", "Cibles"),
-        freeHint: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.FreeHint", "Le total attribue peut etre libre et depasser le jet.")
-      },
+      labels: buildDamageSplitObserverLabels(),
       editable: false,
       escapeHtml: toSafeHtml
     });
@@ -107,14 +111,7 @@ export function buildDamageSplitPopupHooks({
         sourceDisplay: state.sourceDisplay,
         totalDamage: state.totalDamage,
         allocations: state.allocations,
-        labels: {
-          eyebrow: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.ObserverEyebrow", "Suivi MJ"),
-          title: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.Title", "Repartition des degats"),
-          rolledTotal: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.RolledTotal", "Jet"),
-          allocatedTotal: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.AllocatedTotal", "Total attribue"),
-          targetCount: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.TargetCount", "Cibles"),
-          freeHint: translateWithFallback("BLOODMAN.Dialogs.DamageSplit.FreeHint", "Le total attribue peut etre libre et depasser le jet.")
-        },
+        labels: buildDamageSplitObserverLabels(),
         editable: false,
         escapeHtml: toSafeHtml
       }));

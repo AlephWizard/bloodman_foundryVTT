@@ -5,9 +5,15 @@ export function buildCanvasReadyHooks({
   scheduleTokenHudDomEnhancement,
   applyTransparentTokenEffectBackground,
   refreshBossSoloNpcPvMax,
-  repairTokenTextureSource
+  repairTokenTextureSource,
+  shouldApplyTokenHudPatches
 } = {}) {
+  const canApplyTokenHudPatches = typeof shouldApplyTokenHudPatches === "function"
+    ? shouldApplyTokenHudPatches
+    : () => true;
+
   function applyCanvasReadyTokenHudEnhancements() {
+    if (!canApplyTokenHudPatches()) return;
     installTokenEffectBackgroundPatch();
     installTokenHudRenderPatch();
     installTokenHudDomObserver();
@@ -41,4 +47,3 @@ export function buildCanvasReadyHooks({
     onCanvasReady
   };
 }
-

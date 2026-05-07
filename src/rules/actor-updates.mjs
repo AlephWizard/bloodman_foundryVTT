@@ -11,7 +11,7 @@ const VOYAGE_ROOT_PATH = "system.resources.voyage";
 const VOYAGE_CURRENT_PATH = "system.resources.voyage.current";
 const VOYAGE_TOTAL_PATH = "system.resources.voyage.total";
 const VOYAGE_MAX_PATH = "system.resources.voyage.max";
-const VOYAGE_REMOVE_PATH = "system.resources.-=voyage";
+const VOYAGE_REMOVE_PATH = VOYAGE_ROOT_PATH;
 const VOYAGE_STRIP_PATHS = [
   VOYAGE_ROOT_PATH,
   VOYAGE_CURRENT_PATH,

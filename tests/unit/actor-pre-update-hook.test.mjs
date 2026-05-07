@@ -163,8 +163,8 @@ function run() {
     assert.equal(trackingOptions.bloodmanPreviousActorImage, "actor.webp");
     assert.equal(trackingOptions.bloodmanPreviousPrototypeImage, "token.webp");
     assert.equal(getProperty(updateData, "prototypeToken.texture.src"), "new-actor.webp");
-    assert.equal(getProperty(updateData, "prototypeToken.img"), "new-actor.webp");
-    assert.equal(getProperty(updateData, "token.img"), "new-actor.webp");
+    assert.equal(getProperty(updateData, "prototypeToken.img"), undefined);
+    assert.equal(getProperty(updateData, "token.img"), undefined);
     assert.deepEqual(notificationErrors, []);
   });
 

@@ -319,7 +319,7 @@ function run() {
         "system.resources.voyage.total",
         "system.resources.voyage.max"
       ],
-      removePath: "system.resources.-=voyage"
+      removePath: "system.resources.voyage"
     }
   );
   assert.deepEqual(
@@ -335,7 +335,7 @@ function run() {
         "system.resources.voyage.total",
         "system.resources.voyage.max"
       ],
-      removePath: "system.resources.-=voyage"
+      removePath: "system.resources.voyage"
     }
   );
   assert.deepEqual(
@@ -374,7 +374,7 @@ function run() {
         "system.resources.voyage.total",
         "system.resources.voyage.max"
       ],
-      removePath: "system.resources.-=voyage"
+      removePath: "system.resources.voyage"
     }
   );
   assert.deepEqual(

@@ -135,9 +135,7 @@ export function buildActorUpdateHooks({
       await worldActor.update(
         {
           img: nextTokenImage,
-          "prototypeToken.texture.src": nextTokenImage,
-          "prototypeToken.img": nextTokenImage,
-          "token.img": nextTokenImage
+          "prototypeToken.texture.src": nextTokenImage
         },
         { bloodmanSkipPrototypeImageSync: true, bloodmanSkipSceneTokenImageSync: true }
       ).catch(() => null);
@@ -156,8 +154,6 @@ export function buildActorUpdateHooks({
     ).trim();
     const requestedPrototypeImage = String(
       foundry.utils.getProperty(changes, "prototypeToken.texture.src")
-      ?? foundry.utils.getProperty(changes, "prototypeToken.img")
-      ?? foundry.utils.getProperty(changes, "token.img")
       ?? ""
     ).trim();
     if (
