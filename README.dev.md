@@ -2,12 +2,13 @@
 
 ## Project Structure
 - `bloodman.mjs`: point d'entree principal, hooks, sheets et orchestration.
-- `rollHelpers.mjs`: logique de jets, degats, ressources et fallback socket.
+- `src/dice/roll-helpers.mjs`: logique de jets, degats, ressources et fallback socket.
 - `src/compat/`: couche de compatibilite Foundry (version + wrappers API instables).
 - `src/migrations/`: migrations de donnees versionnees et idempotentes.
 - `src/hooks/`: handlers de hooks Foundry extraits par domaine (canvas, items derives, actors, combat/tokens).
 - `src/rules/`: calculs metier purs (ressources/caracteristiques) reutilisables et testables.
-- `utils/`: logger, settings et utilitaires de permissions.
+- `src/core/`: logger, settings et utilitaires de permissions.
+- `utils/`: points de compatibilite (re-exports) pour anciens chemins.
 - `templates/`: vues Handlebars des sheets Actor/Item.
 - `styles/`: CSS du systeme.
 - `lang/`: traductions.

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { applyDamageToActor } from "../../rollHelpers.mjs";
+import { applyDamageToActor } from "../../src/dice/roll-helpers.mjs";
 
 function buildActor({
   id,

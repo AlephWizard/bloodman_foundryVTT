@@ -1,4 +1,4 @@
-import { bmLog } from "../../utils/logger.mjs";
+import { bmLog } from "../core/logger.mjs";
 
 const SYSTEM_ID = "bloodman";
 const SCHEMA_SETTING_KEY = "schemaVersion";
@@ -154,8 +154,14 @@ async function writeMigrationSetting(settingKey, value) {
 
 export function registerBloodmanMigrationSettings() {
   if (!hasSettingsRegistry()) return;
+  const registerSettingIfMissing = (settingKey, config) => {
+    const settingPath = `${SYSTEM_ID}.${settingKey}`;
+    if (game.settings.settings?.has?.(settingPath)) return false;
+    game.settings.register(SYSTEM_ID, settingKey, config);
+    return true;
+  };
 
-  game.settings.register(SYSTEM_ID, SCHEMA_SETTING_KEY, {
+  registerSettingIfMissing(SCHEMA_SETTING_KEY, {
     name: "Bloodman schema version",
     hint: "Internal schema migration version for Bloodman.",
     scope: "world",
@@ -164,7 +170,7 @@ export function registerBloodmanMigrationSettings() {
     default: 0
   });
 
-  game.settings.register(SYSTEM_ID, INCLUDE_COMPENDIUMS_SETTING_KEY, {
+  registerSettingIfMissing(INCLUDE_COMPENDIUMS_SETTING_KEY, {
     name: "Bloodman include compendiums in startup migrations",
     hint: "When enabled, unlocked Actor and Item compendiums are migrated at startup.",
     scope: "world",
@@ -173,7 +179,7 @@ export function registerBloodmanMigrationSettings() {
     default: false
   });
 
-  game.settings.register(SYSTEM_ID, LAST_REPORT_SETTING_KEY, {
+  registerSettingIfMissing(LAST_REPORT_SETTING_KEY, {
     name: "Bloodman last migration report",
     hint: "Internal JSON report of the last migration run.",
     scope: "world",

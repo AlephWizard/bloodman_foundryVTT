@@ -20,6 +20,10 @@ function t(key, fallback) {
 }
 
 export function registerBloodmanCoreSettings() {
+  if (!game?.settings || typeof game.settings.register !== "function") return false;
+  const settingPath = `${SYSTEM_ID}.${BLOODMAN_SETTING_KEYS.DEBUG_LOG_LEVEL}`;
+  if (game.settings.settings?.has?.(settingPath)) return false;
+
   game.settings.register(SYSTEM_ID, BLOODMAN_SETTING_KEYS.DEBUG_LOG_LEVEL, {
     name: t("BLOODMAN.Settings.DebugLogLevelName", "Bloodman log level"),
     hint: t("BLOODMAN.Settings.DebugLogLevelHint", "Controls Bloodman console log verbosity."),
@@ -38,6 +42,7 @@ export function registerBloodmanCoreSettings() {
       setLogLevel(value);
     }
   });
+  return true;
 }
 
 export function initializeBloodmanLoggerFromSettings() {

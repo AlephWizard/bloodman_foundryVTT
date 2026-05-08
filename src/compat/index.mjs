@@ -18,6 +18,7 @@ export {
   getRollClass,
   createRoll,
   getDialogClass,
+  getDialogV2Class,
   getAudioHelper,
   getLegacyApplicationClass,
   getDocumentCollectionClass,

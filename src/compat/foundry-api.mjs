@@ -40,6 +40,11 @@ export function getDialogClass() {
   return foundryNamespace.appv1?.api?.Dialog ?? globalThis.Dialog ?? null;
 }
 
+export function getDialogV2Class() {
+  const foundryNamespace = getFoundryNamespace();
+  return foundryNamespace.applications?.api?.DialogV2 ?? null;
+}
+
 export function getAudioHelper() {
   const foundryNamespace = getFoundryNamespace();
   return foundryNamespace.audio?.AudioHelper ?? globalThis.AudioHelper ?? null;
@@ -59,7 +64,19 @@ export function getDocumentCollectionClass(collectionName) {
   const normalized = asString(collectionName);
   if (!normalized) return null;
   const foundryNamespace = getFoundryNamespace();
-  return foundryNamespace.documents?.collections?.[normalized] ?? globalThis[normalized] ?? null;
+  const directCandidate = foundryNamespace.documents?.collections?.[normalized] ?? globalThis[normalized];
+  if (directCandidate) return directCandidate;
+
+  const documentName = normalized === "Actors"
+    ? "Actor"
+    : normalized === "Items"
+      ? "Item"
+      : "";
+  if (!documentName) return null;
+
+  const configuredCollection = globalThis.CONFIG?.[documentName]?.collection;
+  if (configuredCollection?.instance) return configuredCollection.instance;
+  return configuredCollection || null;
 }
 
 export async function compatFromUuid(uuid) {

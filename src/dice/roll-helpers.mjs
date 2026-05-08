@@ -1,32 +1,33 @@
-import { bmLog } from "./utils/logger.mjs";
+import { bmLog } from "../core/logger.mjs";
 import {
   canUserProcessPrivilegedRequests,
   getActiveGMUserIds,
   getActivePrivilegedOperatorIds,
   isAssistantOrHigherRole,
   isCurrentUserPrimaryPrivilegedOperator
-} from "./utils/privileged-users.mjs";
+} from "../core/privileged-users.mjs";
 import {
   createRoll,
   getDialogClass,
+  getDialogV2Class,
   hasSocket,
   socketEmit,
   updateDocument
-} from "./src/compat/index.mjs";
+} from "../compat/index.mjs";
 import {
   normalizeOptionalRollFormula,
   validateRollFormula
-} from "./src/rules/roll-formula.mjs";
+} from "../rules/roll-formula.mjs";
 import {
   buildDamageSplitDialogContent,
   computeDamageSplitAllocatedTotal,
   normalizeDamageSplitAllocations,
   resolveDamageSplitAllocatedState
-} from "./src/ui/damage-split-dialog.mjs";
+} from "../ui/damage-split-dialog.mjs";
 import {
   buildDamageRollFlavorMarkup,
   buildGmDamageSummaryMarkup
-} from "./src/ui/damage-chat.mjs";
+} from "../ui/damage-chat.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
@@ -63,6 +64,69 @@ const CHAT_ROLL_TYPES = Object.freeze({
 });
 
 function createDialog(config, options = undefined) {
+  const DialogV2Class = getDialogV2Class();
+  if (typeof DialogV2Class === "function") {
+    const normalizedConfig = config && typeof config === "object" ? config : {};
+    const normalizedOptions = options && typeof options === "object" ? options : {};
+    const defaultAction = String(normalizedConfig.default || "").trim();
+    const buttonsConfig = normalizedConfig.buttons && typeof normalizedConfig.buttons === "object"
+      ? normalizedConfig.buttons
+      : {};
+    const jq = globalThis.jQuery || globalThis.$;
+    const toHtmlLike = dialogInstance => {
+      const element = dialogInstance?.form || dialogInstance?.element || null;
+      if (typeof jq === "function" && typeof HTMLElement !== "undefined" && element instanceof HTMLElement) return jq(element);
+      return element;
+    };
+    const buttons = Object.entries(buttonsConfig).map(([action, buttonConfig]) => ({
+      action,
+      label: String(buttonConfig?.label ?? action),
+      default: defaultAction ? action === defaultAction : false,
+      callback: (event, button, dialog) => {
+        const callback = buttonConfig?.callback;
+        if (typeof callback !== "function") return action;
+        return callback(toHtmlLike(dialog), event, button, dialog);
+      }
+    }));
+    const dialogInstance = new DialogV2Class({
+      classes: Array.isArray(normalizedOptions.classes) ? [...normalizedOptions.classes] : undefined,
+      content: String(normalizedConfig.content || ""),
+      rejectClose: false,
+      window: {
+        title: String(normalizedConfig.title || "")
+      },
+      buttons,
+      position: Number.isFinite(Number(normalizedOptions.width))
+        ? { width: Number(normalizedOptions.width) }
+        : undefined,
+      submit: result => {
+        if (result == null && typeof normalizedConfig.close === "function") normalizedConfig.close();
+      },
+      render: (_event, dialog) => {
+        if (typeof normalizedConfig.render !== "function") return;
+        normalizedConfig.render(toHtmlLike(dialog), dialog);
+      }
+    });
+    return {
+      render(force = true) {
+        const renderResult = dialogInstance.render({ force: Boolean(force) });
+        if (renderResult && typeof renderResult.catch === "function") {
+          void renderResult.catch(error => {
+            bmLog.warn("dialog-v2 render failed", {
+              title: String(normalizedConfig.title || ""),
+              error
+            });
+          });
+        }
+        return dialogInstance;
+      },
+      close(optionsArg = {}) {
+        return dialogInstance.close(optionsArg);
+      },
+      instance: dialogInstance
+    };
+  }
+
   const DialogClass = getDialogClass();
   if (typeof DialogClass !== "function") return null;
   return options === undefined ? new DialogClass(config) : new DialogClass(config, options);

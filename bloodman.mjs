@@ -1,13 +1,13 @@
-import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./rollHelpers.mjs";
-import { bmLog } from "./utils/logger.mjs";
-import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } from "./utils/settings.mjs";
+import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./src/dice/roll-helpers.mjs";
+import { bmLog } from "./src/core/logger.mjs";
+import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } from "./src/core/settings.mjs";
 import {
   getActivePrivilegedOperatorIds,
   getActiveGMUserIds,
   isAssistantOrHigherRole,
   isCurrentUserPrimaryPrivilegedOperator,
   registerPrivilegedUsersCacheHooks
-} from "./utils/privileged-users.mjs";
+} from "./src/core/privileged-users.mjs";
 import {
   compatFromUuid,
   compatFromUuidSync,
@@ -18,6 +18,7 @@ import {
   getDragEventData,
   getAudioHelper,
   getDialogClass,
+  getDialogV2Class,
   getDocumentCollectionClass,
   getLegacyApplicationClass,
   getRollClass,
@@ -50,6 +51,11 @@ import { buildChatRelayHelpers } from "./src/hooks/chat-relay.mjs";
 import { buildChatRollDecorationHooks } from "./src/hooks/chat-roll-decoration.mjs";
 import { buildChatMessageRoutingHooks } from "./src/hooks/chat-message-routing.mjs";
 import { buildTokenCombatHooks } from "./src/hooks/token-combat.mjs";
+import {
+  buildStartupCombatantNameNormalization,
+  buildStartupSceneTokenNormalization,
+  buildStartupNormalizationHooks
+} from "./src/hooks/startup-normalization.mjs";
 import { buildDamageRollFlavorMarkup } from "./src/ui/damage-chat.mjs";
 import {
   toFiniteNumber as ruleToFiniteNumber,
@@ -106,6 +112,8 @@ import { createItemRerollExecutionRules } from "./src/rules/item-reroll-executio
 import { createItemUseFlowRules } from "./src/rules/item-use-flow.mjs";
 import { createGrowthRollRules } from "./src/rules/growth-roll.mjs";
 import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
+import { installCombatantInitiativePatch } from "./src/rules/combatant-initiative-patch.mjs";
+import { createStartupNormalizationRunner } from "./src/rules/startup-normalization.mjs";
 import {
   getCarriedItemInventorySlots,
   normalizeCarriedItemInventorySlots,
@@ -199,10 +207,96 @@ function tl(key, fallback, data = null) {
   return localized && localized !== key ? localized : fallback;
 }
 
+function toDialogHtmlLike(dialogInstance) {
+  const jq = globalThis.jQuery || globalThis.$;
+  const element = dialogInstance?.form || dialogInstance?.element || null;
+  if (typeof jq === "function" && typeof HTMLElement !== "undefined" && element instanceof HTMLElement) return jq(element);
+  return element;
+}
+
+function createDialogV2Shim(config = {}, options = {}) {
+  const DialogV2Class = getDialogV2Class();
+  if (typeof DialogV2Class !== "function") return null;
+
+  const normalizedConfig = config && typeof config === "object" ? config : {};
+  const normalizedOptions = options && typeof options === "object" ? options : {};
+  const buttonsConfig = normalizedConfig.buttons && typeof normalizedConfig.buttons === "object"
+    ? normalizedConfig.buttons
+    : {};
+  const defaultAction = String(normalizedConfig.default || "").trim();
+
+  const buttons = Object.entries(buttonsConfig).map(([action, buttonConfig]) => {
+    const legacyCallback = buttonConfig?.callback;
+    return {
+      action,
+      label: String(buttonConfig?.label ?? action),
+      default: defaultAction ? action === defaultAction : false,
+      callback: (event, button, dialog) => {
+        if (typeof legacyCallback !== "function") return action;
+        return legacyCallback(toDialogHtmlLike(dialog), event, button, dialog);
+      }
+    };
+  });
+
+  const v2Options = {
+    classes: Array.isArray(normalizedOptions.classes) ? [...normalizedOptions.classes] : undefined,
+    content: String(normalizedConfig.content || ""),
+    rejectClose: false,
+    window: {
+      title: String(normalizedConfig.title || "")
+    },
+    buttons,
+    position: Number.isFinite(Number(normalizedOptions.width))
+      ? { width: Number(normalizedOptions.width) }
+      : undefined,
+    submit: result => {
+      if (result == null && typeof normalizedConfig.close === "function") normalizedConfig.close();
+    },
+    render: (_event, dialog) => {
+      if (typeof normalizedConfig.render !== "function") return;
+      normalizedConfig.render(toDialogHtmlLike(dialog), dialog);
+    }
+  };
+
+  const dialogInstance = new DialogV2Class(v2Options);
+  return {
+    render(force = true) {
+      const renderResult = dialogInstance.render({ force: Boolean(force) });
+      if (renderResult && typeof renderResult.catch === "function") {
+        void renderResult.catch(error => {
+          bmLog.warn("dialog-v2 render failed", {
+            title: String(normalizedConfig.title || ""),
+            error
+          });
+        });
+      }
+      return dialogInstance;
+    },
+    close(optionsArg = {}) {
+      return dialogInstance.close(optionsArg);
+    },
+    instance: dialogInstance
+  };
+}
+
 function createBloodmanDialog(config, options = undefined) {
+  const dialogV2Shim = createDialogV2Shim(config, options);
+  if (dialogV2Shim) return dialogV2Shim;
   const DialogClass = getDialogClass();
   if (typeof DialogClass !== "function") return null;
   return options === undefined ? new DialogClass(config) : new DialogClass(config, options);
+}
+
+function renderBloodmanDialog(config, options = undefined) {
+  const dialog = createBloodmanDialog(config, options);
+  if (!dialog || typeof dialog.render !== "function") {
+    bmLog.warn("dialog render skipped (Dialog API unavailable)", {
+      title: String(config?.title || "")
+    });
+    return null;
+  }
+  dialog.render(true);
+  return dialog;
 }
 
 function getFilePickerClass() {
@@ -210,6 +304,22 @@ function getFilePickerClass() {
   if (typeof namespaced === "function") return namespaced;
   if (typeof globalThis.FilePicker === "function") return globalThis.FilePicker;
   return null;
+}
+
+function renderFilePickerSafely(picker, contextLabel = "file-picker") {
+  if (!picker || typeof picker.render !== "function") return false;
+  try {
+    const renderResult = picker.render(true);
+    if (renderResult && typeof renderResult.then === "function") {
+      void renderResult.catch(error => {
+        bmLog.warn(`${contextLabel}: render failed`, { error });
+      });
+    }
+    return true;
+  } catch (error) {
+    bmLog.warn(`${contextLabel}: render failed`, { error });
+    return false;
+  }
 }
 
 function isFoundryDocumentLike(value) {
@@ -2993,6 +3103,10 @@ const SYSTEM_ROOT_PATH = `systems/${SYSTEM_ID}`;
 const SYSTEM_SOCKET = `system.${SYSTEM_ID}`;
 const PLAYER_ACTOR_TYPE = "personnage";
 const NPC_ACTOR_TYPE = "personnage-non-joueur";
+const PLAYER_ACTOR_SHEET_TEMPLATE_PATH = `${SYSTEM_ROOT_PATH}/templates/actor-joueur.html`;
+const NPC_ACTOR_SHEET_TEMPLATE_PATH = `${SYSTEM_ROOT_PATH}/templates/actor-non-joueur.html`;
+const ITEM_SHEET_TEMPLATE_PATH = `${SYSTEM_ROOT_PATH}/templates/item-unified.html`;
+const SYSTEM_ITEM_TYPES = Object.freeze(["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"]);
 const CHAOS_DICE_ICON_SRC = `${SYSTEM_ROOT_PATH}/images/d20_destin.svg`;
 const CHAOS_DICE_ICON_FALLBACK_SRC = "icons/svg/d20.svg";
 const CARRIED_ITEMS_PER_MAIN_COLUMN = 5;
@@ -3001,10 +3115,11 @@ const CARRIED_BAG_COLUMN_COUNT = 1;
 const CARRIED_ITEM_LIMIT_BASE = CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_MAIN_COLUMN_COUNT;
 const CARRIED_ITEM_LIMIT_WITH_BAG = CARRIED_ITEM_LIMIT_BASE + (CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_BAG_COLUMN_COUNT);
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set([PLAYER_ACTOR_TYPE, NPC_ACTOR_TYPE]);
-const CARRIED_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
-const BAG_ZONE_ITEM_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
-const ITEM_LINK_SUPPORTED_TYPES = new Set(["arme", "objet", "protection", "ration", "soin", "aptitude", "pouvoir"]);
-const ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES = "arme,objet,protection,ration,soin,aptitude,pouvoir";
+const CARRIED_ITEM_TYPE_LIST = Object.freeze(["arme", "objet", "protection", "ration", "soin"]);
+const CARRIED_ITEM_TYPES = new Set(CARRIED_ITEM_TYPE_LIST);
+const BAG_ZONE_ITEM_TYPES = new Set(CARRIED_ITEM_TYPE_LIST);
+const ITEM_LINK_SUPPORTED_TYPES = new Set(SYSTEM_ITEM_TYPES);
+const ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES = SYSTEM_ITEM_TYPES.join(",");
 const ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPE_SET = new Set(ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES.split(","));
 const BAG_ZONE_FLAG_KEY = "inBag";
 const CARRY_COLUMN_FLAG_KEY = "carryColumn";
@@ -3033,20 +3148,22 @@ const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const VOYAGE_XP_SKIP_CREATE_OPTION = "bloodmanSkipVoyageXPCost";
-const PRICE_ITEM_TYPES = new Set(["arme", "protection", "ration", "objet", "soin", "aptitude", "pouvoir"]);
-const ITEM_BUCKET_TYPES = ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"];
+const PRICE_ITEM_TYPES = new Set(SYSTEM_ITEM_TYPES);
+const ITEM_BUCKET_TYPES = [...SYSTEM_ITEM_TYPES];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
 const CHAOS_PER_PLAYER_REROLL = 1;
 const CHAOS_COST_NPC_REROLL = 1;
 const REROLL_VISIBILITY_MS = 5 * 60 * 1000;
 const DAMAGE_REROLL_ALLOWED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir"]);
-const AUDIO_ENABLED_ITEM_TYPES = new Set(["arme", "aptitude", "pouvoir", "soin", "objet", "ration", "protection"]);
+const AUDIO_ENABLED_ITEM_TYPES = new Set(SYSTEM_ITEM_TYPES);
 const AUDIO_FILE_EXTENSION_PATTERN = /\.(mp3|ogg|oga|wav|flac|m4a|aac|webm)$/i;
 const ITEM_AUDIO_POST_ROLL_DELAY_MS = 450;
 const CHAOS_DICE_PANEL_POSITION_SETTING = "chaosDicePanelPosition";
 const CHAOS_DICE_VALUE_SETTING = "chaosDice";
 const INTERNAL_CANVAS_PATCHES_SETTING = "enableInternalCanvasPatches";
+const INTERNAL_COMBATANT_PATCHES_SETTING = "enableInternalCombatantPatches";
 const STARTUP_NORMALIZATION_SETTING = "startupNormalizationVersion";
+const SHEET_PERFORMANCE_DEBUG_SETTING = "debugSheetPerformance";
 const STARTUP_NORMALIZATION_TARGET_VERSION = 1;
 const CURRENCY_CURRENT_MAX = 1_000_000;
 const VITAL_RESOURCE_PATHS = new Set([
@@ -3136,7 +3253,15 @@ function areInternalCanvasPatchesEnabled() {
   }
 }
 
-function getStoredStartupNormalizationVersion() {
+function areInternalCombatantPatchesEnabled() {
+  try {
+    return game.settings.get(SYSTEM_ID, INTERNAL_COMBATANT_PATCHES_SETTING) !== false;
+  } catch (_error) {
+    return true;
+  }
+}
+
+function readStoredStartupNormalizationVersion() {
   try {
     const raw = Number(game.settings.get(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING));
     if (!Number.isFinite(raw)) return 0;
@@ -3146,21 +3271,50 @@ function getStoredStartupNormalizationVersion() {
   }
 }
 
-function shouldRunStartupNormalization() {
-  return getStoredStartupNormalizationVersion() < STARTUP_NORMALIZATION_TARGET_VERSION;
-}
-
-async function markStartupNormalizationCompleted() {
+async function writeStoredStartupNormalizationVersion(nextVersion) {
+  const normalized = Math.max(0, Math.floor(Number(nextVersion) || 0));
   try {
-    await game.settings.set(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING, STARTUP_NORMALIZATION_TARGET_VERSION);
+    await game.settings.set(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING, normalized);
     return true;
   } catch (_error) {
     return false;
   }
 }
 
+function isSheetPerformanceDebugEnabled() {
+  try {
+    return game.settings.get(SYSTEM_ID, SHEET_PERFORMANCE_DEBUG_SETTING) === true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function startPerfTimer() {
+  return Number(globalThis?.performance?.now?.() ?? Date.now());
+}
+
+function endPerfTimer(startedAt) {
+  const started = Number(startedAt);
+  const now = Number(globalThis?.performance?.now?.() ?? Date.now());
+  if (!Number.isFinite(started)) return 0;
+  return Math.max(0, now - started);
+}
+
+function logSheetPerformance(label, details = {}) {
+  if (!isSheetPerformanceDebugEnabled()) return;
+  bmLog.info(`perf:${label}`, details);
+}
+
 function registerBloodmanRuntimeSettings() {
-  game.settings.register(SYSTEM_ID, CHAOS_DICE_VALUE_SETTING, {
+  if (!game?.settings || typeof game.settings.register !== "function") return;
+  const registerSettingIfMissing = (settingKey, config) => {
+    const settingPath = `${SYSTEM_ID}.${settingKey}`;
+    if (game.settings.settings?.has?.(settingPath)) return false;
+    game.settings.register(SYSTEM_ID, settingKey, config);
+    return true;
+  };
+
+  registerSettingIfMissing(CHAOS_DICE_VALUE_SETTING, {
     name: t("BLOODMAN.Settings.ChaosDiceName"),
     scope: "world",
     config: false,
@@ -3174,7 +3328,7 @@ function registerBloodmanRuntimeSettings() {
     }
   });
 
-  game.settings.register(SYSTEM_ID, CHAOS_DICE_PANEL_POSITION_SETTING, {
+  registerSettingIfMissing(CHAOS_DICE_PANEL_POSITION_SETTING, {
     name: "Position du panneau des du chaos",
     scope: "client",
     config: false,
@@ -3182,7 +3336,7 @@ function registerBloodmanRuntimeSettings() {
     default: {}
   });
 
-  game.settings.register(SYSTEM_ID, INTERNAL_CANVAS_PATCHES_SETTING, {
+  registerSettingIfMissing(INTERNAL_CANVAS_PATCHES_SETTING, {
     name: "Bloodman internal canvas patches",
     scope: "world",
     config: false,
@@ -3190,12 +3344,29 @@ function registerBloodmanRuntimeSettings() {
     default: true
   });
 
-  game.settings.register(SYSTEM_ID, STARTUP_NORMALIZATION_SETTING, {
+  registerSettingIfMissing(INTERNAL_COMBATANT_PATCHES_SETTING, {
+    name: "Bloodman internal combatant patches",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: true
+  });
+
+  registerSettingIfMissing(STARTUP_NORMALIZATION_SETTING, {
     name: "Bloodman startup normalization version",
     scope: "world",
     config: false,
     type: Number,
     default: 0
+  });
+
+  registerSettingIfMissing(SHEET_PERFORMANCE_DEBUG_SETTING, {
+    name: "Bloodman debug sheet performance",
+    hint: "Logs actor sheet render and drop timings in the console.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: false
   });
 }
 
@@ -3376,6 +3547,70 @@ const itemAudioPlaybackRules = createItemAudioPlaybackRules({
 });
 const { playItemAudio } = itemAudioPlaybackRules;
 
+const DROP_DATA_CACHE_MAX = 300;
+const DROP_DATA_CACHE_TTL_MS = 3_000;
+const dropDataDocumentCacheByEntry = new WeakMap();
+const dropDataDocumentCacheByKey = new Map();
+
+function buildDropDataCacheKey(entry) {
+  if (!entry || typeof entry !== "object") return "";
+  const type = String(entry.type || "").trim().toLowerCase();
+  const uuid = String(entry.uuid || "").trim();
+  const pack = String(entry.pack || "").trim();
+  const id = String(entry._id || entry.id || "").trim();
+  const parentUuid = String(entry.parentUuid || entry.actorUuid || "").trim();
+  if (!type && !uuid && !pack && !id && !parentUuid) return "";
+  return `${type}|${uuid}|${pack}|${id}|${parentUuid}`;
+}
+
+function pruneDropDataCache() {
+  if (dropDataDocumentCacheByKey.size <= DROP_DATA_CACHE_MAX) return;
+  const now = Date.now();
+  for (const [key, cached] of dropDataDocumentCacheByKey.entries()) {
+    if (!cached || cached.expiresAt <= now) dropDataDocumentCacheByKey.delete(key);
+    if (dropDataDocumentCacheByKey.size <= DROP_DATA_CACHE_MAX) return;
+  }
+  const overflow = dropDataDocumentCacheByKey.size - DROP_DATA_CACHE_MAX;
+  if (overflow <= 0) return;
+  for (const key of dropDataDocumentCacheByKey.keys()) {
+    dropDataDocumentCacheByKey.delete(key);
+    if (dropDataDocumentCacheByKey.size <= DROP_DATA_CACHE_MAX) break;
+  }
+}
+
+function resolveDroppedItemFromDropDataCached(entry) {
+  const itemDocumentClass = Item?.implementation?.fromDropData ? Item.implementation : Item;
+  if (!itemDocumentClass?.fromDropData) return Promise.resolve(null);
+  const entryObject = entry && typeof entry === "object" ? entry : null;
+
+  if (entryObject) {
+    const cachedByEntry = dropDataDocumentCacheByEntry.get(entryObject);
+    if (cachedByEntry) return cachedByEntry;
+  }
+
+  const cacheKey = buildDropDataCacheKey(entryObject);
+  if (cacheKey) {
+    const now = Date.now();
+    const cachedByKey = dropDataDocumentCacheByKey.get(cacheKey);
+    if (cachedByKey && cachedByKey.expiresAt > now) {
+      if (entryObject) dropDataDocumentCacheByEntry.set(entryObject, cachedByKey.promise);
+      return cachedByKey.promise;
+    }
+    if (cachedByKey && cachedByKey.expiresAt <= now) dropDataDocumentCacheByKey.delete(cacheKey);
+  }
+
+  const promise = itemDocumentClass.fromDropData(entry).catch(() => null);
+  if (entryObject) dropDataDocumentCacheByEntry.set(entryObject, promise);
+  if (cacheKey) {
+    dropDataDocumentCacheByKey.set(cacheKey, {
+      promise,
+      expiresAt: Date.now() + DROP_DATA_CACHE_TTL_MS
+    });
+    pruneDropDataCache();
+  }
+  return promise;
+}
+
 const dropDecisionRules = createDropDecisionRules({
   parseLooseNumericInput,
   roundCurrencyValue,
@@ -3385,7 +3620,7 @@ const dropDecisionRules = createDropDecisionRules({
   getWeaponCategory,
   normalizeNonNegativeInteger,
   getWeaponLoadedAmmo,
-  fromDropData: entry => Item.implementation.fromDropData(entry),
+  fromDropData: resolveDroppedItemFromDropDataCached,
   translate: t,
   translateWithFallback: tl
 });
@@ -3397,7 +3632,7 @@ const {
   resolveDropPreviewItems
 } = dropDecisionRules;
 const dropEvaluationRules = createDropEvaluationRules({
-  fromDropData: entry => Item.implementation.fromDropData(entry),
+  fromDropData: resolveDroppedItemFromDropDataCached,
   roundCurrencyValue,
   getDropItemQuantity: resolveDropItemQuantity,
   getDroppedItemUnitPrice: resolveDroppedItemUnitPrice,
@@ -5189,6 +5424,9 @@ function injectCreateTypeIconsFromHook(htmlLike, sourceHook = "unknown") {
 }
 
 function registerCreateTypeIconRenderHooks() {
+  if (!globalThis.Hooks || typeof Hooks.on !== "function") return false;
+  if (globalThis.__bloodmanCreateTypeIconHooksRegistered) return true;
+  globalThis.__bloodmanCreateTypeIconHooksRegistered = true;
   const hookBindings = [
     ["renderDialog", "renderDialog"],
     ["renderApplication", "renderApplication"],
@@ -5203,9 +5441,49 @@ function registerCreateTypeIconRenderHooks() {
       injectCreateTypeIconsFromHook(htmlLike, sourceHook);
     });
   }
+  return true;
 }
 
 registerCreateTypeIconRenderHooks();
+
+function registerSystemDocumentSheets({
+  actorSheetClass,
+  npcSheetClass
+} = {}) {
+  if (!actorSheetClass || !npcSheetClass || !BloodmanItemSheet) {
+    bmLog.error("sheet registration skipped (missing sheet classes)");
+    return false;
+  }
+  if (!ActorsCollection || typeof ActorsCollection.registerSheet !== "function") {
+    bmLog.error("actor sheet registration skipped (Actors collection unavailable)");
+    return false;
+  }
+  if (!ItemsCollection || typeof ItemsCollection.registerSheet !== "function") {
+    bmLog.error("item sheet registration skipped (Items collection unavailable)");
+    return false;
+  }
+
+  if (typeof ActorsCollection.unregisterSheet === "function" && BaseActorSheet) {
+    ActorsCollection.unregisterSheet("core", BaseActorSheet);
+  }
+  ActorsCollection.registerSheet(SYSTEM_ID, actorSheetClass, {
+    types: [PLAYER_ACTOR_TYPE],
+    makeDefault: true
+  });
+  ActorsCollection.registerSheet(SYSTEM_ID, npcSheetClass, {
+    types: [NPC_ACTOR_TYPE],
+    makeDefault: true
+  });
+
+  if (typeof ItemsCollection.unregisterSheet === "function") {
+    ItemsCollection.unregisterSheet("core", BaseItemSheet);
+  }
+  ItemsCollection.registerSheet(SYSTEM_ID, BloodmanItemSheet, {
+    types: [...SYSTEM_ITEM_TYPES],
+    makeDefault: true
+  });
+  return true;
+}
 
 const canvasReadyHooks = buildCanvasReadyHooks({
   installTokenEffectBackgroundPatch,
@@ -5255,6 +5533,7 @@ Hooks.once("ready", () => {
 });
 
 Hooks.once("init", () => {
+  registerCreateTypeIconRenderHooks();
   registerBloodmanCoreSettings();
   registerBloodmanMigrationSettings();
   registerBloodmanHandlebarsHelpers();
@@ -5273,50 +5552,24 @@ Hooks.once("init", () => {
 
   const actorSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanActorSheetV2 : BloodmanActorSheet;
   const npcSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanNpcSheetV2 : BloodmanNpcSheet;
+  registerSystemDocumentSheets({ actorSheetClass, npcSheetClass });
 
-  ActorsCollection.unregisterSheet("core", BaseActorSheet);
-  ActorsCollection.registerSheet("bloodman", actorSheetClass, {
-    types: ["personnage"],
-    makeDefault: true
-  });
-  ActorsCollection.registerSheet("bloodman", npcSheetClass, {
-    types: ["personnage-non-joueur"],
-    makeDefault: true
-  });
-
-  ItemsCollection.unregisterSheet("core", BaseItemSheet);
-  ItemsCollection.registerSheet("bloodman", BloodmanItemSheet, {
-    types: ["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"],
-    makeDefault: true
-  });
-
-  const combatantDoc = compatGetDocumentClass("Combatant") || CONFIG?.Combatant?.documentClass;
-  if (combatantDoc?.prototype) {
-    const originalGetInitiativeRoll = combatantDoc.prototype.getInitiativeRoll;
-    const originalGetFormula = combatantDoc.prototype._getInitiativeFormula || combatantDoc.prototype.getInitiativeFormula;
-
-    combatantDoc.prototype._getInitiativeFormula = function () {
-      const actor = getCombatantActor(this);
-      if (isCharacterLikeActorType(actor?.type)) {
-        return getInitiativeFormulaForActor(actor);
-      }
-      const fallback = typeof originalGetFormula === "function" ? originalGetFormula.call(this) : "0";
-      return fallback ? String(fallback) : "0";
-    };
-
-    combatantDoc.prototype.getInitiativeRoll = function (formula) {
-      const RollClass = getRollClass();
-      if (typeof RollClass !== "function") return null;
-      const actor = getCombatantActor(this);
-      if (isCharacterLikeActorType(actor?.type)) {
-        return new RollClass(getInitiativeFormulaForActor(actor));
-      }
-      if (typeof originalGetInitiativeRoll === "function") {
-        return originalGetInitiativeRoll.call(this, formula);
-      }
-      const normalized = String(formula ?? "0").trim();
-      return new RollClass(normalized || "0");
-    };
+  if (!areInternalCombatantPatchesEnabled()) {
+    bmLog.info("combatant prototype patch disabled by world setting");
+  } else {
+    const combatantDoc = compatGetDocumentClass("Combatant") || CONFIG?.Combatant?.documentClass;
+    const initiativePatchResult = installCombatantInitiativePatch({
+      combatantDocumentClass: combatantDoc,
+      getCombatantActor,
+      isCharacterLikeActorType,
+      getInitiativeFormulaForActor,
+      getRollClass
+    });
+    if (!initiativePatchResult.ok) {
+      bmLog.warn("combatant initiative patch skipped", initiativePatchResult);
+    } else if (initiativePatchResult.reason === "applied") {
+      bmLog.info("combatant initiative patch applied");
+    }
   }
 });
 
@@ -5538,53 +5791,43 @@ async function applyStartupActorItemNormalization(actor) {
   }
 }
 
-async function applyStartupCombatantNameNormalization() {
-  for (const combat of game.combats || []) {
-    for (const combatant of combat.combatants || []) {
-      const name = getCombatantDisplayName(combatant);
-      if (name && name !== combatant.name) {
-        await combatant.update({ name });
-      }
-    }
-  }
-}
+const applyStartupCombatantNameNormalization = buildStartupCombatantNameNormalization({
+  getCombats: () => game.combats || [],
+  getCombatantDisplayName
+});
 
-async function applyStartupSceneTokenNormalization() {
-  for (const scene of game.scenes) {
-    for (const token of scene.tokens) {
-      const actorType = getTokenActorType(token);
-      const tokenUpdates = {};
-      if (actorType === PLAYER_ACTOR_TYPE && !token.actorLink) tokenUpdates.actorLink = true;
-      if (actorType === NPC_ACTOR_TYPE && token.actorLink) tokenUpdates.actorLink = false;
-      if (isCharacterLikeActorType(actorType)) {
-        const tokenActor = token.actor || game.actors?.get(token.actorId) || null;
-        const tokenSrc = foundry.utils.getProperty(token, "texture.src");
-        if (await needsTokenImageRepair(tokenSrc)) {
-          const actorImg = tokenActor?.img || "";
-          const actorImgValid = actorImg ? await canLoadTextureSource(actorImg) : false;
-          const nextTokenSrc = actorImgValid ? actorImg : "icons/svg/mystery-man.svg";
-          if (nextTokenSrc && nextTokenSrc !== tokenSrc) tokenUpdates["texture.src"] = nextTokenSrc;
-        }
-        if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
-        const pvCurrent = getTokenCurrentPv(token);
-        if (Number.isFinite(pvCurrent)) await syncZeroPvStatusForToken(token, actorType, pvCurrent);
-        continue;
-      }
-      if (Object.keys(tokenUpdates).length) await token.update(tokenUpdates);
-    }
-  }
-}
+const applyStartupSceneTokenNormalization = buildStartupSceneTokenNormalization({
+  getScenes: () => game.scenes,
+  getTokenActorType,
+  playerActorType: PLAYER_ACTOR_TYPE,
+  npcActorType: NPC_ACTOR_TYPE,
+  isCharacterLikeActorType,
+  getActorById: actorId => game.actors?.get(actorId) || null,
+  getProperty: foundry.utils.getProperty,
+  needsTokenImageRepair,
+  canLoadTextureSource,
+  getTokenCurrentPv,
+  syncZeroPvStatusForToken
+});
 
-async function runStartupNormalizationPass() {
-  for (const actor of game.actors) {
-    await applyStartupActorNormalization(actor);
-    await applyStartupActorItemNormalization(actor);
+const startupNormalizationHooks = buildStartupNormalizationHooks({
+  getActors: () => game.actors,
+  applyStartupActorNormalization,
+  applyStartupActorItemNormalization,
+  applyStartupCombatantNameNormalization,
+  applyStartupSceneTokenNormalization,
+  refreshBossSoloNpcPvMax
+});
+
+const startupNormalizationRunner = createStartupNormalizationRunner({
+  targetVersion: STARTUP_NORMALIZATION_TARGET_VERSION,
+  readStoredVersion: readStoredStartupNormalizationVersion,
+  writeStoredVersion: writeStoredStartupNormalizationVersion,
+  runNormalizationPass: startupNormalizationHooks.runStartupNormalizationPass,
+  logger: {
+    warn: (message, context) => bmLog.warn(message, context)
   }
-  await applyStartupCombatantNameNormalization();
-  await applyStartupSceneTokenNormalization();
-  await refreshBossSoloNpcPvMax();
-  await markStartupNormalizationCompleted();
-}
+});
 
 Hooks.once("ready", async () => {
   try {
@@ -5621,15 +5864,19 @@ Hooks.once("ready", async () => {
     bmLog.error("migration runner failed", { error });
   }
   if (!game.user?.isGM) return;
-  const runStartupNormalization = shouldRunStartupNormalization();
-  if (!runStartupNormalization) {
+  const startupNormalizationState = await startupNormalizationRunner.runIfNeeded();
+  if (!startupNormalizationState.ran) {
     bmLog.info("startup normalization skipped", {
-      storedVersion: getStoredStartupNormalizationVersion(),
-      targetVersion: STARTUP_NORMALIZATION_TARGET_VERSION
+      storedVersion: startupNormalizationState.storedVersion,
+      targetVersion: startupNormalizationState.targetVersion
     });
   }
-  if (runStartupNormalization) {
-    await runStartupNormalizationPass();
+  if (startupNormalizationState.ran) {
+    bmLog.info("startup normalization completed", {
+      storedVersion: startupNormalizationState.storedVersion,
+      targetVersion: startupNormalizationState.targetVersion,
+      completed: startupNormalizationState.completed
+    });
   }
   ensureChaosDiceUI();
 });
@@ -5815,7 +6062,7 @@ function installChaosDicePanelDrag(root) {
 
 function showSelectedVoyageXpGrantDialog() {
   if (!game.user?.isGM) return;
-  if (typeof getDialogClass() !== "function") return;
+  if (typeof getDialogClass() !== "function" && typeof getDialogV2Class() !== "function") return;
   const escapeHtml = escapeChatMarkup;
   const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
   const promptText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Prompt", "Saisissez le montant d'XP voyage a attribuer aux tokens joueurs selectionnes.");
@@ -5854,12 +6101,12 @@ function showSelectedVoyageXpGrantDialog() {
       width: 420
     }
   );
-  dialog.render(true);
+  if (dialog?.render) dialog.render(true);
 }
 
 function showSelectedFullPpRestoreConfirmDialog() {
   if (!game.user?.isGM) return;
-  if (typeof getDialogClass() !== "function") return;
+  if (typeof getDialogClass() !== "function" && typeof getDialogV2Class() !== "function") return;
 
   const selectedTokens = [...(globalThis.canvas?.tokens?.controlled || [])];
   const selectedCount = Array.isArray(selectedTokens) ? selectedTokens.length : 0;
@@ -5910,12 +6157,12 @@ function showSelectedFullPpRestoreConfirmDialog() {
       width: 460
     }
   );
-  dialog.render(true);
+  if (dialog?.render) dialog.render(true);
 }
 
 function showSelectedFullPvRestoreConfirmDialog() {
   if (!game.user?.isGM) return;
-  if (typeof getDialogClass() !== "function") return;
+  if (typeof getDialogClass() !== "function" && typeof getDialogV2Class() !== "function") return;
 
   const selectedTokens = [...(globalThis.canvas?.tokens?.controlled || [])];
   const selectedCount = Array.isArray(selectedTokens) ? selectedTokens.length : 0;
@@ -5966,7 +6213,7 @@ function showSelectedFullPvRestoreConfirmDialog() {
       width: 460
     }
   );
-  dialog.render(true);
+  if (dialog?.render) dialog.render(true);
 }
 
 function ensureChaosDiceUI() {
@@ -6848,12 +7095,13 @@ class BloodmanActorSheet extends BaseActorSheet {
     super(object, options);
     this.captureTokenDocumentReference(options?.token || object?.token || null);
     this.sanitizeStoredSheetOptions();
+    this._optimisticBagSlotsEnabled = null;
   }
 
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: ["bloodman", "sheet", "actor"],
-      template: "systems/bloodman/templates/actor-joueur.html",
+      template: PLAYER_ACTOR_SHEET_TEMPLATE_PATH,
       width: 1195,
       height: 650,
       popOut: true,
@@ -7451,8 +7699,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         await this.applyActorUpdate({ [field]: nextPath });
       }
     });
-    picker.render(true);
-    return true;
+    return renderFilePickerSafely(picker, "actor-image-file-picker");
   }
 
   async deleteActorItem(item) {
@@ -7636,6 +7883,17 @@ class BloodmanActorSheet extends BaseActorSheet {
     return containerList instanceof HTMLElement ? containerList : null;
   }
 
+  shouldSkipItemListContainerDelegate(eventLike) {
+    const currentTarget = eventLike?.currentTarget;
+    if (!(currentTarget instanceof HTMLElement)) return false;
+    if (!currentTarget.matches?.("[data-item-list-drop-target='true']")) return false;
+    const nativeEvent = eventLike?.originalEvent || eventLike;
+    const eventTarget = nativeEvent?.target instanceof HTMLElement ? nativeEvent.target : null;
+    if (!(eventTarget instanceof HTMLElement)) return false;
+    const nestedItemList = eventTarget.closest("ol.item-list");
+    return nestedItemList instanceof HTMLElement && currentTarget.contains(nestedItemList);
+  }
+
   getItemListBagZoneFromElement(element) {
     const list = element?.matches?.(".item-list")
       ? element
@@ -7812,8 +8070,10 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     if (item.isOwner || this.actor?.isOwner || game.user?.isGM) {
       try {
-        await item.setFlag(SYSTEM_ID, CARRY_COLUMN_FLAG_KEY, nextColumn);
-        await item.setFlag(SYSTEM_ID, BAG_ZONE_FLAG_KEY, nextInBag);
+        await item.update({
+          [carryFlagPath]: nextColumn,
+          [bagFlagPath]: nextInBag
+        });
         return true;
       } catch (_error) {
         // Falls through to embedded update fallback.
@@ -7842,7 +8102,10 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   isActorBagSlotsEnabled(actorLike = null) {
     const actor = actorLike || this.actor;
-    return Boolean(actor?.system?.equipment?.bagSlotsEnabled);
+    if (!actorLike && this._optimisticBagSlotsEnabled !== null) {
+      return Boolean(this._optimisticBagSlotsEnabled);
+    }
+    return toCheckboxBoolean(actor?.system?.equipment?.bagSlotsEnabled, false);
   }
 
   getCarriedOutsideBagItems(options = {}) {
@@ -8392,6 +8655,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async applyActorItemOrderUpdates(updates = []) {
+    const startedAt = startPerfTimer();
     if (!this.actor || !Array.isArray(updates) || !updates.length) return false;
     const sanitizedUpdates = updates
       .map(entry => {
@@ -8405,11 +8669,27 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     if (this.actor?.isOwner || game.user?.isGM) {
       await this.actor.updateEmbeddedDocuments("Item", sanitizedUpdates);
+      logSheetPerformance("actor-sheet.update.item-order", {
+        actorId: this.actor?.id || "",
+        updateCount: sanitizedUpdates.length,
+        mode: "owner",
+        durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+      });
       return true;
     }
     const sent = requestReorderActorItems(this.actor, sanitizedUpdates);
     if (!sent) safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
+    logSheetPerformance("actor-sheet.update.item-order", {
+      actorId: this.actor?.id || "",
+      updateCount: sanitizedUpdates.length,
+      mode: sent ? "socket" : "socket-failed",
+      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+    });
     return sent;
+  }
+
+  shouldManuallyRenderAfterUpdate() {
+    return !(this.actor?.isOwner || game.user?.isGM);
   }
 
   async handleCarryColumnDrop({
@@ -8511,7 +8791,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     if (!targetItem || String(targetItem.id || "") === sourceId) {
       this.clearItemReorderVisualState();
-      if (movedAcrossColumns) this.render(false);
+      if (movedAcrossColumns && this.shouldManuallyRenderAfterUpdate()) this.render(false);
       return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
     }
 
@@ -8529,17 +8809,18 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     if (!updates.length) {
       this.clearItemReorderVisualState();
-      if (movedAcrossColumns) this.render(false);
+      if (movedAcrossColumns && this.shouldManuallyRenderAfterUpdate()) this.render(false);
       return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
     }
 
     const applied = await this.applyActorItemOrderUpdates(updates);
     this.clearItemReorderVisualState();
-    if (applied || movedAcrossColumns) this.render(false);
+    if ((applied || movedAcrossColumns) && this.shouldManuallyRenderAfterUpdate()) this.render(false);
     return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
   }
 
   onItemReorderDragStart(eventLike) {
+    const startedAt = startPerfTimer();
     const nativeEvent = eventLike?.originalEvent || eventLike;
     const delegatedTarget = eventLike?.currentTarget;
     const li = delegatedTarget?.closest?.("li.item[data-item-id]")
@@ -8570,6 +8851,12 @@ class BloodmanActorSheet extends BaseActorSheet {
       // Keep in-memory payload fallback for browsers that refuse drag metadata.
     }
     li.classList.add("is-reorder-dragging");
+    logSheetPerformance("actor-sheet.drag.start", {
+      actorId: this.actor?.id || "",
+      itemId: String(item.id || ""),
+      itemType: String(item.type || ""),
+      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+    });
   }
 
   onItemReorderDragOver(eventLike) {
@@ -8743,6 +9030,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async onExternalItemListDrop(eventLike) {
+    const startedAt = startPerfTimer();
     const nativeEvent = eventLike?.originalEvent || eventLike;
     const data = getDragEventData(nativeEvent);
     const dataType = String(data?.type || "").trim().toLowerCase();
@@ -8814,7 +9102,14 @@ class BloodmanActorSheet extends BaseActorSheet {
         }
       }
       this.clearItemReorderVisualState();
-      if (movedAny) this.render(false);
+      if (movedAny && this.shouldManuallyRenderAfterUpdate()) this.render(false);
+      logSheetPerformance("actor-sheet.drop.external", {
+        actorId: this.actor?.id || "",
+        dropKey,
+        movedAny,
+        itemCount: candidateIds.length,
+        durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+      });
       return dropped;
     } finally {
       this.clearRememberedEquiperAvecDropTarget();
@@ -8823,6 +9118,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async onItemReorderDrop(eventLike) {
+    const startedAt = startPerfTimer();
     const nativeEvent = eventLike?.originalEvent || eventLike;
     if (
       this.getEquiperAvecDropContainerFromEvent(eventLike)
@@ -8947,7 +9243,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       if (!targetItem || String(targetItem.id || "") === String(latestSourceItem.id || "")) {
         this.clearItemReorderVisualState();
-        if (bagStateChanged) this.render(false);
+        if (bagStateChanged && this.shouldManuallyRenderAfterUpdate()) this.render(false);
         return this.buildCarryDropSuccessResult();
       }
 
@@ -8965,14 +9261,18 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       if (!updates.length) {
         this.clearItemReorderVisualState();
-        if (bagStateChanged) this.render(false);
+        if (bagStateChanged && this.shouldManuallyRenderAfterUpdate()) this.render(false);
         return this.buildCarryDropSuccessResult();
       }
       const applied = await this.applyActorItemOrderUpdates(updates);
       this.clearItemReorderVisualState();
-      if (applied) this.render(false);
+      if (applied && this.shouldManuallyRenderAfterUpdate()) this.render(false);
       return this.buildCarryDropSuccessResult();
     } finally {
+      logSheetPerformance("actor-sheet.drop.reorder", {
+        actorId: this.actor?.id || "",
+        durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+      });
       this._activeItemReorderPayload = null;
     }
   }
@@ -9195,11 +9495,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async resolveDroppedItemDocument(data) {
-    const itemDocumentClass = Item?.implementation?.fromDropData
-      ? Item.implementation
-      : Item;
-    if (!itemDocumentClass?.fromDropData) return null;
-    return itemDocumentClass.fromDropData(data).catch(() => null);
+    return resolveDroppedItemFromDropDataCached(data);
   }
 
   isEquiperAvecTypeCompatible(parentItem, childItem, acceptedTypes = null) {
@@ -9473,8 +9769,15 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   getData(options = {}) {
+    const startedAt = startPerfTimer();
     const data = super.getData(options);
-    return this.prepareBloodmanActorSheetData(data, options);
+    const preparedData = this.prepareBloodmanActorSheetData(data, options);
+    logSheetPerformance("actor-sheet.getData", {
+      actorId: this.actor?.id || "",
+      actorType: this.actor?.type || "",
+      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+    });
+    return preparedData;
   }
 
   prepareBloodmanActorSheetData(data, _options = {}) {
@@ -9633,7 +9936,13 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     equipment.monnaies = String(equipment.monnaies ?? "").trim();
     equipment.monnaiesActuel = normalizeCurrencyCurrentValue(equipment.monnaiesActuel, 0).value;
-    const bagSlotsEnabled = Boolean(equipment.bagSlotsEnabled);
+    const actorBagSlotsEnabled = toCheckboxBoolean(equipment.bagSlotsEnabled, false);
+    if (this._optimisticBagSlotsEnabled !== null && actorBagSlotsEnabled === this._optimisticBagSlotsEnabled) {
+      this._optimisticBagSlotsEnabled = null;
+    }
+    const bagSlotsEnabled = this._optimisticBagSlotsEnabled !== null
+      ? Boolean(this._optimisticBagSlotsEnabled)
+      : actorBagSlotsEnabled;
     const carriedItemsLimit = bagSlotsEnabled ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
     const {
       ammoPool,
@@ -10012,6 +10321,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   activateBloodmanActorListeners(html) {
+    const basicPlayer = isBasicPlayerRole(game.user?.role);
     const activatePrimaryTab = tabId => {
       const tab = String(tabId || this._bloodmanActivePrimaryTab || "carac").trim() || "carac";
       this._bloodmanActivePrimaryTab = tab;
@@ -10188,35 +10498,47 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.reloadWeapon(item);
     });
 
-    html.on("dragstart", "li.item[data-item-id]", ev => {
+    html.off("dragstart.bloodmanDnd", "li.item[data-item-id]");
+    html.off("dragover.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']");
+    html.off("dragleave.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']");
+    html.off("dragend.bloodmanDnd", "li.item[data-item-id]");
+    html.off("drop.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']");
+    html.off("dragover.bloodmanDnd", "[data-equiper-avec-drop='true']");
+    html.off("dragleave.bloodmanDnd", "[data-equiper-avec-drop='true']");
+    html.off("drop.bloodmanDnd", "[data-equiper-avec-drop='true']");
+
+    html.on("dragstart.bloodmanDnd", "li.item[data-item-id]", ev => {
       this.onItemReorderDragStart(ev);
     });
 
-    html.on("dragover", "ol.item-list, [data-item-list-drop-target='true']", ev => {
+    html.on("dragover.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']", ev => {
+      if (this.shouldSkipItemListContainerDelegate(ev)) return;
       this.onItemReorderDragOver(ev);
     });
 
-    html.on("dragleave", "ol.item-list, [data-item-list-drop-target='true']", ev => {
+    html.on("dragleave.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']", ev => {
+      if (this.shouldSkipItemListContainerDelegate(ev)) return;
       this.onItemReorderDragLeave(ev);
     });
 
-    html.on("dragend", "li.item[data-item-id]", () => {
+    html.on("dragend.bloodmanDnd", "li.item[data-item-id]", () => {
       this.onItemReorderDragEnd();
     });
 
-    html.on("drop", "ol.item-list, [data-item-list-drop-target='true']", async ev => {
+    html.on("drop.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']", async ev => {
+      if (this.shouldSkipItemListContainerDelegate(ev)) return;
       await this.onItemReorderDrop(ev);
     });
 
-    html.on("dragover", "[data-equiper-avec-drop='true']", ev => {
+    html.on("dragover.bloodmanDnd", "[data-equiper-avec-drop='true']", ev => {
       this.onEquiperAvecDragOver(ev);
     });
 
-    html.on("dragleave", "[data-equiper-avec-drop='true']", ev => {
+    html.on("dragleave.bloodmanDnd", "[data-equiper-avec-drop='true']", ev => {
       this.onEquiperAvecDragLeave(ev);
     });
 
-    html.on("drop", "[data-equiper-avec-drop='true']", async ev => {
+    html.on("drop.bloodmanDnd", "[data-equiper-avec-drop='true']", async ev => {
       await this.onEquiperAvecDrop(ev);
     });
 
@@ -10389,7 +10711,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       ev.preventDefault();
       ev.stopPropagation();
       if (basicPlayer) {
-        const currentBagSlotsEnabled = this.isActorBagSlotsEnabled();
+        const currentBagSlotsEnabled = this.isActorBagSlotsEnabled(this.actor);
         html.find(".bag-slots-toggle[data-bag-slots='yes']").prop("checked", currentBagSlotsEnabled);
         html.find(".bag-slots-toggle[data-bag-slots='no']").prop("checked", !currentBagSlotsEnabled);
         return;
@@ -10413,7 +10735,15 @@ class BloodmanActorSheet extends BaseActorSheet {
         noInput.prop("checked", checked);
       }
 
-      await this.applyActorUpdate({ "system.equipment.bagSlotsEnabled": bagSlotsEnabled });
+      this._optimisticBagSlotsEnabled = bagSlotsEnabled;
+      const applied = await this.applyActorUpdate({ "system.equipment.bagSlotsEnabled": bagSlotsEnabled });
+      if (!applied) {
+        this._optimisticBagSlotsEnabled = null;
+        const currentBagSlotsEnabled = this.isActorBagSlotsEnabled(this.actor);
+        yesInput.prop("checked", currentBagSlotsEnabled);
+        noInput.prop("checked", !currentBagSlotsEnabled);
+        return;
+      }
       if (bagSlotsEnabled) {
         const overflowMoved = await this.enforceMainCarryOverflowToBag({ bagEnabledOverride: true });
         if (overflowMoved) this.render(false);
@@ -10752,7 +11082,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   async promptDropDecision(preview) {
-    if (!preview || typeof getDialogClass() !== "function") return "fermer";
+    if (!preview || (typeof getDialogClass() !== "function" && typeof getDialogV2Class() !== "function")) return "fermer";
     const escapeHtml = escapeChatMarkup;
     const eyebrow = tl(
       "BLOODMAN.Dialogs.DropDecision.Eyebrow",
@@ -10789,7 +11119,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         resolve(String(value || "fermer"));
       };
 
-      createBloodmanDialog(
+      const dialog = createBloodmanDialog(
         {
           title,
           content,
@@ -10814,11 +11144,14 @@ class BloodmanActorSheet extends BaseActorSheet {
           classes: ["bloodman-insufficient-funds-dialog", "bloodman-drop-decision-dialog"],
           width: 560
         }
-      ).render(true);
+      );
+      if (dialog?.render) dialog.render(true);
+      else finish("fermer");
     });
   }
 
   async _onDropItem(event, data) {
+    const startedAt = startPerfTimer();
     const equiperAvecParent = await this.resolveEquiperAvecParentForDrop(event, data);
     if (equiperAvecParent) {
       this.rememberEquiperAvecDropTarget(equiperAvecParent);
@@ -10900,11 +11233,21 @@ class BloodmanActorSheet extends BaseActorSheet {
         });
         if (overflowMoved) this.render(false);
       }
+      logSheetPerformance("actor-sheet.drop.item", {
+        actorId: this.actor?.id || "",
+        action: shouldBuy ? "buy" : "free",
+        durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+      });
       return dropped;
     } catch (error) {
       if (deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
       }
+      logSheetPerformance("actor-sheet.drop.item-error", {
+        actorId: this.actor?.id || "",
+        durationMs: Number(endPerfTimer(startedAt).toFixed(2)),
+        error: String(error?.message || error || "")
+      });
       throw error;
     }
   }
@@ -11878,7 +12221,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         </div>
       </div>
     </form>`;
-    createBloodmanDialog(
+    renderBloodmanDialog(
       {
         title: t("BLOODMAN.Dialogs.Growth.Title"),
         content,
@@ -11897,14 +12240,14 @@ class BloodmanActorSheet extends BaseActorSheet {
         classes: ["bloodman-growth-dialog"],
         width: 430
       }
-    ).render(true);
+    );
   }
 }
 
 class BloodmanNpcSheet extends BloodmanActorSheet {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      template: "systems/bloodman/templates/actor-non-joueur.html",
+      template: NPC_ACTOR_SHEET_TEMPLATE_PATH,
       width: 1195,
       height: 815
     });
@@ -11966,7 +12309,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
 
   static PARTS = {
     sheet: {
-      template: "systems/bloodman/templates/actor-joueur.html",
+      template: PLAYER_ACTOR_SHEET_TEMPLATE_PATH,
       root: true
     }
   };
@@ -11990,6 +12333,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
   }
 
   async _prepareContext(options = {}) {
+    const startedAt = startPerfTimer();
     registerBloodmanHandlebarsHelpers();
     const context = typeof super._prepareContext === "function"
       ? await super._prepareContext(options)
@@ -12002,10 +12346,17 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       document: this.actor,
       system: this.actor?.system || {}
     };
-    return this.prepareBloodmanActorSheetData(data, options);
+    const preparedData = this.prepareBloodmanActorSheetData(data, options);
+    logSheetPerformance("actor-sheet-v2.prepareContext", {
+      actorId: this.actor?.id || "",
+      actorType: this.actor?.type || "",
+      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+    });
+    return preparedData;
   }
 
   async _onRender(context, options) {
+    const startedAt = startPerfTimer();
     const documentSheetV2 = globalThis.foundry?.applications?.api?.DocumentSheetV2;
     if (documentSheetV2?.prototype?._onRender) {
       await documentSheetV2.prototype._onRender.call(this, context, options);
@@ -12016,6 +12367,12 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     const formElement = this.form || this.element;
     this._bloodmanElementWrapper = typeof jq === "function" ? jq(formElement) : formElement;
     this.activateBloodmanActorListeners(this._bloodmanElementWrapper);
+    this._debugActorSheetRenderCount = Number(this._debugActorSheetRenderCount || 0) + 1;
+    logSheetPerformance("actor-sheet-v2.render", {
+      actorId: this.actor?.id || "",
+      renderCount: this._debugActorSheetRenderCount,
+      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
+    });
   }
 
   _prepareSubmitData(event, form, formData, updateData) {
@@ -12141,7 +12498,7 @@ class BloodmanNpcSheetV2 extends BloodmanActorSheetV2 {
 
   static PARTS = {
     sheet: {
-      template: "systems/bloodman/templates/actor-non-joueur.html",
+      template: NPC_ACTOR_SHEET_TEMPLATE_PATH,
       root: true
     }
   };
@@ -12184,7 +12541,7 @@ copyActorSheetBehaviorToV2();
 
 class BloodmanItemSheet extends BaseItemSheet {
   get template() {
-    return "systems/bloodman/templates/item-unified.html";
+    return ITEM_SHEET_TEMPLATE_PATH;
   }
 
   static getResponsiveSheetSize() {
@@ -12426,8 +12783,7 @@ class BloodmanItemSheet extends BaseItemSheet {
         await this.item.update({ "system.audioFile": nextPath });
       }
     });
-    picker.render(true);
-    return true;
+    return renderFilePickerSafely(picker, "item-audio-file-picker");
   }
 
   getResponsiveSheetScaleTarget(rootLike = null) {
@@ -12885,11 +13241,7 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   async resolveDroppedItemDocument(data) {
-    const itemDocumentClass = Item?.implementation?.fromDropData
-      ? Item.implementation
-      : Item;
-    if (!itemDocumentClass?.fromDropData) return null;
-    return itemDocumentClass.fromDropData(data).catch(() => null);
+    return resolveDroppedItemFromDropDataCached(data);
   }
 
   isItemSheetEquiperAvecTypeAccepted(itemType, acceptedTypes = null) {

@@ -19,15 +19,63 @@ function parseQuotedList(raw = "") {
   return values.filter(Boolean);
 }
 
+function parseConstStringMap(sourceText) {
+  const map = new Map();
+  const pattern = /const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)";/g;
+  let match;
+  while ((match = pattern.exec(sourceText))) {
+    map.set(String(match[1] || "").trim(), String(match[2] || "").trim());
+  }
+  return map;
+}
+
+function parseConstArrayMap(sourceText) {
+  const map = new Map();
+  const pattern = /const\s+([A-Z0-9_]+)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]\)?;/g;
+  let match;
+  while ((match = pattern.exec(sourceText))) {
+    map.set(String(match[1] || "").trim(), parseQuotedList(match[2] || ""));
+  }
+  return map;
+}
+
+function parseTypesExpression(rawExpression, constStrings, constArrays) {
+  const values = [];
+  const expression = String(rawExpression || "").trim();
+  if (!expression) return values;
+  const parts = expression.split(",").map(part => part.trim()).filter(Boolean);
+  for (const part of parts) {
+    if (part.startsWith("...")) {
+      const arrayName = part.slice(3).trim();
+      for (const value of constArrays.get(arrayName) || []) values.push(value);
+      continue;
+    }
+    const quoted = part.match(/^"([^"]+)"$/);
+    if (quoted) {
+      values.push(String(quoted[1] || "").trim());
+      continue;
+    }
+    if (constStrings.has(part)) {
+      values.push(String(constStrings.get(part) || "").trim());
+      continue;
+    }
+    for (const value of constArrays.get(part) || []) values.push(value);
+  }
+  return values.filter(Boolean);
+}
+
 function parseRuntimeRegisteredTypes(sourceText, collectionName) {
   const set = new Set();
+  const constStrings = parseConstStringMap(sourceText);
+  const constArrays = parseConstArrayMap(sourceText);
   const pattern = new RegExp(
-    `${collectionName}\\.registerSheet\\(\\"bloodman\\",[\\s\\S]*?types:\\s*\\[([^\\]]*)\\]`,
+    `${collectionName}\\.registerSheet\\([^\\)]*?types:\\s*\\[([^\\]]*)\\]`,
     "g"
   );
   let match;
   while ((match = pattern.exec(sourceText))) {
-    for (const type of parseQuotedList(match[1])) set.add(type);
+    const parsedValues = parseTypesExpression(match[1], constStrings, constArrays);
+    for (const type of parsedValues) set.add(type);
   }
   return set;
 }
@@ -42,6 +90,10 @@ function parseTemplatePathsFromRuntime(sourceText) {
   const itemTemplatePattern = /return\s+"systems\/bloodman\/(templates\/[^"]+)"/g;
   while ((match = itemTemplatePattern.exec(sourceText))) {
     paths.add(match[1]);
+  }
+  const templateConstPattern = /const\s+[A-Z0-9_]+_TEMPLATE_PATH\s*=\s*`[^`]*\/(templates\/[^`]+)`;/g;
+  while ((match = templateConstPattern.exec(sourceText))) {
+    paths.add(String(match[1] || "").trim());
   }
   return paths;
 }
