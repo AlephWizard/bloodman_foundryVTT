@@ -11089,6 +11089,23 @@ class BloodmanActorSheet extends BaseActorSheet {
       "Deplacement d'objet"
     );
     const title = tl("BLOODMAN.Dialogs.DropDecision.Title", "Transfert d'objet");
+    const itemLabel = tl("BLOODMAN.Dialogs.DropDecision.ItemLabel", "Objet");
+    const sourceLabel = tl("BLOODMAN.Dialogs.DropDecision.SourceLabel", "Source");
+    const destinationLabel = tl("BLOODMAN.Dialogs.DropDecision.TargetLabel", "Destination");
+    const quantityLabel = tl("BLOODMAN.Dialogs.DropDecision.QuantityLabel", "Quantite");
+    const warningLabel = tl("BLOODMAN.Dialogs.DropDecision.WarningLabel", "Attention");
+    const warningText = tl(
+      "BLOODMAN.Dialogs.DropDecision.InvalidPriceWarning",
+      "Un ou plusieurs objets ont un prix invalide. L'achat sera bloque."
+    );
+    const unknownSource = tl("BLOODMAN.Dialogs.DropDecision.SourceUnknown", "Source non identifiee");
+    const sourceDisplay = String(preview.firstSourceName || "").trim() || unknownSource;
+    const quantityDisplay = Number.isFinite(Number(preview.totalQuantity))
+      ? Math.max(1, Math.floor(Number(preview.totalQuantity)))
+      : 1;
+    const itemCountDisplay = Number.isFinite(Number(preview.itemCount))
+      ? Math.max(1, Math.floor(Number(preview.itemCount)))
+      : 1;
     const details = `${preview.costLabel}: ${formatCurrencyValue(preview.totalCost)}`;
     const specificsMarkup = preview.specificities
       .map(line => `<li>${escapeHtml(line)}</li>`)
@@ -11105,7 +11122,27 @@ class BloodmanActorSheet extends BaseActorSheet {
             <p class="bm-drop-insufficient-prompt">${escapeHtml(preview.question)}</p>
           </div>
         </div>
+        <div class="bm-drop-transfer-summary" role="group" aria-label="${escapeHtml(title)}">
+          <div class="bm-drop-transfer-card bm-drop-transfer-card-item">
+            <p class="bm-drop-transfer-card-label">${escapeHtml(itemLabel)}</p>
+            <p class="bm-drop-transfer-card-value">${escapeHtml(preview.firstItemName)}</p>
+            ${itemCountDisplay > 1 ? `<p class="bm-drop-transfer-card-hint">${itemCountDisplay} objet(s)</p>` : ""}
+          </div>
+          <div class="bm-drop-transfer-card">
+            <p class="bm-drop-transfer-card-label">${escapeHtml(sourceLabel)}</p>
+            <p class="bm-drop-transfer-card-value">${escapeHtml(sourceDisplay)}</p>
+          </div>
+          <div class="bm-drop-transfer-card">
+            <p class="bm-drop-transfer-card-label">${escapeHtml(destinationLabel)}</p>
+            <p class="bm-drop-transfer-card-value">${escapeHtml(preview.targetName)}</p>
+          </div>
+          <div class="bm-drop-transfer-card bm-drop-transfer-card-qty">
+            <p class="bm-drop-transfer-card-label">${escapeHtml(quantityLabel)}</p>
+            <p class="bm-drop-transfer-card-value">${escapeHtml(String(quantityDisplay))}</p>
+          </div>
+        </div>
         <p class="bm-drop-insufficient-details">${escapeHtml(details)}</p>
+        ${preview.hasInvalidPrice ? `<p class="bm-drop-insufficient-warning"><strong>${escapeHtml(warningLabel)}:</strong> ${escapeHtml(warningText)}</p>` : ""}
         <p class="bm-drop-insufficient-specificities-title">${escapeHtml(preview.specificsLabel)}</p>
         <ul class="bm-drop-insufficient-specificities">${specificsMarkup}</ul>
       </div>
@@ -11123,6 +11160,34 @@ class BloodmanActorSheet extends BaseActorSheet {
         {
           title,
           content,
+          render: html => {
+            const summary = html.find(".bm-drop-transfer-summary");
+            const currentDisplay = summary.length
+              ? (globalThis.getComputedStyle?.(summary.get(0))?.display || "")
+              : "";
+            if (summary.length && currentDisplay !== "grid") {
+              summary.css({ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" });
+              html.find(".bm-drop-transfer-card").css({
+                display: "grid",
+                gap: "2px",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: "8px",
+                padding: "7px 9px",
+                background: "rgba(255,255,255,0.04)"
+              });
+              html.find(".bm-drop-transfer-card-label").css({
+                fontSize: "10px",
+                textTransform: "uppercase",
+                letterSpacing: "0.45px",
+                opacity: "0.8"
+              });
+              html.find(".bm-drop-transfer-card-value").css({
+                fontSize: "14px",
+                fontWeight: "700",
+                lineHeight: "1.2"
+              });
+            }
+          },
           buttons: {
             buy: {
               label: tl("BLOODMAN.Dialogs.DropDecision.ActionBuy", "Achat"),

@@ -167,6 +167,15 @@ export function createDropDecisionRules({
     if (!Array.isArray(resolvedItems) || !resolvedItems.length) return null;
     const safeTargetName = String(targetName || "").trim() || t("BLOODMAN.Common.Name");
     const firstItemName = String(resolvedItems[0]?.droppedItem?.name || "").trim() || t("BLOODMAN.Common.Name");
+    const firstSourceName = String(
+      resolvedItems[0]?.sourceActor?.name
+      || resolvedItems[0]?.sourceActor?.prototypeToken?.name
+      || ""
+    ).trim();
+    const totalQuantity = resolvedItems.reduce((sum, entry) => {
+      const quantity = Math.max(1, Math.floor(toFinite(entry?.quantity, 1)));
+      return sum + quantity;
+    }, 0);
     const intro = tl(
       "BLOODMAN.Dialogs.DropDecision.Intro",
       "Vous vous appretez a glisser '{item}' sur la fiche de '{sheet}'.",
@@ -214,7 +223,10 @@ export function createDropDecisionRules({
       costLabel,
       specificsLabel,
       firstItemName,
+      firstSourceName,
       targetName: safeTargetName,
+      itemCount: resolvedItems.length,
+      totalQuantity,
       specificities,
       totalCost,
       hasInvalidPrice: Boolean(purchase?.hasInvalidPrice)

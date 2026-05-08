@@ -727,7 +727,8 @@
 }
 
 .window-app.bloodman-damage-dialog,
-.window-app.dialog.bloodman-damage-dialog {
+.window-app.dialog.bloodman-damage-dialog,
+.application.bloodman-damage-dialog {
   --bm-damage-bg: #121015;
   --bm-damage-bg-soft: #1a1720;
   --bm-damage-field: #18141d;
@@ -740,7 +741,8 @@
 }
 
 body.theme-light .window-app.bloodman-damage-dialog,
-body.theme-light .window-app.dialog.bloodman-damage-dialog {
+body.theme-light .window-app.dialog.bloodman-damage-dialog,
+body.theme-light .application.bloodman-damage-dialog {
   --bm-damage-bg: #f2eff8;
   --bm-damage-bg-soft: #ebe6f4;
   --bm-damage-field: #ffffff;
@@ -753,7 +755,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
 }
 
 .window-app.bloodman-damage-dialog-simple-attack,
-.window-app.dialog.bloodman-damage-dialog-simple-attack {
+.window-app.dialog.bloodman-damage-dialog-simple-attack,
+.application.bloodman-damage-dialog-simple-attack {
   --bm-damage-bg: #121910;
   --bm-damage-bg-soft: #1a2416;
   --bm-damage-field: #182114;
@@ -766,7 +769,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog {
 }
 
 body.theme-light .window-app.bloodman-damage-dialog-simple-attack,
-body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
+body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack,
+body.theme-light .application.bloodman-damage-dialog-simple-attack {
   --bm-damage-bg: #edf5e9;
   --bm-damage-bg-soft: #e4efde;
   --bm-damage-field: #ffffff;
@@ -894,6 +898,53 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
   display: grid;
   gap: 9px;
   grid-template-columns: 1fr;
+}
+
+.bm-damage-config .bm-damage-config-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.bm-damage-config .bm-damage-config-meta-chip {
+  display: grid;
+  gap: 2px;
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 86%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bm-damage-field) 90%, transparent);
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.bm-damage-config .bm-damage-config-meta-chip-label {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  color: var(--bm-damage-muted);
+}
+
+.bm-damage-config .bm-damage-config-meta-chip-value {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Rajdhani", "Oswald", sans-serif;
+  font-size: 14px;
+  line-height: 1.1;
+  color: var(--bm-damage-fg);
+}
+
+.bm-damage-config .bm-damage-config-row-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+  color: var(--bm-damage-muted);
 }
 
 .bm-damage-config .bm-damage-config-row {
@@ -1126,7 +1177,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons,
-.window-app.dialog.bloodman-damage-dialog .dialog-buttons {
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons,
+.application.bloodman-damage-dialog .dialog-buttons {
   margin-top: 8px;
   padding: 0;
   border: 0 !important;
@@ -1134,7 +1186,8 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons button,
-.window-app.dialog.bloodman-damage-dialog .dialog-buttons button {
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button,
+.application.bloodman-damage-dialog .dialog-buttons button {
   width: 100%;
   height: 38px;
   border: 1px solid var(--bm-damage-border-strong) !important;
@@ -1154,13 +1207,28 @@ body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack {
 .window-app.bloodman-damage-dialog .dialog-buttons button:hover,
 .window-app.bloodman-damage-dialog .dialog-buttons button:focus,
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button:hover,
-.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:focus {
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:focus,
+.application.bloodman-damage-dialog .dialog-buttons button:hover,
+.application.bloodman-damage-dialog .dialog-buttons button:focus {
   filter: brightness(1.08);
   box-shadow: none;
 }
 
+.window-app.bloodman-damage-dialog .dialog-buttons button[data-button="roll"],
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button[data-button="roll"],
+.application.bloodman-damage-dialog .dialog-buttons button[data-button="roll"] {
+  border-color: color-mix(in srgb, var(--bm-damage-border-strong) 90%, #ff6d6d 10%) !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bm-damage-field) 55%, #2f6b2f 45%),
+    color-mix(in srgb, var(--bm-damage-field) 72%, #204a20 28%)
+  ) !important;
+  color: #f7fff6 !important;
+}
+
 .window-app.bloodman-damage-dialog .window-content,
-.window-app.dialog.bloodman-damage-dialog .window-content {
+.window-app.dialog.bloodman-damage-dialog .window-content,
+.application.bloodman-damage-dialog .window-content {
   background: var(--bm-damage-bg) !important;
   color: var(--bm-damage-fg) !important;
   padding: 10px;
@@ -1543,7 +1611,8 @@ body.theme-light .window-app.dialog.bloodman-growth-dialog {
 }
 
 .window-app.bloodman-insufficient-funds-dialog,
-.window-app.dialog.bloodman-insufficient-funds-dialog {
+.window-app.dialog.bloodman-insufficient-funds-dialog,
+.application.bloodman-insufficient-funds-dialog {
   --bm-insufficient-bg: #1d1212;
   --bm-insufficient-bg-soft: #2a1919;
   --bm-insufficient-field: #261616;
@@ -1555,7 +1624,8 @@ body.theme-light .window-app.dialog.bloodman-growth-dialog {
 }
 
 body.theme-light .window-app.bloodman-insufficient-funds-dialog,
-body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
+body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog,
+body.theme-light .application.bloodman-insufficient-funds-dialog {
   --bm-insufficient-bg: #f7ecec;
   --bm-insufficient-bg-soft: #f1e1e1;
   --bm-insufficient-field: #ffffff;
@@ -1567,13 +1637,15 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 }
 
 .window-app.bloodman-insufficient-funds-dialog .window-header,
-.window-app.dialog.bloodman-insufficient-funds-dialog .window-header {
+.window-app.dialog.bloodman-insufficient-funds-dialog .window-header,
+.application.bloodman-insufficient-funds-dialog .window-header {
   background: linear-gradient(180deg, var(--bm-insufficient-bg-soft), var(--bm-insufficient-bg));
   border-bottom: 1px solid var(--bm-insufficient-border);
 }
 
 .window-app.bloodman-insufficient-funds-dialog .window-content,
-.window-app.dialog.bloodman-insufficient-funds-dialog .window-content {
+.window-app.dialog.bloodman-insufficient-funds-dialog .window-content,
+.application.bloodman-insufficient-funds-dialog .window-content {
   background: var(--bm-insufficient-bg) !important;
   color: var(--bm-insufficient-fg);
   padding: 10px;
@@ -1663,6 +1735,67 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
   padding: 7px 9px;
 }
 
+.bm-drop-insufficient-funds .bm-drop-transfer-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--bm-insufficient-border);
+  border-radius: 8px;
+  background: var(--bm-insufficient-field);
+  padding: 7px 9px;
+  min-width: 0;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-item {
+  border-color: color-mix(in srgb, var(--bm-insufficient-border-strong) 68%, var(--bm-insufficient-border) 32%);
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-qty {
+  align-content: center;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-label {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+  color: var(--bm-insufficient-muted);
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-value {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--bm-insufficient-fg);
+  overflow-wrap: anywhere;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--bm-insufficient-muted);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-warning {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--bm-insufficient-accent) 72%, var(--bm-insufficient-border) 28%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bm-insufficient-field) 72%, var(--bm-insufficient-accent) 28%);
+  color: var(--bm-insufficient-fg);
+  font-size: 12px;
+  line-height: 1.25;
+  padding: 7px 9px;
+}
+
 .bm-drop-insufficient-funds .bm-drop-insufficient-specificities-title {
   margin: 0;
   font-size: 11px;
@@ -1692,7 +1825,8 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons {
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons {
   margin-top: 8px;
   padding: 0;
   border: 0 !important;
@@ -1703,7 +1837,8 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button,
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button {
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button {
   min-height: 38px;
   border: 1px solid var(--bm-insufficient-border-strong) !important;
   border-radius: 8px;
@@ -1719,31 +1854,48 @@ body.theme-light .window-app.dialog.bloodman-insufficient-funds-dialog {
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"] {
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"] {
   border-color: var(--bm-insufficient-accent) !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bm-insufficient-accent) 60%, var(--bm-insufficient-field) 40%),
+    color-mix(in srgb, var(--bm-insufficient-accent) 78%, var(--bm-insufficient-field) 22%)
+  ) !important;
+  color: #fff9f9 !important;
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"] {
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"] {
   border-color: #7aa764 !important;
+  background: color-mix(in srgb, var(--bm-insufficient-field) 82%, #3e5f36 18%) !important;
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="close"],
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="close"] {
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="close"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="close"] {
   border-color: var(--bm-insufficient-border) !important;
 }
 
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
 .window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:focus,
 .window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
-.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:focus {
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:focus,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button:focus {
   filter: brightness(1.08);
   box-shadow: none;
 }
 
 @media (max-width: 520px) {
+  .bm-drop-insufficient-funds .bm-drop-transfer-summary {
+    grid-template-columns: 1fr;
+  }
+
   .window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
-  .window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons {
+  .window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons,
+  .application.bloodman-insufficient-funds-dialog .dialog-buttons {
     grid-template-columns: 1fr;
   }
 }

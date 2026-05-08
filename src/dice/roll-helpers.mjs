@@ -831,6 +831,16 @@ async function promptDamageConfiguration({
   );
   const shouldShowFormulaNotice = !lockFormulaSelection && hasStoredFormulaDivergence;
   const highlightedNumberClass = "bm-damage-config-value-active";
+  const sourceInfoLabel = tl("BLOODMAN.Dialogs.DamageConfig.SourceLabel", "Source");
+  const damageTypeInfoLabel = tl("BLOODMAN.Dialogs.DamageConfig.RollTypeLabel", "Type de jet");
+  const modifiersInfoLabel = tl("BLOODMAN.Dialogs.DamageConfig.ModifiersLabel", "Modificateurs");
+  const formulaSectionLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaSectionLabel", "Degats concernes");
+  const lockedFormulaLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaLockedLabel", "Formule verrouillee");
+  const freeFormulaLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaEditableLabel", "Formule editable");
+  const sourceDisplay = String(sourceName || "").trim() || tl("BLOODMAN.Common.Name", "Source");
+  const rollTypeDisplay = isSimpleAttackVariant
+    ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackTypeLabel", "Attaque simple")
+    : tl("BLOODMAN.Dialogs.DamageConfig.StandardAttackTypeLabel", "Jet de degats");
 
   const inputDisabledAttr = lockFormulaSelection ? " disabled" : "";
   const formVariantClass = isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
@@ -847,6 +857,20 @@ async function promptDamageConfiguration({
           <p class="bm-damage-config-eyebrow">${eyebrowLabel}</p>
           <p class="bm-damage-config-title">${hintLabel}</p>
           ${shouldShowFormulaNotice ? `<p class="bm-damage-config-hint bm-damage-config-hint-sync">${formulaPriorityNotice} ${formulaDivergenceNotice}</p>` : ""}
+        </div>
+      </div>
+      <div class="bm-damage-config-meta" role="group" aria-label="${settingsLabel}">
+        <div class="bm-damage-config-meta-chip">
+          <span class="bm-damage-config-meta-chip-label">${sourceInfoLabel}</span>
+          <strong class="bm-damage-config-meta-chip-value">${sourceDisplay}</strong>
+        </div>
+        <div class="bm-damage-config-meta-chip">
+          <span class="bm-damage-config-meta-chip-label">${damageTypeInfoLabel}</span>
+          <strong class="bm-damage-config-meta-chip-value">${rollTypeDisplay}</strong>
+        </div>
+        <div class="bm-damage-config-meta-chip">
+          <span class="bm-damage-config-meta-chip-label">${formulaSectionLabel}</span>
+          <strong class="bm-damage-config-meta-chip-value">${lockFormulaSelection ? lockedFormulaLabel : freeFormulaLabel}</strong>
         </div>
       </div>
       <div class="bm-damage-config-grid">
@@ -868,6 +892,7 @@ async function promptDamageConfiguration({
             </ul>
           </details>
         </div>
+        <p class="bm-damage-config-row-title">${modifiersInfoLabel}</p>
         <div class="bm-damage-config-stats">
           <div class="bm-damage-config-stat bm-damage-config-stat--bonus">
             <label>${rawBonusCardLabel}</label>
@@ -958,6 +983,46 @@ async function promptDamageConfiguration({
         title: `${titleLabel}${titleSource}`,
         content,
         render: html => {
+          const applyDialogUiFallback = () => {
+            const meta = html.find(".bm-damage-config-meta");
+            if (meta.length) {
+              const currentDisplay = globalThis.getComputedStyle?.(meta.get(0))?.display || "";
+              if (currentDisplay !== "grid") {
+                meta.css({ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "7px" });
+                html.find(".bm-damage-config-meta-chip").css({
+                  display: "grid",
+                  gap: "2px",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  borderRadius: "8px",
+                  padding: "6px 8px",
+                  background: "rgba(255,255,255,0.04)"
+                });
+                html.find(".bm-damage-config-meta-chip-label").css({
+                  fontSize: "10px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.45px",
+                  opacity: "0.8"
+                });
+                html.find(".bm-damage-config-meta-chip-value").css({
+                  fontSize: "14px",
+                  fontWeight: "700",
+                  lineHeight: "1.1"
+                });
+                html.find(".bm-damage-config-stats").css({
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: "8px"
+                });
+                html.find(".bm-damage-config-stepper").css({
+                  display: "grid",
+                  gridTemplateColumns: "30px 1fr 30px",
+                  gap: "5px",
+                  alignItems: "center"
+                });
+              }
+            }
+          };
+          applyDialogUiFallback();
           if (!lockFormulaSelection) {
             const damageInput = html.find("input[name='degats']").first();
             const current = normalizeDamageFormula(damageInput.val());
