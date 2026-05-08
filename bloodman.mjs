@@ -251,14 +251,15 @@ function createDialogV2Shim(config = {}, options = {}) {
       : undefined,
     submit: result => {
       if (result == null && typeof normalizedConfig.close === "function") normalizedConfig.close();
-    },
-    render: (_event, dialog) => {
-      if (typeof normalizedConfig.render !== "function") return;
-      normalizedConfig.render(toDialogHtmlLike(dialog), dialog);
     }
   };
 
   const dialogInstance = new DialogV2Class(v2Options);
+  if (typeof normalizedConfig.render === "function" && typeof dialogInstance.addEventListener === "function") {
+    dialogInstance.addEventListener("render", () => {
+      normalizedConfig.render(toDialogHtmlLike(dialogInstance), dialogInstance);
+    });
+  }
   return {
     render(force = true) {
       const renderResult = dialogInstance.render({ force: Boolean(force) });
@@ -11090,61 +11091,83 @@ class BloodmanActorSheet extends BaseActorSheet {
     );
     const title = tl("BLOODMAN.Dialogs.DropDecision.Title", "Transfert d'objet");
     const itemLabel = tl("BLOODMAN.Dialogs.DropDecision.ItemLabel", "Objet");
-    const sourceLabel = tl("BLOODMAN.Dialogs.DropDecision.SourceLabel", "Source");
     const destinationLabel = tl("BLOODMAN.Dialogs.DropDecision.TargetLabel", "Destination");
-    const quantityLabel = tl("BLOODMAN.Dialogs.DropDecision.QuantityLabel", "Quantite");
     const warningLabel = tl("BLOODMAN.Dialogs.DropDecision.WarningLabel", "Attention");
     const warningText = tl(
       "BLOODMAN.Dialogs.DropDecision.InvalidPriceWarning",
       "Un ou plusieurs objets ont un prix invalide. L'achat sera bloque."
     );
-    const unknownSource = tl("BLOODMAN.Dialogs.DropDecision.SourceUnknown", "Source non identifiee");
-    const sourceDisplay = String(preview.firstSourceName || "").trim() || unknownSource;
-    const quantityDisplay = Number.isFinite(Number(preview.totalQuantity))
-      ? Math.max(1, Math.floor(Number(preview.totalQuantity)))
-      : 1;
-    const itemCountDisplay = Number.isFinite(Number(preview.itemCount))
-      ? Math.max(1, Math.floor(Number(preview.itemCount)))
-      : 1;
-    const details = `${preview.costLabel}: ${formatCurrencyValue(preview.totalCost)}`;
     const specificsMarkup = preview.specificities
       .map(line => `<li>${escapeHtml(line)}</li>`)
       .join("");
-    const content = `<form class="bm-drop-insufficient-funds">
-      <div class="bm-drop-insufficient-shell">
-        <div class="bm-drop-insufficient-head">
-          <div class="bm-drop-insufficient-icon-wrap" aria-hidden="true">
-            <div class="bm-drop-insufficient-icon-ring"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    const transferDialogStyle = `<style>
+      .bloodman-drop-decision-dialog .bm-transfer-dialog{--bm-transfer-bg:#0c0b0a;--bm-transfer-panel:#171310;--bm-transfer-line:rgba(143,113,91,.58);--bm-transfer-soft:rgba(143,113,91,.24);--bm-transfer-red:#d84d45;--bm-transfer-gold:#d4b37e;--bm-transfer-text:#f6eee5;--bm-transfer-muted:#c1b09a;color:var(--bm-transfer-text)!important;margin:0!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-shell{display:grid!important;gap:12px!important;padding:14px!important;border:1px solid var(--bm-transfer-line)!important;border-radius:8px!important;background:radial-gradient(circle at 8% 0%,rgba(216,77,69,.16),transparent 34%),linear-gradient(180deg,#17120f,#080808)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 14px 28px rgba(0,0,0,.38)!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-hero{display:grid!important;grid-template-columns:52px minmax(0,1fr)!important;gap:12px!important;align-items:center!important;padding:12px!important;border:1px solid var(--bm-transfer-soft)!important;border-radius:7px!important;background:linear-gradient(90deg,rgba(216,77,69,.16),transparent 62%),#120f0e!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-alert{display:grid!important;place-items:center!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-alert-ring{display:grid!important;place-items:center!important;width:42px!important;height:42px!important;border:1px solid rgba(212,179,126,.66)!important;border-radius:50%!important;background:radial-gradient(circle,rgba(216,77,69,.22),transparent 62%),#0b0a09!important;box-shadow:0 0 14px rgba(216,77,69,.16),inset 0 0 0 1px rgba(255,255,255,.05)!important;transform:none!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-alert-ring i{color:#f06b61!important;font-size:18px!important;text-shadow:0 0 10px rgba(216,77,69,.45)!important;transform:none!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-kicker{margin:0!important;color:var(--bm-transfer-gold)!important;font-size:19px!important;font-weight:800!important;line-height:1.05!important;text-transform:uppercase!important;letter-spacing:0!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-intro,.bloodman-drop-decision-dialog .bm-transfer-question{margin:4px 0 0!important;color:var(--bm-transfer-text)!important;font-size:13px!important;line-height:1.32!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-question{font-weight:800!important;color:#fff!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;border:0!important;background:transparent!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-card{display:grid!important;grid-template-columns:38px minmax(0,1fr)!important;gap:10px!important;align-items:center!important;min-height:64px!important;padding:10px!important;border:1px solid var(--bm-transfer-soft)!important;border-radius:7px!important;background:linear-gradient(180deg,rgba(255,255,255,.035),transparent 46%),#0f0e0d!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-card-item{border-color:rgba(216,77,69,.52)!important;background:linear-gradient(90deg,rgba(216,77,69,.13),transparent 58%),#100e0d!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-card-icon{display:grid!important;place-items:center!important;width:36px!important;height:36px!important;border:1px solid rgba(216,77,69,.46)!important;border-radius:6px!important;background:rgba(216,77,69,.09)!important;color:#e6665d!important;font-size:15px!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-card-label,.bloodman-drop-decision-dialog .bm-transfer-section-title{margin:0!important;color:var(--bm-transfer-muted)!important;font-size:10px!important;font-weight:800!important;letter-spacing:.5px!important;text-transform:uppercase!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-card-value{margin:4px 0 0!important;color:var(--bm-transfer-text)!important;font-size:15px!important;font-weight:800!important;line-height:1.2!important;overflow-wrap:anywhere!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-lower{display:grid!important;grid-template-columns:154px minmax(0,1fr)!important;gap:10px!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-cost-card,.bloodman-drop-decision-dialog .bm-transfer-specifics-panel{border:1px solid var(--bm-transfer-soft)!important;border-radius:7px!important;background:linear-gradient(180deg,rgba(255,255,255,.035),transparent 44%),var(--bm-transfer-panel)!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-cost-card{display:grid!important;place-items:center!important;min-height:96px!important;padding:12px!important;border-color:rgba(212,179,126,.48)!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-cost-label{color:var(--bm-transfer-muted)!important;font-size:10px!important;font-weight:800!important;text-transform:uppercase!important;letter-spacing:.55px!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-cost-value{color:#fff5df!important;font-size:28px!important;font-weight:900!important;line-height:1!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-specifics-panel{padding:11px!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-specifics{display:grid!important;gap:6px!important;margin:8px 0 0!important;padding:0!important;border:0!important;background:transparent!important;list-style:none!important;max-height:130px!important;overflow:auto!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-specifics li{position:relative!important;margin:0!important;padding-left:15px!important;color:var(--bm-transfer-text)!important;font-size:12px!important;line-height:1.35!important;}
+      .bloodman-drop-decision-dialog .bm-transfer-specifics li::before{content:""!important;position:absolute!important;left:2px!important;top:.55em!important;width:5px!important;height:5px!important;border:1px solid var(--bm-transfer-red)!important;background:rgba(216,77,69,.3)!important;transform:rotate(45deg)!important;}
+      .bloodman-drop-decision-dialog .dialog-buttons{display:grid!important;grid-template-columns:.9fr 1.25fr .9fr!important;gap:8px!important;margin-top:10px!important;}
+      .bloodman-drop-decision-dialog .dialog-buttons button{min-height:42px!important;border:1px solid rgba(143,113,91,.72)!important;border-radius:5px!important;background:linear-gradient(180deg,#1f1a17,#0b0a09)!important;color:#f6eee5!important;font-weight:800!important;}
+      .bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"]{border-color:rgba(255,95,84,.88)!important;background:linear-gradient(180deg,#621612,#1a0706)!important;color:#fff8ef!important;}
+      @media(max-width:640px){.bloodman-drop-decision-dialog .bm-transfer-hero,.bloodman-drop-decision-dialog .bm-transfer-grid,.bloodman-drop-decision-dialog .bm-transfer-lower,.bloodman-drop-decision-dialog .dialog-buttons{grid-template-columns:1fr!important;}}
+    </style>`;
+    const content = `${transferDialogStyle}<form class="bm-drop-insufficient-funds bm-transfer-dialog">
+      <div class="bm-drop-insufficient-shell bm-transfer-shell">
+        <div class="bm-drop-insufficient-head bm-transfer-hero">
+          <div class="bm-transfer-alert" aria-hidden="true">
+            <div class="bm-transfer-alert-ring"><i class="fa-solid fa-right-left"></i></div>
           </div>
-          <div class="bm-drop-insufficient-head-copy">
-            <p class="bm-drop-insufficient-eyebrow">${escapeHtml(eyebrow)}</p>
-            <p class="bm-drop-insufficient-intro">${escapeHtml(preview.intro)}</p>
-            <p class="bm-drop-insufficient-prompt">${escapeHtml(preview.question)}</p>
+          <div class="bm-drop-insufficient-head-copy bm-transfer-hero-copy">
+            <p class="bm-drop-insufficient-eyebrow bm-transfer-kicker">${escapeHtml(eyebrow)}</p>
+            <p class="bm-drop-insufficient-intro bm-transfer-intro">${escapeHtml(preview.intro)}</p>
           </div>
         </div>
-        <div class="bm-drop-transfer-summary" role="group" aria-label="${escapeHtml(title)}">
-          <div class="bm-drop-transfer-card bm-drop-transfer-card-item">
-            <p class="bm-drop-transfer-card-label">${escapeHtml(itemLabel)}</p>
-            <p class="bm-drop-transfer-card-value">${escapeHtml(preview.firstItemName)}</p>
-            ${itemCountDisplay > 1 ? `<p class="bm-drop-transfer-card-hint">${itemCountDisplay} objet(s)</p>` : ""}
+        <div class="bm-drop-transfer-summary bm-transfer-grid" role="group" aria-label="${escapeHtml(title)}">
+          <div class="bm-drop-transfer-card bm-drop-transfer-card-item bm-transfer-card bm-transfer-card-item">
+            <i class="fa-solid fa-box-open bm-transfer-card-icon" aria-hidden="true"></i>
+            <div class="bm-transfer-card-copy">
+              <p class="bm-drop-transfer-card-label bm-transfer-card-label">${escapeHtml(itemLabel)}</p>
+              <p class="bm-drop-transfer-card-value bm-transfer-card-value">${escapeHtml(preview.firstItemName)}</p>
+            </div>
           </div>
-          <div class="bm-drop-transfer-card">
-            <p class="bm-drop-transfer-card-label">${escapeHtml(sourceLabel)}</p>
-            <p class="bm-drop-transfer-card-value">${escapeHtml(sourceDisplay)}</p>
-          </div>
-          <div class="bm-drop-transfer-card">
-            <p class="bm-drop-transfer-card-label">${escapeHtml(destinationLabel)}</p>
-            <p class="bm-drop-transfer-card-value">${escapeHtml(preview.targetName)}</p>
-          </div>
-          <div class="bm-drop-transfer-card bm-drop-transfer-card-qty">
-            <p class="bm-drop-transfer-card-label">${escapeHtml(quantityLabel)}</p>
-            <p class="bm-drop-transfer-card-value">${escapeHtml(String(quantityDisplay))}</p>
+          <div class="bm-drop-transfer-card bm-transfer-card">
+            <i class="fa-solid fa-crosshairs bm-transfer-card-icon" aria-hidden="true"></i>
+            <div class="bm-transfer-card-copy">
+              <p class="bm-drop-transfer-card-label bm-transfer-card-label">${escapeHtml(destinationLabel)}</p>
+              <p class="bm-drop-transfer-card-value bm-transfer-card-value">${escapeHtml(preview.targetName)}</p>
+            </div>
           </div>
         </div>
-        <p class="bm-drop-insufficient-details">${escapeHtml(details)}</p>
-        ${preview.hasInvalidPrice ? `<p class="bm-drop-insufficient-warning"><strong>${escapeHtml(warningLabel)}:</strong> ${escapeHtml(warningText)}</p>` : ""}
-        <p class="bm-drop-insufficient-specificities-title">${escapeHtml(preview.specificsLabel)}</p>
-        <ul class="bm-drop-insufficient-specificities">${specificsMarkup}</ul>
+        <div class="bm-transfer-lower">
+          <section class="bm-transfer-cost-card" aria-label="${escapeHtml(preview.costLabel)}">
+            <span class="bm-transfer-cost-label">${escapeHtml(preview.costLabel)}</span>
+            <strong class="bm-transfer-cost-value">${escapeHtml(formatCurrencyValue(preview.totalCost))}</strong>
+          </section>
+          <section class="bm-transfer-specifics-panel">
+            <p class="bm-drop-insufficient-specificities-title bm-transfer-section-title">${escapeHtml(preview.specificsLabel)}</p>
+            <ul class="bm-drop-insufficient-specificities bm-transfer-specifics">${specificsMarkup}</ul>
+          </section>
+        </div>
+        ${preview.hasInvalidPrice ? `<p class="bm-drop-insufficient-warning bm-transfer-warning"><strong>${escapeHtml(warningLabel)}:</strong> ${escapeHtml(warningText)}</p>` : ""}
       </div>
     </form>`;
 
@@ -11160,34 +11183,6 @@ class BloodmanActorSheet extends BaseActorSheet {
         {
           title,
           content,
-          render: html => {
-            const summary = html.find(".bm-drop-transfer-summary");
-            const currentDisplay = summary.length
-              ? (globalThis.getComputedStyle?.(summary.get(0))?.display || "")
-              : "";
-            if (summary.length && currentDisplay !== "grid") {
-              summary.css({ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px" });
-              html.find(".bm-drop-transfer-card").css({
-                display: "grid",
-                gap: "2px",
-                border: "1px solid rgba(255,255,255,0.2)",
-                borderRadius: "8px",
-                padding: "7px 9px",
-                background: "rgba(255,255,255,0.04)"
-              });
-              html.find(".bm-drop-transfer-card-label").css({
-                fontSize: "10px",
-                textTransform: "uppercase",
-                letterSpacing: "0.45px",
-                opacity: "0.8"
-              });
-              html.find(".bm-drop-transfer-card-value").css({
-                fontSize: "14px",
-                fontWeight: "700",
-                lineHeight: "1.2"
-              });
-            }
-          },
           buttons: {
             buy: {
               label: tl("BLOODMAN.Dialogs.DropDecision.ActionBuy", "Achat"),
@@ -11207,7 +11202,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         },
         {
           classes: ["bloodman-insufficient-funds-dialog", "bloodman-drop-decision-dialog"],
-          width: 560
+          width: 720
         }
       );
       if (dialog?.render) dialog.render(true);

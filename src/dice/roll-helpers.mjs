@@ -102,11 +102,12 @@ function createDialog(config, options = undefined) {
       submit: result => {
         if (result == null && typeof normalizedConfig.close === "function") normalizedConfig.close();
       },
-      render: (_event, dialog) => {
-        if (typeof normalizedConfig.render !== "function") return;
-        normalizedConfig.render(toHtmlLike(dialog), dialog);
-      }
     });
+    if (typeof normalizedConfig.render === "function" && typeof dialogInstance.addEventListener === "function") {
+      dialogInstance.addEventListener("render", () => {
+        normalizedConfig.render(toHtmlLike(dialogInstance), dialogInstance);
+      });
+    }
     return {
       render(force = true) {
         const renderResult = dialogInstance.render({ force: Boolean(force) });
@@ -780,15 +781,9 @@ async function promptDamageConfiguration({
     ? toNonNegativeInt(rememberedConfig.penetration, toNonNegativeInt(defaultPenetration, 0))
     : toNonNegativeInt(defaultPenetration, 0);
   const titleSource = sourceName ? ` (${sourceName})` : "";
-  const damageDieLabel = tl("BLOODMAN.Items.DamageDieLabel", "De de degat");
   const settingsLabel = tl("BLOODMAN.Dialogs.DamageConfig.SettingsLabel", "Reglages du jet");
   const titleLabel = tl("BLOODMAN.Dialogs.DamageConfig.Title", "Configuration du jet de degats");
-  const eyebrowLabel = isSimpleAttackVariant
-    ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackEyebrow", "Attaque")
-    : settingsLabel;
-  const hintLabel = isSimpleAttackVariant
-    ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackHint", "Configuration de l'attaque simple")
-    : titleLabel;
+  const hintLabel = settingsLabel;
   const formulaHintLabel = tl(
     "BLOODMAN.Dialogs.DamageConfig.FormulaHint",
     "Formule libre: 1d8, 4d6kh3, 10d6cs>=4"
@@ -832,20 +827,108 @@ async function promptDamageConfiguration({
   const shouldShowFormulaNotice = !lockFormulaSelection && hasStoredFormulaDivergence;
   const highlightedNumberClass = "bm-damage-config-value-active";
   const sourceInfoLabel = tl("BLOODMAN.Dialogs.DamageConfig.SourceLabel", "Source");
-  const damageTypeInfoLabel = tl("BLOODMAN.Dialogs.DamageConfig.RollTypeLabel", "Type de jet");
   const modifiersInfoLabel = tl("BLOODMAN.Dialogs.DamageConfig.ModifiersLabel", "Modificateurs");
-  const formulaSectionLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaSectionLabel", "Degats concernes");
-  const lockedFormulaLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaLockedLabel", "Formule verrouillee");
-  const freeFormulaLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaEditableLabel", "Formule editable");
+  const formulaSectionCompactLabel = tl("BLOODMAN.Dialogs.DamageConfig.FormulaSectionCompactLabel", "Degats");
   const sourceDisplay = String(sourceName || "").trim() || tl("BLOODMAN.Common.Name", "Source");
-  const rollTypeDisplay = isSimpleAttackVariant
-    ? tl("BLOODMAN.Dialogs.DamageConfig.SimpleAttackTypeLabel", "Attaque simple")
-    : tl("BLOODMAN.Dialogs.DamageConfig.StandardAttackTypeLabel", "Jet de degats");
 
   const inputDisabledAttr = lockFormulaSelection ? " disabled" : "";
   const formVariantClass = isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
 
-  const content = `<form class="bm-damage-config${formVariantClass}">
+  const visualStyleBlock = `<style>
+    .bm-damage-config.bm-damage-config--neo {
+      color: #f5f5f5;
+      font-family: "Oswald", sans-serif;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-shell {
+      background: #090909;
+      border: 1px solid #2a2a2a;
+      border-radius: 0;
+      padding: 12px;
+      box-shadow: none;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-eyebrow { display: none; }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-title {
+      margin: 0;
+      font-size: 44px;
+      line-height: 0.92;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-icon-ring {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-icon-ring i {
+      font-size: 22px;
+      color: #f0f0f0;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel {
+      border: 2px solid #f2f2f2;
+      border-radius: 4px;
+      background: #0a0a0a;
+      padding: 6px;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-title {
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #f2f2f2;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-help {
+      border-top: 1px solid #3c3c3c;
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-help summary {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-help ul {
+      font-size: 10px;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn {
+      background: #f0f0f0;
+      color: #111;
+      border: 0;
+      border-radius: 7px;
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1;
+      padding: 0;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn:hover {
+      background: #fff;
+    }
+    .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn:active {
+      transform: translateY(1px);
+    }
+    .window-app.bloodman-damage-dialog .dialog-buttons button[data-button="roll"] {
+      background: #f0f0f0 !important;
+      color: #111 !important;
+      border: 0 !important;
+      border-radius: 4px !important;
+      height: 46px !important;
+      font-size: 22px !important;
+      font-family: "Oswald", sans-serif !important;
+      font-weight: 700 !important;
+      text-transform: uppercase !important;
+    }
+  </style>`;
+
+  const content = `${visualStyleBlock}<form class="bm-damage-config${formVariantClass} bm-damage-config--neo">
     <div class="bm-damage-config-shell">
       <div class="bm-damage-config-head">
         <div class="bm-damage-config-icon-wrap" aria-hidden="true">
@@ -854,59 +937,46 @@ async function promptDamageConfiguration({
           </div>
         </div>
         <div class="bm-damage-config-head-copy">
-          <p class="bm-damage-config-eyebrow">${eyebrowLabel}</p>
           <p class="bm-damage-config-title">${hintLabel}</p>
-          ${shouldShowFormulaNotice ? `<p class="bm-damage-config-hint bm-damage-config-hint-sync">${formulaPriorityNotice} ${formulaDivergenceNotice}</p>` : ""}
         </div>
       </div>
-      <div class="bm-damage-config-meta" role="group" aria-label="${settingsLabel}">
-        <div class="bm-damage-config-meta-chip">
-          <span class="bm-damage-config-meta-chip-label">${sourceInfoLabel}</span>
-          <strong class="bm-damage-config-meta-chip-value">${sourceDisplay}</strong>
-        </div>
-        <div class="bm-damage-config-meta-chip">
-          <span class="bm-damage-config-meta-chip-label">${damageTypeInfoLabel}</span>
-          <strong class="bm-damage-config-meta-chip-value">${rollTypeDisplay}</strong>
-        </div>
-        <div class="bm-damage-config-meta-chip">
-          <span class="bm-damage-config-meta-chip-label">${formulaSectionLabel}</span>
-          <strong class="bm-damage-config-meta-chip-value">${lockFormulaSelection ? lockedFormulaLabel : freeFormulaLabel}</strong>
-        </div>
-      </div>
+      ${shouldShowFormulaNotice ? `<p class="bm-damage-config-hint bm-damage-config-hint-sync" style="display:none;">${formulaPriorityNotice} ${formulaDivergenceNotice}</p>` : ""}
       <div class="bm-damage-config-grid">
-        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-row-formula">
-          <label>${damageDieLabel}</label>
-          <input type="text" name="degats" value="${selectedDefault.formula}" placeholder="/r 1d6+2"${inputDisabledAttr} />
-          <p class="bm-damage-config-field-hint">${formulaHintLabel}</p>
-          <details class="bm-damage-config-help">
-            <summary>
-              <i class="fa-solid fa-scroll" aria-hidden="true"></i>
-              <span>${formulaHelpSummaryLabel}</span>
-            </summary>
-            <ul>
-              <li>${formulaHelpItemStandard}</li>
-              <li>${formulaHelpItemMath}</li>
-              <li>${formulaHelpItemKeepDrop}</li>
-              <li>${formulaHelpItemRerollExplode}</li>
-              <li>${formulaHelpItemCount}</li>
-            </ul>
-          </details>
+        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-panel bm-damage-config-panel--source" role="group" aria-label="${settingsLabel}" style="display:grid;gap:6px;">
+          <label>${sourceInfoLabel}</label>
+          <input type="text" value="${escapeHtml(sourceDisplay)}" disabled tabindex="-1" style="height:40px;border:2px solid #f2f2f2;border-radius:4px;background:#0a0a0a;color:#f2f2f2;font-size:22px;padding:0 10px;" />
         </div>
+        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-row-formula bm-damage-config-panel bm-damage-config-panel--formula" style="display:grid;gap:6px;">
+          <label>${formulaSectionCompactLabel}</label>
+          <input type="text" name="degats" value="${selectedDefault.formula}" placeholder="/r 1d6+2"${inputDisabledAttr} style="height:40px;border:2px solid #f2f2f2;border-radius:4px;background:#0a0a0a;color:#f2f2f2;font-size:22px;padding:0 10px;" />
+        </div>
+        <details class="bm-damage-config-help">
+          <summary>
+            <span>${formulaHelpSummaryLabel}</span>
+          </summary>
+          <ul>
+            <li>${formulaHelpItemStandard}</li>
+            <li>${formulaHelpItemMath}</li>
+            <li>${formulaHelpItemKeepDrop}</li>
+            <li>${formulaHelpItemRerollExplode}</li>
+            <li>${formulaHelpItemCount}</li>
+          </ul>
+        </details>
         <p class="bm-damage-config-row-title">${modifiersInfoLabel}</p>
-        <div class="bm-damage-config-stats">
-          <div class="bm-damage-config-stat bm-damage-config-stat--bonus">
-            <label>${rawBonusCardLabel}</label>
-            <div class="bm-damage-config-stepper">
+        <div class="bm-damage-config-stats" style="display:grid;gap:8px;">
+          <div class="bm-damage-config-stat bm-damage-config-stat--bonus" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px;border:1px solid #f2f2f2;border-radius:4px;background:#0b0b0b;">
+            <label style="margin:0;font-size:14px;text-transform:uppercase;letter-spacing:0.3px;">${rawBonusCardLabel}</label>
+            <div class="bm-damage-config-stepper" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
               <button type="button" class="bm-damage-config-stepper-btn" data-action="decrement" data-target="bonus_brut" aria-label="${stepperDecreaseLabel}">-</button>
-              <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} />
+              <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} style="width:64px;min-width:64px;height:32px;border:0;border-radius:7px;background:#d8d8d8;color:#111;text-align:center;font-size:16px;padding:0 4px;" />
               <button type="button" class="bm-damage-config-stepper-btn" data-action="increment" data-target="bonus_brut" aria-label="${stepperIncreaseLabel}">+</button>
             </div>
           </div>
-          <div class="bm-damage-config-stat bm-damage-config-stat--penetration">
-            <label>${penetrationCardLabel}</label>
-            <div class="bm-damage-config-stepper">
+          <div class="bm-damage-config-stat bm-damage-config-stat--penetration" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px;border:1px solid #f2f2f2;border-radius:4px;background:#0b0b0b;">
+            <label style="margin:0;font-size:14px;text-transform:uppercase;letter-spacing:0.3px;">${penetrationCardLabel}</label>
+            <div class="bm-damage-config-stepper" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
               <button type="button" class="bm-damage-config-stepper-btn" data-action="decrement" data-target="penetration" aria-label="${stepperDecreaseLabel}">-</button>
-              <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} />
+              <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} style="width:64px;min-width:64px;height:32px;border:0;border-radius:7px;background:#d8d8d8;color:#111;text-align:center;font-size:16px;padding:0 4px;" />
               <button type="button" class="bm-damage-config-stepper-btn" data-action="increment" data-target="penetration" aria-label="${stepperIncreaseLabel}">+</button>
             </div>
           </div>
@@ -967,9 +1037,63 @@ async function promptDamageConfiguration({
 
   return new Promise(resolve => {
     let settled = false;
+    let removeDamageStepperListeners = null;
+    const asRootElement = container => {
+      if (!container) return null;
+      if (typeof container.querySelector === "function") return container;
+      if (typeof container.get === "function") {
+        const candidate = container.get(0);
+        if (candidate && typeof candidate.querySelector === "function") return candidate;
+      }
+      if (container[0] && typeof container[0].querySelector === "function") return container[0];
+      return null;
+    };
+    const findFirst = (container, selector) => {
+      if (container && typeof container.find === "function") {
+        const found = container.find(selector).first();
+        if (found?.length) return found;
+      }
+      const root = asRootElement(container);
+      return root?.querySelector(selector) || null;
+    };
+    const findAll = (container, selector) => {
+      if (container && typeof container.find === "function") {
+        return container.find(selector).toArray();
+      }
+      const root = asRootElement(container);
+      return root ? Array.from(root.querySelectorAll(selector)) : [];
+    };
+    const getInputValue = (container, fieldName) => {
+      const node = findFirst(container, `input[name='${fieldName}']`);
+      if (!node) return "";
+      if (typeof node.val === "function") return String(node.val() ?? "");
+      return String(node.value ?? "");
+    };
+    const setInputValue = (container, fieldName, value) => {
+      const node = findFirst(container, `input[name='${fieldName}']`);
+      if (!node) return;
+      if (typeof node.val === "function") {
+        node.val(String(value));
+        return;
+      }
+      node.value = String(value);
+    };
+    const toggleInputClass = (container, fieldName, className, shouldApply) => {
+      const node = findFirst(container, `input[name='${fieldName}']`);
+      if (!node) return;
+      if (typeof node.toggleClass === "function") {
+        node.toggleClass(className, shouldApply);
+        return;
+      }
+      node.classList?.toggle?.(className, Boolean(shouldApply));
+    };
     const finish = value => {
       if (settled) return;
       settled = true;
+      if (typeof removeDamageStepperListeners === "function") {
+        removeDamageStepperListeners();
+        removeDamageStepperListeners = null;
+      }
       if (popupUpdateTimer) {
         clearTimeout(popupUpdateTimer);
         popupUpdateTimer = null;
@@ -983,89 +1107,94 @@ async function promptDamageConfiguration({
         title: `${titleLabel}${titleSource}`,
         content,
         render: html => {
+          const hasJqueryApi = Boolean(html && typeof html.find === "function" && typeof html.on === "function");
+          const rootElement = asRootElement(html);
           const applyDialogUiFallback = () => {
-            const meta = html.find(".bm-damage-config-meta");
-            if (meta.length) {
-              const currentDisplay = globalThis.getComputedStyle?.(meta.get(0))?.display || "";
-              if (currentDisplay !== "grid") {
-                meta.css({ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "7px" });
-                html.find(".bm-damage-config-meta-chip").css({
-                  display: "grid",
-                  gap: "2px",
-                  border: "1px solid rgba(255,255,255,0.2)",
-                  borderRadius: "8px",
-                  padding: "6px 8px",
-                  background: "rgba(255,255,255,0.04)"
-                });
-                html.find(".bm-damage-config-meta-chip-label").css({
-                  fontSize: "10px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.45px",
-                  opacity: "0.8"
-                });
-                html.find(".bm-damage-config-meta-chip-value").css({
-                  fontSize: "14px",
-                  fontWeight: "700",
-                  lineHeight: "1.1"
-                });
-                html.find(".bm-damage-config-stats").css({
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                  gap: "8px"
-                });
-                html.find(".bm-damage-config-stepper").css({
-                  display: "grid",
-                  gridTemplateColumns: "30px 1fr 30px",
-                  gap: "5px",
-                  alignItems: "center"
-                });
-              }
+            if (hasJqueryApi) {
+              const stats = html.find(".bm-damage-config-stats");
+              if (!stats.length) return;
+              const currentDisplay = globalThis.getComputedStyle?.(stats.get(0))?.display || "";
+              if (currentDisplay === "grid") return;
+              stats.css({
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "8px"
+              });
+              html.find(".bm-damage-config-stepper").css({
+                display: "grid",
+                gridTemplateColumns: "30px 1fr 30px",
+                gap: "5px",
+                alignItems: "center"
+              });
+              html.find(".bm-damage-config-stat").css({
+                display: "grid",
+                gridTemplateColumns: "1fr auto",
+                alignItems: "center",
+                gap: "8px"
+              });
+              html.find(".bm-damage-config-stat > label").css({
+                margin: "0"
+              });
+              html.find(".bm-damage-config-stat input[type='number']").css({
+                maxWidth: "78px"
+              });
+              html.find(".bm-damage-config-panel input[disabled]").css({
+                opacity: "1"
+              });
+              return;
             }
+            if (!rootElement) return;
+            const stats = rootElement.querySelector(".bm-damage-config-stats");
+            if (!stats) return;
+            const currentDisplay = globalThis.getComputedStyle?.(stats)?.display || "";
+            if (currentDisplay === "grid") return;
+            stats.style.display = "grid";
+            stats.style.gridTemplateColumns = "1fr";
+            stats.style.gap = "8px";
+            rootElement.querySelectorAll(".bm-damage-config-stepper").forEach(element => {
+              element.style.display = "grid";
+              element.style.gridTemplateColumns = "30px 1fr 30px";
+              element.style.gap = "5px";
+              element.style.alignItems = "center";
+            });
           };
           applyDialogUiFallback();
           if (!lockFormulaSelection) {
-            const damageInput = html.find("input[name='degats']").first();
-            const current = normalizeDamageFormula(damageInput.val());
+            const current = normalizeDamageFormula(getInputValue(html, "degats"));
             if (current !== normalizedDefaultFormula) {
-              damageInput.val(normalizedDefaultFormula);
+              setInputValue(html, "degats", normalizedDefaultFormula);
             }
           }
           const syncDamageInputHighlights = () => {
-            const bonusInput = html.find("input[name='bonus_brut']");
-            const penetrationInput = html.find("input[name='penetration']");
-            const bonusValue = toNonNegativeInt(bonusInput.val(), initialBonus);
-            const penetrationValue = toNonNegativeInt(penetrationInput.val(), initialPenetration);
-            bonusInput.toggleClass(highlightedNumberClass, bonusValue > 0);
-            penetrationInput.toggleClass(highlightedNumberClass, penetrationValue > 0);
+            const bonusValue = toNonNegativeInt(getInputValue(html, "bonus_brut"), initialBonus);
+            const penetrationValue = toNonNegativeInt(getInputValue(html, "penetration"), initialPenetration);
+            toggleInputClass(html, "bonus_brut", highlightedNumberClass, bonusValue > 0);
+            toggleInputClass(html, "penetration", highlightedNumberClass, penetrationValue > 0);
           };
           const adjustStepperInputValue = (fieldName, delta) => {
-            const target = html.find(`input[name='${fieldName}']`).first();
-            if (!target.length) return;
-            const current = toNonNegativeInt(target.val(), 0);
+            const current = toNonNegativeInt(getInputValue(html, fieldName), 0);
             const next = Math.max(0, current + delta);
-            target.val(String(next));
+            setInputValue(html, fieldName, String(next));
           };
           const readCurrentConfig = () => {
             const selectedFormula = lockFormulaSelection
               ? selectedDefault.formula
-              : normalizeDamageFormula(html.find("input[name='degats']").val());
+              : normalizeDamageFormula(getInputValue(html, "degats"));
             const option = getDamageOptionByFormula(selectedFormula)
               || createCustomDamageOption(selectedFormula, selectedDefault.formula);
             return {
               degats: option?.label || selectedFormula.toUpperCase(),
               formula: option?.formula || selectedFormula,
-              bonusBrut: toNonNegativeInt(html.find("input[name='bonus_brut']").val(), initialBonus),
-              penetration: toNonNegativeInt(html.find("input[name='penetration']").val(), initialPenetration)
+              bonusBrut: toNonNegativeInt(getInputValue(html, "bonus_brut"), initialBonus),
+              penetration: toNonNegativeInt(getInputValue(html, "penetration"), initialPenetration)
             };
           };
           syncDamageInputHighlights();
-          html.on("input change", "input[name='degats'], input[name='bonus_brut'], input[name='penetration']", () => {
+          const onFieldInput = () => {
             syncDamageInputHighlights();
             schedulePopupUpdate(readCurrentConfig());
-          });
-          html.on("click", ".bm-damage-config-stepper-btn", event => {
-            event.preventDefault();
-            const button = event.currentTarget;
+          };
+          const onStepperClick = button => {
             const targetName = String(button?.dataset?.target || "").trim();
             const action = String(button?.dataset?.action || "").trim().toLowerCase();
             const delta = action === "increment" ? 1 : (action === "decrement" ? -1 : 0);
@@ -1073,7 +1202,49 @@ async function promptDamageConfiguration({
             adjustStepperInputValue(targetName, delta);
             syncDamageInputHighlights();
             schedulePopupUpdate(readCurrentConfig());
-          });
+          };
+          const installStepperListener = () => {
+            if (!rootElement || typeof rootElement.addEventListener !== "function") return;
+            if (typeof removeDamageStepperListeners === "function") removeDamageStepperListeners();
+            const onRootStepperClick = event => {
+              const button = event?.target?.closest?.(".bm-damage-config-stepper-btn");
+              if (!button || !rootElement.contains(button)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              onStepperClick(button);
+            };
+            rootElement.addEventListener("click", onRootStepperClick, true);
+            removeDamageStepperListeners = () => {
+              rootElement.removeEventListener("click", onRootStepperClick, true);
+            };
+          };
+          installStepperListener();
+          if (hasJqueryApi) {
+            html.on("input change", "input[name='degats'], input[name='bonus_brut'], input[name='penetration']", onFieldInput);
+            html.on("click", ".bm-damage-config-stepper-btn", event => {
+              event.preventDefault();
+              onStepperClick(event.currentTarget);
+            });
+          } else if (rootElement) {
+            rootElement.addEventListener("input", event => {
+              const target = event?.target;
+              if (!(target instanceof HTMLInputElement)) return;
+              if (!target.matches("input[name='degats'], input[name='bonus_brut'], input[name='penetration']")) return;
+              onFieldInput();
+            });
+            rootElement.addEventListener("change", event => {
+              const target = event?.target;
+              if (!(target instanceof HTMLInputElement)) return;
+              if (!target.matches("input[name='degats'], input[name='bonus_brut'], input[name='penetration']")) return;
+              onFieldInput();
+            });
+            findAll(rootElement, ".bm-damage-config-stepper-btn").forEach(button => {
+              button.addEventListener("click", event => {
+                event.preventDefault();
+                onStepperClick(button);
+              });
+            });
+          }
         },
         buttons: {
           roll: {
@@ -1081,7 +1252,7 @@ async function promptDamageConfiguration({
             callback: html => {
               const selectedFormula = lockFormulaSelection
                 ? selectedDefault.formula
-                : normalizeDamageFormula(html.find("input[name='degats']").val());
+                : normalizeDamageFormula(getInputValue(html, "degats"));
               const formulaValidation = validateDamageFormula(selectedFormula);
               if (!formulaValidation.valid) {
                 const baseMessage = tl("BLOODMAN.Notifications.InvalidDamageFormula", "Selection de degats invalide.");
@@ -1092,8 +1263,8 @@ async function promptDamageConfiguration({
               const option = getDamageOptionByFormula(selectedFormula)
                 || createCustomDamageOption(selectedFormula, selectedDefault.formula);
 
-              const bonusRaw = html.find("input[name='bonus_brut']").val();
-              const penetrationRaw = html.find("input[name='penetration']").val();
+              const bonusRaw = getInputValue(html, "bonus_brut");
+              const penetrationRaw = getInputValue(html, "penetration");
               const bonus = Number(bonusRaw);
               const penetration = Number(penetrationRaw);
               if (!Number.isFinite(bonus) || bonus < 0) {

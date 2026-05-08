@@ -729,91 +729,84 @@
 .window-app.bloodman-damage-dialog,
 .window-app.dialog.bloodman-damage-dialog,
 .application.bloodman-damage-dialog {
-  --bm-damage-bg: #121015;
-  --bm-damage-bg-soft: #1a1720;
-  --bm-damage-field: #18141d;
-  --bm-damage-fg: #f8f7fb;
-  --bm-damage-muted: #cbc5d7;
-  --bm-damage-border: #494154;
-  --bm-damage-border-strong: #f8f7fb;
-  --bm-damage-pulse: rgba(255, 74, 74, 0.34);
-  --bm-damage-pulse-border: #ff5c5c;
+  --bm-damage-bg: #090909;
+  --bm-damage-bg-soft: #101010;
+  --bm-damage-field: #0e0e0e;
+  --bm-damage-fg: #f5f5f5;
+  --bm-damage-muted: #d8d8d8;
+  --bm-damage-border: #8e8e8e;
+  --bm-damage-border-strong: #f5f5f5;
+  --bm-damage-panel: #0c0c0c;
+  --bm-damage-pulse: rgba(255, 255, 255, 0.18);
+  --bm-damage-pulse-border: #ffffff;
 }
 
 body.theme-light .window-app.bloodman-damage-dialog,
 body.theme-light .window-app.dialog.bloodman-damage-dialog,
 body.theme-light .application.bloodman-damage-dialog {
-  --bm-damage-bg: #f2eff8;
-  --bm-damage-bg-soft: #ebe6f4;
-  --bm-damage-field: #ffffff;
-  --bm-damage-fg: #1b1723;
-  --bm-damage-muted: #5f556f;
-  --bm-damage-border: #a49ab8;
-  --bm-damage-border-strong: #1b1723;
-  --bm-damage-pulse: rgba(232, 49, 49, 0.28);
-  --bm-damage-pulse-border: #d62d2d;
+  --bm-damage-bg: #0a0a0a;
+  --bm-damage-bg-soft: #111111;
+  --bm-damage-field: #0f0f0f;
+  --bm-damage-fg: #f5f5f5;
+  --bm-damage-muted: #d8d8d8;
+  --bm-damage-border: #9b9b9b;
+  --bm-damage-border-strong: #ffffff;
+  --bm-damage-panel: #0c0c0c;
+  --bm-damage-pulse: rgba(255, 255, 255, 0.16);
+  --bm-damage-pulse-border: #ffffff;
 }
 
 .window-app.bloodman-damage-dialog-simple-attack,
 .window-app.dialog.bloodman-damage-dialog-simple-attack,
 .application.bloodman-damage-dialog-simple-attack {
-  --bm-damage-bg: #121910;
-  --bm-damage-bg-soft: #1a2416;
-  --bm-damage-field: #182114;
-  --bm-damage-fg: #f1f8ee;
-  --bm-damage-muted: #bfd0b8;
-  --bm-damage-border: #4f6246;
-  --bm-damage-border-strong: #e2eedc;
-  --bm-damage-pulse: rgba(255, 70, 70, 0.34);
-  --bm-damage-pulse-border: #ff5959;
+  --bm-damage-bg: #090909;
+  --bm-damage-bg-soft: #101010;
+  --bm-damage-field: #0e0e0e;
+  --bm-damage-fg: #f5f5f5;
+  --bm-damage-muted: #d8d8d8;
+  --bm-damage-border: #8e8e8e;
+  --bm-damage-border-strong: #f5f5f5;
+  --bm-damage-panel: #0c0c0c;
+  --bm-damage-pulse: rgba(255, 255, 255, 0.18);
+  --bm-damage-pulse-border: #ffffff;
 }
 
 body.theme-light .window-app.bloodman-damage-dialog-simple-attack,
 body.theme-light .window-app.dialog.bloodman-damage-dialog-simple-attack,
 body.theme-light .application.bloodman-damage-dialog-simple-attack {
-  --bm-damage-bg: #edf5e9;
-  --bm-damage-bg-soft: #e4efde;
-  --bm-damage-field: #ffffff;
-  --bm-damage-fg: #1e291a;
-  --bm-damage-muted: #53674b;
-  --bm-damage-border: #9fb198;
-  --bm-damage-border-strong: #1e291a;
-  --bm-damage-pulse: rgba(224, 44, 44, 0.28);
-  --bm-damage-pulse-border: #cf2525;
+  --bm-damage-bg: #0a0a0a;
+  --bm-damage-bg-soft: #111111;
+  --bm-damage-field: #0f0f0f;
+  --bm-damage-fg: #f5f5f5;
+  --bm-damage-muted: #d8d8d8;
+  --bm-damage-border: #9b9b9b;
+  --bm-damage-border-strong: #ffffff;
+  --bm-damage-panel: #0c0c0c;
+  --bm-damage-pulse: rgba(255, 255, 255, 0.16);
+  --bm-damage-pulse-border: #ffffff;
 }
 
 .bm-damage-config .bm-damage-config-shell {
   position: relative;
-  overflow: hidden;
   display: grid;
-  gap: 10px;
-  background:
-    radial-gradient(circle at 92% -10%, color-mix(in srgb, var(--bm-damage-border-strong) 36%, transparent), transparent 38%),
-    linear-gradient(160deg, var(--bm-damage-bg-soft), var(--bm-damage-bg));
-  border: 1px solid var(--bm-damage-border);
-  border-radius: 12px;
+  gap: 12px;
+  background: linear-gradient(180deg, var(--bm-damage-bg-soft), var(--bm-damage-bg));
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 35%, transparent);
+  border-radius: 10px;
   color: var(--bm-damage-fg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 28px rgba(0, 0, 0, 0.2);
-  padding: 11px;
-  animation: bm-damage-config-shell-entry 160ms ease-out both;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  padding: 12px;
+  animation: bm-damage-config-shell-entry 150ms ease-out both;
 }
 
 .bm-damage-config .bm-damage-config-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.06), transparent 42%),
-    linear-gradient(0deg, rgba(0, 0, 0, 0.06), transparent 26%);
+  content: none;
 }
 
 @keyframes bm-damage-config-shell-entry {
   from {
     opacity: 0;
-    transform: translateY(3px);
+    transform: translateY(5px);
   }
   to {
     opacity: 1;
@@ -823,9 +816,10 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
 
 .bm-damage-config .bm-damage-config-head {
   display: grid;
-  grid-template-columns: 40px 1fr;
-  gap: 9px;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
   align-items: center;
+  margin-bottom: 1px;
 }
 
 .bm-damage-config .bm-damage-config-icon-wrap {
@@ -835,75 +829,65 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
 }
 
 .bm-damage-config .bm-damage-config-icon-ring {
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1px solid var(--bm-damage-border);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--bm-damage-field) 88%, #ffffff 12%), var(--bm-damage-field));
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .bm-damage-config .bm-damage-config-icon-ring i {
-  font-size: 16px;
+  font-size: 24px;
   color: var(--bm-damage-fg);
 }
 
 .bm-damage-config .bm-damage-config-head-copy {
   min-width: 0;
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: baseline;
 }
 
 .bm-damage-config .bm-damage-config-eyebrow {
-  margin: 0;
-  font-size: 10px;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--bm-damage-muted);
-  line-height: 1;
+  display: none;
 }
 
 .bm-damage-config .bm-damage-config-title {
   margin: 0;
-  font-family: "Rajdhani", "Oswald", sans-serif;
-  font-size: 18px;
-  line-height: 1;
-  letter-spacing: 0.2px;
+  font-family: "Oswald", sans-serif;
+  font-size: 24px;
+  line-height: 0.95;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   color: var(--bm-damage-fg);
 }
 
 .bm-damage-config .bm-damage-config-hint {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 0;
+  font-size: 11px;
   line-height: 1.2;
   color: var(--bm-damage-muted);
 }
 
 .bm-damage-config .bm-damage-config-hint-sync {
-  margin-top: 4px;
-  padding: 3px 8px;
-  border: 1px dashed color-mix(in srgb, var(--bm-damage-border) 86%, transparent);
-  border-radius: 999px;
-  width: fit-content;
-  max-width: 100%;
-  background: color-mix(in srgb, var(--bm-damage-field) 76%, transparent);
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 70%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bm-damage-field) 90%, transparent);
   font-size: 11px;
   line-height: 1.2;
 }
 
 .bm-damage-config .bm-damage-config-grid {
   display: grid;
-  gap: 9px;
+  gap: 10px;
   grid-template-columns: 1fr;
 }
 
 .bm-damage-config .bm-damage-config-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  display: none;
 }
 
 .bm-damage-config .bm-damage-config-meta-chip {
@@ -939,40 +923,51 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
 
 .bm-damage-config .bm-damage-config-row-title {
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.55px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--bm-damage-muted);
 }
 
 .bm-damage-config .bm-damage-config-row {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .bm-damage-config .bm-damage-config-row-wide {
   grid-column: 1 / -1;
 }
 
+.bm-damage-config .bm-damage-config-panel {
+  padding: 8px;
+  border-radius: 6px;
+  border: 2px solid color-mix(in srgb, var(--bm-damage-border-strong) 88%, transparent);
+  background: linear-gradient(180deg, var(--bm-damage-panel), #0a0a0a);
+}
+
+.bm-damage-config .bm-damage-config-panel--source input[disabled] {
+  opacity: 1;
+  cursor: default;
+  color: var(--bm-damage-fg);
+}
+
 .bm-damage-config .bm-damage-config-row-formula input {
-  height: 36px;
-  font-size: 17px;
+  height: 44px;
+  font-size: 24px;
 }
 
 .bm-damage-config .bm-damage-config-field-hint {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.2;
-  color: var(--bm-damage-muted);
+  display: none;
 }
 
 .bm-damage-config .bm-damage-config-help {
-  border: 1px dashed color-mix(in srgb, var(--bm-damage-border) 76%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--bm-damage-field) 80%, transparent);
-  padding: 4px 7px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--bm-damage-border) 34%, transparent);
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .bm-damage-config .bm-damage-config-help summary {
@@ -984,6 +979,8 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
   font-size: 12px;
   font-weight: 600;
   color: var(--bm-damage-fg);
+  text-transform: uppercase;
+  transition: color 120ms ease;
 }
 
 .bm-damage-config .bm-damage-config-help summary::-webkit-details-marker {
@@ -991,17 +988,28 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
 }
 
 .bm-damage-config .bm-damage-config-help summary i {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--bm-damage-muted);
+  transition: transform 140ms ease, color 120ms ease;
+}
+
+.bm-damage-config .bm-damage-config-help[open] summary i {
+  transform: rotate(90deg);
+  color: var(--bm-damage-fg);
+}
+
+.bm-damage-config .bm-damage-config-help summary:hover,
+.bm-damage-config .bm-damage-config-help summary:focus-visible {
+  color: #ffffff;
 }
 
 .bm-damage-config .bm-damage-config-help ul {
-  margin: 6px 0 2px;
+  margin: 8px 0 2px;
   padding: 0 0 0 16px;
   display: grid;
   gap: 3px;
   color: var(--bm-damage-muted);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.25;
 }
 
@@ -1010,110 +1018,118 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
   font-size: 10px;
   padding: 0 3px;
   border-radius: 4px;
-  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 60%, transparent);
-  background: color-mix(in srgb, var(--bm-damage-bg-soft) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 35%, transparent);
+  background: color-mix(in srgb, var(--bm-damage-bg-soft) 90%, transparent);
   color: var(--bm-damage-fg);
 }
 
 .bm-damage-config .bm-damage-config-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
 .bm-damage-config .bm-damage-config-stat {
   display: grid;
-  gap: 4px;
-  padding: 7px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--bm-damage-border) 84%, transparent);
-  background: color-mix(in srgb, var(--bm-damage-field) 86%, transparent);
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--bm-damage-border-strong) 88%, transparent);
+  background: #0b0b0b;
 }
 
 .bm-damage-config .bm-damage-config-stat label {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
   margin: 0;
-  font-size: 11px;
-  color: var(--bm-damage-muted);
+  font-size: 14px;
+  line-height: 0.9;
+  color: var(--bm-damage-fg);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.25px;
 }
 
 .bm-damage-config .bm-damage-config-stepper {
-  display: grid;
-  grid-template-columns: 30px 1fr 30px;
-  gap: 5px;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-end;
   align-items: center;
+  gap: 8px;
 }
 
 .bm-damage-config .bm-damage-config-stat input[type="number"] {
-  height: 30px;
+  width: 66px !important;
+  min-width: 66px;
+  max-width: 66px;
+  height: 32px;
+  margin: 0 !important;
+  font-size: 18px;
+  background: #d8d8d8 !important;
+  color: #111 !important;
+  border: 0 !important;
 }
 
 .bm-damage-config .bm-damage-config-stepper-btn {
-  height: 30px;
-  border: 1px solid var(--bm-damage-border);
-  border-radius: 7px;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
   padding: 0;
-  font-family: "Rajdhani", "Oswald", sans-serif;
-  font-size: 16px;
+  margin: 0 !important;
+  flex: 0 0 32px;
+  font-family: "Oswald", sans-serif;
+  font-size: 26px;
   font-weight: 700;
-  line-height: 1;
-  color: var(--bm-damage-fg);
-  background: color-mix(in srgb, var(--bm-damage-field) 85%, transparent);
-  transition: transform 120ms ease, filter 120ms ease;
+  line-height: 0.9;
+  color: #101010;
+  background: #f2f2f2;
+  transition: transform 90ms ease, filter 110ms ease, background-color 110ms ease;
 }
 
 .bm-damage-config .bm-damage-config-stepper-btn:hover,
 .bm-damage-config .bm-damage-config-stepper-btn:focus-visible {
-  filter: brightness(1.1);
+  filter: brightness(1.03);
+  background: #ffffff;
 }
 
 .bm-damage-config .bm-damage-config-stepper-btn:active {
-  transform: translateY(1px);
-}
-
-.bm-damage-config .bm-damage-config-inline {
-  grid-template-columns: minmax(0, 1fr) 86px;
-  align-items: center;
+  transform: translateY(1px) scale(0.98);
 }
 
 .bm-damage-config label {
   font-size: 12px;
-  font-weight: 500;
-  line-height: 1.1;
+  font-weight: 600;
+  line-height: 1;
   color: var(--bm-damage-fg);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.bm-damage-config .bm-damage-config-inline label {
-  text-align: right;
-  white-space: nowrap;
-  color: var(--bm-damage-muted);
+  letter-spacing: 0.6px;
 }
 
 .bm-damage-config select,
 .bm-damage-config input {
   width: 100%;
-  height: 34px;
-  border: 1px solid var(--bm-damage-border);
-  border-radius: 8px;
+  height: 40px;
+  border: 2px solid color-mix(in srgb, var(--bm-damage-border-strong) 90%, transparent);
+  border-radius: 6px;
   padding: 0 10px;
-  font-family: "Rajdhani", "Oswald", sans-serif;
-  font-size: 17px;
+  font-family: "Oswald", sans-serif;
+  font-size: 20px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 0.95;
   letter-spacing: 0.2px;
   color: var(--bm-damage-fg);
-  background: var(--bm-damage-field);
+  background: var(--bm-damage-field) !important;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .bm-damage-config select:focus,
 .bm-damage-config input:focus {
   outline: none;
-  border-color: var(--bm-damage-border-strong);
-  box-shadow: 0 0 0 1px var(--bm-damage-border-strong);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
 .bm-damage-config select {
@@ -1131,18 +1147,17 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
   padding-right: 30px;
 }
 
-.bm-damage-config.bm-damage-config--simple-attack select:disabled {
+.bm-damage-config input[disabled] {
   opacity: 1;
-  cursor: not-allowed;
-  border-style: dashed;
-  color: var(--bm-damage-muted);
+  cursor: default;
+  color: var(--bm-damage-fg);
 }
 
 .bm-damage-config.bm-damage-config--simple-attack input[name="degats"]:disabled {
   opacity: 1;
   cursor: not-allowed;
-  border-style: dashed;
-  color: color-mix(in srgb, var(--bm-damage-muted) 92%, #ffffff 8%);
+  border-style: solid;
+  color: var(--bm-damage-muted);
 }
 
 .bm-damage-config input[type="number"] {
@@ -1189,19 +1204,20 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button,
 .application.bloodman-damage-dialog .dialog-buttons button {
   width: 100%;
-  height: 38px;
-  border: 1px solid var(--bm-damage-border-strong) !important;
-  border-radius: 8px;
-  background: var(--bm-damage-field) !important;
-  color: var(--bm-damage-fg) !important;
+  height: 46px;
+  border: 0 !important;
+  border-radius: 4px;
+  background: #f0f0f0 !important;
+  color: #111111 !important;
   font-family: "Oswald", sans-serif;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  line-height: 1;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  line-height: 0.9;
   padding: 0 10px;
   text-transform: uppercase;
   box-shadow: none !important;
+  transition: filter 110ms ease, transform 90ms ease, background-color 120ms ease;
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons button:hover,
@@ -1210,20 +1226,191 @@ body.theme-light .application.bloodman-damage-dialog-simple-attack {
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button:focus,
 .application.bloodman-damage-dialog .dialog-buttons button:hover,
 .application.bloodman-damage-dialog .dialog-buttons button:focus {
-  filter: brightness(1.08);
+  filter: brightness(1.04);
+  background: #ffffff !important;
   box-shadow: none;
 }
 
 .window-app.bloodman-damage-dialog .dialog-buttons button[data-button="roll"],
 .window-app.dialog.bloodman-damage-dialog .dialog-buttons button[data-button="roll"],
 .application.bloodman-damage-dialog .dialog-buttons button[data-button="roll"] {
-  border-color: color-mix(in srgb, var(--bm-damage-border-strong) 90%, #ff6d6d 10%) !important;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--bm-damage-field) 55%, #2f6b2f 45%),
-    color-mix(in srgb, var(--bm-damage-field) 72%, #204a20 28%)
-  ) !important;
-  color: #f7fff6 !important;
+  background: #f0f0f0 !important;
+  color: #111111 !important;
+}
+
+.window-app.bloodman-damage-dialog .window-content .dialog-buttons > button,
+.window-app.dialog.bloodman-damage-dialog .window-content .dialog-buttons > button,
+.application.bloodman-damage-dialog .window-content .dialog-buttons > button {
+  width: 100% !important;
+  background: #f0f0f0 !important;
+  color: #111111 !important;
+  border: 0 !important;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button:active,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:active,
+.application.bloodman-damage-dialog .dialog-buttons button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* Damage dialog: strict visual lock to match combat panel mockup */
+.window-app.bloodman-damage-dialog .bm-damage-config,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config,
+.application.bloodman-damage-dialog .bm-damage-config {
+  font-family: "Oswald", sans-serif !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-shell,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-shell {
+  background: #090909 !important;
+  border: 1px solid #2d2d2d !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 10px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-title,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-title {
+  font-size: 21px !important;
+  line-height: 1 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-hint,
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-hint-sync,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-hint,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-hint-sync,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-hint,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-hint-sync {
+  display: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel {
+  border: 2px solid #efefef !important;
+  border-radius: 4px !important;
+  background: #0a0a0a !important;
+  padding: 6px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-row-formula input,
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel--source input,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-row-formula input,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel--source input,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-row-formula input,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel--source input {
+  height: 40px !important;
+  border: 2px solid #efefef !important;
+  border-radius: 4px !important;
+  background: #0a0a0a !important;
+  color: #f5f5f5 !important;
+  font-size: 17px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help {
+  border-top: 1px solid #3d3d3d !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help summary,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help summary,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help summary {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help summary i,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help summary i,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-help summary i {
+  display: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 8px !important;
+  border: 1px solid #efefef !important;
+  border-radius: 4px !important;
+  background: #0b0b0b !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat > label,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat > label,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat > label {
+  margin: 0 !important;
+  font-size: 14px !important;
+  letter-spacing: 0.3px !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper-btn,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper-btn {
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: #f0f0f0 !important;
+  color: #111 !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat input[type="number"] {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  height: 32px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: #d9d9d9 !important;
+  color: #111 !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button,
+.application.bloodman-damage-dialog .dialog-buttons button {
+  background: #f0f0f0 !important;
+  color: #111 !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  height: 46px !important;
+  font-size: 21px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
 }
 
 .window-app.bloodman-damage-dialog .window-content,
@@ -2791,5 +2978,1026 @@ body.theme-light .application.bloodman-insufficient-funds-dialog {
   .bloodman-item.bm-item-sheet .bm-item-fields {
     padding: 9px;
     gap: 8px;
+  }
+}
+
+/* Visual refinement pass: shared panels, dialogs, and GM controls. */
+#bm-chaos-dice {
+  min-width: 168px;
+  padding: 8px;
+  gap: 8px;
+  border: 1px solid #5b4b47;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 32%),
+    linear-gradient(180deg, rgba(151, 31, 31, 0.12), transparent 34%),
+    linear-gradient(180deg, #181615 0%, #090908 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+    inset 0 -12px 22px rgba(0, 0, 0, 0.34),
+    0 12px 28px rgba(0, 0, 0, 0.5);
+}
+
+#bm-chaos-dice::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(184, 50, 44, 0.35);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+#bm-chaos-dice .bm-chaos-panel-header {
+  min-height: 30px;
+  padding: 3px 8px 8px;
+  border-bottom-color: rgba(242, 77, 70, 0.5);
+  color: #f4eee6;
+  font-size: 18px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+#bm-chaos-dice .bm-chaos-panel-header::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 5px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(242, 77, 70, 0.86), transparent);
+  pointer-events: none;
+}
+
+#bm-chaos-dice .bm-chaos-panel-body {
+  width: 100%;
+  gap: 8px;
+}
+
+#bm-chaos-dice .bm-chaos-row,
+#bm-chaos-dice .bm-chaos-full-row {
+  width: 100%;
+  justify-content: center;
+}
+
+#bm-chaos-dice .bm-chaos-row {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  gap: 8px;
+  align-items: center;
+}
+
+#bm-chaos-dice .bm-chaos-icon {
+  width: 54px;
+  height: 54px;
+  justify-self: center;
+  border: 1px solid rgba(184, 50, 44, 0.52);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(184, 50, 44, 0.22), transparent 58%),
+    linear-gradient(180deg, #16110f, #090707);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 16px rgba(184, 50, 44, 0.18);
+}
+
+#bm-chaos-dice .bm-chaos-icon img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+#bm-chaos-dice .bm-chaos-value {
+  font-size: 24px;
+  color: #f7f2ec;
+  text-shadow:
+    0 1px 2px #000000,
+    0 0 8px rgba(242, 77, 70, 0.42);
+}
+
+#bm-chaos-dice .bm-chaos-btn,
+#bm-chaos-dice .bm-chaos-xp-btn,
+#bm-chaos-dice .bm-chaos-full-pv-btn,
+#bm-chaos-dice .bm-chaos-full-pp-btn {
+  min-height: 32px;
+  border: 1px solid #5b4b47;
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #1d1a18 0%, #0b0a09 100%);
+  color: #f4eee6;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 0 rgba(0, 0, 0, 0.3);
+  transition: border-color 120ms ease, filter 120ms ease, transform 90ms ease, box-shadow 120ms ease;
+}
+
+#bm-chaos-dice .bm-chaos-btn {
+  width: 42px;
+  height: 42px;
+  font-size: 28px;
+}
+
+#bm-chaos-dice .bm-chaos-xp-btn {
+  width: 100%;
+  height: 30px;
+  border-color: rgba(242, 77, 70, 0.54);
+}
+
+#bm-chaos-dice .bm-chaos-full-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+#bm-chaos-dice .bm-chaos-full-pv-btn,
+#bm-chaos-dice .bm-chaos-full-pp-btn {
+  min-width: 0;
+  width: 100%;
+  font-size: 11px;
+  letter-spacing: 0.35px;
+}
+
+#bm-chaos-dice button:hover,
+#bm-chaos-dice button:focus-visible {
+  border-color: #f24d46;
+  filter: brightness(1.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 12px rgba(184, 50, 44, 0.25);
+}
+
+.window-app.bloodman-damage-dialog .window-content,
+.window-app.dialog.bloodman-damage-dialog .window-content,
+.application.bloodman-damage-dialog .window-content {
+  background:
+    radial-gradient(110% 80% at 50% -18%, rgba(184, 50, 44, 0.18), transparent 48%),
+    linear-gradient(180deg, #11100f 0%, #070707 100%) !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-shell,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-shell {
+  border: 1px solid rgba(125, 102, 96, 0.6) !important;
+  border-radius: 8px !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 32%),
+    linear-gradient(180deg, #181514 0%, #090909 100%) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 14px 26px rgba(0, 0, 0, 0.44) !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-title,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-title {
+  color: #f4eee6 !important;
+  text-shadow: 0 1px 0 #000000;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-icon-ring i,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-icon-ring i,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-icon-ring i {
+  color: #f24d46 !important;
+  filter: drop-shadow(0 0 7px rgba(242, 77, 70, 0.24));
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-panel,
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stat {
+  border-color: rgba(220, 199, 184, 0.68) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    #0b0a0a !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config input,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config input,
+.application.bloodman-damage-dialog .bm-damage-config input {
+  border-color: rgba(220, 199, 184, 0.72) !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config input:hover,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config input:hover,
+.application.bloodman-damage-dialog .bm-damage-config input:hover {
+  border-color: #f24d46 !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper-btn,
+.application.bloodman-damage-dialog .bm-damage-config .bm-damage-config-stepper-btn,
+.window-app.bloodman-damage-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button,
+.application.bloodman-damage-dialog .dialog-buttons button {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 2px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:hover,
+.application.bloodman-damage-dialog .dialog-buttons button:hover,
+.window-app.bloodman-damage-dialog .dialog-buttons button:focus,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:focus,
+.application.bloodman-damage-dialog .dialog-buttons button:focus {
+  outline: 2px solid rgba(242, 77, 70, 0.7);
+  outline-offset: 2px;
+}
+
+.window-app.bloodman-insufficient-funds-dialog,
+.window-app.dialog.bloodman-insufficient-funds-dialog,
+.application.bloodman-insufficient-funds-dialog {
+  --bm-insufficient-bg: #080807;
+  --bm-insufficient-bg-soft: #171412;
+  --bm-insufficient-field: #0d0c0b;
+  --bm-insufficient-fg: #f4eee6;
+  --bm-insufficient-muted: #b9ab98;
+  --bm-insufficient-border: #4f413c;
+  --bm-insufficient-border-strong: #806962;
+  --bm-insufficient-accent: #d0473f;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .window-content,
+.window-app.dialog.bloodman-insufficient-funds-dialog .window-content,
+.application.bloodman-insufficient-funds-dialog .window-content {
+  background:
+    radial-gradient(120% 80% at 50% -18%, rgba(184, 50, 44, 0.18), transparent 48%),
+    linear-gradient(180deg, #11100f 0%, #070707 100%) !important;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-shell {
+  gap: 14px;
+  border-color: rgba(128, 105, 98, 0.68);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 32%),
+    linear-gradient(180deg, #181514 0%, #090909 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 14px 26px rgba(0, 0, 0, 0.44);
+  padding: 14px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-head {
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 86px;
+  padding: 12px;
+  border: 1px solid rgba(208, 71, 63, 0.38);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 52px 42px, rgba(208, 71, 63, 0.2), transparent 58px),
+    linear-gradient(90deg, rgba(208, 71, 63, 0.1), transparent 44%),
+    #0d0b0a;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-ring {
+  width: 46px;
+  height: 46px;
+  border-color: rgba(208, 71, 63, 0.78);
+  border-radius: 4px;
+  background:
+    radial-gradient(circle, rgba(208, 71, 63, 0.32), transparent 62%),
+    #140a09;
+  transform: rotate(45deg);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(208, 71, 63, 0.22);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-ring i {
+  color: #ff6f66;
+  font-size: 21px;
+  transform: rotate(-45deg);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-eyebrow {
+  color: #f4eee6;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-intro,
+.bm-drop-insufficient-funds .bm-drop-insufficient-prompt {
+  color: #f4eee6;
+  font-size: 15px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-prompt {
+  color: #fff8ef;
+  font-weight: 700;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid rgba(128, 105, 98, 0.56);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(6, 6, 6, 0.42);
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card {
+  min-height: 62px;
+  border: 0;
+  border-right: 1px solid rgba(128, 105, 98, 0.34);
+  border-bottom: 1px solid rgba(128, 105, 98, 0.34);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    #0d0c0b;
+  padding: 10px 12px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-label,
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities-title {
+  color: #d5b99a;
+  font-size: 12px;
+  letter-spacing: 0.7px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-value {
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-hint,
+.bm-drop-insufficient-funds .bm-drop-insufficient-details {
+  color: var(--bm-insufficient-muted);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-details,
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities,
+.bm-drop-insufficient-funds .bm-drop-insufficient-warning {
+  border-color: rgba(128, 105, 98, 0.52);
+  border-radius: 6px;
+  background: #0d0c0b;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities {
+  list-style: none;
+  padding: 10px 12px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities li::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border: 1px solid #ff6f66;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons {
+  padding: 10px;
+  border: 1px solid rgba(128, 105, 98, 0.48) !important;
+  border-radius: 6px;
+  background: rgba(8, 7, 7, 0.64) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button {
+  min-height: 48px;
+  border-radius: 4px;
+  border-color: rgba(128, 105, 98, 0.72) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #1d1a18 0%, #0b0a09 100%) !important;
+  color: #f4eee6 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"] {
+  border-color: #ff6f66 !important;
+  background:
+    linear-gradient(180deg, rgba(255, 112, 98, 0.22), transparent 46%),
+    linear-gradient(180deg, #5b1110 0%, #1a0707 100%) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"] {
+  border-color: rgba(201, 166, 111, 0.76) !important;
+  background:
+    linear-gradient(180deg, rgba(201, 166, 111, 0.16), transparent 46%),
+    linear-gradient(180deg, #2a2118 0%, #0c0a08 100%) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:active,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:active,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 520px) {
+  #bm-chaos-dice {
+    min-width: 150px;
+  }
+
+  .bm-drop-insufficient-funds .bm-drop-insufficient-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+}
+
+/* Transfer dialog cleanup: calmer hierarchy and fewer decorative effects. */
+.window-app.bloodman-drop-decision-dialog .window-content,
+.window-app.dialog.bloodman-drop-decision-dialog .window-content,
+.application.bloodman-drop-decision-dialog .window-content {
+  background: #10100f !important;
+  padding: 12px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-funds {
+  --bm-transfer-bg: #10100f;
+  --bm-transfer-panel: #171513;
+  --bm-transfer-panel-soft: #0d0c0b;
+  --bm-transfer-line: #3b3430;
+  --bm-transfer-line-strong: #6f5f55;
+  --bm-transfer-accent: #b73731;
+  --bm-transfer-accent-soft: rgba(183, 55, 49, 0.18);
+  --bm-transfer-text: #f2ece3;
+  --bm-transfer-muted: #b7aa98;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-shell {
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--bm-transfer-line-strong);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 34%),
+    var(--bm-transfer-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 22px rgba(0, 0, 0, 0.34);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-head {
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 0;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, var(--bm-transfer-accent-soft), transparent 42%),
+    var(--bm-transfer-panel);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-icon-ring {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(183, 55, 49, 0.72);
+  border-radius: 6px;
+  background: #17100f;
+  box-shadow: none;
+  transform: none;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-icon-ring i {
+  color: #e25b52;
+  font-size: 17px;
+  transform: none;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-head-copy {
+  gap: 5px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-eyebrow {
+  color: var(--bm-transfer-text);
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-intro,
+.bloodman-drop-decision-dialog .bm-drop-insufficient-prompt {
+  color: var(--bm-transfer-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-prompt {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card {
+  min-height: 58px;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background: var(--bm-transfer-panel-soft);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-item {
+  border-color: rgba(183, 55, 49, 0.58);
+  background:
+    linear-gradient(90deg, rgba(183, 55, 49, 0.12), transparent 46%),
+    var(--bm-transfer-panel-soft);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-label,
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities-title {
+  color: var(--bm-transfer-muted);
+  font-size: 10px;
+  letter-spacing: 0.55px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-value {
+  color: var(--bm-transfer-text);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-hint {
+  color: var(--bm-transfer-muted);
+  font-size: 11px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-details,
+.bloodman-drop-decision-dialog .bm-drop-insufficient-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background: var(--bm-transfer-panel);
+  color: var(--bm-transfer-muted);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities {
+  max-height: 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background: var(--bm-transfer-panel-soft);
+  color: var(--bm-transfer-text);
+  list-style: disc;
+  list-style-position: outside;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities li {
+  margin-left: 16px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities li::before {
+  content: none;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+.application.bloodman-drop-decision-dialog .dialog-buttons {
+  margin-top: 10px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button,
+.application.bloodman-drop-decision-dialog .dialog-buttons button {
+  min-height: 42px;
+  border: 1px solid var(--bm-transfer-line-strong) !important;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #1e1b18, #0d0c0b) !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 14px;
+  letter-spacing: 0.35px;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"] {
+  border-color: #d84c44 !important;
+  background: linear-gradient(180deg, #651714, #210908) !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:focus,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:focus,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:focus {
+  filter: brightness(1.12);
+  outline: 2px solid rgba(216, 76, 68, 0.45);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .bloodman-drop-decision-dialog .bm-drop-transfer-summary,
+  .window-app.bloodman-drop-decision-dialog .dialog-buttons,
+  .window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+  .application.bloodman-drop-decision-dialog .dialog-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Transfer dialog v2: stronger scoped presentation for Foundry v14 dialogs. */
+.bm-transfer-dialog {
+  --bm-transfer-bg: #0d0d0c;
+  --bm-transfer-panel: #151311;
+  --bm-transfer-panel-2: #1d1714;
+  --bm-transfer-line: rgba(132, 105, 92, 0.52);
+  --bm-transfer-line-soft: rgba(92, 73, 65, 0.42);
+  --bm-transfer-gold: #d2b07a;
+  --bm-transfer-red: #d44d45;
+  --bm-transfer-red-soft: rgba(212, 77, 69, 0.18);
+  --bm-transfer-text: #f4eee6;
+  --bm-transfer-muted: #bcae9c;
+  display: block !important;
+  margin: 0 !important;
+  color: var(--bm-transfer-text) !important;
+}
+
+.bm-transfer-dialog,
+.bm-transfer-dialog * {
+  box-sizing: border-box;
+}
+
+.window-app.bloodman-drop-decision-dialog .window-content,
+.window-app.dialog.bloodman-drop-decision-dialog .window-content,
+.application.bloodman-drop-decision-dialog .window-content {
+  padding: 14px !important;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(133, 34, 29, 0.18), transparent 28%),
+    linear-gradient(180deg, #171411 0%, #0b0b0a 100%) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-shell {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 16px !important;
+  border: 1px solid rgba(154, 124, 105, 0.62) !important;
+  border-radius: 8px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 22%),
+    linear-gradient(135deg, rgba(212, 77, 69, 0.08), transparent 40%),
+    var(--bm-transfer-bg) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 -18px 42px rgba(0, 0, 0, 0.28),
+    0 18px 36px rgba(0, 0, 0, 0.42) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-hero {
+  display: grid !important;
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 14px !important;
+  border: 1px solid var(--bm-transfer-line) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(90deg, rgba(212, 77, 69, 0.2), transparent 58%),
+    linear-gradient(180deg, #211815, #100f0e) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-alert {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.bm-transfer-dialog .bm-transfer-alert-ring {
+  display: grid !important;
+  place-items: center !important;
+  width: 46px !important;
+  height: 46px !important;
+  border: 1px solid rgba(255, 98, 88, 0.86) !important;
+  border-radius: 7px !important;
+  background:
+    radial-gradient(circle, rgba(212, 77, 69, 0.26), transparent 62%),
+    #150d0c !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(212, 77, 69, 0.22) !important;
+  transform: rotate(45deg) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-alert-ring i {
+  color: #ff756d !important;
+  font-size: 19px !important;
+  text-shadow: 0 0 10px rgba(255, 82, 72, 0.48) !important;
+  transform: rotate(-45deg) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-hero-copy {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-kicker,
+.bm-transfer-dialog .bm-transfer-intro,
+.bm-transfer-dialog .bm-transfer-question,
+.bm-transfer-dialog .bm-transfer-card-label,
+.bm-transfer-dialog .bm-transfer-card-value,
+.bm-transfer-dialog .bm-transfer-card-hint,
+.bm-transfer-dialog .bm-transfer-section-title {
+  margin: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-kicker {
+  color: var(--bm-transfer-gold) !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-intro {
+  color: var(--bm-transfer-text) !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-question {
+  color: #fff9f1 !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  align-items: center !important;
+  min-height: 72px !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  border: 1px solid var(--bm-transfer-line-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 45%),
+    #100f0e !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-item {
+  border-color: rgba(212, 77, 69, 0.58) !important;
+  background:
+    linear-gradient(90deg, rgba(212, 77, 69, 0.16), transparent 58%),
+    #120f0e !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  border: 1px solid rgba(212, 77, 69, 0.52) !important;
+  border-radius: 6px !important;
+  background: rgba(212, 77, 69, 0.1) !important;
+  color: #e06a60 !important;
+  font-size: 17px !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-copy {
+  display: grid !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-label,
+.bm-transfer-dialog .bm-transfer-section-title {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.55px !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-value {
+  color: var(--bm-transfer-text) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-hint {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-lower {
+  display: grid !important;
+  grid-template-columns: 176px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-card,
+.bm-transfer-dialog .bm-transfer-specifics-panel {
+  border: 1px solid var(--bm-transfer-line-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 44%),
+    var(--bm-transfer-panel) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-card {
+  display: grid !important;
+  place-items: center !important;
+  gap: 7px !important;
+  min-height: 116px !important;
+  padding: 14px !important;
+  border-color: rgba(210, 176, 122, 0.5) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-label {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.65px !important;
+  text-transform: uppercase !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-value {
+  color: #fff8e8 !important;
+  font-size: 32px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  text-shadow: 0 0 14px rgba(210, 176, 122, 0.18) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics-panel {
+  min-width: 0 !important;
+  padding: 12px !important;
+}
+
+.bm-transfer-dialog .bm-transfer-section-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 9px !important;
+}
+
+.bm-transfer-dialog .bm-transfer-section-title::after {
+  content: "" !important;
+  flex: 1 1 auto !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, rgba(212, 77, 69, 0.7), transparent) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics {
+  display: grid !important;
+  gap: 7px !important;
+  max-height: 154px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--bm-transfer-text) !important;
+  list-style: none !important;
+  overflow: auto !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics li {
+  position: relative !important;
+  margin: 0 !important;
+  padding-left: 16px !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics li::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0.55em !important;
+  left: 2px !important;
+  width: 6px !important;
+  height: 6px !important;
+  border: 1px solid #f06a60 !important;
+  background: rgba(212, 77, 69, 0.34) !important;
+  transform: rotate(45deg) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-details {
+  display: none !important;
+}
+
+.bm-transfer-dialog .bm-transfer-warning {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border: 1px solid rgba(212, 77, 69, 0.68) !important;
+  border-radius: 7px !important;
+  background: rgba(212, 77, 69, 0.12) !important;
+  color: #ffe8e3 !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+.application.bloodman-drop-decision-dialog .dialog-buttons {
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.32fr 0.9fr !important;
+  gap: 10px !important;
+  margin-top: 12px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button,
+.application.bloodman-drop-decision-dialog .dialog-buttons button {
+  min-height: 48px !important;
+  border: 1px solid rgba(154, 124, 105, 0.68) !important;
+  border-radius: 6px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #211d19, #0c0b0a) !important;
+  color: #f5eee5 !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.2px !important;
+  text-transform: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 0 rgba(0, 0, 0, 0.45) !important;
+  transition: filter 120ms ease, border-color 120ms ease, transform 120ms ease !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"] {
+  border-color: rgba(255, 94, 84, 0.92) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 109, 98, 0.26), transparent 42%),
+    linear-gradient(180deg, #6a1815, #1a0706) !important;
+  color: #fff8ef !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 18px rgba(212, 77, 69, 0.18),
+    0 2px 0 rgba(0, 0, 0, 0.45) !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:focus-visible,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:focus-visible,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:focus-visible {
+  border-color: rgba(255, 205, 146, 0.86) !important;
+  filter: brightness(1.14) !important;
+  outline: 2px solid rgba(212, 77, 69, 0.45) !important;
+  outline-offset: 2px !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:active,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:active,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:active {
+  transform: translateY(1px) !important;
+}
+
+@media (max-width: 640px) {
+  .bm-transfer-dialog .bm-transfer-hero,
+  .bm-transfer-dialog .bm-transfer-grid,
+  .bm-transfer-dialog .bm-transfer-lower,
+  .window-app.bloodman-drop-decision-dialog .dialog-buttons,
+  .window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+  .application.bloodman-drop-decision-dialog .dialog-buttons {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bm-transfer-dialog .bm-transfer-alert {
+    justify-items: start !important;
   }
 }
