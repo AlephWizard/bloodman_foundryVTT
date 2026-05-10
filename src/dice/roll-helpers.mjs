@@ -835,26 +835,43 @@ async function promptDamageConfiguration({
   const formVariantClass = isSimpleAttackVariant ? " bm-damage-config--simple-attack" : "";
 
   const visualStyleBlock = `<style>
-    .bm-damage-config.bm-damage-config--neo {
-      color: #f5f5f5;
-      font-family: "Oswald", sans-serif;
+    .bm-damage-config.bm-damage-config--combat {
+      --bm-combat-bg: #0b0b0b;
+      --bm-combat-panel: #101010;
+      --bm-combat-panel-soft: #151515;
+      --bm-combat-line: #f4f4f4;
+      --bm-combat-line-soft: rgba(255, 255, 255, 0.72);
+      --bm-combat-text: #ffffff;
+      --bm-combat-muted: #e0e0e0;
+      --bm-combat-focus: rgba(255, 255, 255, 0.28);
+      color: var(--bm-combat-text);
+      font-family: "Oswald", "Arial Narrow", "Signika", sans-serif;
+      margin: 0;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-shell {
-      background: #090909;
-      border: 1px solid #2a2a2a;
+    .bm-damage-config.bm-damage-config--combat,
+    .bm-damage-config.bm-damage-config--combat * {
+      box-sizing: border-box;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-shell {
+      display: grid;
+      gap: 13px;
+      padding: 16px;
+      border: 0;
       border-radius: 0;
-      padding: 12px;
+      background: var(--bm-combat-bg);
       box-shadow: none;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-eyebrow { display: none; }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-title {
-      margin: 0;
-      font-size: 44px;
-      line-height: 0.92;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-head {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border-bottom: 0;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-icon-ring {
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-icon-ring {
+      display: inline-grid;
+      place-items: center;
       width: 28px;
       height: 28px;
       border: 0;
@@ -862,73 +879,255 @@ async function promptDamageConfiguration({
       background: transparent;
       box-shadow: none;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-icon-ring i {
-      font-size: 22px;
-      color: #f0f0f0;
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-icon-ring i {
+      color: var(--bm-combat-text);
+      font-size: 27px;
+      text-shadow: none;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel {
-      border: 2px solid #f2f2f2;
-      border-radius: 4px;
-      background: #0a0a0a;
-      padding: 6px;
-    }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-title {
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-title {
       margin: 0;
-      font-size: 13px;
-      letter-spacing: 0.5px;
+      color: var(--bm-combat-text);
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: 0;
       text-transform: uppercase;
-      color: #f2f2f2;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-help {
-      border-top: 1px solid #3c3c3c;
-      border-left: 0;
-      border-right: 0;
-      border-bottom: 0;
-      border-radius: 0;
-      padding: 0;
-      background: transparent;
-    }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-help summary {
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-hint-sync {
+      margin: 0;
+      padding: 8px 9px;
+      border: 1px solid var(--bm-combat-line-soft);
+      border-radius: 3px;
+      background: var(--bm-combat-panel);
+      color: var(--bm-combat-muted);
       font-size: 12px;
+      line-height: 1.3;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-grid {
+      display: grid;
+      gap: 11px;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel,
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat,
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help {
+      border: 1px solid var(--bm-combat-line-soft);
+      border-radius: 4px;
+      background: var(--bm-combat-panel);
+      box-shadow: none;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel {
+      display: grid;
+      gap: 8px;
+      padding: 7px;
+      border-width: 3px;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel--formula {
+      padding: 4px;
+      border-width: 1px;
+      background: var(--bm-combat-bg);
+    }
+    .bm-damage-config.bm-damage-config--combat label,
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-title {
+      margin: 0;
+      color: var(--bm-combat-text);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0;
+      line-height: 1;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-help ul {
-      font-size: 10px;
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula > label {
+      font-size: 25px;
+      line-height: 0.92;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn {
-      background: #f0f0f0;
-      color: #111;
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel input {
+      width: 100%;
+      min-height: 43px;
       border: 0;
-      border-radius: 7px;
-      width: 32px;
-      min-width: 32px;
-      height: 32px;
+      border-radius: 0;
+      background: var(--bm-combat-panel);
+      color: var(--bm-combat-text);
+      font-size: 18px;
+      font-weight: 900;
+      padding: 0 10px;
+      box-shadow: none;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel--formula input {
+      min-height: 48px;
+      border: 3px solid var(--bm-combat-line);
+      background: var(--bm-combat-panel);
       font-size: 24px;
-      font-weight: 700;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel--source input[disabled] {
+      color: var(--bm-combat-text);
+      opacity: 1;
+    }
+    .bm-damage-config.bm-damage-config--combat input:hover {
+      border-color: var(--bm-combat-line);
+    }
+    .bm-damage-config.bm-damage-config--combat input:focus {
+      border-color: var(--bm-combat-line);
+      outline: 2px solid var(--bm-combat-focus);
+      outline-offset: 2px;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+      overflow: hidden;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help summary {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 25px;
+      padding: 0;
+      color: var(--bm-combat-text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help summary::before {
+      content: "\\f0da";
+      color: var(--bm-combat-text);
+      font-family: "Font Awesome 6 Free";
+      font-weight: 900;
+      font-size: 15px;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help[open] summary::before {
+      transform: rotate(90deg);
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help summary::-webkit-details-marker {
+      display: none;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help ul {
+      display: grid;
+      gap: 5px;
+      margin: 0;
+      padding: 4px 0 0 23px;
+      color: var(--bm-combat-muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-help code {
+      border: 1px solid var(--bm-combat-line-soft);
+      border-radius: 2px;
+      background: #000000;
+      color: var(--bm-combat-text);
+      padding: 0 3px;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stats {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: 12px;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 49px;
+      padding: 7px;
+      min-width: 0;
+      border-color: var(--bm-combat-line);
+      background: var(--bm-combat-bg);
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat > label {
+      color: var(--bm-combat-text);
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper {
+      display: grid !important;
+      grid-template-columns: 34px 64px 38px !important;
+      justify-content: end;
+      gap: 10px;
+      align-items: center;
+    }
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn {
+      display: grid;
+      place-items: center;
+      width: 34px !important;
+      min-width: 34px !important;
+      max-width: 34px !important;
+      height: 34px;
+      border: 0;
+      border-radius: 8px;
+      background: #f5f5f5;
+      color: #050505;
+      font-size: 24px;
+      font-weight: 900;
       line-height: 1;
       padding: 0;
+      box-shadow: none;
+      transition: filter 120ms ease, transform 120ms ease;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn:hover {
-      background: #fff;
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn:hover,
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn:focus-visible {
+      filter: brightness(0.9);
+      outline: 2px solid var(--bm-combat-line);
+      outline-offset: 2px;
     }
-    .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn:active {
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn:active {
       transform: translateY(1px);
     }
-    .window-app.bloodman-damage-dialog .dialog-buttons button[data-button="roll"] {
-      background: #f0f0f0 !important;
-      color: #111 !important;
+    .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat input[type="number"] {
+      width: 100%;
+      min-width: 64px;
+      max-width: 64px;
+      height: 34px;
+      border: 0;
+      border-radius: 8px;
+      background: #f5f5f5 !important;
+      color: #050505 !important;
+      font-size: 18px;
+      font-weight: 900;
+      text-align: center;
+      padding: 0 4px;
+    }
+    .bm-damage-config.bm-damage-config--combat input[type="number"].bm-damage-config-value-active {
+      color: #050505 !important;
+      box-shadow: 0 0 0 2px var(--bm-combat-line);
+    }
+    .window-app.bloodman-damage-config-dialog .dialog-buttons,
+    .window-app.dialog.bloodman-damage-config-dialog .dialog-buttons,
+    .application.bloodman-damage-config-dialog .dialog-buttons {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      margin-top: 10px !important;
+      gap: 0 !important;
+    }
+    .window-app.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"],
+    .window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"],
+    .application.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"] {
+      min-height: 48px !important;
       border: 0 !important;
       border-radius: 4px !important;
-      height: 46px !important;
-      font-size: 22px !important;
-      font-family: "Oswald", sans-serif !important;
-      font-weight: 700 !important;
+      background: #f5f5f5 !important;
+      color: #050505 !important;
+      font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+      font-size: 24px !important;
+      font-weight: 900 !important;
+      letter-spacing: 0 !important;
       text-transform: uppercase !important;
+      box-shadow: none !important;
+    }
+    .window-app.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:hover,
+    .window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:hover,
+    .application.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:hover,
+    .window-app.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:focus,
+    .window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:focus,
+    .application.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:focus {
+      background: #ffffff !important;
+      outline: 2px solid #ffffff !important;
+      outline-offset: 2px !important;
+      filter: brightness(0.94);
     }
   </style>`;
 
-  const content = `${visualStyleBlock}<form class="bm-damage-config${formVariantClass} bm-damage-config--neo">
+  const content = `${visualStyleBlock}<form class="bm-damage-config${formVariantClass} bm-damage-config--combat">
     <div class="bm-damage-config-shell">
       <div class="bm-damage-config-head">
         <div class="bm-damage-config-icon-wrap" aria-hidden="true">
@@ -942,13 +1141,13 @@ async function promptDamageConfiguration({
       </div>
       ${shouldShowFormulaNotice ? `<p class="bm-damage-config-hint bm-damage-config-hint-sync" style="display:none;">${formulaPriorityNotice} ${formulaDivergenceNotice}</p>` : ""}
       <div class="bm-damage-config-grid">
-        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-panel bm-damage-config-panel--source" role="group" aria-label="${settingsLabel}" style="display:grid;gap:6px;">
+        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-panel bm-damage-config-panel--source" role="group" aria-label="${settingsLabel}">
           <label>${sourceInfoLabel}</label>
-          <input type="text" value="${escapeHtml(sourceDisplay)}" disabled tabindex="-1" style="height:40px;border:2px solid #f2f2f2;border-radius:4px;background:#0a0a0a;color:#f2f2f2;font-size:22px;padding:0 10px;" />
+          <input type="text" value="${escapeHtml(sourceDisplay)}" disabled tabindex="-1" />
         </div>
-        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-row-formula bm-damage-config-panel bm-damage-config-panel--formula" style="display:grid;gap:6px;">
+        <div class="bm-damage-config-row bm-damage-config-row-wide bm-damage-config-row-formula bm-damage-config-panel bm-damage-config-panel--formula">
           <label>${formulaSectionCompactLabel}</label>
-          <input type="text" name="degats" value="${selectedDefault.formula}" placeholder="/r 1d6+2"${inputDisabledAttr} style="height:40px;border:2px solid #f2f2f2;border-radius:4px;background:#0a0a0a;color:#f2f2f2;font-size:22px;padding:0 10px;" />
+          <input type="text" name="degats" value="${selectedDefault.formula}" placeholder="/r 1d6+2"${inputDisabledAttr} />
         </div>
         <details class="bm-damage-config-help">
           <summary>
@@ -963,20 +1162,20 @@ async function promptDamageConfiguration({
           </ul>
         </details>
         <p class="bm-damage-config-row-title">${modifiersInfoLabel}</p>
-        <div class="bm-damage-config-stats" style="display:grid;gap:8px;">
-          <div class="bm-damage-config-stat bm-damage-config-stat--bonus" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px;border:1px solid #f2f2f2;border-radius:4px;background:#0b0b0b;">
-            <label style="margin:0;font-size:14px;text-transform:uppercase;letter-spacing:0.3px;">${rawBonusCardLabel}</label>
-            <div class="bm-damage-config-stepper" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+        <div class="bm-damage-config-stats">
+          <div class="bm-damage-config-stat bm-damage-config-stat--bonus">
+            <label>${rawBonusCardLabel}</label>
+            <div class="bm-damage-config-stepper">
               <button type="button" class="bm-damage-config-stepper-btn" data-action="decrement" data-target="bonus_brut" aria-label="${stepperDecreaseLabel}">-</button>
-              <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} style="width:64px;min-width:64px;height:32px;border:0;border-radius:7px;background:#d8d8d8;color:#111;text-align:center;font-size:16px;padding:0 4px;" />
+              <input type="number" name="bonus_brut" min="0" step="1" value="${initialBonus}" ${initialBonus > 0 ? `class="${highlightedNumberClass}"` : ""} />
               <button type="button" class="bm-damage-config-stepper-btn" data-action="increment" data-target="bonus_brut" aria-label="${stepperIncreaseLabel}">+</button>
             </div>
           </div>
-          <div class="bm-damage-config-stat bm-damage-config-stat--penetration" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px;border:1px solid #f2f2f2;border-radius:4px;background:#0b0b0b;">
-            <label style="margin:0;font-size:14px;text-transform:uppercase;letter-spacing:0.3px;">${penetrationCardLabel}</label>
-            <div class="bm-damage-config-stepper" style="display:flex;align-items:center;justify-content:flex-end;gap:8px;">
+          <div class="bm-damage-config-stat bm-damage-config-stat--penetration">
+            <label>${penetrationCardLabel}</label>
+            <div class="bm-damage-config-stepper">
               <button type="button" class="bm-damage-config-stepper-btn" data-action="decrement" data-target="penetration" aria-label="${stepperDecreaseLabel}">-</button>
-              <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} style="width:64px;min-width:64px;height:32px;border:0;border-radius:7px;background:#d8d8d8;color:#111;text-align:center;font-size:16px;padding:0 4px;" />
+              <input type="number" name="penetration" min="0" step="1" value="${initialPenetration}" ${initialPenetration > 0 ? `class="${highlightedNumberClass}"` : ""} />
               <button type="button" class="bm-damage-config-stepper-btn" data-action="increment" data-target="penetration" aria-label="${stepperIncreaseLabel}">+</button>
             </div>
           </div>
@@ -1299,9 +1498,9 @@ async function promptDamageConfiguration({
       },
       {
         classes: isSimpleAttackVariant
-          ? ["bloodman-damage-dialog", "bloodman-damage-dialog-simple-attack"]
-          : ["bloodman-damage-dialog"],
-        width: 470
+          ? ["bloodman-damage-dialog", "bloodman-damage-config-dialog", "bloodman-damage-dialog-simple-attack"]
+          : ["bloodman-damage-dialog", "bloodman-damage-config-dialog"],
+        width: 260
       }
     ).render(true);
   });
