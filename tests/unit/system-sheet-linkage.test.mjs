@@ -21,7 +21,7 @@ function parseQuotedList(raw = "") {
 
 function parseConstStringMap(sourceText) {
   const map = new Map();
-  const pattern = /const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)";/g;
+  const pattern = /(?:export\s+)?const\s+([A-Z0-9_]+)\s*=\s*"([^"]+)";/g;
   let match;
   while ((match = pattern.exec(sourceText))) {
     map.set(String(match[1] || "").trim(), String(match[2] || "").trim());
@@ -31,7 +31,7 @@ function parseConstStringMap(sourceText) {
 
 function parseConstArrayMap(sourceText) {
   const map = new Map();
-  const pattern = /const\s+([A-Z0-9_]+)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]\)?;/g;
+  const pattern = /(?:export\s+)?const\s+([A-Z0-9_]+)\s*=\s*(?:Object\.freeze\()?\[([^\]]*)\]\)?;/g;
   let match;
   while ((match = pattern.exec(sourceText))) {
     map.set(String(match[1] || "").trim(), parseQuotedList(match[2] || ""));
@@ -91,7 +91,7 @@ function parseTemplatePathsFromRuntime(sourceText) {
   while ((match = itemTemplatePattern.exec(sourceText))) {
     paths.add(match[1]);
   }
-  const templateConstPattern = /const\s+[A-Z0-9_]+_TEMPLATE_PATH\s*=\s*`[^`]*\/(templates\/[^`]+)`;/g;
+  const templateConstPattern = /(?:export\s+)?const\s+[A-Z0-9_]+_TEMPLATE_PATH\s*=\s*`[^`]*\/(templates\/[^`]+)`;/g;
   while ((match = templateConstPattern.exec(sourceText))) {
     paths.add(String(match[1] || "").trim());
   }
@@ -99,7 +99,7 @@ function parseTemplatePathsFromRuntime(sourceText) {
 }
 
 function parseIconKeySet(sourceText, constName) {
-  const blockPattern = new RegExp(`const\\s+${constName}\\s*=\\s*\\{([\\s\\S]*?)\\};`);
+  const blockPattern = new RegExp(`(?:export\\s+)?const\\s+${constName}\\s*=\\s*(?:Object\\.freeze\\()?\\{([\\s\\S]*?)\\}\\)?;`);
   const block = blockPattern.exec(sourceText)?.[1] || "";
   const keys = [];
   const keyPattern = /\"([^\"]+)\"\s*:/g;
@@ -131,9 +131,34 @@ function assertAbilitiesPowersDropScopes(templateText, label) {
   );
 }
 
+function collectLocalCssImports(relativePath, seen = new Set()) {
+  const normalizedPath = relativePath.replaceAll("\\", "/");
+  if (seen.has(normalizedPath)) return [];
+  seen.add(normalizedPath);
+
+  const cssText = readText(normalizedPath);
+  const imports = [];
+  const importPattern = /@import\s+url\("([^"]+)"\);/g;
+  let match;
+  while ((match = importPattern.exec(cssText))) {
+    const importPath = String(match[1] || "").trim();
+    if (!importPath || /^https?:\/\//i.test(importPath)) continue;
+    const resolvedPath = path
+      .normalize(path.join(path.dirname(normalizedPath), importPath))
+      .replaceAll("\\", "/");
+    imports.push(resolvedPath);
+    imports.push(...collectLocalCssImports(resolvedPath, seen));
+  }
+  return imports;
+}
+
 function run() {
   const systemJson = JSON.parse(readText("system.json"));
   const runtimeSource = readText("bloodman.mjs");
+  const coreConstantsSource = readText("src/core/constants.mjs");
+  const sheetRegistrationSource = readText("src/sheets/register-sheets.mjs");
+  const runtimeAndConstantsSource = `${coreConstantsSource}\n${sheetRegistrationSource}\n${runtimeSource}`;
+  const documentCreateTypeIconsSource = readText("src/ui/document-create-type-icons.mjs");
   const itemSheetCss = readText("styles/item-unified.css");
   const playerSheetTemplate = readText("templates/actor-joueur.html");
   const npcSheetTemplate = readText("templates/actor-non-joueur.html");
@@ -142,8 +167,8 @@ function run() {
   const declaredActorTypes = new Set(Object.keys(systemJson?.documentTypes?.Actor || {}));
   const declaredItemTypes = new Set(Object.keys(systemJson?.documentTypes?.Item || {}));
 
-  const registeredActorTypes = parseRuntimeRegisteredTypes(runtimeSource, "ActorsCollection");
-  const registeredItemTypes = parseRuntimeRegisteredTypes(runtimeSource, "ItemsCollection");
+  const registeredActorTypes = parseRuntimeRegisteredTypes(runtimeAndConstantsSource, "actorsCollection");
+  const registeredItemTypes = parseRuntimeRegisteredTypes(runtimeAndConstantsSource, "itemsCollection");
 
   assert.deepEqual(
     [...registeredActorTypes].sort(),
@@ -157,8 +182,8 @@ function run() {
     "Item types declared in system.json must match runtime sheet registration"
   );
 
-  const actorIconTypes = parseIconKeySet(runtimeSource, "ACTOR_CREATE_TYPE_ICONS");
-  const itemIconTypes = parseIconKeySet(runtimeSource, "ITEM_CREATE_TYPE_ICONS");
+  const actorIconTypes = parseIconKeySet(documentCreateTypeIconsSource, "ACTOR_CREATE_TYPE_ICONS");
+  const itemIconTypes = parseIconKeySet(documentCreateTypeIconsSource, "ITEM_CREATE_TYPE_ICONS");
 
   assert.deepEqual(
     [...actorIconTypes].sort(),
@@ -172,7 +197,7 @@ function run() {
     "Item create-type icon map must cover all item types"
   );
 
-  const referencedTemplates = parseTemplatePathsFromRuntime(runtimeSource);
+  const referencedTemplates = parseTemplatePathsFromRuntime(runtimeAndConstantsSource);
   for (const templatePath of referencedTemplates) {
     const absolutePath = path.join(SYSTEM_ROOT, templatePath);
     assert.equal(
@@ -221,6 +246,14 @@ function run() {
 
   assertAbilitiesPowersDropScopes(playerSheetTemplate, "Player");
   assertAbilitiesPowersDropScopes(npcSheetTemplate, "NPC");
+
+  const manifestCssFiles = systemJson.styles || [];
+  for (const cssPath of manifestCssFiles) {
+    assert.equal(fs.existsSync(path.join(SYSTEM_ROOT, cssPath)), true, `Manifest CSS file must exist: ${cssPath}`);
+    for (const importedPath of collectLocalCssImports(cssPath)) {
+      assert.equal(fs.existsSync(path.join(SYSTEM_ROOT, importedPath)), true, `CSS import must exist: ${importedPath}`);
+    }
+  }
 
   assert.equal(
     runtimeSource.includes('html.find(".bm-item-top, .bm-item-img-el").attr("draggable", true);'),

@@ -1,3 +1,5 @@
+import { SYSTEM_ROOT_PATH } from "../core/constants.mjs";
+
 function normalizeStatusEffectId(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -38,8 +40,8 @@ const BLOODMAN_SUPPLEMENTAL_STATUS_EFFECTS = Object.freeze([
   })
 ]);
 
-export function buildBloodmanSupplementalStatusEffects({ systemRootPath = "systems/bloodman" } = {}) {
-  const basePath = String(systemRootPath || "systems/bloodman").trim().replace(/\/+$/, "");
+export function buildBloodmanSupplementalStatusEffects({ systemRootPath = SYSTEM_ROOT_PATH } = {}) {
+  const basePath = String(systemRootPath || SYSTEM_ROOT_PATH).trim().replace(/\/+$/, "");
   return BLOODMAN_SUPPLEMENTAL_STATUS_EFFECTS.map(definition => ({
     id: definition.id,
     statuses: [definition.id],

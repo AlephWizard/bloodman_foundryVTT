@@ -6,11 +6,16 @@
 - `src/compat/`: couche de compatibilite Foundry (version + wrappers API instables).
 - `src/migrations/`: migrations de donnees versionnees et idempotentes.
 - `src/hooks/`: handlers de hooks Foundry extraits par domaine (canvas, items derives, actors, combat/tokens).
+- `src/sheets/`: enregistrement et glue des sheets Foundry.
+- `src/ui/`: helpers UI extraits des sheets et dialogues (chat, layout, dialogues, decoration des types de documents).
 - `src/rules/`: calculs metier purs (ressources/caracteristiques) reutilisables et testables.
-- `src/core/`: logger, settings et utilitaires de permissions.
+- `src/core/`: constantes systeme, logger, settings et utilitaires de permissions.
 - `utils/`: points de compatibilite (re-exports) pour anciens chemins.
 - `templates/`: vues Handlebars des sheets Actor/Item.
-- `styles/`: CSS du systeme.
+- `styles/`: CSS du systeme, avec `styles/bloodman.css` comme facade d'imports.
+- `styles/base/`: fondations partagees et surcharges communes.
+- `styles/dialogs/`: styles des dialogues Bloodman.
+- `styles/ui/`: panneaux et widgets UI hors sheets.
 - `lang/`: traductions.
 - `tests/`: tests unitaires minimaux, fixtures migration, checklist smoke.
 

@@ -1,0 +1,195 @@
+﻿#bm-chaos-dice {
+  position: fixed;
+  left: 18px;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 90;
+  pointer-events: auto;
+  user-select: none;
+  font-family: "Oswald", sans-serif;
+  min-width: 124px;
+  padding: 4px 5px 6px;
+  border: 1px solid #2a242a;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 32%),
+    linear-gradient(180deg, #171318 0%, #0a090c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.65),
+    0 5px 16px rgba(0, 0, 0, 0.46);
+  color: #ffffff;
+}
+
+#bm-chaos-dice .bm-chaos-panel-header {
+  width: 100%;
+  min-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px 3px;
+  border-bottom: 1px solid rgba(168, 45, 45, 0.44);
+  color: #f4f0ec;
+  cursor: grab;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 #000000;
+}
+
+#bm-chaos-dice.is-dragging,
+#bm-chaos-dice.is-dragging .bm-chaos-panel-header {
+  cursor: grabbing;
+}
+
+#bm-chaos-dice .bm-chaos-panel-body {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+#bm-chaos-dice .bm-chaos-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#bm-chaos-dice .bm-chaos-xp-btn,
+#bm-chaos-dice .bm-chaos-full-pv-btn,
+#bm-chaos-dice .bm-chaos-full-pp-btn {
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid #000000;
+  background: linear-gradient(180deg, #201f22, #0b0b0d);
+  color: #f8f8f8;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 7px;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+#bm-chaos-dice .bm-chaos-xp-btn {
+  min-width: 34px;
+  height: 22px;
+  border-color: #150d0d;
+  background: linear-gradient(180deg, #2b2527, #0f0d10);
+}
+
+#bm-chaos-dice .bm-chaos-full-pp-btn {
+  min-width: 54px;
+}
+
+#bm-chaos-dice .bm-chaos-full-pv-btn {
+  min-width: 54px;
+}
+
+#bm-chaos-dice .bm-chaos-full-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#bm-chaos-dice .bm-chaos-xp-btn:focus-visible,
+#bm-chaos-dice .bm-chaos-full-pv-btn:focus-visible,
+#bm-chaos-dice .bm-chaos-full-pp-btn:focus-visible {
+  outline: none;
+}
+
+#bm-chaos-dice .bm-chaos-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid #000000;
+  background: linear-gradient(180deg, #1f1f22, #09090b);
+  color: #f8f8f8;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.11),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+#bm-chaos-dice button:hover,
+#bm-chaos-dice button:focus-visible {
+  border-color: #6e3535;
+  filter: brightness(1.14);
+  outline: none;
+}
+
+#bm-chaos-dice button:active {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+}
+
+#bm-chaos-dice .bm-chaos-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.62));
+}
+
+#bm-chaos-dice .bm-chaos-icon img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transform-origin: center center;
+}
+
+#bm-chaos-dice .bm-chaos-value {
+  position: absolute;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-block;
+  transform-origin: center center;
+  text-shadow: 0 1px 2px #000000;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-icon img {
+  animation: bm-chaos-bounce 1.35s ease-in-out infinite;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-value {
+  animation: bm-chaos-bounce 1.35s ease-in-out infinite;
+}
+
+@keyframes bm-chaos-bounce {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  12% {
+    transform: scale(1.12) translateY(-2px);
+  }
+  24% {
+    transform: scale(0.95) translateY(1px);
+  }
+  36% {
+    transform: scale(1.06) translateY(-1px);
+  }
+  48% {
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+

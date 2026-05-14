@@ -1,6 +1,20 @@
 import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./src/dice/roll-helpers.mjs";
 import { bmLog } from "./src/core/logger.mjs";
+import {
+  CHAOS_DICE_ICON_FALLBACK_SRC,
+  CHAOS_DICE_ICON_SRC,
+  ITEM_SHEET_TEMPLATE_PATH,
+  NPC_ACTOR_SHEET_TEMPLATE_PATH,
+  NPC_ACTOR_TYPE,
+  PLAYER_ACTOR_SHEET_TEMPLATE_PATH,
+  PLAYER_ACTOR_TYPE,
+  SYSTEM_ID,
+  SYSTEM_ITEM_TYPES,
+  SYSTEM_ROOT_PATH,
+  SYSTEM_SOCKET
+} from "./src/core/constants.mjs";
 import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } from "./src/core/settings.mjs";
+import { registerSystemDocumentSheets } from "./src/sheets/register-sheets.mjs";
 import {
   getActivePrivilegedOperatorIds,
   getActiveGMUserIds,
@@ -62,6 +76,11 @@ import {
   collectOpenApplications,
   getApplicationDocumentActor
 } from "./src/ui/open-applications.mjs";
+import {
+  installCreateTypeIconObserver,
+  refreshAllCreateTypeIcons,
+  registerCreateTypeIconRenderHooks
+} from "./src/ui/document-create-type-icons.mjs";
 import {
   toFiniteNumber as ruleToFiniteNumber,
   normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
@@ -431,340 +450,7 @@ function formatMultilineTextToHtml(value) {
   return html;
 }
 
-const ACTOR_CREATE_TYPE_ICONS = {
-  "personnage": "fa-masks-theater",
-  "personnage-non-joueur": "fa-mask"
-};
-
-const ITEM_CREATE_TYPE_ICONS = {
-  "arme": "fa-gun",
-  "objet": "fa-box-open",
-  "ration": "fa-utensils",
-  "soin": "fa-kit-medical",
-  "protection": "fa-shield-halved",
-  "aptitude": "fa-hand-fist",
-  "pouvoir": "fa-bolt"
-};
-const CREATE_TYPE_PICKER_ROOT_CLASS = "bm-doc-type-picker";
-const CREATE_TYPE_EMOJI_BY_ICON = {
-  "fa-masks-theater": "\u{1F3AD}",
-  "fa-mask": "\u{1F479}",
-  "fa-gun": "\u{1F52B}",
-  "fa-box-open": "\u{1F4E6}",
-  "fa-utensils": "\u{1F37D}\u{FE0F}",
-  "fa-kit-medical": "\u{1F489}",
-  "fa-shield-halved": "\u{1F6E1}\u{FE0F}",
-  "fa-hand-fist": "\u{270A}",
-  "fa-bolt": "\u{26A1}"
-};
-const CREATE_TYPE_REFRESH_DEBOUNCE_MS = 120;
-const CREATE_TYPE_REFRESH_MAX_ROOTS = 40;
 const ENABLE_CREATE_TYPE_ICON_OBSERVER = false;
-let CREATE_TYPE_REFRESH_TIMER_ID = null;
-let CREATE_TYPE_REFRESH_RUNNING = false;
-let CREATE_TYPE_REFRESH_PENDING = false;
-const CREATE_TYPE_REFRESH_ROOTS = new Set();
-
-function normalizeCreateTypeLabel(value) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getCreateTypeIconByTypeKey(typeKey) {
-  const key = String(typeKey || "").trim().toLowerCase();
-  return ACTOR_CREATE_TYPE_ICONS[key] || ITEM_CREATE_TYPE_ICONS[key] || "";
-}
-
-function getCreateTypeIconByLabelText(labelText) {
-  const normalized = normalizeCreateTypeLabel(labelText);
-  if (!normalized) return "";
-  if (normalized.includes("non joueur")) return "fa-mask";
-  if (normalized.includes("joueur")) return "fa-masks-theater";
-  if (normalized.includes("arme")) return "fa-gun";
-  if (normalized.includes("protection")) return "fa-shield-halved";
-  if (normalized.includes("aptitude")) return "fa-hand-fist";
-  if (normalized.includes("pouvoir")) return "fa-bolt";
-  if (normalized.includes("ration")) return "fa-utensils";
-  if (normalized.includes("soin")) return "fa-kit-medical";
-  if (normalized.includes("objet")) return "fa-box-open";
-  return "";
-}
-
-function cleanCreateTypeLabelText(labelText) {
-  return String(labelText || "")
-    .replace(/^[\s\u25A1\u25A0\u2610\u2611\u2612\uF000-\uF8FF]+/g, "")
-    .trim();
-}
-
-function getCreateTypeEmoji(iconClass) {
-  return CREATE_TYPE_EMOJI_BY_ICON[String(iconClass || "").trim()] || "";
-}
-
-function isDocumentTypeSelect(selectEl) {
-  if (!(selectEl instanceof HTMLSelectElement)) return false;
-  if ((selectEl.name || "").toLowerCase() === "type") return true;
-  const keywords = ["joueur", "non joueur", "arme", "aptitude", "objet", "pouvoir", "protection", "ration", "soin"];
-  const options = Array.from(selectEl.options || []);
-  return options.some(option => {
-    const label = normalizeCreateTypeLabel(option?.dataset?.bmTypeLabel || option?.textContent || "");
-    return keywords.some(keyword => label.includes(keyword));
-  });
-}
-
-function findCreateTypeLabelHost(optionRow, input) {
-  const direct = optionRow?.querySelector(".label, .name, .title, .option-name, .document-name");
-  if (direct) return direct;
-  const textCandidates = optionRow?.querySelectorAll("span, div, p, strong, h4") || [];
-  for (const candidate of textCandidates) {
-    if (!candidate) continue;
-    if (candidate.classList?.contains("bm-doc-type-label-with-icon")) return candidate;
-    const text = String(candidate.textContent || "").trim();
-    if (text) return candidate;
-  }
-  if (input?.parentElement && input.parentElement !== optionRow) return input.parentElement;
-  return optionRow;
-}
-
-function appendCreateTypeIcon(optionRow, input, iconClass) {
-  if (!optionRow || !iconClass) return;
-  if (optionRow.querySelector(".bm-doc-type-icon")) return;
-  const host = findCreateTypeLabelHost(optionRow, input);
-  if (!host) return;
-  host.classList?.add("bm-doc-type-label-with-icon");
-  const icon = document.createElement("i");
-  icon.className = `bm-doc-type-icon fa-solid ${iconClass}`;
-  if (host.firstChild) host.insertBefore(icon, host.firstChild);
-  else host.appendChild(icon);
-}
-
-function buildCreateTypeEntries(selectEl) {
-  const entries = [];
-  for (const option of Array.from(selectEl?.options || [])) {
-    const rawLabel = option.dataset?.bmTypeLabel || String(option.textContent || "");
-    const label = cleanCreateTypeLabelText(rawLabel);
-    if (!label) continue;
-    if (!option.dataset.bmTypeLabel) option.dataset.bmTypeLabel = label;
-    const iconClass = getCreateTypeIconByTypeKey(option.value) || getCreateTypeIconByLabelText(label) || "fa-circle-dot";
-    entries.push({ value: option.value, label, iconClass });
-  }
-  return entries;
-}
-
-function resolveSelectedCreateTypeEntry(entries, currentValue) {
-  if (!Array.isArray(entries) || !entries.length) return null;
-  return entries.find(entry => entry.value === currentValue) || entries[0];
-}
-
-function setCreateTypeToggleContent(toggle, entry) {
-  if (!toggle || !entry) return;
-  toggle.replaceChildren();
-  const value = document.createElement("span");
-  value.className = "bm-doc-type-picker-value";
-  const icon = document.createElement("i");
-  icon.className = `fa-solid ${entry.iconClass}`;
-  const label = document.createElement("span");
-  label.textContent = entry.label;
-  value.append(icon, label);
-  const caret = document.createElement("i");
-  caret.className = "fa-solid fa-chevron-down bm-doc-type-picker-caret";
-  toggle.append(value, caret);
-}
-
-function syncCreateTypePicker(selectEl, picker, entries) {
-  if (!selectEl || !picker || !Array.isArray(entries) || !entries.length) return;
-  const toggle = picker.querySelector(".bm-doc-type-picker-toggle");
-  const menu = picker.querySelector(".bm-doc-type-picker-menu");
-  if (!toggle || !menu) return;
-  const selected = resolveSelectedCreateTypeEntry(entries, selectEl.value);
-  if (!selected) return;
-  setCreateTypeToggleContent(toggle, selected);
-  for (const button of menu.querySelectorAll(".bm-doc-type-picker-option")) {
-    const isActive = button.dataset.value === selected.value;
-    button.classList.toggle("active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
-  }
-}
-
-function closeAllCreateTypePickers(except = null) {
-  for (const picker of document.querySelectorAll(`.${CREATE_TYPE_PICKER_ROOT_CLASS}.open`)) {
-    if (except && picker === except) continue;
-    picker.classList.remove("open");
-    const toggle = picker.querySelector(".bm-doc-type-picker-toggle");
-    toggle?.setAttribute("aria-expanded", "false");
-  }
-}
-
-function ensureCreateTypePickerGlobalHandlers() {
-  if (window.__bmCreateTypePickerHandlersInstalled) return;
-  document.addEventListener("pointerdown", event => {
-    try {
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest(`.${CREATE_TYPE_PICKER_ROOT_CLASS}`)) return;
-      closeAllCreateTypePickers();
-    } catch (_error) {
-      // non-fatal UI helper
-    }
-  });
-  document.addEventListener("keydown", event => {
-    try {
-      if (event.key !== "Escape") return;
-      closeAllCreateTypePickers();
-    } catch (_error) {
-      // non-fatal UI helper
-    }
-  });
-  window.__bmCreateTypePickerHandlersInstalled = true;
-}
-
-function decorateCreateTypeSelect(selectEl) {
-  try {
-    if (!(selectEl instanceof HTMLSelectElement) || !selectEl.options?.length) return;
-    if (!isDocumentTypeSelect(selectEl)) return;
-    selectEl.classList.remove("bm-doc-type-select-native");
-    delete selectEl.dataset.bmTypeEnhanced;
-    const existingPicker = selectEl.parentElement?.querySelector(`.${CREATE_TYPE_PICKER_ROOT_CLASS}`);
-    existingPicker?.remove();
-
-    for (const option of Array.from(selectEl.options || [])) {
-      const rawLabel = option.dataset?.bmTypeLabel || String(option.textContent || "");
-      const baseLabel = cleanCreateTypeLabelText(rawLabel);
-      if (!baseLabel) continue;
-      if (!option.dataset.bmTypeLabel) option.dataset.bmTypeLabel = baseLabel;
-      const iconClass = getCreateTypeIconByTypeKey(option.value) || getCreateTypeIconByLabelText(baseLabel);
-      const emoji = getCreateTypeEmoji(iconClass);
-      const nextLabel = emoji ? `${emoji} ${baseLabel}` : baseLabel;
-      if (String(option.textContent || "") !== nextLabel) option.textContent = nextLabel;
-    }
-  } catch (error) {
-    try {
-      if (selectEl?.classList) selectEl.classList.remove("bm-doc-type-select-native");
-      if (selectEl?.dataset) delete selectEl.dataset.bmTypeEnhanced;
-      const picker = selectEl?.parentElement?.querySelector(`.${CREATE_TYPE_PICKER_ROOT_CLASS}`);
-      picker?.remove();
-    } catch (_cleanupError) {
-      // non-fatal cleanup
-    }
-    bmLog.warn("[bloodman] create type icon picker disabled for this select", error);
-    return;
-  }
-}
-
-function injectDocumentCreateTypeIcons(htmlLike) {
-  try {
-    const root = htmlLike?.[0] || htmlLike;
-    if (root instanceof HTMLElement) {
-      const typeSelects = root.querySelectorAll("select[name='type']");
-      for (const selectEl of typeSelects) decorateCreateTypeSelect(selectEl);
-
-      const typeInputs = root.querySelectorAll("input[name='type']");
-      for (const input of typeInputs) {
-        const optionRow = input.closest("label, li, .form-group, .option, [data-value]");
-        if (!optionRow) continue;
-        const typeKey = input.value || optionRow.dataset?.value || "";
-        const rowText = String(optionRow.textContent || "");
-        const iconClass = getCreateTypeIconByTypeKey(typeKey) || getCreateTypeIconByLabelText(rowText);
-        appendCreateTypeIcon(optionRow, input, iconClass);
-      }
-      return;
-    }
-
-    const fallbackSelects = document.querySelectorAll(
-      ".window-app select[name='type'], .application select[name='type'], dialog select[name='type']"
-    );
-    for (const selectEl of fallbackSelects) decorateCreateTypeSelect(selectEl);
-  } catch (error) {
-    bmLog.warn("[bloodman] create type icon injection skipped", error);
-  }
-}
-
-function refreshAllCreateTypeIcons() {
-  const selectNodes = document.querySelectorAll(
-    ".window-app select[name='type'], .application select[name='type'], dialog select[name='type']"
-  );
-  for (const selectEl of selectNodes) decorateCreateTypeSelect(selectEl);
-}
-
-function shouldRefreshCreateTypeIconsForNode(node) {
-  if (!(node instanceof HTMLElement)) return false;
-  if (node.matches("select[name='type'], input[name='type'], .window-app, .application, dialog")) return true;
-  if (!node.childElementCount) return false;
-  return Boolean(node.querySelector("select[name='type'], input[name='type']"));
-}
-
-function resolveCreateTypeRefreshRoot(node) {
-  if (!(node instanceof HTMLElement)) return null;
-  const appRootSelector = ".window-app, .application, dialog";
-  if (node.matches(appRootSelector)) return node;
-  const closestRoot = node.closest(appRootSelector);
-  if (closestRoot) return closestRoot;
-  const nestedRoot = node.querySelector(appRootSelector);
-  if (nestedRoot instanceof HTMLElement) return nestedRoot;
-  return node;
-}
-
-function scheduleCreateTypeIconsRefresh() {
-  if (CREATE_TYPE_REFRESH_TIMER_ID) return;
-  CREATE_TYPE_REFRESH_TIMER_ID = setTimeout(() => {
-    CREATE_TYPE_REFRESH_TIMER_ID = null;
-    flushCreateTypeIconsRefreshQueue();
-  }, CREATE_TYPE_REFRESH_DEBOUNCE_MS);
-}
-
-function queueCreateTypeIconsRefreshFromMutations(mutations = []) {
-  let hasRelevantMutation = false;
-  let saturated = false;
-  for (const mutation of mutations || []) {
-    if (saturated) break;
-    if (!mutation?.addedNodes?.length) continue;
-    for (const node of mutation.addedNodes) {
-      if (!shouldRefreshCreateTypeIconsForNode(node)) continue;
-      const root = resolveCreateTypeRefreshRoot(node) || node;
-      CREATE_TYPE_REFRESH_ROOTS.add(root);
-      hasRelevantMutation = true;
-      if (CREATE_TYPE_REFRESH_ROOTS.size >= CREATE_TYPE_REFRESH_MAX_ROOTS) {
-        CREATE_TYPE_REFRESH_ROOTS.clear();
-        CREATE_TYPE_REFRESH_ROOTS.add(document.body);
-        saturated = true;
-        break;
-      }
-    }
-  }
-  if (!hasRelevantMutation) return;
-  scheduleCreateTypeIconsRefresh();
-}
-
-function flushCreateTypeIconsRefreshQueue() {
-  if (CREATE_TYPE_REFRESH_RUNNING) {
-    CREATE_TYPE_REFRESH_PENDING = true;
-    return;
-  }
-  CREATE_TYPE_REFRESH_RUNNING = true;
-  try {
-    const roots = Array.from(CREATE_TYPE_REFRESH_ROOTS).filter(node => node?.isConnected);
-    CREATE_TYPE_REFRESH_ROOTS.clear();
-    if (!roots.length) return;
-    const cappedRoots = roots.slice(0, CREATE_TYPE_REFRESH_MAX_ROOTS);
-    for (const root of cappedRoots) injectDocumentCreateTypeIcons(root);
-    if (roots.length > cappedRoots.length) {
-      for (const root of roots.slice(cappedRoots.length)) {
-        if (root?.isConnected) CREATE_TYPE_REFRESH_ROOTS.add(root);
-      }
-      CREATE_TYPE_REFRESH_PENDING = true;
-    }
-  } catch (error) {
-    bmLog.warn("create type icon refresh queue failed", { error });
-  } finally {
-    CREATE_TYPE_REFRESH_RUNNING = false;
-    if (CREATE_TYPE_REFRESH_PENDING || CREATE_TYPE_REFRESH_ROOTS.size > 0) {
-      CREATE_TYPE_REFRESH_PENDING = false;
-      scheduleCreateTypeIconsRefresh();
-    }
-  }
-}
 
 function canUserRoleEditCharacteristics(role) {
   const minRole = Number(CONST?.USER_ROLES?.TRUSTED ?? 2);
@@ -3161,17 +2847,6 @@ const TOKEN_IMAGE_UPDATE_PATHS = [
   "texture.src"
 ];
 
-const SYSTEM_ID = "bloodman";
-const SYSTEM_ROOT_PATH = `systems/${SYSTEM_ID}`;
-const SYSTEM_SOCKET = `system.${SYSTEM_ID}`;
-const PLAYER_ACTOR_TYPE = "personnage";
-const NPC_ACTOR_TYPE = "personnage-non-joueur";
-const PLAYER_ACTOR_SHEET_TEMPLATE_PATH = `${SYSTEM_ROOT_PATH}/templates/actor-joueur.html`;
-const NPC_ACTOR_SHEET_TEMPLATE_PATH = `${SYSTEM_ROOT_PATH}/templates/actor-non-joueur.html`;
-const ITEM_SHEET_TEMPLATE_PATH = `${SYSTEM_ROOT_PATH}/templates/item-unified.html`;
-const SYSTEM_ITEM_TYPES = Object.freeze(["arme", "objet", "ration", "soin", "protection", "aptitude", "pouvoir"]);
-const CHAOS_DICE_ICON_SRC = `${SYSTEM_ROOT_PATH}/images/d20_destin.svg`;
-const CHAOS_DICE_ICON_FALLBACK_SRC = "icons/svg/d20.svg";
 const CARRIED_ITEMS_PER_MAIN_COLUMN = 5;
 const CARRIED_MAIN_COLUMN_COUNT = 2;
 const CARRIED_BAG_COLUMN_COUNT = 1;
@@ -5573,78 +5248,7 @@ async function syncCombatantNameForToken(tokenDoc) {
   }
 }
 
-function injectCreateTypeIconsFromHook(htmlLike, sourceHook = "unknown") {
-  try {
-    const root = htmlLike?.[0] || htmlLike;
-    if (!(root instanceof HTMLElement)) return;
-    if (!root.querySelector("select[name='type'], input[name='type']")) return;
-    injectDocumentCreateTypeIcons(root);
-  } catch (error) {
-    bmLog.warn(`[bloodman] ${sourceHook} type icon hook skipped`, error);
-  }
-}
-
-function registerCreateTypeIconRenderHooks() {
-  if (!globalThis.Hooks || typeof Hooks.on !== "function") return false;
-  if (globalThis.__bloodmanCreateTypeIconHooksRegistered) return true;
-  globalThis.__bloodmanCreateTypeIconHooksRegistered = true;
-  const hookBindings = [
-    ["renderDialog", "renderDialog"],
-    ["renderApplication", "renderApplication"],
-    ["renderApplicationV1", "renderApplicationV1"],
-    ["renderApplicationV2", "renderApplicationV2"],
-    ["renderDocumentCreateDialog", "renderDocumentCreateDialog"],
-    ["renderDocumentCreateDialogV1", "renderDocumentCreateDialogV1"],
-    ["renderDocumentCreateDialogV2", "renderDocumentCreateDialogV2"]
-  ];
-  for (const [hookName, sourceHook] of hookBindings) {
-    Hooks.on(hookName, (_app, htmlLike) => {
-      injectCreateTypeIconsFromHook(htmlLike, sourceHook);
-    });
-  }
-  return true;
-}
-
 registerCreateTypeIconRenderHooks();
-
-function registerSystemDocumentSheets({
-  actorSheetClass,
-  npcSheetClass
-} = {}) {
-  if (!actorSheetClass || !npcSheetClass || !BloodmanItemSheet) {
-    bmLog.error("sheet registration skipped (missing sheet classes)");
-    return false;
-  }
-  if (!ActorsCollection || typeof ActorsCollection.registerSheet !== "function") {
-    bmLog.error("actor sheet registration skipped (Actors collection unavailable)");
-    return false;
-  }
-  if (!ItemsCollection || typeof ItemsCollection.registerSheet !== "function") {
-    bmLog.error("item sheet registration skipped (Items collection unavailable)");
-    return false;
-  }
-
-  if (typeof ActorsCollection.unregisterSheet === "function" && BaseActorSheet) {
-    ActorsCollection.unregisterSheet("core", BaseActorSheet);
-  }
-  ActorsCollection.registerSheet(SYSTEM_ID, actorSheetClass, {
-    types: [PLAYER_ACTOR_TYPE],
-    makeDefault: true
-  });
-  ActorsCollection.registerSheet(SYSTEM_ID, npcSheetClass, {
-    types: [NPC_ACTOR_TYPE],
-    makeDefault: true
-  });
-
-  if (typeof ItemsCollection.unregisterSheet === "function") {
-    ItemsCollection.unregisterSheet("core", BaseItemSheet);
-  }
-  ItemsCollection.registerSheet(SYSTEM_ID, BloodmanItemSheet, {
-    types: [...SYSTEM_ITEM_TYPES],
-    makeDefault: true
-  });
-  return true;
-}
 
 const canvasReadyHooks = buildCanvasReadyHooks({
   installTokenEffectBackgroundPatch,
@@ -5713,7 +5317,16 @@ Hooks.once("init", () => {
 
   const actorSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanActorSheetV2 : BloodmanActorSheet;
   const npcSheetClass = ResolvedBloodmanActorSheetV2Base ? BloodmanNpcSheetV2 : BloodmanNpcSheet;
-  registerSystemDocumentSheets({ actorSheetClass, npcSheetClass });
+  registerSystemDocumentSheets({
+    actorSheetClass,
+    npcSheetClass,
+    itemSheetClass: BloodmanItemSheet,
+    actorsCollection: ActorsCollection,
+    itemsCollection: ItemsCollection,
+    baseActorSheet: BaseActorSheet,
+    baseItemSheet: BaseItemSheet,
+    logger: bmLog
+  });
 
   if (!areInternalCombatantPatchesEnabled()) {
     bmLog.info("combatant prototype patch disabled by world setting");
@@ -5993,23 +5606,7 @@ const startupNormalizationRunner = createStartupNormalizationRunner({
 Hooks.once("ready", async () => {
   try {
     refreshAllCreateTypeIcons();
-    const existingObserver = window.__bmCreateTypeIconObserver;
-    if (existingObserver && typeof existingObserver.disconnect === "function") {
-      try {
-        existingObserver.disconnect();
-      } catch (_disconnectError) {
-        // ignore stale observer cleanup failure
-      }
-      window.__bmCreateTypeIconObserver = null;
-    }
-
-    if (ENABLE_CREATE_TYPE_ICON_OBSERVER && !window.__bmCreateTypeIconObserver) {
-      const observer = new MutationObserver(mutations => {
-        queueCreateTypeIconsRefreshFromMutations(mutations);
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-      window.__bmCreateTypeIconObserver = observer;
-    }
+    installCreateTypeIconObserver({ enabled: ENABLE_CREATE_TYPE_ICON_OBSERVER });
   } catch (error) {
     bmLog.warn("create type icon ready hook skipped", { error });
   }

@@ -1,0 +1,1960 @@
+﻿
+.bm-drop-insufficient-funds .bm-drop-insufficient-shell {
+  gap: 14px;
+  border-color: rgba(128, 105, 98, 0.68);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 32%),
+    linear-gradient(180deg, #181514 0%, #090909 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 14px 26px rgba(0, 0, 0, 0.44);
+  padding: 14px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-head {
+  grid-template-columns: 72px minmax(0, 1fr);
+  min-height: 86px;
+  padding: 12px;
+  border: 1px solid rgba(208, 71, 63, 0.38);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 52px 42px, rgba(208, 71, 63, 0.2), transparent 58px),
+    linear-gradient(90deg, rgba(208, 71, 63, 0.1), transparent 44%),
+    #0d0b0a;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-ring {
+  width: 46px;
+  height: 46px;
+  border-color: rgba(208, 71, 63, 0.78);
+  border-radius: 4px;
+  background:
+    radial-gradient(circle, rgba(208, 71, 63, 0.32), transparent 62%),
+    #140a09;
+  transform: rotate(45deg);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(208, 71, 63, 0.22);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-icon-ring i {
+  color: #ff6f66;
+  font-size: 21px;
+  transform: rotate(-45deg);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-eyebrow {
+  color: #f4eee6;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-intro,
+.bm-drop-insufficient-funds .bm-drop-insufficient-prompt {
+  color: #f4eee6;
+  font-size: 15px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-prompt {
+  color: #fff8ef;
+  font-weight: 700;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid rgba(128, 105, 98, 0.56);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(6, 6, 6, 0.42);
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card {
+  min-height: 62px;
+  border: 0;
+  border-right: 1px solid rgba(128, 105, 98, 0.34);
+  border-bottom: 1px solid rgba(128, 105, 98, 0.34);
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    #0d0c0b;
+  padding: 10px 12px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-label,
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities-title {
+  color: #d5b99a;
+  font-size: 12px;
+  letter-spacing: 0.7px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-value {
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-transfer-card-hint,
+.bm-drop-insufficient-funds .bm-drop-insufficient-details {
+  color: var(--bm-insufficient-muted);
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-details,
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities,
+.bm-drop-insufficient-funds .bm-drop-insufficient-warning {
+  border-color: rgba(128, 105, 98, 0.52);
+  border-radius: 6px;
+  background: #0d0c0b;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities {
+  list-style: none;
+  padding: 10px 12px;
+}
+
+.bm-drop-insufficient-funds .bm-drop-insufficient-specificities li::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border: 1px solid #ff6f66;
+  transform: rotate(45deg) translateY(-1px);
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons {
+  padding: 10px;
+  border: 1px solid rgba(128, 105, 98, 0.48) !important;
+  border-radius: 6px;
+  background: rgba(8, 7, 7, 0.64) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button {
+  min-height: 48px;
+  border-radius: 4px;
+  border-color: rgba(128, 105, 98, 0.72) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #1d1a18 0%, #0b0a09 100%) !important;
+  color: #f4eee6 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="free"] {
+  border-color: #ff6f66 !important;
+  background:
+    linear-gradient(180deg, rgba(255, 112, 98, 0.22), transparent 46%),
+    linear-gradient(180deg, #5b1110 0%, #1a0707 100%) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"],
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button[data-button="buy"] {
+  border-color: rgba(201, 166, 111, 0.76) !important;
+  background:
+    linear-gradient(180deg, rgba(201, 166, 111, 0.16), transparent 46%),
+    linear-gradient(180deg, #2a2118 0%, #0c0a08 100%) !important;
+}
+
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:active,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:active,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 520px) {
+  #bm-chaos-dice {
+    min-width: 150px;
+  }
+
+  .bm-drop-insufficient-funds .bm-drop-insufficient-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+}
+
+/* Transfer dialog cleanup: calmer hierarchy and fewer decorative effects. */
+.window-app.bloodman-drop-decision-dialog .window-content,
+.window-app.dialog.bloodman-drop-decision-dialog .window-content,
+.application.bloodman-drop-decision-dialog .window-content {
+  background: #10100f !important;
+  padding: 12px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-funds {
+  --bm-transfer-bg: #10100f;
+  --bm-transfer-panel: #171513;
+  --bm-transfer-panel-soft: #0d0c0b;
+  --bm-transfer-line: #3b3430;
+  --bm-transfer-line-strong: #6f5f55;
+  --bm-transfer-accent: #b73731;
+  --bm-transfer-accent-soft: rgba(183, 55, 49, 0.18);
+  --bm-transfer-text: #f2ece3;
+  --bm-transfer-muted: #b7aa98;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-shell {
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--bm-transfer-line-strong);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 34%),
+    var(--bm-transfer-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 22px rgba(0, 0, 0, 0.34);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-head {
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 0;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, var(--bm-transfer-accent-soft), transparent 42%),
+    var(--bm-transfer-panel);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-icon-ring {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(183, 55, 49, 0.72);
+  border-radius: 6px;
+  background: #17100f;
+  box-shadow: none;
+  transform: none;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-icon-ring i {
+  color: #e25b52;
+  font-size: 17px;
+  transform: none;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-head-copy {
+  gap: 5px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-eyebrow {
+  color: var(--bm-transfer-text);
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0.5px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-intro,
+.bloodman-drop-decision-dialog .bm-drop-insufficient-prompt {
+  color: var(--bm-transfer-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-prompt {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card {
+  min-height: 58px;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background: var(--bm-transfer-panel-soft);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-item {
+  border-color: rgba(183, 55, 49, 0.58);
+  background:
+    linear-gradient(90deg, rgba(183, 55, 49, 0.12), transparent 46%),
+    var(--bm-transfer-panel-soft);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-label,
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities-title {
+  color: var(--bm-transfer-muted);
+  font-size: 10px;
+  letter-spacing: 0.55px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-value {
+  color: var(--bm-transfer-text);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-transfer-card-hint {
+  color: var(--bm-transfer-muted);
+  font-size: 11px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-details,
+.bloodman-drop-decision-dialog .bm-drop-insufficient-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background: var(--bm-transfer-panel);
+  color: var(--bm-transfer-muted);
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities {
+  max-height: 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--bm-transfer-line);
+  border-radius: 6px;
+  background: var(--bm-transfer-panel-soft);
+  color: var(--bm-transfer-text);
+  list-style: disc;
+  list-style-position: outside;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities li {
+  margin-left: 16px;
+}
+
+.bloodman-drop-decision-dialog .bm-drop-insufficient-specificities li::before {
+  content: none;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+.application.bloodman-drop-decision-dialog .dialog-buttons {
+  margin-top: 10px;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button,
+.application.bloodman-drop-decision-dialog .dialog-buttons button {
+  min-height: 42px;
+  border: 1px solid var(--bm-transfer-line-strong) !important;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #1e1b18, #0d0c0b) !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 14px;
+  letter-spacing: 0.35px;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"] {
+  border-color: #d84c44 !important;
+  background: linear-gradient(180deg, #651714, #210908) !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:focus,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:focus,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:focus {
+  filter: brightness(1.12);
+  outline: 2px solid rgba(216, 76, 68, 0.45);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .bloodman-drop-decision-dialog .bm-drop-transfer-summary,
+  .window-app.bloodman-drop-decision-dialog .dialog-buttons,
+  .window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+  .application.bloodman-drop-decision-dialog .dialog-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Transfer dialog v2: stronger scoped presentation for Foundry v14 dialogs. */
+.bm-transfer-dialog {
+  --bm-transfer-bg: #0d0d0c;
+  --bm-transfer-panel: #151311;
+  --bm-transfer-panel-2: #1d1714;
+  --bm-transfer-line: rgba(132, 105, 92, 0.52);
+  --bm-transfer-line-soft: rgba(92, 73, 65, 0.42);
+  --bm-transfer-gold: #d2b07a;
+  --bm-transfer-red: #d44d45;
+  --bm-transfer-red-soft: rgba(212, 77, 69, 0.18);
+  --bm-transfer-text: #f4eee6;
+  --bm-transfer-muted: #bcae9c;
+  display: block !important;
+  margin: 0 !important;
+  color: var(--bm-transfer-text) !important;
+}
+
+.bm-transfer-dialog,
+.bm-transfer-dialog * {
+  box-sizing: border-box;
+}
+
+.window-app.bloodman-drop-decision-dialog .window-content,
+.window-app.dialog.bloodman-drop-decision-dialog .window-content,
+.application.bloodman-drop-decision-dialog .window-content {
+  padding: 14px !important;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(133, 34, 29, 0.18), transparent 28%),
+    linear-gradient(180deg, #171411 0%, #0b0b0a 100%) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-shell {
+  display: grid !important;
+  gap: 14px !important;
+  padding: 16px !important;
+  border: 1px solid rgba(154, 124, 105, 0.62) !important;
+  border-radius: 8px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 22%),
+    linear-gradient(135deg, rgba(212, 77, 69, 0.08), transparent 40%),
+    var(--bm-transfer-bg) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 -18px 42px rgba(0, 0, 0, 0.28),
+    0 18px 36px rgba(0, 0, 0, 0.42) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-hero {
+  display: grid !important;
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 14px !important;
+  border: 1px solid var(--bm-transfer-line) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(90deg, rgba(212, 77, 69, 0.2), transparent 58%),
+    linear-gradient(180deg, #211815, #100f0e) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-alert {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.bm-transfer-dialog .bm-transfer-alert-ring {
+  display: grid !important;
+  place-items: center !important;
+  width: 46px !important;
+  height: 46px !important;
+  border: 1px solid rgba(255, 98, 88, 0.86) !important;
+  border-radius: 7px !important;
+  background:
+    radial-gradient(circle, rgba(212, 77, 69, 0.26), transparent 62%),
+    #150d0c !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 18px rgba(212, 77, 69, 0.22) !important;
+  transform: rotate(45deg) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-alert-ring i {
+  color: #ff756d !important;
+  font-size: 19px !important;
+  text-shadow: 0 0 10px rgba(255, 82, 72, 0.48) !important;
+  transform: rotate(-45deg) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-hero-copy {
+  display: grid !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-kicker,
+.bm-transfer-dialog .bm-transfer-intro,
+.bm-transfer-dialog .bm-transfer-question,
+.bm-transfer-dialog .bm-transfer-card-label,
+.bm-transfer-dialog .bm-transfer-card-value,
+.bm-transfer-dialog .bm-transfer-card-hint,
+.bm-transfer-dialog .bm-transfer-section-title {
+  margin: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-kicker {
+  color: var(--bm-transfer-gold) !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-intro {
+  color: var(--bm-transfer-text) !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-question {
+  color: #fff9f1 !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+  align-items: center !important;
+  min-height: 72px !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  border: 1px solid var(--bm-transfer-line-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 45%),
+    #100f0e !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-item {
+  border-color: rgba(212, 77, 69, 0.58) !important;
+  background:
+    linear-gradient(90deg, rgba(212, 77, 69, 0.16), transparent 58%),
+    #120f0e !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  border: 1px solid rgba(212, 77, 69, 0.52) !important;
+  border-radius: 6px !important;
+  background: rgba(212, 77, 69, 0.1) !important;
+  color: #e06a60 !important;
+  font-size: 17px !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-copy {
+  display: grid !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-label,
+.bm-transfer-dialog .bm-transfer-section-title {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.55px !important;
+  line-height: 1 !important;
+  text-transform: uppercase !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-value {
+  color: var(--bm-transfer-text) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.bm-transfer-dialog .bm-transfer-card-hint {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-lower {
+  display: grid !important;
+  grid-template-columns: 176px minmax(0, 1fr) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-card,
+.bm-transfer-dialog .bm-transfer-specifics-panel {
+  border: 1px solid var(--bm-transfer-line-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 44%),
+    var(--bm-transfer-panel) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-card {
+  display: grid !important;
+  place-items: center !important;
+  gap: 7px !important;
+  min-height: 116px !important;
+  padding: 14px !important;
+  border-color: rgba(210, 176, 122, 0.5) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-label {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.65px !important;
+  text-transform: uppercase !important;
+}
+
+.bm-transfer-dialog .bm-transfer-cost-value {
+  color: #fff8e8 !important;
+  font-size: 32px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  text-shadow: 0 0 14px rgba(210, 176, 122, 0.18) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics-panel {
+  min-width: 0 !important;
+  padding: 12px !important;
+}
+
+.bm-transfer-dialog .bm-transfer-section-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-bottom: 9px !important;
+}
+
+.bm-transfer-dialog .bm-transfer-section-title::after {
+  content: "" !important;
+  flex: 1 1 auto !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, rgba(212, 77, 69, 0.7), transparent) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics {
+  display: grid !important;
+  gap: 7px !important;
+  max-height: 154px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--bm-transfer-text) !important;
+  list-style: none !important;
+  overflow: auto !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics li {
+  position: relative !important;
+  margin: 0 !important;
+  padding-left: 16px !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+}
+
+.bm-transfer-dialog .bm-transfer-specifics li::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0.55em !important;
+  left: 2px !important;
+  width: 6px !important;
+  height: 6px !important;
+  border: 1px solid #f06a60 !important;
+  background: rgba(212, 77, 69, 0.34) !important;
+  transform: rotate(45deg) !important;
+}
+
+.bm-transfer-dialog .bm-transfer-details {
+  display: none !important;
+}
+
+.bm-transfer-dialog .bm-transfer-warning {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border: 1px solid rgba(212, 77, 69, 0.68) !important;
+  border-radius: 7px !important;
+  background: rgba(212, 77, 69, 0.12) !important;
+  color: #ffe8e3 !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+.application.bloodman-drop-decision-dialog .dialog-buttons {
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.32fr 0.9fr !important;
+  gap: 10px !important;
+  margin-top: 12px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button,
+.application.bloodman-drop-decision-dialog .dialog-buttons button {
+  min-height: 48px !important;
+  border: 1px solid rgba(154, 124, 105, 0.68) !important;
+  border-radius: 6px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, #211d19, #0c0b0a) !important;
+  color: #f5eee5 !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.2px !important;
+  text-transform: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 0 rgba(0, 0, 0, 0.45) !important;
+  transition: filter 120ms ease, border-color 120ms ease, transform 120ms ease !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"],
+.application.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"] {
+  border-color: rgba(255, 94, 84, 0.92) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 109, 98, 0.26), transparent 42%),
+    linear-gradient(180deg, #6a1815, #1a0706) !important;
+  color: #fff8ef !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 18px rgba(212, 77, 69, 0.18),
+    0 2px 0 rgba(0, 0, 0, 0.45) !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:focus-visible,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:focus-visible,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:focus-visible {
+  border-color: rgba(255, 205, 146, 0.86) !important;
+  filter: brightness(1.14) !important;
+  outline: 2px solid rgba(212, 77, 69, 0.45) !important;
+  outline-offset: 2px !important;
+}
+
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:active,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:active,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:active {
+  transform: translateY(1px) !important;
+}
+
+@media (max-width: 640px) {
+  .bm-transfer-dialog .bm-transfer-hero,
+  .bm-transfer-dialog .bm-transfer-grid,
+  .bm-transfer-dialog .bm-transfer-lower,
+  .window-app.bloodman-drop-decision-dialog .dialog-buttons,
+  .window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons,
+  .application.bloodman-drop-decision-dialog .dialog-buttons {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bm-transfer-dialog .bm-transfer-alert {
+    justify-items: start !important;
+  }
+}
+
+/* Damage configuration dialog: brutal black/white visual lock. */
+.window-app.bloodman-damage-config-dialog .window-content,
+.window-app.dialog.bloodman-damage-config-dialog .window-content,
+.application.bloodman-damage-config-dialog .window-content {
+  background: #0b0b0b !important;
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat {
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-shell,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-shell {
+  gap: 13px !important;
+  padding: 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #0b0b0b !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-head,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-head,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-head {
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-icon-ring,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-icon-ring,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-icon-ring {
+  width: 28px !important;
+  height: 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-icon-ring i,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-icon-ring i,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-icon-ring i {
+  color: #ffffff !important;
+  font-size: 27px !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-title,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-title {
+  color: #ffffff !important;
+  font-size: 26px !important;
+  font-weight: 900 !important;
+  line-height: 0.95 !important;
+  letter-spacing: 0 !important;
+  text-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat label,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat label,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat label,
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-row-title,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-row-title,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-row-title {
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-row-formula > label,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-row-formula > label,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-row-formula > label {
+  font-size: 25px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel {
+  padding: 7px !important;
+  border: 3px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #101010 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel--formula,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel--formula,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel--formula {
+  padding: 4px !important;
+  border-width: 1px !important;
+  background: #0b0b0b !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat input,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat input,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat input {
+  border-radius: 0 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat input:hover,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat input:hover,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat input:hover,
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat input:focus,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat input:focus,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat input:focus {
+  border-color: #f4f4f4 !important;
+  outline: 2px solid rgba(255, 255, 255, 0.28) !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel input,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel input,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel input {
+  min-height: 43px !important;
+  border: 0 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel--formula input,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel--formula input,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-panel--formula input {
+  min-height: 48px !important;
+  border: 3px solid #f4f4f4 !important;
+  font-size: 24px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help summary,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help summary,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help summary {
+  min-height: 25px !important;
+  padding: 0 !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help summary::before,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help summary::before,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help summary::before {
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help ul,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help ul,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-help ul {
+  color: #e0e0e0 !important;
+  font-size: 12px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stats,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stats,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stats {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stat,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stat {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 49px !important;
+  padding: 7px !important;
+  border: 1px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #0b0b0b !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper {
+  display: grid !important;
+  grid-template-columns: 34px 64px 38px !important;
+  justify-content: end !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn {
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn:hover,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn:hover,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn:hover,
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn:focus-visible,
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn:focus-visible,
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stepper-btn:focus-visible {
+  background: #ffffff !important;
+  color: #050505 !important;
+  outline: 2px solid #ffffff !important;
+  outline-offset: 2px !important;
+  filter: brightness(0.94) !important;
+}
+
+.window-app.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-config-dialog .bm-damage-config--combat .bm-damage-config-stat input[type="number"] {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"],
+.window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"],
+.application.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"] {
+  min-height: 48px !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:hover,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:hover,
+.application.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:hover,
+.window-app.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:focus,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:focus,
+.application.bloodman-damage-config-dialog .dialog-buttons button[data-button="roll"]:focus {
+  background: #ffffff !important;
+  color: #050505 !important;
+  outline: 2px solid #ffffff !important;
+  outline-offset: 2px !important;
+  filter: brightness(0.94) !important;
+  box-shadow: none !important;
+}
+
+/* Same visual lock for the already-existing damage config window markup. */
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .window-content,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .window-content,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .window-content {
+  background: #0b0b0b !important;
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-shell,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-shell {
+  display: grid !important;
+  gap: 13px !important;
+  padding: 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #0b0b0b !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-head,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-head,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-head {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-icon-ring,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-icon-ring,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-icon-ring {
+  width: 28px !important;
+  height: 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-icon-ring i,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-icon-ring i,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-icon-ring i {
+  color: #ffffff !important;
+  font-size: 27px !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-title,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-title {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 26px !important;
+  font-weight: 900 !important;
+  line-height: 0.95 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  text-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-grid,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-grid,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 11px !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-panel,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-panel {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 7px !important;
+  border: 3px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #101010 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-panel--formula,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-panel--formula,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-panel--formula {
+  padding: 4px !important;
+  border-width: 1px !important;
+  background: #0b0b0b !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config label,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config label,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config label,
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-title,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-title,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-title {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-formula > label,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-formula > label,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-formula > label {
+  font-size: 25px !important;
+  line-height: 0.92 !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config input,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config input,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config input {
+  width: 100% !important;
+  min-height: 43px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-formula input[name="degats"],
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-formula input[name="degats"],
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-row-formula input[name="degats"] {
+  min-height: 48px !important;
+  border: 3px solid #f4f4f4 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  font-size: 24px !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help summary,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help summary,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help summary {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-height: 25px !important;
+  padding: 0 !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help ul,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help ul,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-help ul {
+  color: #e0e0e0 !important;
+  font-size: 12px !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stats,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stats,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stats {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stat,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stat {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 49px !important;
+  padding: 7px !important;
+  border: 1px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #0b0b0b !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stepper,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stepper {
+  display: grid !important;
+  grid-template-columns: 34px 64px 38px !important;
+  justify-content: end !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stepper-btn,
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stepper-btn {
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .bm-damage-config-stat input[type="number"] {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.window-app.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .dialog-buttons button[data-button="roll"],
+.window-app.dialog.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .dialog-buttons button[data-button="roll"],
+.application.bloodman-damage-dialog:has(.bm-damage-config input[name="degats"]) .dialog-buttons button[data-button="roll"] {
+  min-height: 48px !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+}
+
+/* Fallback without :has for Foundry/Electron builds where :has may be ignored. */
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-shell,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-shell,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-shell,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-shell {
+  display: grid !important;
+  gap: 13px !important;
+  padding: 16px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #0b0b0b !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-title,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-title,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-title,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-title {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 26px !important;
+  font-weight: 900 !important;
+  line-height: 0.95 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  text-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 7px !important;
+  border: 3px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #101010 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel--formula,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel--formula,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-panel--formula,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel--formula,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel--formula,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-panel--formula {
+  padding: 4px !important;
+  border-width: 1px !important;
+  background: #0b0b0b !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat label,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat label,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat label,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo label,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo label,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo label,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-title,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-title,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-title,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-title,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-title,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-title {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula > label,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula > label,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula > label,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-formula > label,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-formula > label,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-formula > label {
+  font-size: 25px !important;
+  line-height: 0.92 !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat input,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat input,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat input,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo input,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo input,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo input {
+  width: 100% !important;
+  min-height: 43px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula input[name="degats"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula input[name="degats"],
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-row-formula input[name="degats"],
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-formula input[name="degats"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-formula input[name="degats"],
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-row-formula input[name="degats"] {
+  min-height: 48px !important;
+  border: 3px solid #f4f4f4 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  font-size: 24px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-help,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-help,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-help,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-help,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-help,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-help {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stats,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stats,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stats,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stats,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stats,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stats {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stat,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stat {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 49px !important;
+  padding: 7px !important;
+  border: 1px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #0b0b0b !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper {
+  display: grid !important;
+  grid-template-columns: 34px 64px 38px !important;
+  justify-content: end !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stepper-btn,
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn,
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stepper-btn {
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat .bm-damage-config-stat input[type="number"],
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo .bm-damage-config-stat input[type="number"] {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat + .dialog-buttons button[data-button="roll"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat + .dialog-buttons button[data-button="roll"],
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--combat + .dialog-buttons button[data-button="roll"],
+.window-app.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo + .dialog-buttons button[data-button="roll"],
+.window-app.dialog.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo + .dialog-buttons button[data-button="roll"],
+.application.bloodman-damage-dialog .bm-damage-config.bm-damage-config--neo + .dialog-buttons button[data-button="roll"],
+.window-app.bloodman-damage-dialog .dialog-buttons button[data-button="roll"],
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button[data-button="roll"],
+.application.bloodman-damage-dialog .dialog-buttons button[data-button="roll"] {
+  min-height: 48px !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: #f5f5f5 !important;
+  color: #050505 !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+}
+
+/* Damage config DialogV2: hard lock using the actual rendered DOM (no .bm-damage-config wrapper). */
+.window-app.bloodman-damage-config-dialog .window-content,
+.window-app.dialog.bloodman-damage-config-dialog .window-content,
+.application.bloodman-damage-config-dialog .window-content {
+  background: #0b0b0b !important;
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-shell,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-shell {
+  display: grid !important;
+  gap: 12px !important;
+  padding: 14px !important;
+  background: #0b0b0b !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+  color: #ffffff !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-head,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-head,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-head {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring {
+  width: 28px !important;
+  height: 28px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring i,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring i,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring i {
+  color: #ffffff !important;
+  font-size: 27px !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-title,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-title {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 26px !important;
+  line-height: 0.95 !important;
+  letter-spacing: 0 !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-hint,
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-hint-sync,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-hint,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-hint-sync,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-hint,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-hint-sync {
+  display: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-grid,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-grid,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-grid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 11px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form label,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form label,
+.application.bloodman-damage-config-dialog .dialog-form label,
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-title,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-title,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-title {
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 7px !important;
+  border: 3px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #101010 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--formula,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--formula,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--formula {
+  border-width: 1px !important;
+  padding: 4px !important;
+  background: #0b0b0b !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-formula > label,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-formula > label,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-formula > label {
+  font-size: 24px !important;
+  line-height: 0.92 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel input,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel input,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel input {
+  min-height: 46px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  font-size: 19px !important;
+  font-weight: 900 !important;
+  box-shadow: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form input[name="degats"],
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form input[name="degats"],
+.application.bloodman-damage-config-dialog .dialog-form input[name="degats"] {
+  min-height: 48px !important;
+  border: 3px solid #f4f4f4 !important;
+  background: #101010 !important;
+  color: #ffffff !important;
+  font-size: 24px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary {
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary i,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary i,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary i {
+  display: none !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stats,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stats,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stats {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 7px !important;
+  border: 1px solid #f4f4f4 !important;
+  border-radius: 4px !important;
+  background: #0b0b0b !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper {
+  display: grid !important;
+  grid-template-columns: 34px 64px 34px !important;
+  justify-content: end !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn {
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #f5f5f5 !important;
+  color: #111111 !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+  padding: 0 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"] {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: #e8e8e8 !important;
+  color: #111111 !important;
+  text-align: center !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .form-footer button[data-action="roll"],
+.window-app.dialog.bloodman-damage-config-dialog .form-footer button[data-action="roll"],
+.application.bloodman-damage-config-dialog .form-footer button[data-action="roll"] {
+  min-height: 48px !important;
+  border: 0 !important;
+  border-radius: 4px !important;
+  background: #f5f5f5 !important;
+  color: #111111 !important;
+  font-family: "Oswald", "Arial Narrow", "Signika", sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0 !important;
+  text-transform: uppercase !important;
+  box-shadow: none !important;
+}
+
+/* Final compact pass: smaller damage dialog + canvas Bloodman panel (visual only). */
+.window-app.bloodman-damage-config-dialog,
+.window-app.dialog.bloodman-damage-config-dialog,
+.application.bloodman-damage-config-dialog {
+  min-width: 260px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .window-content,
+.window-app.dialog.bloodman-damage-config-dialog .window-content,
+.application.bloodman-damage-config-dialog .window-content {
+  padding: 0 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-shell,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-shell,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-shell {
+  gap: 7px !important;
+  padding: 8px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-head,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-head,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-head {
+  grid-template-columns: 18px minmax(0, 1fr) !important;
+  gap: 6px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring i,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring i,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-icon-ring i {
+  font-size: 16px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-title,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-title,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-title {
+  font-size: 14px !important;
+  line-height: 1 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-grid,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-grid,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-grid {
+  gap: 6px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form label,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form label,
+.application.bloodman-damage-config-dialog .dialog-form label,
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-title,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-title,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-title {
+  font-size: 10px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel {
+  gap: 4px !important;
+  padding: 5px !important;
+  border-width: 2px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-formula > label,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-formula > label,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-row-formula > label {
+  font-size: 11px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel input,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel input,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel input {
+  min-height: 30px !important;
+  font-size: 13px !important;
+  padding: 4px 6px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form input[name="degats"],
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form input[name="degats"],
+.application.bloodman-damage-config-dialog .dialog-form input[name="degats"] {
+  min-height: 33px !important;
+  font-size: 15px !important;
+  border-width: 2px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-help summary {
+  font-size: 10px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stats,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stats,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stats {
+  gap: 6px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat {
+  gap: 6px !important;
+  padding: 5px !important;
+  border-radius: 3px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper {
+  grid-template-columns: 26px 44px 26px !important;
+  gap: 5px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn,
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn {
+  width: 26px !important;
+  min-width: 26px !important;
+  height: 26px !important;
+  font-size: 17px !important;
+  border-radius: 5px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"],
+.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"],
+.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"] {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  height: 26px !important;
+  font-size: 13px !important;
+  border-radius: 5px !important;
+}
+
+.window-app.bloodman-damage-config-dialog .form-footer,
+.window-app.dialog.bloodman-damage-config-dialog .form-footer,
+.application.bloodman-damage-config-dialog .form-footer {
+  padding: 0 8px 8px !important;
+  margin: 0 !important;
+}
+
+.window-app.bloodman-damage-config-dialog .form-footer button[data-action="roll"],
+.window-app.dialog.bloodman-damage-config-dialog .form-footer button[data-action="roll"],
+.application.bloodman-damage-config-dialog .form-footer button[data-action="roll"] {
+  min-height: 34px !important;
+  font-size: 14px !important;
+}
+

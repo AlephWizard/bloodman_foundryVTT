@@ -1,4 +1,5 @@
 import { bmLog } from "../core/logger.mjs";
+import { SYSTEM_ID, SYSTEM_SOCKET } from "../core/constants.mjs";
 import {
   canUserProcessPrivilegedRequests,
   getActiveGMUserIds,
@@ -34,7 +35,6 @@ const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SO
 const BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
-const SYSTEM_SOCKET = "system.bloodman";
 const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
@@ -616,13 +616,13 @@ function generateRandomId() {
 }
 
 function getChaosValue() {
-  return Math.max(0, Math.floor(Number(game.settings.get("bloodman", "chaosDice") || 0)));
+  return Math.max(0, Math.floor(Number(game.settings.get(SYSTEM_ID, "chaosDice") || 0)));
 }
 
 async function setChaosValue(nextValue) {
   if (!isCurrentUserPrimaryPrivilegedOperator()) return;
   const clamped = Math.max(0, Math.floor(Number(nextValue) || 0));
-  await game.settings.set("bloodman", "chaosDice", clamped);
+  await game.settings.set(SYSTEM_ID, "chaosDice", clamped);
 }
 
 function normalizeDamageFormula(formula) {
@@ -652,7 +652,7 @@ function getDefaultDamageOption(formula) {
 }
 
 function getRememberedDamageDialogConfig() {
-  const raw = game.user?.getFlag?.("bloodman", DAMAGE_DIALOG_CONFIG_USER_FLAG);
+  const raw = game.user?.getFlag?.(SYSTEM_ID, DAMAGE_DIALOG_CONFIG_USER_FLAG);
   if (!raw || typeof raw !== "object") return null;
   const normalizedFormula = normalizeDamageFormula(raw.formula);
   const option = getDamageOptionByFormula(normalizedFormula);
@@ -674,7 +674,7 @@ async function rememberDamageDialogConfig(config = {}) {
     updatedAt: Date.now()
   };
   try {
-    await game.user.setFlag("bloodman", DAMAGE_DIALOG_CONFIG_USER_FLAG, payload);
+    await game.user.setFlag(SYSTEM_ID, DAMAGE_DIALOG_CONFIG_USER_FLAG, payload);
   } catch (error) {
     bmLog.warn("damage:remember config failed", { error });
   }

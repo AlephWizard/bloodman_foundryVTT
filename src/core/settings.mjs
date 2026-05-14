@@ -1,6 +1,7 @@
 import { configureLoggerFromSettings, setLogLevel } from "./logger.mjs";
+import { SYSTEM_ID } from "./constants.mjs";
 
-export const SYSTEM_ID = "bloodman";
+export { SYSTEM_ID };
 export const BLOODMAN_SETTING_KEYS = Object.freeze({
   DEBUG_LOG_LEVEL: "debugLogLevel"
 });

@@ -1,6 +1,6 @@
+import { SYSTEM_ID as DEFAULT_SYSTEM_ID } from "../core/constants.mjs";
 import { normalizeBooleanFlag } from "./boolean-flags.mjs";
 
-const DEFAULT_SYSTEM_ID = "bloodman";
 const BACKPACK_CARRY_COLUMN = "bag";
 const BACKPACK_SUPPORTED_TYPES = new Set(["arme", "objet", "protection", "ration", "soin"]);
 

@@ -1,0 +1,21 @@
+@media (max-width: 720px) {
+  .bm-damage-config .bm-damage-config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-damage-config .bm-damage-config-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-damage-config .bm-damage-config-inline {
+    grid-template-columns: minmax(0, 1fr) 72px;
+  }
+
+  .bm-damage-split .bm-damage-split-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-damage-split .bm-damage-split-row {
+    grid-template-columns: 1fr;
+  }
+}

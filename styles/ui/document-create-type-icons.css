@@ -1,0 +1,13 @@
+﻿.bm-doc-type-label-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bm-doc-type-icon {
+  width: 1.1em;
+  text-align: center;
+  opacity: 0.95;
+}
+
+

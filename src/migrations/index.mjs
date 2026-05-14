@@ -1,10 +1,10 @@
 import { bmLog } from "../core/logger.mjs";
+import { SYSTEM_ID } from "../core/constants.mjs";
 import {
   actorHasPersistedBackpackItems,
   normalizeBackpackBoolean
 } from "../rules/backpack.mjs";
 
-const SYSTEM_ID = "bloodman";
 const SCHEMA_SETTING_KEY = "schemaVersion";
 const INCLUDE_COMPENDIUMS_SETTING_KEY = "includeCompendiumMigrations";
 const LAST_REPORT_SETTING_KEY = "lastMigrationReport";
