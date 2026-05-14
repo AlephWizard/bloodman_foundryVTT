@@ -13,6 +13,8 @@ export function buildSystemSocketHooks({
   handleActorSheetUpdateRequest,
   handleDeleteItemRequest,
   handleReorderActorItemsRequest,
+  handleActorItemTransferRequest,
+  handleActorBackpackStateChangedMessage,
   wasChaosRequestProcessed,
   rememberChaosRequest,
   setChaosValue,
@@ -46,6 +48,12 @@ export function buildSystemSocketHooks({
   const onReorderActorItems = typeof handleReorderActorItemsRequest === "function"
     ? handleReorderActorItemsRequest
     : async () => {};
+  const onActorItemTransfer = typeof handleActorItemTransferRequest === "function"
+    ? handleActorItemTransferRequest
+    : async () => {};
+  const onActorBackpackStateChanged = typeof handleActorBackpackStateChangedMessage === "function"
+    ? handleActorBackpackStateChangedMessage
+    : async () => {};
   const onIncomingDamage = typeof handleIncomingDamageRequest === "function"
     ? handleIncomingDamageRequest
     : async () => {};
@@ -74,6 +82,10 @@ export function buildSystemSocketHooks({
         await onDamageApplied(data);
         return;
       }
+      if (data.type === "actorBackpackStateChanged") {
+        await onActorBackpackStateChanged(data);
+        return;
+      }
       if (data.type === "rerollDamage") {
         if (canHandlePrivilegedRequests) await onDamageReroll(data);
         return;
@@ -92,6 +104,10 @@ export function buildSystemSocketHooks({
       }
       if (data.type === "reorderActorItems") {
         if (canHandlePrivilegedRequests) await onReorderActorItems(data);
+        return;
+      }
+      if (data.type === "transferActorItem") {
+        if (canHandlePrivilegedRequests) await onActorItemTransfer(data);
         return;
       }
       if (data.type === "adjustChaosDice") {

@@ -57,6 +57,11 @@ import {
   buildStartupNormalizationHooks
 } from "./src/hooks/startup-normalization.mjs";
 import { buildDamageRollFlavorMarkup } from "./src/ui/damage-chat.mjs";
+import { buildDropDecisionDialogContent } from "./src/ui/drop-decision-dialog.mjs";
+import {
+  collectOpenApplications,
+  getApplicationDocumentActor
+} from "./src/ui/open-applications.mjs";
 import {
   toFiniteNumber as ruleToFiniteNumber,
   normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
@@ -114,6 +119,7 @@ import { createGrowthRollRules } from "./src/rules/growth-roll.mjs";
 import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
 import { installCombatantInitiativePatch } from "./src/rules/combatant-initiative-patch.mjs";
 import { createStartupNormalizationRunner } from "./src/rules/startup-normalization.mjs";
+import { resolveActorBackpackEnabled } from "./src/rules/backpack.mjs";
 import {
   getCarriedItemInventorySlots,
   normalizeCarriedItemInventorySlots,
@@ -2734,8 +2740,8 @@ function getOwnedCharacterActorInstances() {
 function getOpenSheetActorInstances() {
   const instances = [];
   const seen = new Set();
-  for (const app of Object.values(ui.windows || {})) {
-    const actorDoc = app?.actor || null;
+  for (const app of collectOpenApplications()) {
+    const actorDoc = getApplicationDocumentActor(app);
     if (!actorDoc) continue;
     const type = String(actorDoc.type || "");
     if (type !== "personnage" && type !== "personnage-non-joueur") continue;
@@ -2747,29 +2753,85 @@ function getOpenSheetActorInstances() {
   return instances;
 }
 
-function renderOpenActorSheetsForActor(actor) {
-  if (!actor) return;
-  const targetKeys = new Set([
+function getActorSheetMatchKeys(actor) {
+  if (!actor) return new Set();
+  return new Set([
     String(actor.id || "").trim(),
     String(actor.uuid || "").trim(),
     String(actor.baseActor?.id || "").trim(),
     String(actor.token?.actorId || "").trim()
   ].filter(Boolean));
-  if (!targetKeys.size) return;
-  for (const app of Object.values(ui.windows || {})) {
-    const appActor = app?.actor || app?.document || null;
+}
+
+function getActorSheetDomMatchTokens(actor) {
+  const tokens = new Set();
+  for (const key of getActorSheetMatchKeys(actor)) {
+    tokens.add(key);
+    tokens.add(key.replace(/\./g, "-"));
+  }
+  return [...tokens].filter(Boolean);
+}
+
+function getOpenActorSheetApplicationsForActor(actor) {
+  const targetKeys = getActorSheetMatchKeys(actor);
+  const apps = [];
+  if (!targetKeys.size) return apps;
+  for (const app of collectOpenApplications()) {
+    const appActor = getApplicationDocumentActor(app);
     if (!appActor) continue;
-    if (appActor.documentName && String(appActor.documentName) !== "Actor") continue;
-    if (!appActor.items) continue;
-    const appKeys = [
-      String(appActor.id || "").trim(),
-      String(appActor.uuid || "").trim(),
-      String(appActor.baseActor?.id || "").trim(),
-      String(appActor.token?.actorId || "").trim()
-    ].filter(Boolean);
-    if (!appKeys.some(key => targetKeys.has(key))) continue;
+    const appKeys = getActorSheetMatchKeys(appActor);
+    if (![...appKeys].some(key => targetKeys.has(key))) continue;
+    apps.push(app);
+  }
+  return apps;
+}
+
+function patchBackpackControlsInRoot(root, enabled) {
+  if (!root?.find) return false;
+  root.find(".bag-slots-toggle[data-bag-slots='yes']").prop("checked", Boolean(enabled));
+  root.find(".bag-slots-toggle[data-bag-slots='no']").prop("checked", !Boolean(enabled));
+  root.find(".objects-bag-list").toggleClass("is-disabled", !Boolean(enabled));
+  const limit = Boolean(enabled) ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
+  const indicator = root.find(".carry-slots-indicator").first();
+  if (indicator.length) {
+    const current = String(indicator.text() || "").split("/")[0]?.trim() || "0";
+    indicator.text(`${current} / ${limit}`);
+  }
+  return true;
+}
+
+function patchOpenActorSheetBackpackControls(app, enabled) {
+  return patchBackpackControlsInRoot(getSheetElementWrapper(app), enabled);
+}
+
+function patchActorSheetDomBackpackControls(actor, enabled) {
+  const jq = globalThis.jQuery || globalThis.$;
+  if (typeof jq !== "function" || typeof document === "undefined") return 0;
+  const tokens = getActorSheetDomMatchTokens(actor);
+  if (!tokens.length) return 0;
+  let patched = 0;
+  const selector = ".app.bloodman.actor, .application.bloodman.actor, [id^='bloodman-actor-'], [id^='bloodman-npc-']";
+  for (const element of document.querySelectorAll(selector)) {
+    const id = String(element?.id || "");
+    if (!tokens.some(token => id.includes(token))) continue;
+    if (patchBackpackControlsInRoot(jq(element), enabled)) patched += 1;
+  }
+  return patched;
+}
+
+function renderOpenActorSheetsForActor(actor) {
+  for (const app of getOpenActorSheetApplicationsForActor(actor) || []) {
     if (typeof app.render === "function") app.render(false);
   }
+}
+
+function updateOpenActorSheetsBackpackState(actor, enabled) {
+  for (const app of getOpenActorSheetApplicationsForActor(actor) || []) {
+    app._optimisticBagSlotsEnabled = Boolean(enabled);
+    patchOpenActorSheetBackpackControls(app, enabled);
+    if (typeof app.render === "function") app.render(false);
+  }
+  patchActorSheetDomBackpackControls(actor, enabled);
 }
 
 function resolveAttackerActorInstancesForDamageApplied(data) {
@@ -3194,7 +3256,8 @@ const itemTypeFlagRules = createItemTypeFlagRules({
   voyageXpCostItemTypes: VOYAGE_XP_COST_ITEM_TYPES,
   carriedItemLimitActorTypes: CARRIED_ITEM_LIMIT_ACTOR_TYPES,
   carriedItemLimitBase: CARRIED_ITEM_LIMIT_BASE,
-  carriedItemLimitWithBag: CARRIED_ITEM_LIMIT_WITH_BAG
+  carriedItemLimitWithBag: CARRIED_ITEM_LIMIT_WITH_BAG,
+  resolveBagSlotsEnabled: actor => resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled
 });
 const {
   isDamageRerollItemType,
@@ -3323,7 +3386,7 @@ function registerBloodmanRuntimeSettings() {
     default: 0,
     onChange: value => {
       updateChaosDiceUI(typeof value === "number" ? value : Number(value));
-      for (const app of Object.values(ui.windows || {})) {
+      for (const app of collectOpenApplications()) {
         if (app instanceof BloodmanNpcSheet || app instanceof BloodmanNpcSheetV2) app.render(false);
       }
     }
@@ -3579,6 +3642,36 @@ function pruneDropDataCache() {
   }
 }
 
+async function resolveDroppedItemFromActorDropData(entry) {
+  const entryObject = entry && typeof entry === "object" ? entry : null;
+  if (!entryObject) return null;
+  const itemId = String(entryObject.itemId || entryObject._id || entryObject.id || "").trim();
+  if (!itemId) return null;
+
+  const uuid = String(entryObject.uuid || entryObject.documentUuid || "").trim();
+  const actorUuid = String(
+    entryObject.actorUuid
+    || entryObject.parentUuid
+    || (uuid.includes(".Item.") ? uuid.split(".Item.")[0] : "")
+    || ""
+  ).trim();
+  if (actorUuid) {
+    const resolvedActor = await compatFromUuid(actorUuid).catch(() => null);
+    const actor = resolvedActor?.documentName === "Actor"
+      ? resolvedActor
+      : (resolvedActor?.actor?.documentName === "Actor" ? resolvedActor.actor : null);
+    const item = actor?.items?.get?.(itemId) || null;
+    if (item) return item;
+  }
+
+  const actorId = String(entryObject.actorId || "").trim();
+  if (actorId) {
+    const item = game.actors?.get?.(actorId)?.items?.get?.(itemId) || null;
+    if (item) return item;
+  }
+  return null;
+}
+
 function resolveDroppedItemFromDropDataCached(entry) {
   const itemDocumentClass = Item?.implementation?.fromDropData ? Item.implementation : Item;
   if (!itemDocumentClass?.fromDropData) return Promise.resolve(null);
@@ -3600,7 +3693,10 @@ function resolveDroppedItemFromDropDataCached(entry) {
     if (cachedByKey && cachedByKey.expiresAt <= now) dropDataDocumentCacheByKey.delete(cacheKey);
   }
 
-  const promise = itemDocumentClass.fromDropData(entry).catch(() => null);
+  const promise = itemDocumentClass
+    .fromDropData(entry)
+    .catch(() => null)
+    .then(item => item || resolveDroppedItemFromActorDropData(entryObject));
   if (entryObject) dropDataDocumentCacheByEntry.set(entryObject, promise);
   if (cacheKey) {
     dropDataDocumentCacheByKey.set(cacheKey, {
@@ -5140,13 +5236,17 @@ const actorSocketRequestHandlers = buildActorSocketRequestHandlers({
   sanitizeActorUpdateForRole,
   hasActorUpdatePayload,
   flattenObject: foundry.utils.flattenObject,
-  toFiniteNumber
+  toFiniteNumber,
+  applyActorItemTransfer: applyActorItemTransferFromSocket,
+  getActorById: actorId => game.actors?.get(actorId) || null,
+  fromUuid: compatFromUuid
 });
 const {
   handleVitalResourceUpdateRequest,
   handleActorSheetUpdateRequest,
   handleDeleteItemRequest,
-  handleReorderActorItemsRequest
+  handleReorderActorItemsRequest,
+  handleActorItemTransferRequest
 } = actorSocketRequestHandlers;
 const actorSocketRequestClient = buildActorSocketRequestClient({
   systemSocket: SYSTEM_SOCKET,
@@ -5162,8 +5262,66 @@ const {
   requestVitalResourceUpdate,
   requestActorSheetUpdate,
   requestDeleteActorItem,
-  requestReorderActorItems
+  requestReorderActorItems,
+  requestActorItemTransfer
 } = actorSocketRequestClient;
+
+async function handleActorBackpackStateChangedMessage(data) {
+  const requester = game.users?.get?.(String(data?.requesterId || ""));
+  if (!requester || (!requester.isGM && !isAssistantOrHigherRole(requester.role))) return;
+  const actor = await resolveActorForSheetRequest({
+    actorUuid: data?.actorUuid,
+    actorId: data?.actorId,
+    actorBaseId: data?.actorBaseId
+  });
+  const enabled = toBooleanFlag(data?.enabled, false);
+  if (actor && typeof actor.updateSource === "function") {
+    try {
+      const updateData = foundry.utils?.expandObject
+        ? foundry.utils.expandObject({ "system.equipment.bagSlotsEnabled": enabled })
+        : { system: { equipment: { bagSlotsEnabled: enabled } } };
+      actor.updateSource(updateData);
+    } catch (_error) {
+      // The authoritative Foundry document update may already have arrived.
+    }
+  }
+  updateOpenActorSheetsBackpackState(actor || {
+    id: String(data?.actorId || ""),
+    uuid: String(data?.actorUuid || ""),
+    baseActor: { id: String(data?.actorBaseId || "") }
+  }, enabled);
+}
+
+async function applyActorItemTransferFromSocket(payload = {}) {
+  const targetActor = payload?.targetActor || null;
+  const transferEntries = Array.isArray(payload?.transferEntries) ? payload.transferEntries : [];
+  if (!targetActor || !transferEntries.length) return null;
+  if (isCarriedItemLimitedActorType(targetActor.type)) {
+    const incomingSlots = transferEntries
+      .map(entry => entry?.droppedItem)
+      .filter(item => item && CARRIED_ITEM_TYPES.has(String(item.type || "").trim().toLowerCase()))
+      .filter(item => isCarriedItemCountedForBag(item, targetActor))
+      .reduce((total, item) => total + getCarriedItemInventorySlots(item), 0);
+    if (incomingSlots > 0) {
+      const currentSlots = Array.from(targetActor.items || [])
+        .filter(item => isCarriedItemCountedForBag(item, targetActor))
+        .reduce((total, item) => total + getCarriedItemInventorySlots(item), 0);
+      const limit = getActorCarriedItemsLimit(targetActor);
+      if (isCarriedItemsLimitExceeded({
+        currentCarriedCount: currentSlots,
+        incomingCarriedCount: incomingSlots,
+        carriedItemsLimit: limit
+      })) {
+        return null;
+      }
+    }
+  }
+  return applyActorToActorItemTransferRule({
+    ...payload,
+    renderTarget: () => renderOpenActorSheetsForActor(targetActor)
+  });
+}
+
 const systemSocketHooks = buildSystemSocketHooks({
   systemSocket: SYSTEM_SOCKET,
   hasSocket,
@@ -5179,6 +5337,8 @@ const systemSocketHooks = buildSystemSocketHooks({
   handleActorSheetUpdateRequest,
   handleDeleteItemRequest,
   handleReorderActorItemsRequest,
+  handleActorItemTransferRequest,
+  handleActorBackpackStateChangedMessage,
   wasChaosRequestProcessed,
   rememberChaosRequest,
   setChaosValue,
@@ -7075,6 +7235,19 @@ const actorUpdateHooks = buildActorUpdateHooks({
 Hooks.on("updateActor", async (actor, changes, options, userId) => {
   clearResolvedActorDocumentCaches();
   await actorUpdateHooks.onUpdateActor(actor, changes, options, userId);
+  if (foundry.utils.getProperty(changes, "system.equipment.bagSlotsEnabled") != null) {
+    if (game.user?.isGM || isCurrentUserPrimaryPrivilegedOperator()) {
+      socketEmit(SYSTEM_SOCKET, {
+        type: "actorBackpackStateChanged",
+        requesterId: String(game.user?.id || userId || ""),
+        actorUuid: String(actor?.uuid || ""),
+        actorId: String(actor?.id || ""),
+        actorBaseId: String(actor?.token?.actorId || actor?.baseActor?.id || actor?.id || ""),
+        enabled: resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled
+      });
+    }
+    updateOpenActorSheetsBackpackState(actor, resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled);
+  }
 });
 Hooks.on("createActor", clearResolvedActorDocumentCaches);
 Hooks.on("deleteActor", clearResolvedActorDocumentCaches);
@@ -8106,7 +8279,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!actorLike && this._optimisticBagSlotsEnabled !== null) {
       return Boolean(this._optimisticBagSlotsEnabled);
     }
-    return toCheckboxBoolean(actor?.system?.equipment?.bagSlotsEnabled, false);
+    return resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled;
   }
 
   getCarriedOutsideBagItems(options = {}) {
@@ -8422,9 +8595,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     let itemType = String(rawData.itemType || rawData.type || "").trim().toLowerCase();
     if (itemType === "item" || !itemType) itemType = String(actorItem?.type || "").trim().toLowerCase();
     if (!itemType) return null;
-    if (String(this.actor?.id || "").trim() && actorId && actorId !== String(this.actor?.id || "").trim() && !actorItem) {
-      return null;
-    }
     return this.normalizeItemReorderPayload({
       actorId,
       actorUuid: String(rawData.actorUuid || "").trim(),
@@ -8458,6 +8628,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       itemId: String(item.id || "").trim(),
       itemType: String(item.type || "").trim().toLowerCase()
     });
+  }
+
+  getGlobalItemReorderPayload() {
+    const payload = globalThis.__bloodmanActiveItemDragPayload || null;
+    const normalized = this.normalizeItemReorderPayload(payload);
+    if (!normalized) return null;
+    if ((Date.now() - Number(payload?.startedAt || 0)) > 10_000) return null;
+    return normalized;
   }
 
   getItemReorderPayloadFromEvent(eventLike) {
@@ -8500,6 +8678,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     const inMemoryPayload = this.normalizeItemReorderPayload(this._activeItemReorderPayload);
     if (inMemoryPayload) return inMemoryPayload;
+    const globalPayload = this.getGlobalItemReorderPayload();
+    if (globalPayload) return globalPayload;
     return this.getActiveItemReorderPayloadFromDom();
   }
 
@@ -8512,6 +8692,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       type: "Item",
       uuid,
       id: itemId,
+      itemId,
+      itemType: String(item.type || ""),
       actorId: String(this.actor?.id || ""),
       actorUuid: String(this.actor?.uuid || "")
     };
@@ -8842,6 +9024,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       this._itemReorderPayloadClearTimer = null;
     }
     this._activeItemReorderPayload = payload;
+    globalThis.__bloodmanActiveItemDragPayload = {
+      ...payload,
+      startedAt: Date.now()
+    };
     this.setDragTransferData(nativeEvent.dataTransfer, "application/x-bloodman-item-reorder", payload);
     const foundryPayload = this.buildFoundryItemDragPayload(item);
     this.setDragTransferData(nativeEvent.dataTransfer, "text/plain", foundryPayload);
@@ -8868,7 +9054,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
     const payload = this.getItemReorderPayloadFromEvent(eventLike);
     if (!payload) return this.onExternalItemListDragOver(eventLike);
-    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.onExternalItemListDragOver(eventLike);
+    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.onExternalItemListDragOver(eventLike, payload);
 
     const list = this.getItemListDropTargetFromEvent(eventLike);
     if (!(list instanceof HTMLElement)) return;
@@ -8950,15 +9136,16 @@ class BloodmanActorSheet extends BaseActorSheet {
     targetLi.classList.add(sortBefore ? "is-reorder-drop-before" : "is-reorder-drop-after");
   }
 
-  onExternalItemListDragOver(eventLike) {
+  onExternalItemListDragOver(eventLike, payloadOverride = null) {
     const nativeEvent = eventLike?.originalEvent || eventLike;
     const data = getDragEventData(nativeEvent);
+    const override = payloadOverride && typeof payloadOverride === "object" ? payloadOverride : null;
 
     const list = this.getItemListDropTargetFromEvent(eventLike);
     if (!(list instanceof HTMLElement)) return;
 
-    const dataType = String(data?.type || "").trim().toLowerCase();
-    const itemType = this.getExternalItemDragTypeFromData(data);
+    const dataType = String(data?.type || (override ? "Item" : "")).trim().toLowerCase();
+    const itemType = String(override?.itemType || this.getExternalItemDragTypeFromData(data)).trim().toLowerCase();
     const carryColumn = this.getItemListCarryColumnFromElement(list);
     const bagZone = this.getItemListBagZoneFromElement(list);
     const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
@@ -8969,7 +9156,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
       else nativeEvent?.preventDefault?.();
       if (nativeEvent?.dataTransfer) {
-        nativeEvent.dataTransfer.dropEffect = String(data?.actorId || data?.uuid || "").includes("Actor.")
+        nativeEvent.dataTransfer.dropEffect = String(override?.actorId || data?.actorId || data?.uuid || "").includes("Actor.")
           ? "move"
           : "copy";
       }
@@ -8999,7 +9186,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
     else nativeEvent?.preventDefault?.();
     if (nativeEvent?.dataTransfer) {
-      nativeEvent.dataTransfer.dropEffect = String(data?.actorId || data?.uuid || "").includes("Actor.")
+      nativeEvent.dataTransfer.dropEffect = String(override?.actorId || data?.actorId || data?.uuid || "").includes("Actor.")
         ? "move"
         : "copy";
     }
@@ -9009,11 +9196,22 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   onItemReorderDragEnd() {
+    const endingPayload = this.normalizeItemReorderPayload(this._activeItemReorderPayload);
     if (this._itemReorderPayloadClearTimer) clearTimeout(this._itemReorderPayloadClearTimer);
     this._itemReorderPayloadClearTimer = setTimeout(() => {
       this._activeItemReorderPayload = null;
       this._itemReorderPayloadClearTimer = null;
     }, 200);
+    setTimeout(() => {
+      const active = globalThis.__bloodmanActiveItemDragPayload || null;
+      if (
+        active
+        && String(active.actorId || "") === String(this.actor?.id || "")
+        && String(active.itemId || "") === String(endingPayload?.itemId || "")
+      ) {
+        globalThis.__bloodmanActiveItemDragPayload = null;
+      }
+    }, 250);
     this.clearRememberedEquiperAvecDropTarget();
     this.clearItemReorderVisualState();
   }
@@ -9033,7 +9231,19 @@ class BloodmanActorSheet extends BaseActorSheet {
   async onExternalItemListDrop(eventLike) {
     const startedAt = startPerfTimer();
     const nativeEvent = eventLike?.originalEvent || eventLike;
-    const data = getDragEventData(nativeEvent);
+    let data = getDragEventData(nativeEvent);
+    const payload = this.getItemReorderPayloadFromEvent(eventLike);
+    if ((!data || String(data?.type || "").trim().toLowerCase() !== "item") && payload) {
+      data = {
+        type: "Item",
+        uuid: payload.actorUuid && payload.itemId ? `${payload.actorUuid}.Item.${payload.itemId}` : "",
+        id: payload.itemId,
+        itemId: payload.itemId,
+        itemType: payload.itemType,
+        actorId: payload.actorId,
+        actorUuid: payload.actorUuid
+      };
+    }
     const dataType = String(data?.type || "").trim().toLowerCase();
     if (dataType !== "item") return null;
     stopHandledDropEvent(eventLike);
@@ -9937,7 +10147,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     equipment.monnaies = String(equipment.monnaies ?? "").trim();
     equipment.monnaiesActuel = normalizeCurrencyCurrentValue(equipment.monnaiesActuel, 0).value;
-    const actorBagSlotsEnabled = toCheckboxBoolean(equipment.bagSlotsEnabled, false);
+    const actorBagSlotsEnabled = resolveActorBackpackEnabled(this.actor, { items: visibleActorItems }).enabled;
     if (this._optimisticBagSlotsEnabled !== null && actorBagSlotsEnabled === this._optimisticBagSlotsEnabled) {
       this._optimisticBagSlotsEnabled = null;
     }
@@ -10745,6 +10955,15 @@ class BloodmanActorSheet extends BaseActorSheet {
         noInput.prop("checked", !currentBagSlotsEnabled);
         return;
       }
+      socketEmit(SYSTEM_SOCKET, {
+        type: "actorBackpackStateChanged",
+        requesterId: String(game.user?.id || ""),
+        actorUuid: String(this.actor?.uuid || ""),
+        actorId: String(this.actor?.id || ""),
+        actorBaseId: String(this.actor?.token?.actorId || this.actor?.baseActor?.id || this.actor?.id || ""),
+        enabled: bagSlotsEnabled
+      });
+      updateOpenActorSheetsBackpackState(this.actor, bagSlotsEnabled);
       if (bagSlotsEnabled) {
         const overflowMoved = await this.enforceMainCarryOverflowToBag({ bagEnabledOverride: true });
         if (overflowMoved) this.render(false);
@@ -11084,7 +11303,6 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   async promptDropDecision(preview) {
     if (!preview || (typeof getDialogClass() !== "function" && typeof getDialogV2Class() !== "function")) return "fermer";
-    const escapeHtml = escapeChatMarkup;
     const eyebrow = tl(
       "BLOODMAN.Dialogs.DropDecision.Eyebrow",
       "Deplacement d'objet"
@@ -11097,79 +11315,18 @@ class BloodmanActorSheet extends BaseActorSheet {
       "BLOODMAN.Dialogs.DropDecision.InvalidPriceWarning",
       "Un ou plusieurs objets ont un prix invalide. L'achat sera bloque."
     );
-    const specificsMarkup = preview.specificities
-      .map(line => `<li>${escapeHtml(line)}</li>`)
-      .join("");
-    const transferDialogStyle = `<style>
-      .bloodman-drop-decision-dialog .bm-transfer-dialog{--bm-transfer-bg:#0c0b0a;--bm-transfer-panel:#171310;--bm-transfer-line:rgba(143,113,91,.58);--bm-transfer-soft:rgba(143,113,91,.24);--bm-transfer-red:#d84d45;--bm-transfer-gold:#d4b37e;--bm-transfer-text:#f6eee5;--bm-transfer-muted:#c1b09a;color:var(--bm-transfer-text)!important;margin:0!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-shell{display:grid!important;gap:12px!important;padding:14px!important;border:1px solid var(--bm-transfer-line)!important;border-radius:8px!important;background:radial-gradient(circle at 8% 0%,rgba(216,77,69,.16),transparent 34%),linear-gradient(180deg,#17120f,#080808)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 14px 28px rgba(0,0,0,.38)!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-hero{display:grid!important;grid-template-columns:52px minmax(0,1fr)!important;gap:12px!important;align-items:center!important;padding:12px!important;border:1px solid var(--bm-transfer-soft)!important;border-radius:7px!important;background:linear-gradient(90deg,rgba(216,77,69,.16),transparent 62%),#120f0e!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-alert{display:grid!important;place-items:center!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-alert-ring{display:grid!important;place-items:center!important;width:42px!important;height:42px!important;border:1px solid rgba(212,179,126,.66)!important;border-radius:50%!important;background:radial-gradient(circle,rgba(216,77,69,.22),transparent 62%),#0b0a09!important;box-shadow:0 0 14px rgba(216,77,69,.16),inset 0 0 0 1px rgba(255,255,255,.05)!important;transform:none!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-alert-ring i{color:#f06b61!important;font-size:18px!important;text-shadow:0 0 10px rgba(216,77,69,.45)!important;transform:none!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-kicker{margin:0!important;color:var(--bm-transfer-gold)!important;font-size:19px!important;font-weight:800!important;line-height:1.05!important;text-transform:uppercase!important;letter-spacing:0!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-intro,.bloodman-drop-decision-dialog .bm-transfer-question{margin:4px 0 0!important;color:var(--bm-transfer-text)!important;font-size:13px!important;line-height:1.32!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-question{font-weight:800!important;color:#fff!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;border:0!important;background:transparent!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-card{display:grid!important;grid-template-columns:38px minmax(0,1fr)!important;gap:10px!important;align-items:center!important;min-height:64px!important;padding:10px!important;border:1px solid var(--bm-transfer-soft)!important;border-radius:7px!important;background:linear-gradient(180deg,rgba(255,255,255,.035),transparent 46%),#0f0e0d!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-card-item{border-color:rgba(216,77,69,.52)!important;background:linear-gradient(90deg,rgba(216,77,69,.13),transparent 58%),#100e0d!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-card-icon{display:grid!important;place-items:center!important;width:36px!important;height:36px!important;border:1px solid rgba(216,77,69,.46)!important;border-radius:6px!important;background:rgba(216,77,69,.09)!important;color:#e6665d!important;font-size:15px!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-card-label,.bloodman-drop-decision-dialog .bm-transfer-section-title{margin:0!important;color:var(--bm-transfer-muted)!important;font-size:10px!important;font-weight:800!important;letter-spacing:.5px!important;text-transform:uppercase!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-card-value{margin:4px 0 0!important;color:var(--bm-transfer-text)!important;font-size:15px!important;font-weight:800!important;line-height:1.2!important;overflow-wrap:anywhere!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-lower{display:grid!important;grid-template-columns:154px minmax(0,1fr)!important;gap:10px!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-cost-card,.bloodman-drop-decision-dialog .bm-transfer-specifics-panel{border:1px solid var(--bm-transfer-soft)!important;border-radius:7px!important;background:linear-gradient(180deg,rgba(255,255,255,.035),transparent 44%),var(--bm-transfer-panel)!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-cost-card{display:grid!important;place-items:center!important;min-height:96px!important;padding:12px!important;border-color:rgba(212,179,126,.48)!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-cost-label{color:var(--bm-transfer-muted)!important;font-size:10px!important;font-weight:800!important;text-transform:uppercase!important;letter-spacing:.55px!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-cost-value{color:#fff5df!important;font-size:28px!important;font-weight:900!important;line-height:1!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-specifics-panel{padding:11px!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-specifics{display:grid!important;gap:6px!important;margin:8px 0 0!important;padding:0!important;border:0!important;background:transparent!important;list-style:none!important;max-height:130px!important;overflow:auto!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-specifics li{position:relative!important;margin:0!important;padding-left:15px!important;color:var(--bm-transfer-text)!important;font-size:12px!important;line-height:1.35!important;}
-      .bloodman-drop-decision-dialog .bm-transfer-specifics li::before{content:""!important;position:absolute!important;left:2px!important;top:.55em!important;width:5px!important;height:5px!important;border:1px solid var(--bm-transfer-red)!important;background:rgba(216,77,69,.3)!important;transform:rotate(45deg)!important;}
-      .bloodman-drop-decision-dialog .dialog-buttons{display:grid!important;grid-template-columns:.9fr 1.25fr .9fr!important;gap:8px!important;margin-top:10px!important;}
-      .bloodman-drop-decision-dialog .dialog-buttons button{min-height:42px!important;border:1px solid rgba(143,113,91,.72)!important;border-radius:5px!important;background:linear-gradient(180deg,#1f1a17,#0b0a09)!important;color:#f6eee5!important;font-weight:800!important;}
-      .bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"]{border-color:rgba(255,95,84,.88)!important;background:linear-gradient(180deg,#621612,#1a0706)!important;color:#fff8ef!important;}
-      @media(max-width:640px){.bloodman-drop-decision-dialog .bm-transfer-hero,.bloodman-drop-decision-dialog .bm-transfer-grid,.bloodman-drop-decision-dialog .bm-transfer-lower,.bloodman-drop-decision-dialog .dialog-buttons{grid-template-columns:1fr!important;}}
-    </style>`;
-    const content = `${transferDialogStyle}<form class="bm-drop-insufficient-funds bm-transfer-dialog">
-      <div class="bm-drop-insufficient-shell bm-transfer-shell">
-        <div class="bm-drop-insufficient-head bm-transfer-hero">
-          <div class="bm-transfer-alert" aria-hidden="true">
-            <div class="bm-transfer-alert-ring"><i class="fa-solid fa-right-left"></i></div>
-          </div>
-          <div class="bm-drop-insufficient-head-copy bm-transfer-hero-copy">
-            <p class="bm-drop-insufficient-eyebrow bm-transfer-kicker">${escapeHtml(eyebrow)}</p>
-            <p class="bm-drop-insufficient-intro bm-transfer-intro">${escapeHtml(preview.intro)}</p>
-          </div>
-        </div>
-        <div class="bm-drop-transfer-summary bm-transfer-grid" role="group" aria-label="${escapeHtml(title)}">
-          <div class="bm-drop-transfer-card bm-drop-transfer-card-item bm-transfer-card bm-transfer-card-item">
-            <i class="fa-solid fa-box-open bm-transfer-card-icon" aria-hidden="true"></i>
-            <div class="bm-transfer-card-copy">
-              <p class="bm-drop-transfer-card-label bm-transfer-card-label">${escapeHtml(itemLabel)}</p>
-              <p class="bm-drop-transfer-card-value bm-transfer-card-value">${escapeHtml(preview.firstItemName)}</p>
-            </div>
-          </div>
-          <div class="bm-drop-transfer-card bm-transfer-card">
-            <i class="fa-solid fa-crosshairs bm-transfer-card-icon" aria-hidden="true"></i>
-            <div class="bm-transfer-card-copy">
-              <p class="bm-drop-transfer-card-label bm-transfer-card-label">${escapeHtml(destinationLabel)}</p>
-              <p class="bm-drop-transfer-card-value bm-transfer-card-value">${escapeHtml(preview.targetName)}</p>
-            </div>
-          </div>
-        </div>
-        <div class="bm-transfer-lower">
-          <section class="bm-transfer-cost-card" aria-label="${escapeHtml(preview.costLabel)}">
-            <span class="bm-transfer-cost-label">${escapeHtml(preview.costLabel)}</span>
-            <strong class="bm-transfer-cost-value">${escapeHtml(formatCurrencyValue(preview.totalCost))}</strong>
-          </section>
-          <section class="bm-transfer-specifics-panel">
-            <p class="bm-drop-insufficient-specificities-title bm-transfer-section-title">${escapeHtml(preview.specificsLabel)}</p>
-            <ul class="bm-drop-insufficient-specificities bm-transfer-specifics">${specificsMarkup}</ul>
-          </section>
-        </div>
-        ${preview.hasInvalidPrice ? `<p class="bm-drop-insufficient-warning bm-transfer-warning"><strong>${escapeHtml(warningLabel)}:</strong> ${escapeHtml(warningText)}</p>` : ""}
-      </div>
-    </form>`;
+    const content = buildDropDecisionDialogContent({
+      preview,
+      labels: {
+        eyebrow,
+        title,
+        itemLabel,
+        destinationLabel,
+        warningLabel,
+        warningText
+      },
+      formatCurrencyValue
+    });
 
     return new Promise(resolve => {
       let settled = false;
@@ -11225,13 +11382,17 @@ class BloodmanActorSheet extends BaseActorSheet {
       return null;
     }
 
-    const reachedLimit = await this._reachedCarriedItemsLimit(data);
-    if (reachedLimit) return null;
-
     const dropEntries = this.getDropEntries(data);
     const actorTransferEntries = await this.resolveActorTransferEntries(data);
     const hasOnlyActorTransfers = shouldUseActorTransferPath(dropEntries, actorTransferEntries);
     if (hasOnlyActorTransfers) {
+      if (!game.user?.isGM) {
+        const sent = requestActorItemTransfer(this.actor, actorTransferEntries);
+        if (!sent) safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
+        return sent ? [] : null;
+      }
+      const reachedLimit = await this._reachedCarriedItemsLimit(data);
+      if (reachedLimit) return null;
       const dropped = await this.applyActorToActorItemTransfer(actorTransferEntries, {
         createItemOptions: { [VOYAGE_XP_SKIP_CREATE_OPTION]: true }
       });
@@ -11243,6 +11404,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       return dropped;
     }
+
+    const reachedLimit = await this._reachedCarriedItemsLimit(data);
+    if (reachedLimit) return null;
 
     const purchase = await this.resolveDropPurchaseSummary(data);
     const preview = await this.buildDropDecisionPreview(data, purchase);

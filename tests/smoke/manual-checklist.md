@@ -44,3 +44,20 @@
 - `bm-oracle-destin`: macro GM creee, jet du destin et carte chat.
 - `bm-redimensionnement-token` / `bm-resize-token`: champs de cadrage et echelle sur fiche/token, persistance apres rechargement.
 - `bm-ui-joueur`: masquage/ajustements UI joueur sans masquer les controles GM.
+
+## Checklist minimale apres refactorisation
+
+- Ouvrir une fiche joueur depuis le menu lateral.
+- Ouvrir la meme fiche joueur depuis un token sur la scene.
+- Modifier un parametre cote GM et verifier qu'il apparait cote joueur.
+- Activer le bouton oui du sac objet cote GM.
+- Verifier que le joueur voit le sac deverrouille.
+- Glisser un objet dans le sac cote joueur.
+- Verifier que l'objet reste bien dans le sac apres fermeture et reouverture de la fiche.
+- Tester les jets de degats cote GM.
+- Tester les jets de degats cote joueur.
+- Comparer les fenetres de configuration GM et joueur.
+- Verifier la console navigateur.
+- Verifier qu'il n'y a pas d'erreur au lancement du monde.
+- Verifier qu'il n'y a pas d'erreur lors du drag and drop d'un objet.
+- Verifier qu'il n'y a pas de ralentissement important sur les fiches.

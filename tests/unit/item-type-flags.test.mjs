@@ -23,10 +23,21 @@ async function run() {
 
   assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: true } } }), true);
   assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: false } } }), false);
+  assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: "yes" } } }), true);
+  assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: "false" } } }), false);
   assert.equal(rules.isBagSlotsEnabled(null), false);
 
   assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { bagSlotsEnabled: false } } }), 10);
   assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { bagSlotsEnabled: true } } }), 15);
+  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { bagSlotsEnabled: "false" } } }), 10);
+
+  const resolvedRules = createItemTypeFlagRules({
+    carriedItemLimitBase: 10,
+    carriedItemLimitWithBag: 15,
+    resolveBagSlotsEnabled: actor => actor?.resolvedBag === true
+  });
+  assert.equal(resolvedRules.getActorCarriedItemsLimit({ resolvedBag: true }), 15);
+  assert.equal(resolvedRules.getActorCarriedItemsLimit({ resolvedBag: false, system: { equipment: { bagSlotsEnabled: true } } }), 10);
 }
 
 run()

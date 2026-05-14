@@ -33,6 +33,8 @@ async function run() {
     handleActorSheetUpdateRequest: async () => calls.push("msg:sheet"),
     handleDeleteItemRequest: async () => calls.push("msg:delete-item"),
     handleReorderActorItemsRequest: async () => calls.push("msg:reorder-item"),
+    handleActorItemTransferRequest: async () => calls.push("msg:transfer-item"),
+    handleActorBackpackStateChangedMessage: async () => calls.push("msg:backpack"),
     wasChaosRequestProcessed: id => remembered.has(id),
     rememberChaosRequest: id => {
       remembered.add(id);
@@ -55,11 +57,13 @@ async function run() {
   await registeredHandler({ type: "damageSplitPopup" });
   await registeredHandler({ type: "powerUsePopup" });
   await registeredHandler({ type: "damageApplied" });
+  await registeredHandler({ type: "actorBackpackStateChanged" });
   await registeredHandler({ type: "rerollDamage" });
   await registeredHandler({ type: "updateVitalResources" });
   await registeredHandler({ type: "updateActorSheetData" });
   await registeredHandler({ type: "deleteActorItem" });
   await registeredHandler({ type: "reorderActorItems" });
+  await registeredHandler({ type: "transferActorItem" });
   await registeredHandler({ type: "adjustChaosDice", delta: 3, requestId: "r1" });
   await registeredHandler({ type: "adjustChaosDice", delta: 3, requestId: "r1" });
   await registeredHandler({ type: "applyDamage" });
@@ -79,11 +83,13 @@ async function run() {
     "msg:damage-split",
     "msg:power-popup",
     "msg:damage-applied",
+    "msg:backpack",
     "msg:reroll",
     "msg:vital",
     "msg:sheet",
     "msg:delete-item",
     "msg:reorder-item",
+    "msg:transfer-item",
     "chaos:remember:r1",
     "chaos:set:13",
     "msg:apply-damage"

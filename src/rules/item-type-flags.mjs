@@ -1,9 +1,12 @@
+import { normalizeBooleanFlag } from "./boolean-flags.mjs";
+
 export function createItemTypeFlagRules({
   damageRerollAllowedItemTypes,
   voyageXpCostItemTypes,
   carriedItemLimitActorTypes,
   carriedItemLimitBase = 10,
-  carriedItemLimitWithBag = 15
+  carriedItemLimitWithBag = 15,
+  resolveBagSlotsEnabled
 } = {}) {
   const damageRerollTypes = damageRerollAllowedItemTypes instanceof Set
     ? damageRerollAllowedItemTypes
@@ -31,7 +34,11 @@ export function createItemTypeFlagRules({
   }
 
   function isBagSlotsEnabled(actor) {
-    return Boolean(actor?.system?.equipment?.bagSlotsEnabled);
+    if (typeof resolveBagSlotsEnabled === "function") {
+      const resolved = resolveBagSlotsEnabled(actor);
+      if (resolved === true || resolved === false) return resolved;
+    }
+    return normalizeBooleanFlag(actor?.system?.equipment?.bagSlotsEnabled, false);
   }
 
   function getActorCarriedItemsLimit(actor) {

@@ -228,6 +228,51 @@ async function run() {
       { _id: "it2", sort: 3 }
     ]]);
   });
+
+  await withGameContext({
+    isGM: true,
+    users: [["u1", { role: 1 }]]
+  }, async () => {
+    const transferred = [];
+    const item = { id: "it1", type: "soin", name: "Potion" };
+    const sourceActor = {
+      id: "source",
+      uuid: "Actor.source",
+      items: {
+        get: id => (id === "it1" ? item : null),
+        find: () => null
+      },
+      testUserPermission: (_user, level) => level <= 1
+    };
+    const targetActor = {
+      id: "target",
+      uuid: "Actor.target",
+      type: "personnage",
+      testUserPermission: (_user, level) => level <= 3
+    };
+    const handlers = buildActorSocketRequestHandlers({
+      canUserRoleEditCharacteristics: () => true,
+      vitalResourcePaths: new Set(),
+      resolveActorForVitalResourceUpdate: async () => null,
+      resolveActorForSheetRequest: async () => null,
+      getActorById: id => (id === "source" ? sourceActor : (id === "target" ? targetActor : null)),
+      applyActorItemTransfer: async payload => transferred.push(payload)
+    });
+    await handlers.handleActorItemTransferRequest({
+      requesterId: "u1",
+      targetActorId: "target",
+      entries: [{
+        sourceActorId: "source",
+        itemId: "it1",
+        itemType: "soin",
+        itemName: "Potion"
+      }]
+    });
+    assert.equal(transferred.length, 1);
+    assert.equal(transferred[0].targetActor, targetActor);
+    assert.deepEqual(transferred[0].transferEntries, [{ droppedItem: item, sourceActor }]);
+    assert.equal(transferred[0].isGM, true);
+  });
 }
 
 run()

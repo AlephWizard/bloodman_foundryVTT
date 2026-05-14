@@ -1,4 +1,8 @@
 import { bmLog } from "../core/logger.mjs";
+import {
+  actorHasPersistedBackpackItems,
+  normalizeBackpackBoolean
+} from "../rules/backpack.mjs";
 
 const SYSTEM_ID = "bloodman";
 const SCHEMA_SETTING_KEY = "schemaVersion";
@@ -285,7 +289,12 @@ export function computeActorStructureMigrationData(actorSource = {}) {
     }
 
     const rawBagSlotsEnabled = getPropertyCompat(equipment, "bagSlotsEnabled", false);
-    const normalizedBagSlotsEnabled = normalizeBooleanFlag(rawBagSlotsEnabled, false);
+    const hasPersistedBackpackItems = actorHasPersistedBackpackItems(actorSource, {
+      items: Array.isArray(actorSource?.items) ? actorSource.items : []
+    });
+    const normalizedBagSlotsEnabled = hasPersistedBackpackItems
+      ? true
+      : normalizeBackpackBoolean(rawBagSlotsEnabled, false);
     if (rawBagSlotsEnabled !== normalizedBagSlotsEnabled) {
       updateData["system.equipment.bagSlotsEnabled"] = normalizedBagSlotsEnabled;
     }
@@ -339,9 +348,17 @@ function buildItemMigrationUpdate(itemDocument) {
 
 function buildActorMigrationUpdate(actorDocument) {
   if (!actorDocument) return null;
-  const source = typeof actorDocument.toObject === "function"
+  let source = typeof actorDocument.toObject === "function"
     ? actorDocument.toObject()
     : actorDocument;
+  if (!Array.isArray(source?.items) && actorDocument?.items) {
+    source = {
+      ...(source || {}),
+      items: Array.from(actorDocument.items || []).map(item => (
+        typeof item?.toObject === "function" ? item.toObject() : item
+      ))
+    };
+  }
   return computeActorStructureMigrationData(source);
 }
 
@@ -553,6 +570,11 @@ const MIGRATION_STEPS = Object.freeze([
   {
     version: 2,
     id: "normalize-actor-structure",
+    run: migrationStepNormalizeActorStructure
+  },
+  {
+    version: 3,
+    id: "normalize-backpack-state",
     run: migrationStepNormalizeActorStructure
   }
 ]);

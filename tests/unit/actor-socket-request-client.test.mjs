@@ -71,6 +71,13 @@ function run() {
       { uuid: "Actor.a1", id: "a1" },
       { id: "it1", uuid: "Actor.a1.Item.it1", type: "objet", name: "Corde" }
     );
+    const transferOk = client.requestActorItemTransfer(
+      { uuid: "Actor.target", id: "target" },
+      [{
+        sourceActor: { uuid: "Actor.source", id: "source" },
+        droppedItem: { id: "it2", uuid: "Actor.source.Item.it2", type: "soin", name: "Potion" }
+      }]
+    );
     const reorderFail = client.requestReorderActorItems(
       { uuid: "Actor.a1", id: "a1" },
       [{ id: "" }]
@@ -80,9 +87,10 @@ function run() {
     assert.equal(sheetUpdateFail, false);
     assert.equal(deleteOk, true);
     assert.equal(reorderOk, true);
+    assert.equal(transferOk, true);
     assert.equal(reorderFail, false);
 
-    assert.equal(emitted.length, 4);
+    assert.equal(emitted.length, 5);
     assert.equal(emitted[0].channel, "system.bloodman");
     assert.deepEqual(emitted[0].payload, {
       type: "updateVitalResources",
@@ -124,6 +132,22 @@ function run() {
       itemUuid: "Actor.a1.Item.it1",
       itemType: "objet",
       itemName: "Corde"
+    });
+    assert.deepEqual(emitted[4].payload, {
+      type: "transferActorItem",
+      requesterId: "u1",
+      targetActorUuid: "Actor.target",
+      targetActorId: "target",
+      targetActorBaseId: "target",
+      entries: [{
+        sourceActorUuid: "Actor.source",
+        sourceActorId: "source",
+        sourceActorBaseId: "source",
+        itemUuid: "Actor.source.Item.it2",
+        itemId: "it2",
+        itemType: "soin",
+        itemName: "Potion"
+      }]
     });
   });
 }

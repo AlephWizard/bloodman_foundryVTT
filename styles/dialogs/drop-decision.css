@@ -1,0 +1,257 @@
+.bloodman-drop-decision-dialog .bm-transfer-dialog {
+  --bm-transfer-bg: #0c0b0a;
+  --bm-transfer-panel: #171310;
+  --bm-transfer-line: rgba(143, 113, 91, 0.58);
+  --bm-transfer-soft: rgba(143, 113, 91, 0.24);
+  --bm-transfer-red: #d84d45;
+  --bm-transfer-gold: #d4b37e;
+  --bm-transfer-text: #f6eee5;
+  --bm-transfer-muted: #c1b09a;
+  margin: 0 !important;
+  color: var(--bm-transfer-text) !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-shell {
+  display: grid !important;
+  gap: 12px !important;
+  padding: 14px !important;
+  border: 1px solid var(--bm-transfer-line) !important;
+  border-radius: 8px !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(216, 77, 69, 0.16), transparent 34%),
+    linear-gradient(180deg, #17120f, #080808) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 14px 28px rgba(0, 0, 0, 0.38) !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-hero {
+  display: grid !important;
+  grid-template-columns: 52px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  border: 1px solid var(--bm-transfer-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(90deg, rgba(216, 77, 69, 0.16), transparent 62%),
+    #120f0e !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-alert {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-alert-ring {
+  display: grid !important;
+  place-items: center !important;
+  width: 42px !important;
+  height: 42px !important;
+  border: 1px solid rgba(212, 179, 126, 0.66) !important;
+  border-radius: 50% !important;
+  background:
+    radial-gradient(circle, rgba(216, 77, 69, 0.22), transparent 62%),
+    #0b0a09 !important;
+  box-shadow:
+    0 0 14px rgba(216, 77, 69, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  transform: none !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-alert-ring i {
+  color: #f06b61 !important;
+  font-size: 18px !important;
+  text-shadow: 0 0 10px rgba(216, 77, 69, 0.45) !important;
+  transform: none !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-kicker {
+  margin: 0 !important;
+  color: var(--bm-transfer-gold) !important;
+  font-size: 19px !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0 !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-intro,
+.bloodman-drop-decision-dialog .bm-transfer-question {
+  margin: 4px 0 0 !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 13px !important;
+  line-height: 1.32 !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-question {
+  color: #fff !important;
+  font-weight: 800 !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-card {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  align-items: center !important;
+  min-height: 64px !important;
+  gap: 10px !important;
+  padding: 10px !important;
+  border: 1px solid var(--bm-transfer-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 46%),
+    #0f0e0d !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-card-item {
+  border-color: rgba(216, 77, 69, 0.52) !important;
+  background:
+    linear-gradient(90deg, rgba(216, 77, 69, 0.13), transparent 58%),
+    #100e0d !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-card-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  border: 1px solid rgba(216, 77, 69, 0.46) !important;
+  border-radius: 6px !important;
+  background: rgba(216, 77, 69, 0.09) !important;
+  color: #e6665d !important;
+  font-size: 15px !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-card-label,
+.bloodman-drop-decision-dialog .bm-transfer-section-title {
+  margin: 0 !important;
+  color: var(--bm-transfer-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-card-value {
+  margin: 4px 0 0 !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-lower {
+  display: grid !important;
+  grid-template-columns: 154px minmax(0, 1fr) !important;
+  gap: 10px !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-cost-card,
+.bloodman-drop-decision-dialog .bm-transfer-specifics-panel {
+  border: 1px solid var(--bm-transfer-soft) !important;
+  border-radius: 7px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 44%),
+    var(--bm-transfer-panel) !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-cost-card {
+  display: grid !important;
+  place-items: center !important;
+  min-height: 96px !important;
+  padding: 12px !important;
+  border-color: rgba(212, 179, 126, 0.48) !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-cost-label {
+  color: var(--bm-transfer-muted) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.55px !important;
+  text-transform: uppercase !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-cost-value {
+  color: #fff5df !important;
+  font-size: 28px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-specifics-panel {
+  padding: 11px !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-specifics {
+  display: grid !important;
+  gap: 6px !important;
+  max-height: 130px !important;
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--bm-transfer-text) !important;
+  list-style: none !important;
+  overflow: auto !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-specifics li {
+  position: relative !important;
+  margin: 0 !important;
+  padding-left: 15px !important;
+  color: var(--bm-transfer-text) !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.bloodman-drop-decision-dialog .bm-transfer-specifics li::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0.55em !important;
+  left: 2px !important;
+  width: 5px !important;
+  height: 5px !important;
+  border: 1px solid var(--bm-transfer-red) !important;
+  background: rgba(216, 77, 69, 0.3) !important;
+  transform: rotate(45deg) !important;
+}
+
+.bloodman-drop-decision-dialog .dialog-buttons {
+  display: grid !important;
+  grid-template-columns: 0.9fr 1.25fr 0.9fr !important;
+  gap: 8px !important;
+  margin-top: 10px !important;
+}
+
+.bloodman-drop-decision-dialog .dialog-buttons button {
+  min-height: 42px !important;
+  border: 1px solid rgba(143, 113, 91, 0.72) !important;
+  border-radius: 5px !important;
+  background: linear-gradient(180deg, #1f1a17, #0b0a09) !important;
+  color: #f6eee5 !important;
+  font-weight: 800 !important;
+}
+
+.bloodman-drop-decision-dialog .dialog-buttons button[data-button="free"] {
+  border-color: rgba(255, 95, 84, 0.88) !important;
+  background: linear-gradient(180deg, #621612, #1a0706) !important;
+  color: #fff8ef !important;
+}
+
+@media (max-width: 640px) {
+  .bloodman-drop-decision-dialog .bm-transfer-hero,
+  .bloodman-drop-decision-dialog .bm-transfer-grid,
+  .bloodman-drop-decision-dialog .bm-transfer-lower,
+  .bloodman-drop-decision-dialog .dialog-buttons {
+    grid-template-columns: 1fr !important;
+  }
+}

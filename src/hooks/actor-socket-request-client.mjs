@@ -91,11 +91,43 @@ export function buildActorSocketRequestClient({
     });
   }
 
+  function requestActorItemTransfer(targetActor, transferEntries = []) {
+    if (!targetActor || typeof hasSocket !== "function" || !hasSocket() || !Array.isArray(transferEntries)) return false;
+    const entries = transferEntries
+      .map(entry => {
+        const droppedItem = entry?.droppedItem || null;
+        const sourceActor = entry?.sourceActor || droppedItem?.actor || null;
+        const itemId = String(droppedItem?.id || droppedItem?._id || "").trim();
+        if (!sourceActor || !itemId) return null;
+        return {
+          sourceActorUuid: String(sourceActor.uuid || ""),
+          sourceActorId: String(sourceActor.id || ""),
+          sourceActorBaseId: getSocketActorBaseId(sourceActor),
+          itemUuid: String(droppedItem.uuid || ""),
+          itemId,
+          itemType: String(droppedItem.type || ""),
+          itemName: String(droppedItem.name || "")
+        };
+      })
+      .filter(Boolean);
+    if (!entries.length) return false;
+
+    return socketEmit(systemSocket, {
+      type: "transferActorItem",
+      requesterId: String(game.user?.id || ""),
+      targetActorUuid: String(targetActor.uuid || ""),
+      targetActorId: String(targetActor.id || ""),
+      targetActorBaseId: getSocketActorBaseId(targetActor),
+      entries
+    });
+  }
+
   return {
     getSocketActorBaseId,
     requestVitalResourceUpdate,
     requestActorSheetUpdate,
     requestDeleteActorItem,
-    requestReorderActorItems
+    requestReorderActorItems,
+    requestActorItemTransfer
   };
 }

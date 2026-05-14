@@ -63,6 +63,30 @@ function run() {
     "system.characteristics.PHY.xp": [false, false, true]
   });
 
+  const staleBackpackActor = {
+    type: "personnage",
+    system: {
+      npcRole: "",
+      profile: { quickNotes: "RAS" },
+      equipment: {
+        monnaies: "Couronnes",
+        monnaiesActuel: 12.5,
+        bagSlotsEnabled: false,
+        transportNpcs: []
+      },
+      characteristics: {}
+    },
+    items: [
+      {
+        type: "objet",
+        flags: { bloodman: { carryColumn: "bag" } }
+      }
+    ]
+  };
+  assert.deepEqual(computeActorStructureMigrationData(staleBackpackActor), {
+    "system.equipment.bagSlotsEnabled": true
+  });
+
   assert.deepEqual(
     normalizeMigrationRunOptions({ includeCompendiums: true }, { includeCompendiums: false }),
     { includeCompendiums: true }

@@ -11,7 +11,10 @@ export function buildActorSocketRequestHandlers({
   sanitizeActorUpdateForRole,
   hasActorUpdatePayload,
   flattenObject,
-  toFiniteNumber
+  toFiniteNumber,
+  applyActorItemTransfer,
+  getActorById,
+  fromUuid
 } = {}) {
   async function handleVitalResourceUpdateRequest(data) {
     const currentGame = globalThis.game;
@@ -189,10 +192,92 @@ export function buildActorSocketRequestHandlers({
     await actor.updateEmbeddedDocuments("Item", safeUpdates);
   }
 
+  async function resolveActorReference({ uuid = "", id = "", baseId = "" } = {}) {
+    const worldActorId = String(baseId || id || "").trim();
+    const worldActor = worldActorId ? getActorById?.(worldActorId) || null : null;
+    const actorUuid = String(uuid || "").trim();
+    if (actorUuid && typeof fromUuid === "function") {
+      const resolved = await fromUuid(actorUuid).catch(() => null);
+      const actor = resolved?.documentName === "Actor"
+        ? resolved
+        : (resolved?.actor?.documentName === "Actor" ? resolved.actor : null);
+      if (actor) {
+        if (actor.isToken && actor.token?.actorLink && worldActor) return worldActor;
+        return actor;
+      }
+    }
+    return worldActor;
+  }
+
+  async function handleActorItemTransferRequest(data) {
+    const currentGame = globalThis.game;
+    if (!data || !currentGame?.user?.isGM) return;
+    const requesterId = String(data.requesterId || "");
+    const requester = currentGame.users?.get(requesterId);
+    if (!requester) return;
+
+    const targetActor = await resolveActorReference({
+      uuid: data.targetActorUuid,
+      id: data.targetActorId,
+      baseId: data.targetActorBaseId
+    });
+    if (!isCharacterLikeActor(targetActor)) return;
+
+    const ownerLevel = Number(globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
+    const limitedLevel = Number(globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.LIMITED ?? 1);
+    const canManageTarget = typeof targetActor.testUserPermission === "function"
+      ? targetActor.testUserPermission(requester, ownerLevel, { exact: false })
+      : Boolean(targetActor.isOwner);
+    if (!canManageTarget) return;
+
+    const entries = [];
+    for (const entry of Array.isArray(data.entries) ? data.entries : []) {
+      const sourceActor = await resolveActorReference({
+        uuid: entry?.sourceActorUuid,
+        id: entry?.sourceActorId,
+        baseId: entry?.sourceActorBaseId
+      });
+      if (!sourceActor || sourceActor.id === targetActor.id) continue;
+
+      const sourceVisible = typeof sourceActor.testUserPermission === "function"
+        ? sourceActor.testUserPermission(requester, limitedLevel, { exact: false })
+        : true;
+      if (!sourceVisible) continue;
+
+      const itemId = String(entry?.itemId || "").trim();
+      let droppedItem = itemId ? sourceActor.items?.get?.(itemId) || null : null;
+      if (!droppedItem && entry?.itemUuid && typeof fromUuid === "function") {
+        const resolvedItem = await fromUuid(entry.itemUuid).catch(() => null);
+        if (resolvedItem?.parent?.id === sourceActor.id) droppedItem = resolvedItem;
+      }
+      if (!droppedItem) {
+        const itemName = String(entry?.itemName || "").trim();
+        const itemType = String(entry?.itemType || "").trim().toLowerCase();
+        droppedItem = sourceActor.items?.find?.(item => {
+          if (!item || String(item.name || "").trim() !== itemName) return false;
+          if (itemType && String(item.type || "").trim().toLowerCase() !== itemType) return false;
+          return true;
+        }) || null;
+      }
+      if (!droppedItem) continue;
+      entries.push({ droppedItem, sourceActor });
+    }
+
+    if (!entries.length || typeof applyActorItemTransfer !== "function") return;
+    await applyActorItemTransfer({
+      targetActor,
+      transferEntries: entries,
+      currentUser: currentGame.user,
+      ownerLevel,
+      isGM: true
+    });
+  }
+
   return {
     handleVitalResourceUpdateRequest,
     handleActorSheetUpdateRequest,
     handleDeleteItemRequest,
-    handleReorderActorItemsRequest
+    handleReorderActorItemsRequest,
+    handleActorItemTransferRequest
   };
 }
