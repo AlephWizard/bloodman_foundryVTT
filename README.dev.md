@@ -2,12 +2,15 @@
 
 ## Project Structure
 - `bloodman.mjs`: point d'entree principal, hooks, sheets et orchestration.
-- `src/dice/roll-helpers.mjs`: logique de jets, degats, ressources et fallback socket.
+- `src/dice/roll-helpers.mjs`: orchestration publique des jets, degats, ressources et fallback socket.
+- `src/dice/damage-config-options.mjs`: options et validation des formules de degats.
+- `src/dice/damage-dialog-memory.mjs`: persistance utilisateur de la configuration de degats.
+- `src/dice/weapon-category.mjs`: normalisation des types/catégories d'armes.
 - `src/compat/`: couche de compatibilite Foundry (version + wrappers API instables).
 - `src/migrations/`: migrations de donnees versionnees et idempotentes.
-- `src/hooks/`: handlers de hooks Foundry extraits par domaine (canvas, items derives, actors, combat/tokens).
+- `src/hooks/`: handlers et enregistrements de hooks Foundry extraits par domaine (canvas, items derives, actors, combat/tokens).
 - `src/sheets/`: enregistrement et glue des sheets Foundry.
-- `src/ui/`: helpers UI extraits des sheets et dialogues (chat, layout, dialogues, decoration des types de documents).
+- `src/ui/`: helpers UI extraits des sheets et dialogues (chat, layout, dialogues, panneau du chaos, decoration des types de documents).
 - `src/rules/`: calculs metier purs (ressources/caracteristiques) reutilisables et testables.
 - `src/core/`: constantes systeme, logger, settings et utilitaires de permissions.
 - `utils/`: points de compatibilite (re-exports) pour anciens chemins.
@@ -65,5 +68,6 @@
 - `node tests/unit/actor-sheet-layout.test.mjs`
 - `node tests/unit/item-sheet-price-preview.test.mjs`
 - `node tests/unit/ui-refresh-queue.test.mjs`
+- `node tests/unit/module-linkage.test.mjs`
 - Smoke Foundry:
 - suivre `tests/smoke/manual-checklist.md`

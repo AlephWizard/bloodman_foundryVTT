@@ -1,8 +1,6 @@
 import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./src/dice/roll-helpers.mjs";
 import { bmLog } from "./src/core/logger.mjs";
 import {
-  CHAOS_DICE_ICON_FALLBACK_SRC,
-  CHAOS_DICE_ICON_SRC,
   ITEM_SHEET_TEMPLATE_PATH,
   NPC_ACTOR_SHEET_TEMPLATE_PATH,
   NPC_ACTOR_TYPE,
@@ -65,6 +63,7 @@ import { buildChatRelayHelpers } from "./src/hooks/chat-relay.mjs";
 import { buildChatRollDecorationHooks } from "./src/hooks/chat-roll-decoration.mjs";
 import { buildChatMessageRoutingHooks } from "./src/hooks/chat-message-routing.mjs";
 import { buildTokenCombatHooks } from "./src/hooks/token-combat.mjs";
+import { registerTokenCombatHooks } from "./src/hooks/register-token-combat-hooks.mjs";
 import {
   buildStartupCombatantNameNormalization,
   buildStartupSceneTokenNormalization,
@@ -81,6 +80,7 @@ import {
   refreshAllCreateTypeIcons,
   registerCreateTypeIconRenderHooks
 } from "./src/ui/document-create-type-icons.mjs";
+import { createChaosDicePanelController } from "./src/ui/chaos-dice-panel.mjs";
 import {
   toFiniteNumber as ruleToFiniteNumber,
   normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
@@ -2609,9 +2609,9 @@ const STATE_PRESETS = [
   {
     id: "psychic-1",
     category: "psychic",
-    name: "NIV 1 : INQUIETUDE (24h)",
+    name: "NIV 1 : INQUIETUDE (12h)",
     shortName: "INQUIETUDE",
-    duration: "24h",
+    duration: "12h",
     description: "",
     modifierAll: -2,
     modifierByKey: {}
@@ -2619,9 +2619,9 @@ const STATE_PRESETS = [
   {
     id: "psychic-2",
     category: "psychic",
-    name: "NIV 2 : ANGOISSE (72h)",
+    name: "NIV 2 : ANGOISSE (24h)",
     shortName: "ANGOISSE",
-    duration: "72h",
+    duration: "24h",
     description: "",
     modifierAll: -4,
     modifierByKey: {}
@@ -2629,9 +2629,9 @@ const STATE_PRESETS = [
   {
     id: "psychic-3",
     category: "psychic",
-    name: "NIV 3 : EFFROI (168h)",
+    name: "NIV 3 : EFFROI (72h)",
     shortName: "EFFROI",
-    duration: "168h",
+    duration: "72h",
     description: "",
     modifierAll: -6,
     modifierByKey: {}
@@ -2639,9 +2639,9 @@ const STATE_PRESETS = [
   {
     id: "psychic-4",
     category: "psychic",
-    name: "NIV 4 : PANIQUE (730h)",
+    name: "NIV 4 : PANIQUE (168h)",
     shortName: "PANIQUE",
-    duration: "730h",
+    duration: "168h",
     description: "",
     modifierAll: -8,
     modifierByKey: {}
@@ -2649,9 +2649,9 @@ const STATE_PRESETS = [
   {
     id: "psychic-5",
     category: "psychic",
-    name: "NIV 5 : DELIRES (8760h)",
+    name: "NIV 5 : DELIRES (720h)",
     shortName: "DELIRES",
-    duration: "8760h",
+    duration: "720h",
     description: "",
     modifierAll: -10,
     modifierByKey: {}
@@ -2979,6 +2979,31 @@ let TOKEN_HUD_LAST_ICON_SYNC_AT = 0;
 let TOKEN_HUD_ICON_CACHE_BUSTER = Date.now();
 let TOKEN_HUD_DOM_OBSERVER = null;
 let TOKEN_HUD_DOM_SYNC_FRAME = null;
+
+const chaosDicePanelController = createChaosDicePanelController({
+  systemId: SYSTEM_ID,
+  systemSocket: SYSTEM_SOCKET,
+  chaosDiceValueSetting: CHAOS_DICE_VALUE_SETTING,
+  chaosDicePanelPositionSetting: CHAOS_DICE_PANEL_POSITION_SETTING,
+  chaosRequestChatMarkup: CHAOS_REQUEST_CHAT_MARKUP,
+  isChatTransportFallbackEnabled: ENABLE_CHAT_TRANSPORT_FALLBACK,
+  getActiveGMUserIds,
+  hasSocket,
+  socketEmit,
+  translate: tl,
+  escapeMarkup: escapeChatMarkup,
+  showVoyageXpGrantDialog: () => showSelectedVoyageXpGrantDialog(),
+  showFullPvRestoreConfirmDialog: () => showSelectedFullPvRestoreConfirmDialog(),
+  showFullPpRestoreConfirmDialog: () => showSelectedFullPpRestoreConfirmDialog()
+});
+const {
+  getChaosValue,
+  setChaosValue,
+  requestChaosDelta,
+  updateChaosDiceUI,
+  positionChaosDiceUI,
+  ensureChaosDiceUI
+} = chaosDicePanelController;
 
 function toFiniteNumber(value, fallback = 0) {
   return ruleToFiniteNumber(value, fallback);
@@ -5639,185 +5664,6 @@ Hooks.once("ready", async () => {
   ensureChaosDiceUI();
 });
 
-function clampChaosValue(value) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function getChaosValue() {
-  return clampChaosValue(Number(game.settings.get(SYSTEM_ID, CHAOS_DICE_VALUE_SETTING)));
-}
-
-async function setChaosValue(nextValue) {
-  if (!game.user.isGM) return;
-  const clamped = clampChaosValue(nextValue);
-  await game.settings.set(SYSTEM_ID, CHAOS_DICE_VALUE_SETTING, clamped);
-  updateChaosDiceUI(clamped);
-}
-
-async function requestChaosDelta(delta) {
-  const numeric = Number(delta);
-  if (!Number.isFinite(numeric) || numeric === 0) return;
-  if (game.user.isGM) {
-    await setChaosValue(getChaosValue() + numeric);
-    return;
-  }
-  const requestId = foundry.utils?.randomID ? foundry.utils.randomID() : Math.random().toString(36).slice(2);
-  if (hasSocket()) socketEmit(SYSTEM_SOCKET, { type: "adjustChaosDice", delta: numeric, requestId });
-  const gmIds = getActiveGMUserIds();
-  if (!ENABLE_CHAT_TRANSPORT_FALLBACK || !gmIds.length) return;
-  await ChatMessage.create({
-    content: CHAOS_REQUEST_CHAT_MARKUP,
-    whisper: gmIds,
-    flags: { bloodman: { chaosDeltaRequest: { requestId, delta: numeric } } }
-  }).catch(() => null);
-}
-
-function updateChaosDiceUI(value) {
-  const root = document.getElementById("bm-chaos-dice");
-  if (!root) return;
-  const chaosValue = clampChaosValue(value);
-  const display = root.querySelector(".bm-chaos-value");
-  if (display) display.textContent = String(chaosValue);
-  root.classList.toggle("is-active", chaosValue > 0);
-}
-
-function getVisibleRect(element) {
-  if (!element) return null;
-  const rect = element.getBoundingClientRect();
-  if (!rect || rect.width === 0 || rect.height === 0) return null;
-  return rect;
-}
-
-function clampChaosDicePanelPosition(position, root) {
-  const rect = root?.getBoundingClientRect?.();
-  const width = Math.max(1, Number(rect?.width) || 150);
-  const height = Math.max(1, Number(rect?.height) || 106);
-  const margin = 8;
-  const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || width + margin * 2;
-  const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || height + margin * 2;
-  const maxLeft = Math.max(margin, viewportWidth - width - margin);
-  const maxTop = Math.max(margin, viewportHeight - height - margin);
-  return {
-    left: Math.round(Math.max(margin, Math.min(maxLeft, Number(position?.left) || 0))),
-    top: Math.round(Math.max(margin, Math.min(maxTop, Number(position?.top) || 0)))
-  };
-}
-
-function getDefaultChaosDicePanelPosition(root) {
-  const rect = root?.getBoundingClientRect?.();
-  const width = Math.max(1, Number(rect?.width) || 150);
-  const height = Math.max(1, Number(rect?.height) || 106);
-  const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 720;
-  const macroStripRect = getVisibleRect(
-    document.querySelector("#hotbar #macro-list")
-    || document.querySelector("#hotbar ol#macro-list")
-    || document.querySelector("#hotbar #action-bar")
-    || document.querySelector("#hotbar ol#action-bar")
-    || document.querySelector("#hotbar .macro-list")
-    || document.querySelector("#hotbar .action-bar")
-  );
-  const hotbarRect = getVisibleRect(document.getElementById("hotbar"));
-  const anchorRect = macroStripRect || hotbarRect || null;
-  const oldPanelGap = 72;
-  const left = anchorRect ? anchorRect.left - oldPanelGap - width : 18;
-  const top = viewportHeight - height - 30;
-  return clampChaosDicePanelPosition({ left, top }, root);
-}
-
-function getSavedChaosDicePanelPosition(root) {
-  const saved = game.settings?.get?.(SYSTEM_ID, CHAOS_DICE_PANEL_POSITION_SETTING) || {};
-  const left = Number(saved.left);
-  const top = Number(saved.top);
-  if (Number.isFinite(left) && Number.isFinite(top)) return clampChaosDicePanelPosition({ left, top }, root);
-  return getDefaultChaosDicePanelPosition(root);
-}
-
-function applyChaosDicePanelPosition(root, position) {
-  const next = clampChaosDicePanelPosition(position, root);
-  root.style.left = `${next.left}px`;
-  root.style.top = `${next.top}px`;
-  root.style.right = "auto";
-  root.style.bottom = "auto";
-  root.style.transform = "none";
-  return next;
-}
-
-function positionChaosDiceUI(position = null) {
-  const root = document.getElementById("bm-chaos-dice");
-  if (!root) return;
-  // Keep the widget at document level so fixed coordinates stay viewport-based.
-  if (root.parentElement !== document.body) {
-    document.body.appendChild(root);
-  }
-  return applyChaosDicePanelPosition(root, position || getSavedChaosDicePanelPosition(root));
-}
-
-function installChaosDicePanelDrag(root) {
-  if (!root || root.dataset.bmChaosDragInstalled === "true") return;
-  root.dataset.bmChaosDragInstalled = "true";
-
-  let dragState = null;
-  const savePosition = async position => {
-    await game.settings.set(SYSTEM_ID, CHAOS_DICE_PANEL_POSITION_SETTING, {
-      top: Math.round(position.top),
-      left: Math.round(position.left)
-    });
-  };
-
-  const onPointerMove = event => {
-    if (!dragState) return;
-    event.preventDefault();
-    root.classList.add("is-dragging");
-    const next = applyChaosDicePanelPosition(root, {
-      left: dragState.left + event.clientX - dragState.x,
-      top: dragState.top + event.clientY - dragState.y
-    });
-    dragState.lastPosition = next;
-    dragState.moved = true;
-  };
-
-  const onPointerUp = event => {
-    if (!dragState) return;
-    event.preventDefault();
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    root.classList.remove("is-dragging");
-    const lastPosition = dragState.lastPosition || positionChaosDiceUI();
-    const moved = dragState.moved;
-    dragState = null;
-    if (moved && lastPosition) void savePosition(lastPosition);
-  };
-
-  const onPointerDown = event => {
-    if (event.button !== 0) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest?.("button, input, select, textarea")) return;
-    event.preventDefault();
-    const rect = root.getBoundingClientRect();
-    dragState = {
-      left: rect.left,
-      top: rect.top,
-      x: event.clientX,
-      y: event.clientY,
-      moved: false,
-      lastPosition: { left: rect.left, top: rect.top }
-    };
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  };
-
-  root.addEventListener("pointerdown", onPointerDown);
-  window.__bmChaosDiceDrag = {
-    dispose: () => {
-      root.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      root.dataset.bmChaosDragInstalled = "";
-    }
-  };
-}
-
 function showSelectedVoyageXpGrantDialog() {
   if (!game.user?.isGM) return;
   if (typeof getDialogClass() !== "function" && typeof getDialogV2Class() !== "function") return;
@@ -5972,92 +5818,6 @@ function showSelectedFullPvRestoreConfirmDialog() {
     }
   );
   if (dialog?.render) dialog.render(true);
-}
-
-function ensureChaosDiceUI() {
-  if (!game.user.isGM) return;
-  if (document.getElementById("bm-chaos-dice")) return;
-  const target = document.body;
-  if (!target) return;
-
-  const container = document.createElement("div");
-  container.id = "bm-chaos-dice";
-  container.className = "bm-chaos-dice";
-  container.title = tl("BLOODMAN.Settings.ChaosDiceName", "Des du chaos");
-  const xpAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage"));
-  const fullPvAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV"));
-  const fullPpAriaLabel = escapeChatMarkup(tl("BLOODMAN.Dialogs.FullPPRestore.Title", "Restauration PP"));
-  const plusAriaLabel = escapeChatMarkup("Augmenter les des du chaos");
-  const minusAriaLabel = escapeChatMarkup("Diminuer les des du chaos");
-  const panelTitle = "Bloodman";
-  container.innerHTML = `
-    <div class="bm-chaos-panel-header" title="${panelTitle}">
-      <span>${panelTitle}</span>
-    </div>
-    <div class="bm-chaos-panel-body">
-      <button type="button" class="bm-chaos-xp-btn" aria-label="${xpAriaLabel}">XP</button>
-      <div class="bm-chaos-row">
-        <button type="button" class="bm-chaos-btn bm-chaos-plus" aria-label="${plusAriaLabel}">+</button>
-        <div class="bm-chaos-icon" aria-hidden="true">
-          <img src="${CHAOS_DICE_ICON_SRC}" data-fallback-src="${CHAOS_DICE_ICON_FALLBACK_SRC}" alt="" />
-          <span class="bm-chaos-value">0</span>
-        </div>
-        <button type="button" class="bm-chaos-btn bm-chaos-minus" aria-label="${minusAriaLabel}">-</button>
-      </div>
-      <div class="bm-chaos-full-row">
-        <button type="button" class="bm-chaos-full-pv-btn" aria-label="${fullPvAriaLabel}">FULL PV</button>
-        <button type="button" class="bm-chaos-full-pp-btn" aria-label="${fullPpAriaLabel}">FULL PP</button>
-      </div>
-    </div>
-  `;
-
-  target.appendChild(container);
-
-  const xp = container.querySelector(".bm-chaos-xp-btn");
-  const fullPv = container.querySelector(".bm-chaos-full-pv-btn");
-  const fullPp = container.querySelector(".bm-chaos-full-pp-btn");
-  const minus = container.querySelector(".bm-chaos-minus");
-  const plus = container.querySelector(".bm-chaos-plus");
-  const chaosIconImage = container.querySelector(".bm-chaos-icon img");
-
-  chaosIconImage?.addEventListener("error", () => {
-    if (chaosIconImage.dataset.fallbackApplied === "true") return;
-    const fallbackSrc = String(chaosIconImage.dataset.fallbackSrc || "").trim();
-    if (!fallbackSrc) return;
-    chaosIconImage.dataset.fallbackApplied = "true";
-    chaosIconImage.src = fallbackSrc;
-  });
-
-  minus?.addEventListener("click", async () => {
-    const current = getChaosValue();
-    await setChaosValue(current - 1);
-  });
-
-  plus?.addEventListener("click", async () => {
-    const current = getChaosValue();
-    await setChaosValue(current + 1);
-  });
-
-  xp?.addEventListener("click", () => {
-    showSelectedVoyageXpGrantDialog();
-  });
-
-  fullPv?.addEventListener("click", () => {
-    showSelectedFullPvRestoreConfirmDialog();
-  });
-
-  fullPp?.addEventListener("click", () => {
-    showSelectedFullPpRestoreConfirmDialog();
-  });
-
-  updateChaosDiceUI(getChaosValue());
-  positionChaosDiceUI();
-  installChaosDicePanelDrag(container);
-
-  if (!window.__bmChaosDiceResizeHandler) {
-    window.__bmChaosDiceResizeHandler = () => positionChaosDiceUI();
-    window.addEventListener("resize", window.__bmChaosDiceResizeHandler);
-  }
 }
 
 async function applyVoyageXPCostOnCreate(actor, item, options = null) {
@@ -6771,19 +6531,11 @@ const tokenCombatHooks = buildTokenCombatHooks({
   syncNpcDeadStatusToZeroPvForToken
 });
 
-Hooks.on("preCreateToken", tokenCombatHooks.onPreCreateToken);
-Hooks.on("drawToken", tokenCombatHooks.onDrawToken);
-Hooks.on("refreshToken", tokenCombatHooks.onRefreshToken);
-Hooks.on("createToken", tokenCombatHooks.onCreateToken);
-Hooks.on("deleteToken", tokenCombatHooks.onDeleteToken);
-Hooks.on("createToken", clearResolvedActorDocumentCaches);
-Hooks.on("updateToken", clearResolvedActorDocumentCaches);
-Hooks.on("deleteToken", clearResolvedActorDocumentCaches);
-Hooks.on("preCreateCombatant", tokenCombatHooks.onPreCreateCombatant);
-Hooks.on("updateCombat", tokenCombatHooks.onUpdateCombat);
-Hooks.on("combatTurnChange", tokenCombatHooks.onCombatTurnChange);
-Hooks.on("combatStart", tokenCombatHooks.onCombatStart);
-Hooks.on("deleteCombat", tokenCombatHooks.onDeleteCombat);
+registerTokenCombatHooks({
+  tokenCombatHooks,
+  clearResolvedActorDocumentCaches,
+  syncNpcDeadStatusToZeroPvFromActiveEffect
+});
 
 const actorPreUpdateHooks = buildActorPreUpdateHooks({
   toFiniteNumber,
@@ -6851,15 +6603,6 @@ Hooks.on("deleteActor", clearResolvedActorDocumentCaches);
 Hooks.on("createScene", clearResolvedActorDocumentCaches);
 Hooks.on("updateScene", clearResolvedActorDocumentCaches);
 Hooks.on("deleteScene", clearResolvedActorDocumentCaches);
-
-Hooks.on("preUpdateToken", tokenCombatHooks.onPreUpdateToken);
-Hooks.on("updateToken", tokenCombatHooks.onUpdateToken);
-Hooks.on("createActiveEffect", async effectDoc => {
-  await syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc);
-});
-Hooks.on("updateActiveEffect", async effectDoc => {
-  await syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc);
-});
 
 class BloodmanActorSheet extends BaseActorSheet {
   constructor(object, options = {}) {

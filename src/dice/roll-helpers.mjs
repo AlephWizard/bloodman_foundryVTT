@@ -16,10 +16,6 @@ import {
   updateDocument
 } from "../compat/index.mjs";
 import {
-  normalizeOptionalRollFormula,
-  validateRollFormula
-} from "../rules/roll-formula.mjs";
-import {
   buildDamageSplitDialogContent,
   computeDamageSplitAllocatedTotal,
   normalizeDamageSplitAllocations,
@@ -29,6 +25,24 @@ import {
   buildDamageRollFlavorMarkup,
   buildGmDamageSummaryMarkup
 } from "../ui/damage-chat.mjs";
+import {
+  getWeaponCategory,
+  normalizeWeaponType
+} from "./weapon-category.mjs";
+import {
+  createCustomDamageOption,
+  DAMAGE_CONFIG_OPTIONS,
+  getDamageOptionByFormula,
+  getDefaultDamageOption,
+  normalizeDamageFormula,
+  validateDamageFormula
+} from "./damage-config-options.mjs";
+import {
+  getRememberedDamageDialogConfig,
+  rememberDamageDialogConfig
+} from "./damage-dialog-memory.mjs";
+
+export { getWeaponCategory, normalizeWeaponType } from "./weapon-category.mjs";
 // Helpers pour centraliser les jets (caractéristiques et dégâts)
 
 const BONUS_KEYS = new Set(["MEL", "VIS", "ESP", "PHY", "MOU", "ADR", "PER", "SOC", "SAV"]);
@@ -39,23 +53,8 @@ const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const DAMAGE_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-request</span>";
 const DAMAGE_CONFIG_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-config-popup</span>";
 const DAMAGE_SPLIT_POPUP_CHAT_MARKUP = "<span style='display:none'>bloodman-damage-split-popup</span>";
-const DAMAGE_DIALOG_CONFIG_USER_FLAG = "damageDialogConfig";
 const DAMAGE_CONFIG_POPUP_SOCKET_TYPE = "damageConfigPopup";
 const DAMAGE_SPLIT_POPUP_SOCKET_TYPE = "damageSplitPopup";
-const DAMAGE_CONFIG_OPTIONS = [
-  { label: "1D4", formula: "1d4" },
-  { label: "1D6", formula: "1d6" },
-  { label: "1D8", formula: "1d8" },
-  { label: "2D4", formula: "2d4" },
-  { label: "1D10", formula: "1d10" },
-  { label: "1D12", formula: "1d12" },
-  { label: "2D6", formula: "2d6" },
-  { label: "1D10+1D4", formula: "1d10+1d4" },
-  { label: "2D8", formula: "2d8" },
-  { label: "1D10+1D8", formula: "1d10+1d8" },
-  { label: "2D10", formula: "2d10" },
-  { label: "2D12", formula: "2d12" }
-];
 const CHAT_ROLL_TYPES = Object.freeze({
   CHARACTERISTIC: "characteristic",
   DAMAGE: "damage",
@@ -201,21 +200,6 @@ function getLinkedParentItemId(item, actorLike = null) {
 
 function isActorItemLinkedChild(item, actorLike = null) {
   return Boolean(getLinkedParentItemId(item, actorLike));
-}
-
-export function normalizeWeaponType(value) {
-  const raw = (value ?? "").toString().toLowerCase();
-  if (!raw) return "";
-  if (raw === "distance" || raw.includes("distance")) return "distance";
-  if (raw === "corps" || raw.includes("corps") || raw.includes("blanche") || raw.includes("mêlée") || raw.includes("melee")) return "corps";
-  if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return "distance";
-  return (value ?? "").toString().trim();
-}
-
-export function getWeaponCategory(value) {
-  const normalized = normalizeWeaponType(value);
-  if (normalized === "corps") return "corps";
-  return "distance";
 }
 
 function getItemBonus(actor, key) {
@@ -623,61 +607,6 @@ async function setChaosValue(nextValue) {
   if (!isCurrentUserPrimaryPrivilegedOperator()) return;
   const clamped = Math.max(0, Math.floor(Number(nextValue) || 0));
   await game.settings.set(SYSTEM_ID, "chaosDice", clamped);
-}
-
-function normalizeDamageFormula(formula) {
-  return normalizeOptionalRollFormula(formula);
-}
-
-function getDamageOptionByFormula(formula) {
-  const normalized = normalizeDamageFormula(formula);
-  if (!normalized) return null;
-  return DAMAGE_CONFIG_OPTIONS.find(option => option.formula === normalized) || null;
-}
-
-function createCustomDamageOption(formula, fallbackFormula = "1d4") {
-  const normalized = normalizeDamageFormula(formula) || normalizeDamageFormula(fallbackFormula) || "1d4";
-  return {
-    label: normalized.toUpperCase(),
-    formula: normalized
-  };
-}
-
-function validateDamageFormula(formula) {
-  return validateRollFormula(formula, "d4", { useFallbackOnEmpty: false });
-}
-
-function getDefaultDamageOption(formula) {
-  return getDamageOptionByFormula(formula) || DAMAGE_CONFIG_OPTIONS[0];
-}
-
-function getRememberedDamageDialogConfig() {
-  const raw = game.user?.getFlag?.(SYSTEM_ID, DAMAGE_DIALOG_CONFIG_USER_FLAG);
-  if (!raw || typeof raw !== "object") return null;
-  const normalizedFormula = normalizeDamageFormula(raw.formula);
-  const option = getDamageOptionByFormula(normalizedFormula);
-  return {
-    formula: option?.formula || normalizedFormula || "",
-    bonusBrut: toNonNegativeInt(raw.bonusBrut, 0),
-    penetration: toNonNegativeInt(raw.penetration, 0)
-  };
-}
-
-async function rememberDamageDialogConfig(config = {}) {
-  if (!game.user?.setFlag) return;
-  const normalizedFormula = normalizeDamageFormula(config.formula);
-  const option = getDamageOptionByFormula(normalizedFormula);
-  const payload = {
-    formula: option?.formula || normalizedFormula || "",
-    bonusBrut: toNonNegativeInt(config.bonusBrut, 0),
-    penetration: toNonNegativeInt(config.penetration, 0),
-    updatedAt: Date.now()
-  };
-  try {
-    await game.user.setFlag(SYSTEM_ID, DAMAGE_DIALOG_CONFIG_USER_FLAG, payload);
-  } catch (error) {
-    bmLog.warn("damage:remember config failed", { error });
-  }
 }
 
 function getRollValues(roll) {
