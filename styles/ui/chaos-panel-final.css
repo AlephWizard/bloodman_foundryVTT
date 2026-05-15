@@ -1,4 +1,4 @@
-﻿#bm-chaos-dice {
+#bm-chaos-dice {
   min-width: 232px !important;
   width: 232px !important;
   padding: 12px 10px 10px !important;
@@ -132,36 +132,6 @@
   animation: none !important;
 }
 
-/* Final tweak: source inline + extra compact chaos panel. */
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source,
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source,
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source {
-  grid-template-columns: auto minmax(0, 1fr) !important;
-  align-items: center !important;
-  column-gap: 8px !important;
-  row-gap: 0 !important;
-}
-
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source > label,
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source > label,
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source > label {
-  margin: 0 !important;
-  white-space: nowrap !important;
-}
-
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source > input[disabled],
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source > input[disabled],
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-panel--source > input[disabled] {
-  min-height: 24px !important;
-  height: 24px !important;
-  padding: 0 6px !important;
-  border: 0 !important;
-  background: transparent !important;
-  color: #ffffff !important;
-  font-size: 14px !important;
-  font-weight: 800 !important;
-}
-
 #bm-chaos-dice {
   min-width: 124px !important;
   width: 124px !important;
@@ -210,15 +180,6 @@
 }
 
 /* Final polish: alignment lock + hover animations (visual only). */
-@keyframes bm-soft-pulse-red {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(214, 60, 60, 0);
-  }
-  50% {
-    box-shadow: 0 0 0 2px rgba(214, 60, 60, 0.55);
-  }
-}
-
 #bm-chaos-dice .bm-chaos-row {
   display: grid !important;
   grid-template-columns: 22px minmax(0, 1fr) 22px !important;
@@ -250,56 +211,6 @@
   justify-self: center !important;
 }
 
-.window-app.bloodman-damage-config-dialog .form-footer button[data-action="roll"],
-.window-app.dialog.bloodman-damage-config-dialog .form-footer button[data-action="roll"],
-.application.bloodman-damage-config-dialog .form-footer button[data-action="roll"] {
-  transition: transform 120ms ease, filter 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease !important;
-}
-
-.window-app.bloodman-damage-config-dialog .form-footer button[data-action="roll"]:hover,
-.window-app.dialog.bloodman-damage-config-dialog .form-footer button[data-action="roll"]:hover,
-.application.bloodman-damage-config-dialog .form-footer button[data-action="roll"]:hover,
-.window-app.bloodman-damage-config-dialog .form-footer button[data-action="roll"]:focus-visible,
-.window-app.dialog.bloodman-damage-config-dialog .form-footer button[data-action="roll"]:focus-visible,
-.application.bloodman-damage-config-dialog .form-footer button[data-action="roll"]:focus-visible {
-  background: #d63c3c !important;
-  color: #ffffff !important;
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 0 0 1px #ffffff !important;
-}
-
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn,
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn,
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn {
-  transition: transform 110ms ease, filter 110ms ease, background-color 110ms ease, color 110ms ease !important;
-}
-
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn:hover,
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn:hover,
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn:hover,
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn:focus-visible,
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn:focus-visible,
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stepper-btn:focus-visible {
-  background: #d63c3c !important;
-  color: #ffffff !important;
-  transform: scale(1.07);
-  filter: none !important;
-}
-
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"].bm-damage-config-value-active,
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"].bm-damage-config-value-active,
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat input[type="number"].bm-damage-config-value-active {
-  background: #d63c3c !important;
-  color: #ffffff !important;
-  animation: bm-soft-pulse-red 1.15s ease-in-out infinite;
-}
-
-.window-app.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat:has(input[type="number"].bm-damage-config-value-active),
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat:has(input[type="number"].bm-damage-config-value-active),
-.application.bloodman-damage-config-dialog .dialog-form .bm-damage-config-stat:has(input[type="number"].bm-damage-config-value-active) {
-  border-color: #d63c3c !important;
-}
-
 #bm-chaos-dice .bm-chaos-btn,
 #bm-chaos-dice .bm-chaos-xp-btn,
 #bm-chaos-dice .bm-chaos-full-pv-btn,
@@ -328,10 +239,3 @@
   box-shadow: 0 0 0 1px #d63c3c !important;
 }
 
-/* Damage formula visibility boost. */
-.window-app.bloodman-damage-config-dialog .dialog-form input[name="degats"],
-.window-app.dialog.bloodman-damage-config-dialog .dialog-form input[name="degats"],
-.application.bloodman-damage-config-dialog .dialog-form input[name="degats"] {
-  color: #d63c3c !important;
-  caret-color: #d63c3c !important;
-}

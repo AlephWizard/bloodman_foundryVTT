@@ -1,0 +1,1904 @@
+.bloodman-sheet,
+.bloodman-sheet * {
+  box-sizing: border-box;
+}
+
+.bloodman-sheet {
+  font-family: "Oswald", sans-serif;
+  color: var(--bm-ink);
+  padding: 0;
+  background: transparent;
+}
+
+.bloodman-sheet input,
+.bloodman-sheet textarea,
+.bloodman-sheet button {
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: var(--bm-white);
+}
+
+.bloodman-sheet textarea {
+  resize: vertical;
+}
+
+.bloodman-sheet textarea[data-autogrow="true"] {
+  resize: none;
+  overflow-y: hidden;
+}
+
+.bloodman-sheet .sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 2px solid var(--bm-line);
+  background: var(--bm-white);
+}
+
+.bloodman-sheet .sheet-title {
+  font-family: "Penumbra", "Oswald", sans-serif;
+  font-size: 32px;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.bloodman-sheet .sheet-tabs {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bloodman-sheet .sheet-tabs .item {
+  padding: 4px 8px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: var(--bm-white);
+  cursor: pointer;
+}
+
+.bloodman-sheet .sheet-tabs .item.active {
+  background: var(--bm-black);
+  color: var(--bm-white);
+}
+
+.bloodman-sheet .state-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.npc-role-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 0 10px;
+}
+
+.npc-role-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.bloodman-sheet .state-label {
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.bloodman-sheet .state-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bloodman-sheet .state-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  padding: 2px 4px;
+  background: var(--bm-white);
+}
+
+.state-field span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.state-field input {
+  width: 40px;
+  text-align: center;
+  border: none;
+}
+
+.state-name {
+  min-width: 150px;
+  flex: 1;
+}
+
+.state-name-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.state-name-row .state-name {
+  min-width: 150px;
+  flex: 1;
+}
+
+.state-name.is-invalid {
+  border-color: #b83228 !important;
+  box-shadow: 0 0 0 2px rgba(184, 50, 40, 0.2);
+}
+
+.state-preset-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.state-preset-menu[open] {
+  z-index: 25;
+}
+
+.state-preset-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: var(--bm-black);
+  color: var(--bm-white);
+  list-style: none;
+}
+
+.state-preset-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.state-preset-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: min(560px, 72vw);
+  max-height: 280px;
+  overflow: auto;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+.state-preset-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.state-preset-group-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid #bdbdbd;
+  padding-bottom: 2px;
+}
+
+.state-preset-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #000000;
+  border-radius: 8px;
+  background: #f6f6f6;
+  color: #111111;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.state-preset-item.is-selected {
+  background: #111111;
+  color: #ffffff;
+}
+
+.state-preset-name {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.state-preset-meta {
+  font-size: 10px;
+  opacity: 0.85;
+  line-height: 1.2;
+}
+
+.bloodman-sheet .sheet-body {
+  padding: 10px;
+  background: var(--bm-white);
+}
+
+.bloodman-sheet .tab {
+  display: none;
+  background: var(--bm-white);
+}
+
+.bloodman-sheet .tab.active {
+  display: block;
+}
+
+.bloodman-sheet .tab-grid {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 12px;
+  background: var(--bm-white);
+}
+
+.bloodman-sheet .sidebar {
+  background: transparent;
+  border-radius: 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+  box-shadow: none;
+}
+
+.portrait-frame {
+  width: 100%;
+  border-radius: 10px;
+  border: 2px solid var(--bm-line);
+  background: transparent;
+  display: flex;
+}
+
+.portrait {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+  background: transparent;
+  display: block;
+}
+
+.resource-badges {
+  margin-top: -8px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-self: center;
+}
+
+.resource-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border: 2px solid var(--bm-line);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  gap: 2px;
+}
+
+.resource-circle .value {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.resource-circle input {
+  width: 30px;
+  padding: 2px 4px;
+  text-align: center;
+  border: 1px solid var(--bm-line);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.resource-circle .label {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+}
+
+.resource-circle.pv {
+  background: #2a1113;
+  color: var(--bm-white);
+}
+
+.resource-circle.pp {
+  background: #241731;
+  color: var(--bm-white);
+}
+
+.resource-circle.voyage {
+  background: var(--bm-gray);
+  color: var(--bm-black);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  border: 2px solid var(--bm-line);
+  border-radius: 12px;
+  background: var(--bm-white);
+  padding: 6px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--bm-line);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.card-title {
+  font-family: "Oswald", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.6px;
+}
+
+.card-meta {
+  font-size: 12px;
+  opacity: 0.85;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.card-total input {
+  width: 56px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.characteristics-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.char-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 140px 110px;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--bm-line);
+  padding: 4px 0;
+}
+
+.char-row.move-row {
+  grid-template-columns: 24px 44px 1fr 140px 110px;
+}
+
+.npc-sheet .char-row {
+  grid-template-columns: 24px 1fr 140px;
+}
+
+.npc-sheet .char-row.move-row {
+  grid-template-columns: 24px 44px 1fr 140px;
+}
+
+.move-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+
+.char-icon {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--bm-line);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f2f2f2;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.char-name a {
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--bm-ink);
+}
+
+.char-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bloodman-sheet .char-reroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  min-height: 17px;
+  border-radius: 6px;
+  border: 1px solid #4d2284 !important;
+  background: var(--bm-purple) !important;
+  background-image: none !important;
+  color: var(--bm-white) !important;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bloodman-sheet .char-reroll:hover,
+.bloodman-sheet .char-reroll:focus-visible {
+  border-color: #3f1a6b !important;
+  background: #7d43cc !important;
+  background-image: none !important;
+  color: var(--bm-white) !important;
+}
+
+.bloodman-sheet .char-reroll-clear,
+.bloodman-sheet .item-reroll-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid #6f2dbd;
+  background: rgba(111, 45, 189, 0.12);
+  color: #4d2284;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.char-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.char-value input {
+  width: 56px;
+  text-align: center;
+}
+
+.char-effective {
+  font-weight: 700;
+  min-width: 32px;
+  text-align: right;
+}
+
+.char-modifier {
+  min-width: 34px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.char-modifier.negative {
+  color: #b24a2e;
+}
+
+.char-modifier.positive {
+  color: #2f7a38;
+}
+
+.move-box {
+  width: 38px;
+  text-align: center;
+  font-weight: 700;
+  background: #f2f2f2;
+}
+
+.move-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--bm-line);
+  background: #f2f2f2;
+  color: var(--bm-black);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.move-reset-btn i {
+  font-size: 10px;
+}
+
+.char-xp {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.xp-check {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.xp-check input {
+  appearance: auto;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.xp-check input:checked {
+  accent-color: var(--bm-black);
+}
+
+.bloodman-sheet button.xp-roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--bm-black);
+  color: var(--bm-white);
+  border: 1px solid var(--bm-line);
+  cursor: pointer;
+}
+
+.xp-text {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.card-title i {
+  margin-right: 6px;
+}
+
+.equip-block {
+  margin-top: 6px;
+}
+
+.card.equipment-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 14px 10px;
+}
+
+.equipment-card .card-header {
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.equipment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.equipment-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.equipment-column-primary {
+  padding-right: 10px;
+}
+
+.equipment-column-secondary {
+  border-left: 1px solid rgba(0, 0, 0, 0.4);
+  padding-left: 14px;
+}
+
+.equipment-card .equip-block {
+  margin-top: 0;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.equipment-card .equip-block-ammo {
+  gap: 3px;
+}
+
+.equipment-card .weapon-header-row,
+.equipment-card .ammo-row,
+.equipment-card .currency-row {
+  margin-top: 0;
+}
+
+.equipment-card .item-list {
+  margin: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.equipment-column-primary ol.item-list[data-carry-column="equipment"] {
+  min-height: 84px;
+}
+
+.equip-block-main-equipment .equip-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.equip-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.equip-subtitle i {
+  width: 12px;
+  text-align: center;
+}
+
+.equip-block-main-equipment .equipment-main-list {
+  max-height: 300px;
+  min-height: 300px;
+  padding-right: 2px;
+}
+
+.equipment-card .item {
+  border-bottom-color: transparent;
+}
+
+.weapon-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 8px;
+  margin-top: 4px;
+  align-items: center;
+}
+
+.weapon-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.equipment-card textarea.equip-autogrow-field[data-autogrow="true"] {
+  width: 100%;
+  min-height: 26px;
+  line-height: 1.25;
+}
+
+.equipment-card .equip-block > textarea.equip-autogrow-field,
+.weapon-header-row > textarea.equip-autogrow-field,
+.currency-row > textarea.equip-autogrow-field {
+  width: 100%;
+}
+
+.bloodman-sheet button.weapon-simple-attack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  min-width: 124px;
+  padding: 2px 10px;
+  border: 1px solid var(--bm-line);
+  border-radius: 7px;
+  background: var(--bm-black) !important;
+  color: var(--bm-white) !important;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.28px;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bloodman-sheet button.weapon-simple-attack:hover,
+.bloodman-sheet button.weapon-simple-attack:focus {
+  filter: brightness(1.08);
+}
+
+.equip-title {
+  background: var(--bm-black);
+  color: var(--bm-white);
+  padding: 3px 6px;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  border-radius: 6px;
+}
+
+.equip-title i {
+  margin-right: 6px;
+}
+
+.equip-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.equip-title-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.equip-subtitle {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--bm-black);
+}
+
+.currency-row {
+  display: grid;
+  grid-template-columns: 1fr auto 110px;
+  gap: 6px;
+  margin-top: 4px;
+  align-items: center;
+}
+
+.currency-current-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.currency-row input[type="number"] {
+  text-align: right;
+}
+
+.item-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  max-height: 140px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.item-list.item-list-two-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 14px;
+  max-height: 240px;
+  align-items: start;
+}
+
+.item-list.item-list-three-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px 10px;
+  max-height: 240px;
+  align-items: start;
+}
+
+.item-list.item-list-two-columns .item,
+.item-list.item-list-three-columns .item {
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  border-bottom: 1px solid #c7c7c7;
+  padding: 3px 2px;
+}
+
+.item.item--stacked {
+  position: relative;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 3px 8px;
+  align-items: start;
+  padding: 4px 2px 4px 18px;
+}
+
+.item--stacked .item-delete,
+.item--stacked .transport-npc-delete {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  line-height: 1;
+}
+
+.item--stacked .item-icon {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
+}
+
+.item--stacked .item-body {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.item--stacked .item-name {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.item--stacked .item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+
+.item--stacked .item-actions:empty {
+  display: none;
+  min-height: 0;
+}
+
+.item--stacked .item-notes {
+  margin: 0;
+  width: 100%;
+}
+
+.equiper-avec-block {
+  margin-top: 4px;
+  padding: 4px 5px;
+  border: 1px dashed #8a8a8a;
+  border-radius: 8px;
+  background: #f4f4f4;
+}
+
+.equiper-avec-block.is-drop-target {
+  border-color: #111111;
+  background: #ececec;
+}
+
+.equiper-avec-title {
+  margin: 0 0 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.equiper-avec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 24px;
+}
+
+.equiper-avec-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  gap: 2px 6px;
+  padding: 2px 2px 2px 17px;
+  border: 1px solid #d2d2d2;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.equiper-avec-item:hover {
+  border-color: #b5b5b5;
+}
+
+.equiper-avec-remove {
+  appearance: none !important;
+  position: absolute;
+  top: 3px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: #111111 !important;
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: none;
+}
+
+.equiper-avec-remove:hover,
+.equiper-avec-remove:focus-visible {
+  color: #8b0000 !important;
+}
+
+.equiper-avec-meta .equiper-avec-power-use,
+.equiper-avec-meta .equiper-avec-aptitude-use,
+.equiper-avec-meta .equiper-avec-weapon-reload,
+.equiper-avec-meta .equiper-avec-item-use,
+.equiper-avec-meta .equiper-avec-ability-roll,
+.equiper-avec-meta .equiper-avec-item-reroll,
+.equiper-avec-meta .equiper-avec-item-reroll-clear {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  min-height: 14px !important;
+  min-width: 14px;
+  padding: 1px 4px !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+.equiper-avec-icon {
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--bm-line);
+  border-radius: 5px;
+  object-fit: cover;
+}
+
+.equiper-avec-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.equiper-avec-name {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.equiper-avec-item-open {
+  cursor: pointer;
+}
+
+.equiper-avec-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+.equiper-avec-meta .item-chip {
+  min-height: 14px;
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+.equiper-avec-meta .equiper-avec-item-reroll {
+  gap: 3px;
+  border: 1px solid #4d2284 !important;
+  border-radius: 6px;
+  background: var(--bm-purple) !important;
+  color: var(--bm-white) !important;
+  text-transform: uppercase;
+}
+
+.equiper-avec-meta .equiper-avec-item-reroll:hover,
+.equiper-avec-meta .equiper-avec-item-reroll:focus-visible {
+  border-color: #3f1a6b !important;
+  background: #7d43cc !important;
+  color: var(--bm-white) !important;
+}
+
+.equiper-avec-meta .equiper-avec-item-reroll-clear {
+  padding: 1px 3px !important;
+  border: 1px solid var(--bm-line) !important;
+  border-radius: 6px !important;
+  background: #f5f5f5 !important;
+  color: #1a1a1a !important;
+  font-weight: 700;
+}
+
+.equiper-avec-note {
+  font-size: 10px;
+  line-height: 1.2;
+  opacity: 0.75;
+}
+
+.item-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: #f1f1f1;
+  color: #1a1a1a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.item--stacked .item-actions .item-use,
+.item--stacked .item-actions .ability-show-gm,
+.item--stacked .item-actions .power-use,
+.item--stacked .item-actions .weapon-reload,
+.item--stacked .item-actions .weapon-ammo,
+.item--stacked .item-actions .weapon-roll,
+.item--stacked .item-actions .ability-roll,
+.item--stacked .item-actions .item-reroll,
+.item--stacked .item-actions .item-reroll-clear {
+  min-height: 18px;
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.item--stacked .item-actions .item-reroll-clear {
+  min-width: 18px;
+  justify-content: center;
+}
+
+.aptitudes-card .item-list.item-list-three-columns,
+.powers-card .item-list.item-list-three-columns {
+  align-items: start;
+}
+
+.aptitudes-card .item,
+.powers-card .item {
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+.item-icon {
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--bm-white);
+}
+
+.item[draggable="true"] {
+  cursor: grab;
+}
+
+.item.is-reorder-dragging {
+  opacity: 0.45;
+}
+
+.item-list.is-reorder-target {
+  outline: 2px dashed #000000;
+  outline-offset: 2px;
+}
+
+.item.is-reorder-drop-before {
+  box-shadow: inset 0 3px 0 #000000;
+}
+
+.item.is-reorder-drop-after {
+  box-shadow: inset 0 -3px 0 #000000;
+}
+
+.item-name {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.item-meta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.item-mark {
+  font-weight: 700;
+}
+
+.item-notes {
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.3;
+  opacity: 0.7;
+}
+
+.weapon-roll,
+.ability-roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 1px 7px;
+  border: 1px solid #000000;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #ffffff 0%, #ececec 100%);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+  color: #111111;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  user-select: none;
+  cursor: pointer;
+}
+
+.weapon-roll:hover,
+.ability-roll:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #e3e3e3 100%);
+}
+
+.weapon-ammo {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 1px 6px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: #f2f2f2;
+}
+
+.item-delete {
+  cursor: pointer;
+}
+
+.transport-npc-open {
+  cursor: pointer;
+}
+
+.transport-npc-delete {
+  margin-left: 0;
+  cursor: pointer;
+}
+
+.item-use,
+.ability-show-gm,
+.power-use,
+.weapon-reload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: var(--bm-black);
+  color: var(--bm-white);
+  text-transform: uppercase;
+  font-size: 10px;
+  line-height: 1;
+  min-height: 18px;
+  padding: 1px 5px;
+}
+
+.ability-show-gm,
+.power-use {
+  padding: 1px 5px;
+  min-height: 18px;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: #111111 !important;
+  color: #ffffff !important;
+  border-color: var(--bm-line) !important;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.weapon-reload {
+  padding: 0 4px;
+  min-height: 16px;
+  font-size: 9px;
+  line-height: 1;
+  text-transform: uppercase;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  background: #111111 !important;
+  color: #ffffff !important;
+  border-color: var(--bm-line) !important;
+  font-family: inherit;
+  font-weight: 700;
+}
+
+.weapon-reload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.weapon-reload.is-blocked {
+  background: #f2f2f2;
+  color: #333333;
+}
+
+.bloodman-sheet .bm-btn-damage {
+  background: linear-gradient(180deg, #d45151 0%, #af2222 100%) !important;
+  border-color: #741616 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-heal {
+  background: linear-gradient(180deg, #4ab774 0%, #1f8a44 100%) !important;
+  border-color: #1d6a36 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-magic {
+  background: linear-gradient(180deg, #4f8fe5 0%, #2364c7 100%) !important;
+  border-color: #1f4f99 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .item-chip.bm-btn-armor,
+.bloodman-sheet .bm-btn-armor {
+  background: linear-gradient(180deg, #d9dee4 0%, #afb7c0 100%) !important;
+  border-color: #7c8793 !important;
+  color: #1a1f24 !important;
+}
+
+.bloodman-sheet .item-chip.bm-btn-pa,
+.bloodman-sheet .bm-btn-pa {
+  background: linear-gradient(180deg, #f0b25b 0%, #d37a0f 100%) !important;
+  border-color: #9b5608 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .item-chip.bm-btn-usage-count,
+.bloodman-sheet .bm-btn-usage-count {
+  min-height: 16px !important;
+  padding: 1px 5px !important;
+  border: 1px solid var(--bm-line) !important;
+  border-radius: 6px !important;
+  background: #f2f2f2 !important;
+  color: #111111 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px !important;
+  line-height: 1 !important;
+}
+
+.bloodman-sheet button.bm-btn-damage:hover,
+.bloodman-sheet button.bm-btn-heal:hover,
+.bloodman-sheet button.bm-btn-magic:hover,
+.bloodman-sheet button.bm-btn-pa:hover,
+.bloodman-sheet .weapon-roll.bm-btn-damage:hover,
+.bloodman-sheet .ability-roll.bm-btn-damage:hover {
+  filter: brightness(1.08);
+}
+
+.bloodman-sheet .item-reroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  min-height: 17px;
+  border: 1px solid #4d2284 !important;
+  border-radius: 6px;
+  background: var(--bm-purple) !important;
+  background-image: none !important;
+  color: var(--bm-white) !important;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  width: auto !important;
+  max-width: max-content;
+  flex: 0 0 auto;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bloodman-sheet .item-reroll:hover,
+.bloodman-sheet .item-reroll:focus-visible {
+  border-color: #3f1a6b !important;
+  background: #7d43cc !important;
+  background-image: none !important;
+  color: var(--bm-white) !important;
+}
+
+.item-reroll-clear {
+  flex: 0 0 auto;
+}
+
+.ammo-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 52px;
+  column-gap: 4px;
+  row-gap: 2px;
+  margin-top: 0;
+  align-items: center;
+  min-width: 0;
+  width: min(100%, 330px);
+  max-width: 100%;
+}
+
+.ammo-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ammo-line {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ammo-line-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.equip-title .ammo-line-toolbar {
+  gap: 3px;
+}
+
+.equip-block-ammo .equip-title {
+  height: 20px;
+  min-height: 20px;
+  max-height: 20px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  line-height: 14px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.equip-block-ammo .equip-title-label {
+  min-width: 0;
+  line-height: 14px;
+}
+
+.equip-block-ammo .ammo-line-toolbar {
+  flex: 0 0 auto;
+  height: 12px;
+}
+
+.ammo-line-toolbar-button {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 232, 223, 0.95));
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.equip-title .ammo-line-toolbar-button {
+  min-width: 12px;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 10px;
+}
+
+.ammo-line-toolbar-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ammo-line-select {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid #1b1b1b;
+  border-radius: 999px;
+  background: #f5f2ea;
+  box-shadow: none;
+}
+
+.ammo-line-select.is-active {
+  background: #111;
+}
+
+.ammo-line-select:disabled {
+  opacity: 0.55;
+}
+
+.ammo-inline-label {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 16px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding-right: 2px;
+}
+
+.ammo-row input,
+.ammo-row textarea {
+  min-width: 0;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.equipment-card .ammo-row textarea.equip-autogrow-field[data-autogrow="true"],
+.equipment-card .ammo-row input {
+  min-height: 20px;
+  height: 20px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  line-height: 1.1;
+}
+
+.equipment-card .ammo-row textarea.equip-autogrow-field[data-autogrow="true"] {
+  resize: none;
+  overflow: hidden;
+}
+
+.ammo-line-empty {
+  margin: 0 0 0 22px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1.05;
+  color: #7d1616;
+}
+
+.npc-quick-notes-block {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.npc-quick-notes-block > label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.npc-quick-notes {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.35;
+}
+
+.npc-quick-notes[data-autogrow="true"] {
+  max-height: 360px;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+
+.identity-hero {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.identity-hero-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.identity-header-inline {
+  margin-bottom: 0;
+  padding-top: 6px;
+}
+
+.identity-token-preview {
+  width: 94px;
+  height: 94px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 2px solid #111111;
+  background: linear-gradient(180deg, #f1f1f1 0%, #dddddd 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.identity-token-preview.is-empty {
+  opacity: 0.55;
+}
+
+.identity-token-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.identity-hero .field.field-inline.name-inline {
+  margin-bottom: 0;
+}
+
+.identity-grid > .field {
+  margin-bottom: 0;
+}
+
+.identity-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 0;
+}
+
+.identity-grid .field.field-inline {
+  display: grid;
+  grid-template-columns: 106px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 0;
+}
+
+.identity-grid .field.field-inline.name-inline {
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 5px;
+}
+
+.identity-grid .field.field-inline.name-inline > label {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.identity-grid .field.field-inline label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.identity-grid .field-row {
+  display: grid;
+  gap: 6px;
+}
+
+.identity-main-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.identity-stats-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field.wide {
+  grid-column: span 2;
+}
+
+.field.full {
+  width: 100%;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.identity-grid .origin-field input,
+.identity-grid .origin-field textarea {
+  min-height: 26px;
+  line-height: 1.35;
+}
+
+.identity-grid .field > label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.identity-grid input[type="text"],
+.identity-grid input[type="number"],
+.identity-grid select,
+.identity-grid textarea {
+  border: 1.5px solid #111111;
+  border-radius: 11px;
+  background: #f5f5f5;
+  min-height: 30px;
+  padding: 3px 9px;
+}
+
+.identity-grid .origin-field textarea {
+  min-height: 30px;
+}
+
+.identity-grid .archetype-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px 92px;
+  gap: 6px;
+  align-items: center;
+}
+
+.identity-grid .archetype-row .archetype-text {
+  min-width: 0;
+}
+
+.identity-grid .archetype-row .archetype-bonus-value {
+  text-align: center;
+}
+
+.identity-grid .archetype-row .archetype-bonus-key {
+  width: 100%;
+}
+
+.identity-grid textarea[name="system.profile.historique"] {
+  min-height: 124px;
+}
+
+.identity-main-row > .field input[type="text"],
+.identity-main-row > .field input[type="number"],
+.identity-main-row > .field select {
+  min-height: 30px;
+}
+
+.notes-card textarea,
+.aptitudes-card textarea,
+.powers-card textarea {
+  width: 100%;
+  font-size: 15px;
+}
+
+.notes-card textarea {
+  min-height: 90px;
+}
+
+.origin-field textarea[data-autogrow="true"] {
+  max-height: 150px;
+}
+
+.identity-grid textarea[name="system.profile.historique"][data-autogrow="true"] {
+  max-height: 900px;
+}
+
+.notes-card textarea[name="system.profile.notes"][data-autogrow="true"] {
+  max-height: 420px;
+}
+
+.aptitudes-card textarea,
+.powers-card textarea {
+  min-height: 70px;
+}
+
+.tab[data-tab="pouvoirs"] .abilities-powers-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  align-items: start;
+}
+
+.tab[data-tab="pouvoirs"] .abilities-powers-layout > .card {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 4px 12px 2px;
+}
+
+.tab[data-tab="pouvoirs"] .abilities-powers-layout > .aptitudes-card {
+  padding-left: 0;
+  padding-right: 14px;
+}
+
+.tab[data-tab="pouvoirs"] .abilities-powers-layout > .powers-card {
+  border-left: 1px solid rgba(0, 0, 0, 0.45);
+  padding-left: 14px;
+  padding-right: 0;
+}
+
+.tab[data-tab="pouvoirs"] .abilities-powers-layout .card-header {
+  border-bottom-width: 1px;
+  margin-bottom: 8px;
+}
+
+.tab[data-tab="pouvoirs"] .aptitudes-card .item-list,
+.tab[data-tab="pouvoirs"] .powers-card .item-list {
+  margin-top: 2px;
+  min-height: 72px;
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns,
+.tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns {
+  display: block;
+  column-count: 2;
+  column-gap: 14px;
+  column-fill: balance;
+}
+
+.tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns > .item,
+.tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns > .item {
+  width: 100%;
+  margin-bottom: 4px;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+@media (max-width: 980px) {
+  .tab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .identity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .identity-hero {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .identity-main-row,
+  .identity-stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .identity-grid .field.field-inline {
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+  }
+
+  .identity-grid .archetype-row {
+    grid-template-columns: minmax(0, 1fr) 72px 130px;
+  }
+
+  .equipment-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .equipment-column-primary {
+    padding-right: 0;
+  }
+
+  .equipment-column-secondary {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .tab[data-tab="pouvoirs"] .abilities-powers-layout {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .tab[data-tab="pouvoirs"] .abilities-powers-layout > .aptitudes-card,
+  .tab[data-tab="pouvoirs"] .abilities-powers-layout > .powers-card {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .tab[data-tab="pouvoirs"] .abilities-powers-layout > .powers-card {
+    border-left: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.35);
+    padding-top: 10px;
+  }
+
+  .tab[data-tab="pouvoirs"] .aptitudes-card .item-list.item-list-split-columns,
+  .tab[data-tab="pouvoirs"] .powers-card .item-list.item-list-split-columns {
+    column-count: 1;
+    column-gap: 0;
+  }
+}
+

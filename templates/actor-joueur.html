@@ -1,6 +1,6 @@
 <form class="bloodman-sheet pj-sheet">
   <header class="sheet-header">
-    <img class="sheet-logo" src="systems/bloodman/images/bloodman_logo.svg" alt="Bloodman" />
+    {{> "systems/bloodman/templates/partials/actor-logo.html"}}
     <div class="voyage-tools">
       <div class="voyage-banner">
         <i class="fa-solid fa-compass"></i>
@@ -13,13 +13,7 @@
         <i class="fa-solid fa-clover" aria-hidden="true"></i>
       </button>
     </div>
-    <nav class="sheet-tabs tabs" data-group="primary">
-      <a class="item" data-tab="carac">{{localize "BLOODMAN.Tabs.Character"}}</a>
-      <a class="item" data-tab="identite">{{localize "BLOODMAN.Tabs.Identity"}}</a>
-      <a class="item" data-tab="equipement">{{localize "BLOODMAN.Tabs.Equipment"}}</a>
-      <a class="item" data-tab="pouvoirs">{{localize "BLOODMAN.Tabs.AbilitiesPowers"}}</a>
-      <a class="item" data-tab="notes">{{localize "BLOODMAN.Tabs.Notes"}}</a>
-    </nav>
+    {{> "systems/bloodman/templates/partials/actor-tabs.html"}}
   </header>
 
   <section class="sheet-body">

@@ -1,0 +1,246 @@
+/* UX polish: item sheets keep their dark identity while making active zones obvious. */
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry {
+  position: relative;
+  overflow: hidden;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section::after,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--bm-item-accent);
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:focus-within,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel:focus-within,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry:focus-within {
+  border-color: var(--bm-item-accent);
+  box-shadow:
+    0 0 0 2px var(--bm-item-accent-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-input:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-textarea:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified input[type="number"]:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified select:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified button:focus-visible,
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option input:focus-visible {
+  outline: 2px solid var(--bm-item-accent) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px var(--bm-item-accent-glow) !important;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title {
+  text-wrap: balance;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-open:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-open:focus-visible {
+  color: var(--bm-item-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloodman-item.bm-item-sheet.bm-item-unified *,
+  .bloodman-item.bm-item-sheet.bm-item-unified *::before,
+  .bloodman-item.bm-item-sheet.bm-item-unified *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Visual refinement pass: unify item sheets with the Bloodman dark-panel direction. */
+.bloodman.sheet.item .window-content,
+.application.bloodman.sheet.item .window-content {
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(170, 38, 33, 0.17), transparent 48%),
+    linear-gradient(180deg, #11100f 0%, #070707 100%) !important;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified {
+  --bm-item-metal: #0b0a09;
+  --bm-item-metal-soft: #12100f;
+  --bm-item-metal-raised: #1b1715;
+  --bm-item-line: #4f413c;
+  --bm-item-border: #806962;
+  --bm-item-accent: #d0473f;
+  --bm-item-accent-glow: rgba(208, 71, 63, 0.24);
+  --bm-item-text: #f4eee6;
+  --bm-item-muted: #b9ab98;
+  border-color: rgba(128, 105, 98, 0.78);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 34%),
+    linear-gradient(180deg, var(--bm-item-metal-raised) 0%, var(--bm-item-metal) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 30px rgba(0, 0, 0, 0.48);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-img {
+  border-color: rgba(128, 105, 98, 0.86);
+  border-radius: 6px;
+  background: #080808;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 8px 16px rgba(0, 0, 0, 0.42);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-fields,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section {
+  border: 1px solid rgba(128, 105, 98, 0.62);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    linear-gradient(180deg, var(--bm-item-metal-raised) 0%, var(--bm-item-metal-soft) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section::after,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel::after {
+  width: 3px;
+  background: linear-gradient(180deg, transparent, var(--bm-item-accent), transparent);
+  opacity: 0.72;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-tag,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-head,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title {
+  color: var(--bm-item-text);
+  text-shadow: 0 1px 0 #000000;
+  letter-spacing: 0.45px;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-tag {
+  border-color: rgba(128, 105, 98, 0.68);
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, rgba(208, 71, 63, 0.22), transparent 56%),
+    linear-gradient(180deg, #181412, #0b0a09);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .inline-label,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-inline-sub-label,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-inline-hint,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-inline-unit {
+  color: var(--bm-item-muted);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-input,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-textarea,
+.bloodman-item.bm-item-sheet.bm-item-unified input[type="number"],
+.bloodman-item.bm-item-sheet.bm-item-unified select {
+  border-color: rgba(128, 105, 98, 0.72);
+  border-radius: 4px;
+  background: #0c0b0a !important;
+  color: var(--bm-item-text);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.54);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-input:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-textarea:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified input[type="number"]:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified select:hover {
+  border-color: rgba(208, 71, 63, 0.78);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-switch-track {
+  border-color: rgba(128, 105, 98, 0.68);
+  background: linear-gradient(180deg, #2b2724 0%, #141210 100%);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-switch-input:checked + .bm-switch-track {
+  border-color: rgba(255, 122, 110, 0.86);
+  background: linear-gradient(180deg, #c7443d 0%, #7f1d19 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.28),
+    0 0 0 2px rgba(208, 71, 63, 0.18);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option {
+  color: var(--bm-item-text);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option input {
+  border-color: rgba(201, 166, 111, 0.74);
+  background: #0b0a09;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option input:checked {
+  border-color: #ffd0bd;
+  background: var(--bm-item-accent);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid label,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-empty {
+  border-color: rgba(128, 105, 98, 0.48);
+  border-radius: 5px;
+  background: rgba(10, 9, 8, 0.62);
+  color: var(--bm-item-text);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-entry:focus-within {
+  border-color: rgba(208, 71, 63, 0.72);
+  background: rgba(43, 17, 16, 0.82);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-icon {
+  border-color: rgba(128, 105, 98, 0.72);
+  border-radius: 4px;
+  background: #090909;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-name,
+.bloodman-item.bm-item-sheet.bm-item-unified .bonus-grid label span {
+  color: var(--bm-item-text);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-type {
+  border-color: rgba(201, 166, 111, 0.52);
+  background: rgba(35, 27, 20, 0.82);
+  color: #d8c29c;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-remove,
+.bloodman-item.bm-item-sheet.bm-item-unified .file-picker {
+  border-radius: 4px;
+  color: var(--bm-item-text);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .file-picker {
+  border-color: rgba(208, 71, 63, 0.58);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 40%),
+    linear-gradient(180deg, #2b1110 0%, #100707 100%);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .file-picker:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .file-picker:focus-visible {
+  border-color: #f24d46;
+  filter: brightness(1.12);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-price-error:not(:empty) {
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 112, 98, 0.56);
+  border-radius: 4px;
+  background: rgba(92, 18, 16, 0.54);
+}

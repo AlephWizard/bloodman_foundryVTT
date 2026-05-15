@@ -1,0 +1,212 @@
+/* Strict top-row layout for the character tab:
+   portrait left, PV/PP center, characteristics right, with equal heights. */
+.bloodman-sheet .tab[data-tab="carac"] .tab-grid {
+  grid-template-columns:
+    clamp(235px, calc(var(--bm-sheet-window-width, 1200px) * 0.245), 330px)
+    76px
+    minmax(560px, 1fr);
+  column-gap: 10px;
+  row-gap: 10px;
+  align-items: start;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .sidebar {
+  width: clamp(235px, calc(var(--bm-sheet-window-width, 1200px) * 0.245), 330px);
+  min-height: 0;
+  align-self: start;
+  justify-self: start;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .portrait-frame {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  align-self: stretch;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .resource-badges {
+  width: 76px;
+  min-height: 0;
+  gap: 10px;
+  align-self: start;
+  justify-self: start;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .resource-circle {
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 0;
+}
+
+.bloodman-sheet .tab[data-tab="carac"] .column.center {
+  min-width: 560px;
+  align-self: start;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .tab-grid,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .tab-grid {
+  grid-template-columns:
+    clamp(210px, calc(var(--bm-sheet-window-width, 980px) * 0.225), 285px)
+    72px
+    minmax(520px, 1fr);
+  column-gap: 8px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .sidebar,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .sidebar {
+  width: clamp(210px, calc(var(--bm-sheet-window-width, 980px) * 0.225), 285px);
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .resource-badges,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .resource-badges {
+  width: 72px;
+  gap: 8px;
+}
+
+.bloodman-sheet[data-bm-sheet-layout="compact"] .tab[data-tab="carac"] .column.center,
+.bloodman-sheet[data-bm-sheet-layout="narrow"] .tab[data-tab="carac"] .column.center {
+  min-width: 520px;
+}
+
+/* Foundry v14 ApplicationV2 applies stronger default form styling than V1.
+   Keep Bloodman sheet values visually neutral and restore the custom XP boxes. */
+.bloodman-sheet .state-field input[type="number"],
+.bloodman-sheet .card-total input[type="number"],
+.bloodman-sheet .char-base input[type="number"],
+.bloodman-sheet .move-box,
+.bloodman-sheet .resource-circle input[type="number"] {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  box-shadow: none !important;
+}
+
+.bloodman-sheet .state-field.is-negative input[type="number"],
+.bloodman-sheet .char-modifier.negative {
+  color: #b83228 !important;
+  -webkit-text-fill-color: #b83228 !important;
+}
+
+.bloodman-sheet .state-field.is-positive input[type="number"],
+.bloodman-sheet .char-modifier.positive {
+  color: #2f8a42 !important;
+  -webkit-text-fill-color: #2f8a42 !important;
+}
+
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid #000000 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  accent-color: #000000 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"]:checked {
+  background: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"]::before,
+.bloodman-sheet .char-xp .xp-check input[type="checkbox"]::after {
+  content: none !important;
+  display: none !important;
+}
+
+.bloodman-sheet .carry-choice input.bag-slots-toggle,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 2px solid #000000 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  accent-color: #000000 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+.bloodman-sheet .carry-choice input.bag-slots-toggle:checked,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]:checked {
+  background: #000000 !important;
+  border-color: #000000 !important;
+}
+
+.bloodman-sheet .carry-choice input.bag-slots-toggle::before,
+.bloodman-sheet .carry-choice input.bag-slots-toggle::after,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]::before,
+.bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]::after {
+  content: none !important;
+  display: none !important;
+}
+
+.bloodman-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="image"]),
+.bloodman-sheet textarea,
+.bloodman-sheet select {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet input::placeholder,
+.bloodman-sheet textarea::placeholder {
+  color: #6b6258 !important;
+  -webkit-text-fill-color: #6b6258 !important;
+  opacity: 1 !important;
+}
+
+.bloodman-sheet .voyage-input {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet .sheet-tabs .item {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet .sheet-tabs .item.active {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.bloodman-sheet .resource-circle input[type="number"],
+.bloodman-sheet .resource-circle .value,
+.bloodman-sheet .resource-circle .value span {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.bloodman-sheet .resource-circle .value input[type="number"]:not([type="checkbox"]):not([type="radio"]):not([type="image"]) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.bloodman-sheet .ammo-line-toolbar-button {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #e7e7e7 100%) !important;
+  background-color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+.bloodman-sheet .ammo-line-toolbar-button.ammo-line-add {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+

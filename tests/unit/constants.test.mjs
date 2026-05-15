@@ -13,6 +13,7 @@ import {
   PLAYER_ACTOR_TYPE,
   SYSTEM_ID,
   SYSTEM_ITEM_TYPES,
+  SYSTEM_TEMPLATE_PARTIAL_PATHS,
   SYSTEM_ROOT_PATH,
   SYSTEM_SOCKET
 } from "../../src/core/constants.mjs";
@@ -62,6 +63,9 @@ function run() {
   assertSystemPathExists(PLAYER_ACTOR_SHEET_TEMPLATE_PATH, "Player actor sheet template");
   assertSystemPathExists(NPC_ACTOR_SHEET_TEMPLATE_PATH, "NPC actor sheet template");
   assertSystemPathExists(ITEM_SHEET_TEMPLATE_PATH, "Item sheet template");
+  for (const [index, partialPath] of SYSTEM_TEMPLATE_PARTIAL_PATHS.entries()) {
+    assertSystemPathExists(partialPath, `Template partial #${index + 1}`);
+  }
   assertSystemPathExists(CHAOS_DICE_ICON_SRC, "Chaos dice icon");
 
   assert.equal(

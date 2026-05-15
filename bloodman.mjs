@@ -13,6 +13,13 @@ import {
 } from "./src/core/constants.mjs";
 import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } from "./src/core/settings.mjs";
 import { registerSystemDocumentSheets } from "./src/sheets/register-sheets.mjs";
+import { registerBloodmanHandlebarsHelpers } from "./src/sheets/register-handlebars-helpers.mjs";
+import { registerBloodmanTemplatePartials } from "./src/sheets/register-template-partials.mjs";
+import {
+  getDocumentUuidOrId,
+  isFoundryDocumentLike,
+  sanitizeRenderOptions
+} from "./src/sheets/render-options.mjs";
 import {
   getActivePrivilegedOperatorIds,
   getActiveGMUserIds,
@@ -345,42 +352,6 @@ function renderFilePickerSafely(picker, contextLabel = "file-picker") {
   } catch (error) {
     bmLog.warn(`${contextLabel}: render failed`, { error });
     return false;
-  }
-}
-
-function isFoundryDocumentLike(value) {
-  if (!value || typeof value !== "object") return false;
-  const constructorName = String(value.constructor?.name || "");
-  return Boolean(
-    value.documentName
-    || constructorName.endsWith("Document")
-    || (typeof value.update === "function" && typeof value.toObject === "function")
-  );
-}
-
-function sanitizeRenderOptions(options = {}) {
-  if (!options || typeof options !== "object") return {};
-  const sanitized = { ...options };
-  for (const [key, value] of Object.entries(sanitized)) {
-    if (isFoundryDocumentLike(value)) delete sanitized[key];
-  }
-  return sanitized;
-}
-
-function getDocumentUuidOrId(documentLike) {
-  return String(documentLike?.uuid || documentLike?.id || documentLike?._id || "").trim();
-}
-
-function registerBloodmanHandlebarsHelpers() {
-  const handlebars = globalThis.Handlebars;
-  if (!handlebars || typeof handlebars.registerHelper !== "function") return;
-  const helpers = {
-    lt: (left, right) => Number(left) < Number(right),
-    gt: (left, right) => Number(left) > Number(right)
-  };
-  for (const [name, helper] of Object.entries(helpers)) {
-    if (typeof handlebars.helpers?.[name] === "function") continue;
-    handlebars.registerHelper(name, helper);
   }
 }
 
@@ -5327,6 +5298,7 @@ Hooks.once("init", () => {
   registerBloodmanCoreSettings();
   registerBloodmanMigrationSettings();
   registerBloodmanHandlebarsHelpers();
+  void registerBloodmanTemplatePartials({ logger: bmLog });
   registerPrivilegedUsersCacheHooks();
   initializeBloodmanLoggerFromSettings();
   bmLog.info("compat:init", {

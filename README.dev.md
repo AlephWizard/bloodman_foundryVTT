@@ -9,15 +9,18 @@
 - `src/compat/`: couche de compatibilite Foundry (version + wrappers API instables).
 - `src/migrations/`: migrations de donnees versionnees et idempotentes.
 - `src/hooks/`: handlers et enregistrements de hooks Foundry extraits par domaine (canvas, items derives, actors, combat/tokens).
-- `src/sheets/`: enregistrement et glue des sheets Foundry.
+- `src/sheets/`: enregistrement, partials Handlebars, options de rendu et glue des sheets Foundry.
 - `src/ui/`: helpers UI extraits des sheets et dialogues (chat, layout, dialogues, panneau du chaos, decoration des types de documents).
 - `src/rules/`: calculs metier purs (ressources/caracteristiques) reutilisables et testables.
 - `src/core/`: constantes systeme, logger, settings et utilitaires de permissions.
 - `utils/`: points de compatibilite (re-exports) pour anciens chemins.
 - `templates/`: vues Handlebars des sheets Actor/Item.
+- `templates/partials/`: fragments Handlebars partages et precharges au `init`.
 - `styles/`: CSS du systeme, avec `styles/bloodman.css` comme facade d'imports.
 - `styles/base/`: fondations partagees et surcharges communes.
+- `styles/actors/`: sections CSS de la fiche acteur `personnage` / `personnage-non-joueur`.
 - `styles/dialogs/`: styles des dialogues Bloodman.
+- `styles/items/`: sections CSS de la fiche item unifiee.
 - `styles/ui/`: panneaux et widgets UI hors sheets.
 - `lang/`: traductions.
 - `tests/`: tests unitaires minimaux, fixtures migration, checklist smoke.
@@ -68,6 +71,10 @@
 - `node tests/unit/actor-sheet-layout.test.mjs`
 - `node tests/unit/item-sheet-price-preview.test.mjs`
 - `node tests/unit/ui-refresh-queue.test.mjs`
+- `node tests/unit/css-architecture.test.mjs`
+- `node tests/unit/handlebars-helpers.test.mjs`
+- `node tests/unit/render-options.test.mjs`
+- `node tests/unit/template-partials.test.mjs`
 - `node tests/unit/module-linkage.test.mjs`
 - Smoke Foundry:
 - suivre `tests/smoke/manual-checklist.md`
