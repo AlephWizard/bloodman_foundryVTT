@@ -15,6 +15,17 @@ import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } fr
 import { registerSystemDocumentSheets } from "./src/sheets/register-sheets.mjs";
 import { registerBloodmanHandlebarsHelpers } from "./src/sheets/register-handlebars-helpers.mjs";
 import { registerBloodmanTemplatePartials } from "./src/sheets/register-template-partials.mjs";
+import { createActorItemDndController } from "./src/sheets/actor-item-dnd.mjs";
+import { createDropDocumentResolutionController } from "./src/sheets/drop-document-resolution.mjs";
+import { createOpenActorSheetController } from "./src/sheets/open-actor-sheets.mjs";
+import {
+  buildActorSheetBaseData,
+  callPrototypeMethod,
+  getHandlebarsActorSheetV2Base,
+  getHTMLElementFromHtmlLike,
+  getSheetElementWrapper,
+  getSheetHTMLElement
+} from "./src/sheets/sheet-dom.mjs";
 import {
   getDocumentUuidOrId,
   isFoundryDocumentLike,
@@ -33,7 +44,6 @@ import {
   compatGetDocumentClass,
   foundryVersion,
   getFoundryGeneration,
-  isV14Plus,
   getDragEventData,
   getAudioHelper,
   getDialogClass,
@@ -89,6 +99,27 @@ import {
 } from "./src/ui/document-create-type-icons.mjs";
 import { createChaosDicePanelController } from "./src/ui/chaos-dice-panel.mjs";
 import {
+  createBloodmanDialog,
+  renderBloodmanDialog
+} from "./src/ui/dialog-rendering.mjs";
+import {
+  getFilePickerClass,
+  renderFilePickerSafely
+} from "./src/ui/file-picker.mjs";
+import {
+  configureTokenHudEnhancements,
+  decrementTokenHudCountersForActorTurn,
+  ensureTokenHudLocalSvgIcons,
+  installTokenHudDomObserver,
+  installTokenHudRenderPatch,
+  refreshTokenHudStatusEffectIconPaths,
+  scheduleTokenHudDomEnhancement
+} from "./src/ui/token-hud.mjs";
+import {
+  applyTransparentTokenEffectBackground,
+  installTokenEffectBackgroundPatch
+} from "./src/ui/token-effect-background.mjs";
+import {
   toFiniteNumber as ruleToFiniteNumber,
   normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
   normalizeArchetypeBonusValue as ruleNormalizeArchetypeBonusValue,
@@ -129,6 +160,14 @@ import {
 } from "./src/rules/item-links.mjs";
 import { createResourceGaugeRules } from "./src/rules/resource-gauge.mjs";
 import { createStatePresetRules } from "./src/rules/state-presets.mjs";
+import { createPlayerResourceActionRules } from "./src/rules/player-resource-actions.mjs";
+import { createZeroPvStatusController } from "./src/rules/zero-pv-status.mjs";
+import {
+  ACTOR_TOKEN_IMAGE_UPDATE_PATHS,
+  TOKEN_IMAGE_UPDATE_PATHS,
+  TOKEN_TEXTURE_VALIDITY_CACHE,
+  createTokenImageController
+} from "./src/rules/token-images.mjs";
 import { createItemBucketRules } from "./src/rules/item-buckets.mjs";
 import { createItemAudioPlaybackRules } from "./src/rules/item-audio-playback.mjs";
 import { createItemTypeFlagRules } from "./src/rules/item-type-flags.mjs";
@@ -152,6 +191,9 @@ import {
   sumCarriedItemInventorySlots
 } from "./src/rules/carried-item-slots.mjs";
 import { createActorSheetLayoutRules } from "./src/ui/actor-sheet-layout.mjs";
+import { createItemSheetControlsController } from "./src/ui/item-sheet-controls.mjs";
+import { createItemSheetEquipWithController } from "./src/ui/item-sheet-equip-with.mjs";
+import { createItemSheetLayoutController } from "./src/ui/item-sheet-layout.mjs";
 import { createItemSheetPricePreviewRules } from "./src/ui/item-sheet-price-preview.mjs";
 import {
   buildBloodmanSupplementalStatusEffects,
@@ -166,196 +208,79 @@ import {
 import {
   planActorUpdateRestrictionByRole,
 } from "./src/rules/actor-updates.mjs";
+import { t, tl } from "./src/core/localization.mjs";
 
 const BaseActorSheet = getLegacyApplicationClass("ActorSheet");
 const BaseItemSheet = getLegacyApplicationClass("ItemSheet");
 const ActorsCollection = getDocumentCollectionClass("Actors");
 const ItemsCollection = getDocumentCollectionClass("Items");
 
-function getHandlebarsActorSheetV2Base() {
-  const actorSheetV2 = globalThis.foundry?.applications?.sheets?.ActorSheetV2;
-  const handlebarsMixin = globalThis.foundry?.applications?.api?.HandlebarsApplicationMixin;
-  if (typeof actorSheetV2 !== "function" || typeof handlebarsMixin !== "function") return null;
-  return handlebarsMixin(actorSheetV2);
-}
-
-function getSheetElementWrapper(sheet) {
-  const element = sheet?._bloodmanElementWrapper || sheet?.element || null;
-  if (element?.find) return element;
-  const jq = globalThis.jQuery || globalThis.$;
-  if (typeof jq === "function" && typeof HTMLElement !== "undefined" && element instanceof HTMLElement) return jq(element);
-  return element;
-}
-
-function getSheetHTMLElement(sheet) {
-  const element = sheet?.element || null;
-  if (typeof HTMLElement === "undefined") return null;
-  if (element instanceof HTMLElement) return element;
-  if (element?.[0] instanceof HTMLElement) return element[0];
-  return null;
-}
-
-function getHTMLElementFromHtmlLike(htmlLike) {
-  if (typeof HTMLElement === "undefined") return null;
-  if (htmlLike instanceof HTMLElement) return htmlLike;
-  if (htmlLike?.[0] instanceof HTMLElement) return htmlLike[0];
-  if (typeof htmlLike?.get === "function" && htmlLike.get(0) instanceof HTMLElement) return htmlLike.get(0);
-  return null;
-}
-
-function buildActorSheetBaseData(sheet, options = {}) {
-  const actor = sheet?.actor || sheet?.document || sheet?.object || null;
-  const system = actor?.system || {};
-  const items = actor?.items?.contents || Array.from(actor?.items || []);
-  const editable = Boolean(sheet?.isEditable);
-  return {
-    actor,
-    data: actor,
-    document: actor,
-    object: actor,
-    system,
-    items,
-    owner: Boolean(actor?.isOwner),
-    limited: Boolean(actor?.limited),
-    editable,
-    cssClass: editable ? "editable" : "locked",
-    options: sheet?.options || options
-  };
-}
-
-function callPrototypeMethod(prototype, receiver, methodName, args = []) {
-  const method = prototype?.[methodName];
-  if (typeof method !== "function") return undefined;
-  return method.apply(receiver, args);
-}
-
-function t(key, data = null) {
-  if (!globalThis.game?.i18n) return key;
-  return data ? game.i18n.format(key, data) : game.i18n.localize(key);
-}
-
-function tl(key, fallback, data = null) {
-  const localized = t(key, data);
-  return localized && localized !== key ? localized : fallback;
-}
-
-function toDialogHtmlLike(dialogInstance) {
-  const jq = globalThis.jQuery || globalThis.$;
-  const element = dialogInstance?.form || dialogInstance?.element || null;
-  if (typeof jq === "function" && typeof HTMLElement !== "undefined" && element instanceof HTMLElement) return jq(element);
-  return element;
-}
-
-function createDialogV2Shim(config = {}, options = {}) {
-  const DialogV2Class = getDialogV2Class();
-  if (typeof DialogV2Class !== "function") return null;
-
-  const normalizedConfig = config && typeof config === "object" ? config : {};
-  const normalizedOptions = options && typeof options === "object" ? options : {};
-  const buttonsConfig = normalizedConfig.buttons && typeof normalizedConfig.buttons === "object"
-    ? normalizedConfig.buttons
-    : {};
-  const defaultAction = String(normalizedConfig.default || "").trim();
-
-  const buttons = Object.entries(buttonsConfig).map(([action, buttonConfig]) => {
-    const legacyCallback = buttonConfig?.callback;
-    return {
-      action,
-      label: String(buttonConfig?.label ?? action),
-      default: defaultAction ? action === defaultAction : false,
-      callback: (event, button, dialog) => {
-        if (typeof legacyCallback !== "function") return action;
-        return legacyCallback(toDialogHtmlLike(dialog), event, button, dialog);
-      }
-    };
-  });
-
-  const v2Options = {
-    classes: Array.isArray(normalizedOptions.classes) ? [...normalizedOptions.classes] : undefined,
-    content: String(normalizedConfig.content || ""),
-    rejectClose: false,
-    window: {
-      title: String(normalizedConfig.title || "")
-    },
-    buttons,
-    position: Number.isFinite(Number(normalizedOptions.width))
-      ? { width: Number(normalizedOptions.width) }
-      : undefined,
-    submit: result => {
-      if (result == null && typeof normalizedConfig.close === "function") normalizedConfig.close();
-    }
-  };
-
-  const dialogInstance = new DialogV2Class(v2Options);
-  if (typeof normalizedConfig.render === "function" && typeof dialogInstance.addEventListener === "function") {
-    dialogInstance.addEventListener("render", () => {
-      normalizedConfig.render(toDialogHtmlLike(dialogInstance), dialogInstance);
-    });
-  }
-  return {
-    render(force = true) {
-      const renderResult = dialogInstance.render({ force: Boolean(force) });
-      if (renderResult && typeof renderResult.catch === "function") {
-        void renderResult.catch(error => {
-          bmLog.warn("dialog-v2 render failed", {
-            title: String(normalizedConfig.title || ""),
-            error
-          });
-        });
-      }
-      return dialogInstance;
-    },
-    close(optionsArg = {}) {
-      return dialogInstance.close(optionsArg);
-    },
-    instance: dialogInstance
-  };
-}
-
-function createBloodmanDialog(config, options = undefined) {
-  const dialogV2Shim = createDialogV2Shim(config, options);
-  if (dialogV2Shim) return dialogV2Shim;
-  const DialogClass = getDialogClass();
-  if (typeof DialogClass !== "function") return null;
-  return options === undefined ? new DialogClass(config) : new DialogClass(config, options);
-}
-
-function renderBloodmanDialog(config, options = undefined) {
-  const dialog = createBloodmanDialog(config, options);
-  if (!dialog || typeof dialog.render !== "function") {
-    bmLog.warn("dialog render skipped (Dialog API unavailable)", {
-      title: String(config?.title || "")
-    });
-    return null;
-  }
-  dialog.render(true);
-  return dialog;
-}
-
-function getFilePickerClass() {
-  const namespaced = foundry?.applications?.apps?.FilePicker?.implementation;
-  if (typeof namespaced === "function") return namespaced;
-  if (typeof globalThis.FilePicker === "function") return globalThis.FilePicker;
-  return null;
-}
-
-function renderFilePickerSafely(picker, contextLabel = "file-picker") {
-  if (!picker || typeof picker.render !== "function") return false;
-  try {
-    const renderResult = picker.render(true);
-    if (renderResult && typeof renderResult.then === "function") {
-      void renderResult.catch(error => {
-        bmLog.warn(`${contextLabel}: render failed`, { error });
-      });
-    }
-    return true;
-  } catch (error) {
-    bmLog.warn(`${contextLabel}: render failed`, { error });
-    return false;
-  }
-}
-
 const SIMPLE_ATTACK_REROLL_ID = "__bloodman-simple-attack__";
+const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
+let zeroPvStatusController = null;
+let tokenImageController = null;
+let openActorSheetController = null;
+let dropDocumentResolutionController = null;
+
+function getZeroPvStatusController() {
+  if (!zeroPvStatusController) {
+    zeroPvStatusController = createZeroPvStatusController({
+      logger: bmLog,
+      getProperty: (source, path) => foundry.utils.getProperty(source, path),
+      getGame: () => game,
+      getTokenDocumentsForActor,
+      setActorStatePresetActive,
+      resolveStatePresetSelection,
+      applyTransparentTokenEffectBackground,
+      playerZeroPvStatePresetId: PLAYER_ZERO_PV_STATE_PRESET_ID
+    });
+  }
+  return zeroPvStatusController;
+}
+
+function getTokenImageController() {
+  if (!tokenImageController) {
+    tokenImageController = createTokenImageController({
+      getProperty: (source, path) => foundry.utils.getProperty(source, path),
+      expandObject: source => foundry.utils.expandObject(source),
+      getGame: () => game,
+      getCanvas: () => canvas,
+      getTokenActorType,
+      isCharacterLikeActorType,
+      getTokenDocumentsForActor,
+      textureValidityCache: TOKEN_TEXTURE_VALIDITY_CACHE
+    });
+  }
+  return tokenImageController;
+}
+
+function getOpenActorSheetController() {
+  if (!openActorSheetController) {
+    openActorSheetController = createOpenActorSheetController({
+      getGame: () => game,
+      getDocument: () => globalThis.document,
+      getJQuery: () => globalThis.jQuery || globalThis.$,
+      collectOpenApplications,
+      getApplicationDocumentActor,
+      getSheetElementWrapperForApp: getSheetElementWrapper,
+      carriedItemLimitBase: CARRIED_ITEM_LIMIT_BASE,
+      carriedItemLimitWithBag: CARRIED_ITEM_LIMIT_WITH_BAG,
+      characterActorTypes: [PLAYER_ACTOR_TYPE, NPC_ACTOR_TYPE]
+    });
+  }
+  return openActorSheetController;
+}
+
+function getDropDocumentResolutionController() {
+  if (!dropDocumentResolutionController) {
+    dropDocumentResolutionController = createDropDocumentResolutionController({
+      getItemDocumentClass: () => Item?.implementation?.fromDropData ? Item.implementation : Item,
+      getGame: () => game,
+      fromUuid: compatFromUuid
+    });
+  }
+  return dropDocumentResolutionController;
+}
 
 function getSimpleAttackRerollLabel() {
   return tl("BLOODMAN.Common.SimpleAttack", "Attaque simple");
@@ -696,1867 +621,115 @@ function resolveCombatTargetName(tokenName, actorName, fallback = "Cible") {
   return fallback;
 }
 
-function normalizeStatusValue(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function getStatusEffectIds(effectDef, { normalized = false } = {}) {
-  if (!effectDef) return [];
-  const rawStatuses = effectDef.statuses instanceof Set
-    ? [...effectDef.statuses]
-    : (Array.isArray(effectDef.statuses) ? effectDef.statuses : []);
-  const ids = [effectDef.id, ...rawStatuses]
-    .map(value => String(value || "").trim())
-    .filter(Boolean);
-  const output = [];
-  const seen = new Set();
-  for (const id of ids) {
-    const key = normalized ? normalizeStatusValue(id) : id;
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    output.push(normalized ? key : id);
-  }
-  return output;
-}
-
-function getConfiguredStatusIdSet() {
-  const configured = new Set();
-  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
-  for (const effect of effects) {
-    for (const id of getStatusEffectIds(effect, { normalized: true })) configured.add(id);
-  }
-  return configured;
-}
-
-function getLocalizedStatusLabel(effect) {
-  if (!effect) return "";
-  const raw = effect.name ?? effect.label ?? "";
-  if (!raw) return "";
-  const hasI18nKey = Boolean(game.i18n?.has?.(raw));
-  const localized = hasI18nKey ? game.i18n.localize(raw) : raw;
-  return normalizeStatusValue(localized);
-}
-
-function findStatusEffect(candidates, labelKeywords = []) {
-  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
-  const wanted = new Set(candidates.map(normalizeStatusValue).filter(Boolean));
-  for (const effect of effects) {
-    const ids = getStatusEffectIds(effect, { normalized: true });
-    if (ids.some(id => wanted.has(id))) return effect;
-  }
-  if (!labelKeywords.length) return null;
-  const keywords = labelKeywords.map(normalizeStatusValue).filter(Boolean);
-  for (const effect of effects) {
-    const label = getLocalizedStatusLabel(effect);
-    if (!label) continue;
-    if (keywords.some(keyword => label.includes(keyword))) return effect;
-  }
-  return null;
-}
-
-function ensureStatusEffectDefinition(effectDef) {
-  if (!effectDef) return null;
-  if (!Array.isArray(CONFIG.statusEffects)) return effectDef;
-  const targetIds = new Set(getStatusEffectIds(effectDef, { normalized: true }));
-  if (!targetIds.size) return effectDef;
-  for (const effect of CONFIG.statusEffects) {
-    const existingIds = getStatusEffectIds(effect, { normalized: true });
-    if (existingIds.some(id => targetIds.has(id))) return effect;
-  }
-  try {
-    CONFIG.statusEffects.push(effectDef);
-  } catch (_error) {
-    // keep non-fatal if the status list is immutable
-  }
-  return effectDef;
-}
-
-function resolvePrimaryStatusId(effectDef) {
-  const ids = getStatusEffectIds(effectDef);
-  if (!ids.length) return "";
-  const configured = getConfiguredStatusIdSet();
-  return ids.find(id => configured.has(normalizeStatusValue(id))) || ids[0];
-}
-
-function buildBleedingFallbackStatusEffect() {
-  return {
-    id: "bleeding",
-    statuses: ["bleeding"],
-    name: "Bleeding",
-    img: `${SYSTEM_ROOT_PATH}/images/blood.svg`
-  };
-}
-
-function buildDeadFallbackStatusEffect() {
-  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
-  const id = defeatedRaw || "dead";
-  const normalized = normalizeStatusValue(id);
-  const statuses = normalized && normalized !== id ? [id, normalized] : [id];
-  return {
-    id,
-    statuses,
-    name: "Dead",
-    img: `${SYSTEM_ROOT_PATH}/images/skull.svg`
-  };
-}
-
-function forceStatusEffectIcon(effectDef, img) {
-  if (!effectDef || typeof effectDef !== "object") return effectDef;
-  const iconPath = String(img || "").trim();
-  if (!iconPath) return effectDef;
-  try {
-    effectDef.img = iconPath;
-    effectDef.icon = iconPath;
-  } catch (_error) {
-    // Some Foundry-provided definitions may be immutable; the fallback remains usable.
-  }
-  return effectDef;
-}
-
-function getBleedingStatusEffect() {
-  const effect = findStatusEffect(PLAYER_ZERO_PV_STATUS_CANDIDATES, ["bleed", "saign"])
-    || ensureStatusEffectDefinition(buildBleedingFallbackStatusEffect());
-  return forceStatusEffectIcon(effect, `${SYSTEM_ROOT_PATH}/images/blood.svg`);
-}
-
-function getDeadStatusEffect() {
-  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
-  const defeated = normalizeStatusValue(defeatedRaw);
-  const candidates = defeated ? [defeated, ...NPC_ZERO_PV_STATUS_CANDIDATES] : NPC_ZERO_PV_STATUS_CANDIDATES;
-  const effect = findStatusEffect(candidates, ["dead", "mort", "defeat"])
-    || ensureStatusEffectDefinition(buildDeadFallbackStatusEffect());
-  return forceStatusEffectIcon(effect, `${SYSTEM_ROOT_PATH}/images/skull.svg`);
-}
-
-function getNpcDeadStatusFamilyIds(deadEffect = null) {
-  const defeatedRaw = String(CONFIG.specialStatusEffects?.DEFEATED || "").trim();
-  const deadCandidates = defeatedRaw
-    ? [defeatedRaw, ...NPC_ZERO_PV_STATUS_CANDIDATES]
-    : [...NPC_ZERO_PV_STATUS_CANDIDATES];
-  return buildStatusFamilyIds(deadEffect || getDeadStatusEffect(), deadCandidates);
-}
-
-function getTokenStatusesList(tokenDoc, { normalized = true } = {}) {
-  const statuses = tokenDoc?.statuses;
-  const list = Array.isArray(statuses)
-    ? [...statuses]
-    : statuses instanceof Set
-      ? [...statuses]
-      : [];
-  const cleaned = list
-    .map(value => String(value || "").trim())
-    .filter(Boolean);
-  if (!normalized) return cleaned;
-  return cleaned.map(normalizeStatusValue).filter(Boolean);
-}
-
-async function removeTokenStatusOverrides(tokenDoc, familyIds = []) {
-  const family = new Set(normalizeStatusIdList(familyIds));
-  if (!tokenDoc || !family.size) return false;
-  const currentStatuses = getTokenStatusesList(tokenDoc, { normalized: false });
-  if (!currentStatuses.length) return false;
-  const nextStatuses = currentStatuses.filter(id => !family.has(normalizeStatusValue(id)));
-  if (nextStatuses.length === currentStatuses.length) return false;
-  await tokenDoc.update({ statuses: nextStatuses }).catch(() => null);
-  return true;
-}
-
-function getActiveEffectStatusIds(effectDoc, { normalized = true } = {}) {
-  const statuses = effectDoc?.statuses;
-  const list = Array.isArray(statuses)
-    ? [...statuses]
-    : statuses instanceof Set
-      ? [...statuses]
-      : [];
-  const legacyStatusId = String(foundry.utils.getProperty(effectDoc, "flags.core.statusId") || "").trim();
-  if (legacyStatusId) list.push(legacyStatusId);
-  const cleaned = list
-    .map(value => String(value || "").trim())
-    .filter(Boolean);
-  if (!normalized) return cleaned;
-  return cleaned.map(normalizeStatusValue).filter(Boolean);
-}
-
-function getActorEffectDocuments(actor) {
-  const effects = actor?.effects;
-  if (!effects) return [];
-  if (Array.isArray(effects)) return effects;
-  if (Array.isArray(effects.contents)) return effects.contents;
-  if (typeof effects.values === "function") return [...effects.values()];
-  return [];
-}
-
-function isLiveActorEffectDocument(effectDoc) {
-  if (!effectDoc?.id) return false;
-  const parent = effectDoc.parent || null;
-  const effects = parent?.effects || null;
-  if (!effects) return Boolean(parent);
-  if (typeof effects.get === "function") return effects.get(effectDoc.id) === effectDoc;
-  if (Array.isArray(effects)) return effects.includes(effectDoc);
-  if (Array.isArray(effects.contents)) return effects.contents.includes(effectDoc);
-  if (typeof effects.values === "function") return [...effects.values()].includes(effectDoc);
-  return Boolean(parent);
-}
-
-function normalizeStatusIdList(ids = []) {
-  return [...new Set(
-    (Array.isArray(ids) ? ids : [])
-      .map(normalizeStatusValue)
-      .filter(Boolean)
-  )];
-}
-
-function buildStatusFamilyIds(effectDef, extraIds = []) {
-  return normalizeStatusIdList([
-    ...(Array.isArray(extraIds) ? extraIds : []),
-    ...getStatusEffectIds(effectDef)
-  ]);
-}
-
-function getActorStatusEffectDocumentsByFamily(actor, familyIds = []) {
-  const family = new Set(normalizeStatusIdList(familyIds));
-  if (!actor || !family.size) return [];
-  const docs = [];
-  for (const effectDoc of getActorEffectDocuments(actor)) {
-    if (!isLiveActorEffectDocument(effectDoc)) continue;
-    const ids = getActiveEffectStatusIds(effectDoc);
-    if (ids.some(id => family.has(id))) docs.push(effectDoc);
-  }
-  return docs;
-}
-
-async function deleteStatusEffectDocuments(effectDocs = []) {
-  if (!Array.isArray(effectDocs) || !effectDocs.length) return false;
-  let changed = false;
-  const seen = new Set();
-  for (const effectDoc of effectDocs) {
-    if (!isLiveActorEffectDocument(effectDoc) || seen.has(effectDoc.uuid || effectDoc.id)) continue;
-    seen.add(effectDoc.uuid || effectDoc.id);
-    try {
-      await effectDoc.delete();
-      changed = true;
-    } catch (_error) {
-      // continue best-effort cleanup
-    }
-  }
-  return changed;
-}
-
-async function showStatusEffectDocuments(effectDocs = []) {
-  if (!Array.isArray(effectDocs) || !effectDocs.length) return false;
-  const showIcon = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2;
-  let changed = false;
-  for (const effectDoc of effectDocs) {
-    if (!isLiveActorEffectDocument(effectDoc) || effectDoc.showIcon === showIcon || typeof effectDoc.update !== "function") continue;
-    try {
-      await effectDoc.update({ showIcon });
-      changed = true;
-    } catch (_error) {
-      // Status synchronization should remain best-effort.
-    }
-  }
-  return changed;
-}
-
-function actorHasStatusInFamily(actor, familyIds = []) {
-  const family = normalizeStatusIdList(familyIds);
-  if (!actor || !family.length) return false;
-  if (typeof actor.hasStatusEffect === "function") {
-    for (const id of family) {
-      try {
-        if (actor.hasStatusEffect(id)) return true;
-      } catch (_error) {
-        // continue checks
-      }
-    }
-  }
-  return getActorStatusEffectDocumentsByFamily(actor, family).length > 0;
-}
-
-function tokenHasStatusInFamily(tokenDoc, familyIds = []) {
-  const family = normalizeStatusIdList(familyIds);
-  if (!tokenDoc || !family.length) return false;
-  const actor = tokenDoc.actorLink === true
-    ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
-    : tokenDoc.actor || null;
-  if (actorHasStatusInFamily(actor, family)) return true;
-  const tokenStatuses = new Set(getTokenStatusesList(tokenDoc));
-  if (family.some(id => tokenStatuses.has(id))) return true;
-
-  if (typeof tokenDoc.hasStatusEffect === "function") {
-    for (const id of family) {
-      try {
-        if (tokenDoc.hasStatusEffect(id)) return true;
-      } catch (_error) {
-        // continue checks
-      }
-    }
-  }
-  return false;
-}
-
-async function clearActorStatusFamily(actor, familyIds = []) {
-  const family = normalizeStatusIdList(familyIds);
-  if (!actor || !family.length) return false;
-  const docs = getActorStatusEffectDocumentsByFamily(actor, family);
-  if (docs.length) await deleteStatusEffectDocuments(docs);
-  return !actorHasStatusInFamily(actor, family);
-}
-
-function tokenHasStatusEffect(tokenDoc, effectDef, familyIds = []) {
-  return tokenHasStatusInFamily(tokenDoc, buildStatusFamilyIds(effectDef, familyIds));
-}
-
-const STATUS_EFFECT_SYNC_LOCKS = new Map();
-
-function getStatusEffectSyncLockKey(tokenDoc, actor, familyIds = []) {
-  const ownerRef = String(actor?.uuid || actor?.id || tokenDoc?.uuid || tokenDoc?.id || "").trim();
-  const familyRef = normalizeStatusIdList(familyIds).join("|");
-  return `${ownerRef || "unknown"}::${familyRef || "status"}`;
-}
-
-async function runStatusEffectSyncLocked(lockKey, operation) {
-  const key = String(lockKey || "").trim();
-  if (!key) return operation();
-  const previous = STATUS_EFFECT_SYNC_LOCKS.get(key) || Promise.resolve();
-  let release;
-  const current = new Promise(resolve => { release = resolve; });
-  const chained = previous.then(() => current, () => current);
-  STATUS_EFFECT_SYNC_LOCKS.set(key, chained);
-  try {
-    await previous.catch(() => null);
-    return await operation();
-  } finally {
-    release();
-    if (STATUS_EFFECT_SYNC_LOCKS.get(key) === chained) STATUS_EFFECT_SYNC_LOCKS.delete(key);
-  }
-}
-
-async function setTokenStatusEffect(tokenDoc, effectDef, active, familyIds = []) {
-  if (!tokenDoc || !effectDef) return false;
-  const primaryId = resolvePrimaryStatusId(effectDef) || getStatusEffectIds(effectDef)[0] || "";
-  const family = buildStatusFamilyIds(effectDef, familyIds);
-  if (!primaryId || !family.length) return false;
-  const actor = tokenDoc.actorLink === true
-    ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
-    : tokenDoc.actor || null;
-  const lockKey = getStatusEffectSyncLockKey(tokenDoc, actor, family);
-  return runStatusEffectSyncLocked(lockKey, async () => setTokenStatusEffectUnlocked(tokenDoc, effectDef, active, family, primaryId, actor));
-}
-
-async function setTokenStatusEffectUnlocked(tokenDoc, effectDef, active, family, primaryId, actor) {
-  const currentStatuses = getTokenStatusesList(tokenDoc, { normalized: false });
-  const familySet = new Set(family);
-  const hasTokenOverrides = currentStatuses.some(id => familySet.has(normalizeStatusValue(id)));
-
-  if (actor && !hasTokenOverrides) {
-    const actorDocs = getActorStatusEffectDocumentsByFamily(actor, family);
-    const actorHas = actorHasStatusInFamily(actor, family);
-    if (actorHas === active && actorDocs.length <= 1) {
-      if (active) await showStatusEffectDocuments(actorDocs);
-      return true;
-    }
-  }
-
-  if (hasTokenOverrides) await removeTokenStatusOverrides(tokenDoc, family);
-
-  if (actor && typeof actor.toggleStatusEffect === "function") {
-    await clearActorStatusFamily(actor, family);
-    if (active) {
-      try {
-        await actor.toggleStatusEffect(primaryId, { active: true, overlay: false });
-      } catch (_error) {
-        // fallback on token statuses below
-      }
-      const actorDocs = getActorStatusEffectDocumentsByFamily(actor, family);
-      if (actorDocs.length > 1) await deleteStatusEffectDocuments(actorDocs.slice(1));
-      if (!actorHasStatusInFamily(actor, family)) {
-        const normalizedPrimary = normalizeStatusValue(primaryId);
-        if (normalizedPrimary && normalizedPrimary !== primaryId) {
-          try {
-            await actor.toggleStatusEffect(normalizedPrimary, { active: true, overlay: false });
-          } catch (_error) {
-            // fallback on token statuses below
-          }
-        }
-      }
-    }
-    if (active) await showStatusEffectDocuments(getActorStatusEffectDocumentsByFamily(actor, family));
-    const actorMatches = actorHasStatusInFamily(actor, family) === active;
-    if (actorMatches) return true;
-  }
-
-  const nextStatuses = currentStatuses.filter(id => !familySet.has(normalizeStatusValue(id)));
-  if (active) nextStatuses.push(primaryId);
-
-  const deduped = [];
-  const seen = new Set();
-  for (const id of nextStatuses) {
-    const normalized = normalizeStatusValue(id);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    deduped.push(id);
-  }
-
-  const hasChanged = deduped.length !== currentStatuses.length
-    || deduped.some((id, index) => id !== currentStatuses[index]);
-  if (hasChanged) await tokenDoc.update({ statuses: deduped }).catch(() => null);
-
-  return tokenHasStatusInFamily(tokenDoc, family) === active;
-}
-
-function getTokenHudRootElement(htmlLike, fallback = null) {
-  if (htmlLike instanceof HTMLElement) return htmlLike;
-
-  const candidateFromCollection = Array.isArray(htmlLike)
-    ? htmlLike[0]
-    : htmlLike?.[0];
-  if (candidateFromCollection instanceof HTMLElement) return candidateFromCollection;
-
-  if (fallback instanceof HTMLElement) return fallback;
-
-  const domRoot = document.getElementById("token-hud");
-  return domRoot instanceof HTMLElement ? domRoot : null;
-}
-
-function getTokenHudStorageKey(tokenDoc) {
-  return String(tokenDoc?.uuid || tokenDoc?.id || "").trim();
-}
-
-function getTokenDocumentFromPlaceable(tokenLike) {
-  return tokenLike?.document || tokenLike || null;
-}
-
-function getTokenHudActorForDocument(tokenDoc, fallbackActor = null) {
-  if (!tokenDoc) return fallbackActor || null;
-  if (tokenDoc.actorLink === true) {
-    return tokenDoc.actor
-      || (tokenDoc.actorId ? globalThis.game?.actors?.get?.(tokenDoc.actorId) : null)
-      || fallbackActor
-      || null;
-  }
-  return tokenDoc.actor || fallbackActor || null;
-}
-
-function getTokenHudTargetTokenDocuments(hud) {
-  const hudTokenDoc = getTokenDocumentFromPlaceable(hud?.document || hud?.object);
-  const hudKey = getTokenHudStorageKey(hudTokenDoc);
-  const controlled = Array.isArray(globalThis.canvas?.tokens?.controlled)
-    ? globalThis.canvas.tokens.controlled
-    : [];
-  const docs = [];
-  const seen = new Set();
-
-  for (const token of controlled) {
-    const tokenDoc = getTokenDocumentFromPlaceable(token);
-    const key = getTokenHudStorageKey(tokenDoc);
-    if (!tokenDoc || !key || seen.has(key)) continue;
-    docs.push(tokenDoc);
-    seen.add(key);
-  }
-
-  if (docs.length > 1 && hudKey && seen.has(hudKey)) return docs;
-  return hudTokenDoc ? [hudTokenDoc] : docs.slice(0, 1);
-}
-
-function rememberTokenHudStatusSelection(tokenDocs = [], statusId = "", turns = TOKEN_HUD_TURN_MIN) {
-  const normalizedStatusId = normalizeStatusValue(statusId);
-  if (!normalizedStatusId) return;
-  const selectedTurns = clampTokenHudTurnValue(turns);
-  for (const tokenDoc of tokenDocs) {
-    const tokenKey = getTokenHudStorageKey(tokenDoc);
-    if (!tokenKey) continue;
-    TOKEN_HUD_TURN_SELECTION_BY_TOKEN.set(tokenKey, selectedTurns);
-    TOKEN_HUD_LAST_STATUS_BY_TOKEN.set(tokenKey, normalizedStatusId);
-  }
-}
-
-function clampTokenHudTurnValue(value) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return TOKEN_HUD_TURN_MIN;
-  return Math.max(TOKEN_HUD_TURN_MIN, Math.min(TOKEN_HUD_TURN_MAX, Math.floor(numeric)));
-}
-
-function queryTokenHudControl(root, selectors = []) {
-  if (!(root instanceof HTMLElement)) return null;
-  for (const selector of selectors) {
-    if (!selector) continue;
-    const element = root.querySelector(selector);
-    if (element) return element;
-  }
-  return null;
-}
-
-function ensureTokenHudColumn(root, name) {
-  if (!(root instanceof HTMLElement) || !name) return null;
-  const existing = root.querySelector(`.col.${name}`);
-  if (existing) return existing;
-  const column = document.createElement("div");
-  column.className = `col ${name}`;
-  root.appendChild(column);
-  return column;
-}
-
-function reorderTokenHudColumn(column, orderedNodes = []) {
-  if (!(column instanceof HTMLElement)) return;
-  const unique = [];
-  const seen = new Set();
-  for (const node of orderedNodes) {
-    if (!(node instanceof HTMLElement)) continue;
-    if (seen.has(node)) continue;
-    seen.add(node);
-    unique.push(node);
-  }
-  const extras = Array.from(column.children).filter(node => !seen.has(node));
-  column.replaceChildren(...unique, ...extras);
-}
-
-function ensureTokenHudLayoutContainer(root, className) {
-  if (!(root instanceof HTMLElement) || !className) return null;
-  let container = root.querySelector(`.${className}`);
-  if (!(container instanceof HTMLElement)) {
-    container = document.createElement("div");
-    container.className = className;
-    root.appendChild(container);
-  }
-  return container;
-}
-
-function resolveTokenHudEffectsButton(root) {
-  const directMatch = queryTokenHudControl(root, [
-    "button[data-action='togglePalette'][data-palette='effects']",
-    "[data-action='togglePalette'][data-palette='effects']",
-    "[data-action='toggleStatusEffects']",
-    "button[data-action='toggleStatusEffects']",
-    "button.control-icon.effects",
-    "button[data-action='effects']",
-    ".control-icon[data-action='togglePalette'][data-palette='effects']",
-    ".control-icon.effects",
-    ".control-icon[data-action='effects']",
-    "[data-action='effects']",
-    "[data-tooltip='HUD.AssignStatusEffects']",
-    "[data-tooltip-text='HUD.AssignStatusEffects']"
-  ]);
-  if (directMatch instanceof HTMLElement) return directMatch;
-
-  const effectsPalette = resolveTokenHudEffectsPalette(root);
-  const previousSibling = effectsPalette?.previousElementSibling;
-  if (previousSibling instanceof HTMLElement) return previousSibling;
-
-  const rightCol = root instanceof HTMLElement ? root.querySelector(".col.right") : null;
-  if (rightCol instanceof HTMLElement) {
-    const paletteSibling = Array.from(rightCol.querySelectorAll(".palette.status-effects, .palette[data-palette='effects'], .status-effects"))
-      .map(palette => palette?.previousElementSibling)
-      .find(node => node instanceof HTMLElement);
-    if (paletteSibling instanceof HTMLElement) return paletteSibling;
-  }
-
-  return null;
-}
-
-function resolveTokenHudEffectsPalette(root) {
-  let palette = queryTokenHudControl(root, [
-    ".palette[data-palette='effects']",
-    ".palette.status-effects",
-    ".status-effects"
-  ]);
-  if (!(palette instanceof HTMLElement) && root instanceof HTMLElement) {
-    palette = Array.from(root.querySelectorAll(".palette, .status-effects"))
-      .find(node => node instanceof HTMLElement && (
-        node.matches(".palette.status-effects, .palette[data-palette='effects'], .status-effects")
-        || Boolean(node.querySelector?.(".effect-control[data-status-id]"))
-      )) || null;
-  }
-  if (!(palette instanceof HTMLElement)) return null;
-  palette.classList.add("palette", "status-effects");
-  if (!palette.dataset.palette) palette.dataset.palette = "effects";
-  return palette;
-}
-
-function resolveTokenHudMovementButton(root) {
-  return queryTokenHudControl(root, [
-    "button[data-action='togglePalette'][data-palette='movementActions']",
-    "button[data-action='movement']",
-    "button[data-action='movementAction']",
-    ".control-icon[data-action='togglePalette'][data-palette='movementActions']",
-    ".control-icon[data-action='movement']"
-  ]);
-}
-
-function resolveTokenHudMovementPalette(root) {
-  const palette = queryTokenHudControl(root, [
-    ".palette[data-palette='movementActions']",
-    ".movement-actions"
-  ]);
-  if (!(palette instanceof HTMLElement)) return null;
-  palette.classList.add("palette", "movement-actions");
-  if (!palette.dataset.palette) palette.dataset.palette = "movementActions";
-  return palette;
-}
-
-function getTokenHudLocalIconDirectoryPath() {
-  return `${SYSTEM_ROOT_PATH}/images`;
-}
-
-function extractFileNameFromPath(path) {
-  const normalized = String(path || "").trim();
-  if (!normalized) return "";
-  const cleanPath = normalized.split("#")[0].split("?")[0];
-  const chunks = cleanPath.split("/");
-  return String(chunks[chunks.length - 1] || "").trim();
-}
-
-function isSvgAssetPath(path) {
-  const normalized = String(path || "").trim();
-  if (!normalized) return false;
-  return /\.svg(?:$|[?#])/i.test(normalized);
-}
-
-function collectTokenHudSvgStatusSources() {
-  const sources = new Map();
-  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
-  for (const effect of effects) {
-    if (!effect || typeof effect !== "object") continue;
-    for (const key of ["img", "icon"]) {
-      const sourcePath = String(effect[key] || "").trim();
-      if (!isSvgAssetPath(sourcePath)) continue;
-      const fileName = extractFileNameFromPath(sourcePath);
-      if (!fileName) continue;
-      const lower = fileName.toLowerCase();
-      if (!sources.has(lower)) sources.set(lower, { fileName, sourcePath });
-    }
-  }
-  return sources;
-}
-
-async function listTokenHudLocalSvgIconNames() {
-  try {
-    const FilePickerClass = getFilePickerClass();
-    if (typeof FilePickerClass?.browse !== "function") return new Set();
-    const browseResult = await FilePickerClass.browse("data", getTokenHudLocalIconDirectoryPath());
-    const names = new Set();
-    for (const filePath of Array.isArray(browseResult?.files) ? browseResult.files : []) {
-      if (!isSvgAssetPath(filePath)) continue;
-      const fileName = extractFileNameFromPath(filePath).toLowerCase();
-      if (fileName) names.add(fileName);
-    }
-    return names;
-  } catch (_error) {
-    return new Set();
-  }
-}
-
-async function copyTokenHudSvgIconToLocalFolder(fileName, sourcePath) {
-  if (!fileName || !sourcePath) return false;
-  try {
-    const response = await fetch(sourcePath, { cache: "no-store" });
-    if (!response?.ok) return false;
-    const content = await response.text();
-    if (!/<svg[\s>]/i.test(content)) return false;
-    const file = new File([content], fileName, { type: "image/svg+xml" });
-    const FilePickerClass = getFilePickerClass();
-    if (typeof FilePickerClass?.upload !== "function") return false;
-    await FilePickerClass.upload("data", getTokenHudLocalIconDirectoryPath(), file, {}, { notify: false });
-    return true;
-  } catch (_error) {
-    return false;
-  }
-}
-
-async function ensureTokenHudLocalSvgIcons({ copyMissing = false, force = false } = {}) {
-  const now = Date.now();
-  if (
-    !force
-    && !copyMissing
-    && TOKEN_HUD_LOCAL_SVG_ICON_NAMES.size
-    && (now - TOKEN_HUD_LAST_ICON_SYNC_AT) < TOKEN_HUD_ICON_SYNC_INTERVAL_MS
-  ) {
-    return TOKEN_HUD_LOCAL_SVG_ICON_NAMES;
-  }
-
-  if (TOKEN_HUD_ICON_SYNC_PROMISE) return TOKEN_HUD_ICON_SYNC_PROMISE;
-
-  TOKEN_HUD_ICON_SYNC_PROMISE = (async () => {
-    const svgSources = collectTokenHudSvgStatusSources();
-    let localIconNames = await listTokenHudLocalSvgIconNames();
-
-    if (copyMissing && game.user?.isGM && svgSources.size) {
-      for (const { fileName, sourcePath } of svgSources.values()) {
-        const lower = fileName.toLowerCase();
-        if (localIconNames.has(lower)) continue;
-        const copied = await copyTokenHudSvgIconToLocalFolder(fileName, sourcePath);
-        if (copied) localIconNames.add(lower);
-      }
-      localIconNames = await listTokenHudLocalSvgIconNames();
-    }
-
-    TOKEN_HUD_LOCAL_SVG_ICON_NAMES = localIconNames;
-    TOKEN_HUD_LAST_ICON_SYNC_AT = Date.now();
-    TOKEN_HUD_ICON_CACHE_BUSTER = TOKEN_HUD_LAST_ICON_SYNC_AT;
-    return TOKEN_HUD_LOCAL_SVG_ICON_NAMES;
-  })().finally(() => {
-    TOKEN_HUD_ICON_SYNC_PROMISE = null;
-  });
-
-  return TOKEN_HUD_ICON_SYNC_PROMISE;
-}
-
-function resolveTokenHudLocalSvgIconPath(sourcePath) {
-  const normalized = String(sourcePath || "").trim();
-  if (!normalized || !isSvgAssetPath(normalized)) return normalized;
-  const fileName = extractFileNameFromPath(normalized);
-  const lower = fileName.toLowerCase();
-  if (!fileName || !TOKEN_HUD_LOCAL_SVG_ICON_NAMES.has(lower)) return normalized;
-  return `${getTokenHudLocalIconDirectoryPath()}/${fileName}?v=${TOKEN_HUD_ICON_CACHE_BUSTER}`;
-}
-
-function refreshTokenHudStatusEffectIconPaths({ bumpCache = false } = {}) {
-  if (bumpCache) TOKEN_HUD_ICON_CACHE_BUSTER = Date.now();
-  const effects = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : [];
-  for (const effect of effects) {
-    if (!effect || typeof effect !== "object") continue;
-    const nextImg = resolveTokenHudLocalSvgIconPath(effect.img);
-    if (nextImg && nextImg !== effect.img) effect.img = nextImg;
-    const nextIcon = resolveTokenHudLocalSvgIconPath(effect.icon);
-    if (nextIcon && nextIcon !== effect.icon) effect.icon = nextIcon;
-  }
-}
-
-function arrangeTokenHudControlLayout(root) {
-  if (!(root instanceof HTMLElement)) return;
-  const leftCol = ensureTokenHudColumn(root, "left");
-  const middleCol = ensureTokenHudColumn(root, "middle");
-  const rightCol = ensureTokenHudColumn(root, "right");
-  if (!(leftCol && middleCol && rightCol)) return;
-
-  const elevation = queryTokenHudControl(root, [
-    ".attribute.elevation",
-    ".attribute[data-attribute='elevation']",
-    "[name='elevation']"
-  ])?.closest(".attribute") || null;
-
-  const sortUp = queryTokenHudControl(root, [
-    "button[data-action='sort'][data-direction='up']",
-    "button[data-action='sort-up']",
-    "button[data-action='sortUp']",
-    "button[data-direction='up'][data-action='sort']"
-  ]);
-
-  const sortDown = queryTokenHudControl(root, [
-    "button[data-action='sort'][data-direction='down']",
-    "button[data-action='sort-down']",
-    "button[data-action='sortDown']",
-    "button[data-direction='down'][data-action='sort']"
-  ]);
-
-  const config = queryTokenHudControl(root, [
-    "button[data-action='config']",
-    ".control-icon[data-action='config']"
-  ]);
-
-  const visibility = queryTokenHudControl(root, [
-    "button[data-action='visibility']",
-    ".control-icon[data-action='visibility']"
-  ]);
-
-  const effectsButton = resolveTokenHudEffectsButton(root);
-  const effectsPalette = resolveTokenHudEffectsPalette(root);
-
-  const movementButton = resolveTokenHudMovementButton(root);
-  const movementPalette = resolveTokenHudMovementPalette(root);
-
-  const target = queryTokenHudControl(root, [
-    "button[data-action='target']",
-    ".control-icon[data-action='target']"
-  ]);
-
-  const combat = queryTokenHudControl(root, [
-    "button[data-action='combat']",
-    ".control-icon[data-action='combat']"
-  ]);
-
-  const bar2 = queryTokenHudControl(root, [".attribute.bar2"]);
-  const bar1 = queryTokenHudControl(root, [".attribute.bar1"]);
-
-  const topRow = ensureTokenHudLayoutContainer(root, "bm-token-hud-top-row");
-  if (topRow instanceof HTMLElement) {
-    if (effectsButton instanceof HTMLElement) topRow.appendChild(effectsButton);
-    if (effectsPalette instanceof HTMLElement) topRow.appendChild(effectsPalette);
-  }
-
-  const bottomRow = ensureTokenHudLayoutContainer(root, "bm-token-hud-bottom-row");
-  const bottomSort = ensureTokenHudLayoutContainer(root, "bm-token-hud-bottom-sort");
-  if (bottomRow instanceof HTMLElement && bottomSort instanceof HTMLElement) {
-    if (sortUp instanceof HTMLElement) bottomSort.appendChild(sortUp);
-    if (sortDown instanceof HTMLElement) bottomSort.appendChild(sortDown);
-    reorderTokenHudColumn(bottomRow, [config, elevation, bottomSort]);
-  }
-
-  reorderTokenHudColumn(leftCol, [combat, target]);
-  reorderTokenHudColumn(middleCol, [bar2, bar1]);
-  reorderTokenHudColumn(rightCol, [
-    visibility,
-    movementButton,
-    movementPalette,
-    ...Array.from(rightCol.children).filter(node => {
-      if (!(node instanceof HTMLElement)) return false;
-      return node !== visibility && node !== movementButton && node !== movementPalette;
-    })
-  ]);
-}
-
-function getTokenHudCounterFlagData(effectDoc) {
-  const data = foundry.utils.getProperty(effectDoc, `flags.${SYSTEM_ID}.${TOKEN_HUD_COUNTER_FLAG_KEY}`);
-  return data && typeof data === "object" ? data : null;
-}
-
-function isTokenHudCounterEffect(effectDoc, statusId = "") {
-  const flagData = getTokenHudCounterFlagData(effectDoc);
-  if (!flagData) return false;
-  if (!statusId) return true;
-  return normalizeStatusValue(flagData.statusId) === normalizeStatusValue(statusId);
-}
-
-function getTokenHudCounterEffects(actor, statusId = "") {
-  const normalizedStatusId = normalizeStatusValue(statusId);
-  return getActorEffectDocuments(actor).filter(effectDoc => {
-    if (!isTokenHudCounterEffect(effectDoc)) return false;
-    if (!normalizedStatusId) return true;
-    return isTokenHudCounterEffect(effectDoc, normalizedStatusId);
-  });
-}
-
-async function clearTokenHudCounterEffects(actor, statusId = "") {
-  const counterEffects = getTokenHudCounterEffects(actor, statusId);
-  if (!counterEffects.length) return false;
-  return deleteStatusEffectDocuments(counterEffects);
-}
-
-async function cleanupTokenHudOrphanCounterEffects(actor) {
-  if (!actor) return false;
-  const orphanEffects = [];
-  for (const effectDoc of getTokenHudCounterEffects(actor)) {
-    const statusId = normalizeStatusValue(getTokenHudCounterFlagData(effectDoc)?.statusId);
-    if (!statusId) {
-      orphanEffects.push(effectDoc);
-      continue;
-    }
-    if (!actorHasStatusInFamily(actor, [statusId])) orphanEffects.push(effectDoc);
-  }
-  if (!orphanEffects.length) return false;
-  return deleteStatusEffectDocuments(orphanEffects);
-}
-
-function buildTokenHudTurnDurationData(turns) {
-  return {
-    value: null,
-    units: "seconds",
-    expiry: null
-  };
-}
-
-function buildTokenHudCounterDurationData() {
-  return {
-    value: null,
-    units: "seconds",
-    expiry: null
-  };
-}
-
-function buildTokenHudCounterIconPath(path, statusId, roundCount) {
-  const source = String(path || "").trim();
-  if (!source) return source;
-  const separator = source.includes("?") ? "&" : "?";
-  const status = encodeURIComponent(normalizeStatusValue(statusId) || "status");
-  const round = encodeURIComponent(String(roundCount || TOKEN_HUD_TURN_MIN));
-  return `${source}${separator}bmCounter=${status}-${round}`;
-}
-
-function resolveTokenHudEffectOrigin(tokenDoc) {
-  const uuid = String(tokenDoc?.uuid || "").trim();
-  return uuid ? uuid : null;
-}
-
-function buildTokenHudEmptyEffectChangesData() {
-  const data = { changes: [] };
-  if (isV14Plus()) data.system = { changes: [] };
-  return data;
-}
-
-async function setTokenHudEffectDuration(effectDoc, turns) {
-  if (!effectDoc) return false;
-  const duration = buildTokenHudTurnDurationData(turns);
-  await effectDoc.update({
-    duration,
-    showIcon: globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.NEVER ?? 0
-  }).catch(() => null);
-  return true;
-}
-
-function getTokenHudPrimaryStatusEffectDocument(actor, statusId) {
-  const normalizedStatusId = normalizeStatusValue(statusId);
-  if (!actor || !normalizedStatusId) return null;
-  const candidates = getActorStatusEffectDocumentsByFamily(actor, [normalizedStatusId]);
-  for (const effectDoc of candidates) {
-    if (isTokenHudCounterEffect(effectDoc)) continue;
-    const statusIds = getActiveEffectStatusIds(effectDoc);
-    if (statusIds.includes(normalizedStatusId)) return effectDoc;
-  }
-  return candidates.find(effectDoc => !isTokenHudCounterEffect(effectDoc)) || null;
-}
-
-function buildTokenHudTurnCounterEffectPayloads({ statusId, turns, primaryEffect, tokenDoc }) {
-  const totalTurns = clampTokenHudTurnValue(turns);
-  const statusDef = findStatusEffect([statusId]) || null;
-  const statusNameKey = String(statusDef?.name ?? statusDef?.label ?? "").trim();
-  const statusName = statusNameKey
-    ? (game.i18n?.has?.(statusNameKey) ? game.i18n.localize(statusNameKey) : statusNameKey)
-    : String(primaryEffect?.name || statusId || "Etat").trim();
-  const rawStatusImg = String(statusDef?.img || statusDef?.icon || primaryEffect?.img || "icons/svg/aura.svg").trim();
-  const statusImg = resolveTokenHudLocalSvgIconPath(rawStatusImg) || rawStatusImg;
-  const normalizedStatusId = normalizeStatusValue(statusId);
-  const tokenRef = resolveTokenHudEffectOrigin(tokenDoc);
-  const payloads = [];
-
-  for (let roundCount = TOKEN_HUD_TURN_MIN; roundCount <= totalTurns; roundCount += 1) {
-    payloads.push({
-      name: `${statusName} (${roundCount})`,
-      img: buildTokenHudCounterIconPath(statusImg, normalizedStatusId, roundCount),
-      ...(tokenRef ? { origin: tokenRef } : {}),
-      statuses: [],
-      ...buildTokenHudEmptyEffectChangesData(),
-      duration: buildTokenHudCounterDurationData(),
-      showIcon: globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2,
-      flags: {
-        [SYSTEM_ID]: {
-          [TOKEN_HUD_COUNTER_FLAG_KEY]: {
-            statusId: normalizedStatusId,
-            token: tokenRef,
-            rounds: roundCount
-          }
-        }
-      }
-    });
-  }
-
-  return payloads;
-}
-
-async function applyTokenHudStatusTurnSelection(hud, statusId, { active = true, turns = TOKEN_HUD_TURN_MIN, overlay = false } = {}) {
-  const tokenDoc = getTokenDocumentFromPlaceable(hud?.document || hud?.object);
-  const actor = getTokenHudActorForDocument(tokenDoc, hud?.actor || null);
-  const normalizedStatusId = normalizeStatusValue(statusId);
-  if (!actor || !normalizedStatusId || typeof actor.toggleStatusEffect !== "function") return false;
-
-  await clearTokenHudCounterEffects(actor, normalizedStatusId);
-
-  try {
-    await actor.toggleStatusEffect(statusId, { active: Boolean(active), overlay: Boolean(overlay) });
-  } catch (error) {
-    bmLog.warn("[bloodman] token HUD status toggle failed", { statusId, error });
-    return false;
-  }
-
-  if (!active) {
-    await cleanupTokenHudOrphanCounterEffects(actor);
-    return true;
-  }
-
-  const primaryEffect = getTokenHudPrimaryStatusEffectDocument(actor, normalizedStatusId);
-  if (!primaryEffect) return true;
-
-  const totalTurns = clampTokenHudTurnValue(turns);
-  await setTokenHudEffectDuration(primaryEffect, totalTurns);
-
-  const payloads = buildTokenHudTurnCounterEffectPayloads({
-    statusId: normalizedStatusId,
-    turns: totalTurns,
-    primaryEffect,
-    tokenDoc
-  });
-  if (payloads.length) {
-    await actor.createEmbeddedDocuments("ActiveEffect", payloads).catch(error => {
-      bmLog.warn("[bloodman] token HUD counter effects creation failed", { statusId: normalizedStatusId, error });
-    });
-  }
-
-  await cleanupTokenHudOrphanCounterEffects(actor);
-  return true;
-}
-
-async function applyTokenHudStatusTurnSelectionToDocuments(hud, tokenDocs = [], statusId, options = {}) {
-  const docs = Array.isArray(tokenDocs) && tokenDocs.length
-    ? tokenDocs
-    : getTokenHudTargetTokenDocuments(hud);
-  let changed = false;
-
-  for (const tokenDoc of docs) {
-    const actor = getTokenHudActorForDocument(tokenDoc, hud?.actor || null);
-    if (!actor) continue;
-    const applied = await applyTokenHudStatusTurnSelection({
-      actor,
-      document: tokenDoc,
-      object: { document: tokenDoc }
-    }, statusId, options);
-    changed = applied || changed;
-  }
-
-  return changed;
-}
-
-function buildTokenHudTurnLabel(turns) {
-  const count = clampTokenHudTurnValue(turns);
-  return `${count} ${count > 1 ? "TOURS" : "TOUR"}`;
-}
-
-function getTokenHudTurnFieldValue(turnField) {
-  if (turnField instanceof HTMLSelectElement) {
-    return clampTokenHudTurnValue(turnField.value);
-  }
-  if (!(turnField instanceof HTMLElement)) return TOKEN_HUD_TURN_MIN;
-  const valueInput = turnField.querySelector(".bm-token-hud-turn-value");
-  if (valueInput instanceof HTMLInputElement) return clampTokenHudTurnValue(valueInput.value);
-  return clampTokenHudTurnValue(turnField.dataset.turns || TOKEN_HUD_TURN_MIN);
-}
-
-function setTokenHudTurnFieldValue(turnField, turns) {
-  const value = String(clampTokenHudTurnValue(turns));
-  if (turnField instanceof HTMLSelectElement) {
-    turnField.value = value;
-    return;
-  }
-  if (!(turnField instanceof HTMLElement)) return;
-  turnField.dataset.turns = value;
-  const valueInput = turnField.querySelector(".bm-token-hud-turn-value");
-  if (valueInput instanceof HTMLInputElement) valueInput.value = value;
-  const label = turnField.querySelector(".bm-token-hud-turn-label");
-  if (label instanceof HTMLElement) label.textContent = buildTokenHudTurnLabel(value);
-  const options = turnField.querySelectorAll(".bm-token-hud-turn-option[data-turns]");
-  for (const option of options) {
-    if (!(option instanceof HTMLElement)) continue;
-    const isSelected = option.dataset.turns === value;
-    option.classList.toggle("is-selected", isSelected);
-    option.setAttribute("aria-selected", isSelected ? "true" : "false");
-  }
-}
-
-function buildTokenHudTurnControlContent(wrapper) {
-  if (!(wrapper instanceof HTMLElement)) return null;
-  wrapper.replaceChildren();
-
-  const valueInput = document.createElement("input");
-  valueInput.type = "hidden";
-  valueInput.className = "bm-token-hud-turn-value";
-  valueInput.name = "bm-token-hud-turns";
-
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "bm-token-hud-turn-toggle";
-  toggle.setAttribute("aria-label", "Nombre de tours d'effet");
-  toggle.title = "Nombre de tours d'attribution d'effet d'etat (1 a 12)";
-
-  const label = document.createElement("span");
-  label.className = "bm-token-hud-turn-label";
-  label.textContent = buildTokenHudTurnLabel(TOKEN_HUD_TURN_MIN);
-
-  const caret = document.createElement("i");
-  caret.className = "fa-solid fa-chevron-down bm-token-hud-turn-caret";
-  caret.setAttribute("inert", "");
-
-  toggle.append(label, caret);
-
-  const menu = document.createElement("div");
-  menu.className = "bm-token-hud-turn-menu";
-  menu.setAttribute("role", "listbox");
-
-  for (let turns = TOKEN_HUD_TURN_MIN; turns <= TOKEN_HUD_TURN_MAX; turns += 1) {
-    const option = document.createElement("button");
-    option.type = "button";
-    option.className = "bm-token-hud-turn-option";
-    option.dataset.turns = String(turns);
-    option.setAttribute("role", "option");
-    option.setAttribute("aria-selected", "false");
-    option.textContent = buildTokenHudTurnLabel(turns);
-    menu.appendChild(option);
-  }
-
-  wrapper.append(valueInput, toggle, menu);
-  return wrapper;
-}
-
-function positionTokenHudTurnControl(root, wrapper) {
-  if (!(root instanceof HTMLElement) || !(wrapper instanceof HTMLElement)) return;
-  wrapper.style.left = "50%";
-  wrapper.style.top = "calc(-1 * var(--control-size) - 16px)";
-  wrapper.style.transform = "translateX(-50%)";
-}
-
-function ensureTokenHudTurnControl(root, hud) {
-  const effectsPalette = resolveTokenHudEffectsPalette(root);
-  const effectsButton = resolveTokenHudEffectsButton(root);
-  const anchorButton = effectsButton instanceof HTMLElement
-    ? effectsButton
-    : (effectsPalette?.previousElementSibling instanceof HTMLElement ? effectsPalette.previousElementSibling : null);
-  if (!(anchorButton instanceof HTMLElement)) return null;
-
-  let wrapper = root.querySelector(".bm-token-hud-turn-control");
-  if (!(wrapper instanceof HTMLElement)) {
-    wrapper = document.createElement("div");
-    wrapper.className = "bm-token-hud-turn-control";
-    buildTokenHudTurnControlContent(wrapper);
-  } else if (!(wrapper.querySelector(".bm-token-hud-turn-toggle") instanceof HTMLElement)) {
-    buildTokenHudTurnControlContent(wrapper);
-  }
-
-  const legacyInput = wrapper.querySelector(".bm-token-hud-turn-field");
-  if (legacyInput instanceof HTMLElement) legacyInput.remove();
-  const legacySuffix = wrapper.querySelector(".bm-token-hud-turn-suffix");
-  if (legacySuffix instanceof HTMLElement) legacySuffix.remove();
-  const legacySelect = wrapper.querySelector(".bm-token-hud-turn-select");
-  if (legacySelect instanceof HTMLElement) legacySelect.remove();
-
-  if (wrapper.parentElement !== root) root.appendChild(wrapper);
-  wrapper.classList.add("is-visible");
-  positionTokenHudTurnControl(root, wrapper);
-
-  const turnField = wrapper;
-
-  const tokenKey = getTokenHudStorageKey(hud?.document || hud?.object?.document || null);
-  const selectedTurns = tokenKey ? TOKEN_HUD_TURN_SELECTION_BY_TOKEN.get(tokenKey) : null;
-  setTokenHudTurnFieldValue(turnField, selectedTurns ?? TOKEN_HUD_TURN_MIN);
-
-  const selectedStatus = tokenKey ? TOKEN_HUD_LAST_STATUS_BY_TOKEN.get(tokenKey) : "";
-  if (selectedStatus) turnField.dataset.statusId = selectedStatus;
-
-  return turnField;
-}
-
-function syncTokenHudTurnControlUi(root) {
-  if (!(root instanceof HTMLElement)) return;
-  const wrapper = root.querySelector(".bm-token-hud-turn-control");
-  if (!(wrapper instanceof HTMLElement)) return;
-  wrapper.classList.add("is-visible");
-  positionTokenHudTurnControl(root, wrapper);
-}
-
-function bindTokenHudTurnControlEvents(root, hud, turnField) {
-  if (!(root instanceof HTMLElement) || !(turnField instanceof HTMLElement)) return;
-
-  if (turnField.dataset.bmTokenHudTurnsBound !== "true") {
-    const applyTurnValue = () => {
-      const turns = getTokenHudTurnFieldValue(turnField);
-      setTokenHudTurnFieldValue(turnField, turns);
-      const tokenKey = getTokenHudStorageKey(hud?.document || hud?.object?.document || null);
-      if (tokenKey) TOKEN_HUD_TURN_SELECTION_BY_TOKEN.set(tokenKey, turns);
-
-      const statusId = String(turnField.dataset.statusId || "").trim();
-      if (!statusId) return;
-      const tokenDocs = getTokenHudTargetTokenDocuments(hud)
-        .filter(tokenDoc => tokenHasStatusInFamily(tokenDoc, [statusId]));
-      if (!tokenDocs.length) return;
-      rememberTokenHudStatusSelection(tokenDocs, statusId, turns);
-
-      void applyTokenHudStatusTurnSelectionToDocuments(hud, tokenDocs, statusId, { active: true, turns, overlay: false });
-    };
-
-    const toggle = turnField.querySelector(".bm-token-hud-turn-toggle");
-    const menu = turnField.querySelector(".bm-token-hud-turn-menu");
-    const closeMenu = () => menu?.classList.remove("is-open");
-
-    if (toggle instanceof HTMLButtonElement && menu instanceof HTMLElement) {
-      toggle.addEventListener("click", event => {
-        event.preventDefault();
-        event.stopPropagation();
-        menu.classList.toggle("is-open");
-      });
-
-      menu.addEventListener("click", event => {
-        const option = event.target instanceof HTMLElement
-          ? event.target.closest(".bm-token-hud-turn-option[data-turns]")
-          : null;
-        if (!(option instanceof HTMLElement)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setTokenHudTurnFieldValue(turnField, option.dataset.turns || TOKEN_HUD_TURN_MIN);
-        applyTurnValue();
-        closeMenu();
-      });
-
-      root.addEventListener("click", event => {
-        const target = event.target;
-        if (target instanceof Node && turnField.contains(target)) return;
-        closeMenu();
-      });
-      root.addEventListener("contextmenu", () => closeMenu());
-    }
-
-    turnField.dataset.bmTokenHudTurnsBound = "true";
-  }
-
-  const effectsPalette = resolveTokenHudEffectsPalette(root);
-  if (effectsPalette && effectsPalette.dataset.bmTokenHudPaletteBound !== "true") {
-    const handleEffectSelection = event => {
-      const target = event.target instanceof HTMLElement
-        ? event.target.closest(".effect-control[data-status-id]")
-        : null;
-      if (!(target instanceof HTMLElement) || !effectsPalette.contains(target)) return;
-      const statusId = String(target.dataset.statusId || "").trim();
-      if (!statusId) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      const turns = getTokenHudTurnFieldValue(turnField);
-      setTokenHudTurnFieldValue(turnField, turns);
-      turnField.dataset.statusId = statusId;
-      const tokenDocs = getTokenHudTargetTokenDocuments(hud);
-      rememberTokenHudStatusSelection(tokenDocs, statusId, turns);
-
-      const nextActive = tokenDocs.length
-        ? !tokenDocs.every(tokenDoc => tokenHasStatusInFamily(tokenDoc, [statusId]))
-        : !target.classList.contains("active");
-      const overlay = event.type === "contextmenu";
-      void applyTokenHudStatusTurnSelectionToDocuments(hud, tokenDocs, statusId, { active: nextActive, turns, overlay });
-    };
-
-    effectsPalette.addEventListener("click", handleEffectSelection, true);
-    effectsPalette.addEventListener("contextmenu", handleEffectSelection, true);
-    effectsPalette.dataset.bmTokenHudPaletteBound = "true";
-  }
-
-  if (root.dataset.bmTokenHudSyncBound !== "true") {
-    const scheduleSync = () => {
-      requestAnimationFrame(() => syncTokenHudTurnControlUi(root));
-    };
-    root.addEventListener("click", scheduleSync);
-    root.addEventListener("contextmenu", scheduleSync);
-    root.dataset.bmTokenHudSyncBound = "true";
-  }
-}
-
-function configureTokenHudEnhancements(hud, htmlLike) {
-  const root = getTokenHudRootElement(htmlLike, hud?.element);
-  if (!root) return;
-
-  void ensureTokenHudLocalSvgIcons({ copyMissing: false });
-  refreshTokenHudStatusEffectIconPaths({ bumpCache: false });
-
-  root.classList.add("bm-token-hud");
-  root.dataset.bmTokenHudEnhanced = "true";
-
-  const turnField = ensureTokenHudTurnControl(root, hud);
-  if (!(turnField instanceof HTMLElement)) return;
-
-  bindTokenHudTurnControlEvents(root, hud, turnField);
-  syncTokenHudTurnControlUi(root);
-
-  const actor = hud?.actor || hud?.document?.actor || null;
-  if (actor) void cleanupTokenHudOrphanCounterEffects(actor);
-}
-
-function installTokenHudRenderPatch() {
-  const hudClass = CONFIG?.Token?.hudClass;
-  if (!hudClass?.prototype) return false;
-  const proto = hudClass.prototype;
-  if (proto[TOKEN_HUD_RENDER_PATCH_FLAG] === true) return true;
-
-  const originalOnRender = proto._onRender;
-  if (typeof originalOnRender !== "function") return false;
-
-  proto._onRender = async function (...args) {
-    const response = await originalOnRender.apply(this, args);
-    try {
-      configureTokenHudEnhancements(this, this.element);
-    } catch (error) {
-      bmLog.warn("[bloodman] token HUD enhancement (patched render) skipped", error);
-    }
-    return response;
-  };
-
-  Object.defineProperty(proto, TOKEN_HUD_RENDER_PATCH_FLAG, {
-    value: true,
-    configurable: false,
-    enumerable: false,
-    writable: false
-  });
-
-  return true;
-}
-
-function scheduleTokenHudDomEnhancement(attempt = 0) {
-  if (TOKEN_HUD_DOM_SYNC_FRAME !== null) return;
-  TOKEN_HUD_DOM_SYNC_FRAME = requestAnimationFrame(() => {
-    TOKEN_HUD_DOM_SYNC_FRAME = null;
-    const root = document.getElementById("token-hud");
-    if (!(root instanceof HTMLElement)) {
-      if (attempt < 8) setTimeout(() => scheduleTokenHudDomEnhancement(attempt + 1), 40);
-      return;
-    }
-    const hud = canvas?.hud?.token || null;
-    try {
-      configureTokenHudEnhancements(hud, root);
-    } catch (error) {
-      bmLog.warn("[bloodman] token HUD enhancement (dom observer) skipped", error);
-    }
-    const hasTurnControl = Boolean(root.querySelector(".bm-token-hud-turn-control"));
-    if (!hasTurnControl && attempt < 8) setTimeout(() => scheduleTokenHudDomEnhancement(attempt + 1), 40);
-  });
-}
-
-function installTokenHudDomObserver() {
-  if (TOKEN_HUD_DOM_OBSERVER) return true;
-  if (typeof MutationObserver !== "function") return false;
-  const hudContainer = document.getElementById("hud");
-  if (!(hudContainer instanceof HTMLElement)) return false;
-
-  TOKEN_HUD_DOM_OBSERVER = new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-      if (mutation.type !== "childList") continue;
-      const added = Array.from(mutation.addedNodes || []).some(node => {
-        return node instanceof HTMLElement && (node.id === "token-hud" || Boolean(node.querySelector?.("#token-hud")));
-      });
-      if (added) {
-        scheduleTokenHudDomEnhancement();
-        return;
-      }
-      const removedTokenHud = Array.from(mutation.removedNodes || []).some(node => node instanceof HTMLElement && node.id === "token-hud");
-      if (removedTokenHud) {
-        TOKEN_HUD_DOM_SYNC_FRAME = null;
-      }
-    }
-  });
-
-  TOKEN_HUD_DOM_OBSERVER.observe(hudContainer, { childList: true });
-  scheduleTokenHudDomEnhancement();
-  return true;
-}
-
-function setTokenEffectBackgroundTransparent(target) {
-  if (!target || target.destroyed) return false;
-  let changed = false;
-  if (typeof target.clear === "function") {
-    try {
-      target.clear();
-      changed = true;
-    } catch (_error) {
-      // no-op
-    }
-  }
-  if ("alpha" in target && target.alpha !== 0) {
-    target.alpha = 0;
-    changed = true;
-  }
-  if ("visible" in target && target.visible !== false) {
-    target.visible = false;
-    changed = true;
-  }
-  if ("renderable" in target && target.renderable !== false) {
-    target.renderable = false;
-    changed = true;
-  }
-  return changed;
-}
-
-function applyTransparentTokenEffectBackground(tokenLike) {
-  const tokenObject = tokenLike?.object || tokenLike || null;
-  if (!tokenObject) return false;
-
-  const roots = [
-    tokenObject.effects,
-    tokenObject.effectContainer,
-    tokenObject.effectsContainer,
-    tokenObject._effects
-  ].filter(root => root && typeof root === "object");
-  if (!roots.length) return false;
-
-  let changed = false;
-  for (const root of roots) {
-    changed = setTokenEffectBackgroundTransparent(root?.bg) || changed;
-    changed = setTokenEffectBackgroundTransparent(root?.background) || changed;
-    changed = setTokenEffectBackgroundTransparent(root?.backdrop) || changed;
-
-    const children = Array.isArray(root?.children) ? root.children : [];
-    for (const child of children) {
-      const name = String(child?.name || "").trim().toLowerCase();
-      const isBackgroundLike = name === "bg" || name.includes("background") || name.includes("backdrop");
-      if (isBackgroundLike) changed = setTokenEffectBackgroundTransparent(child) || changed;
-      changed = setTokenEffectBackgroundTransparent(child?.bg) || changed;
-      changed = setTokenEffectBackgroundTransparent(child?.background) || changed;
-      changed = setTokenEffectBackgroundTransparent(child?.backdrop) || changed;
-    }
-  }
-
-  return changed;
-}
-
-function installTokenEffectBackgroundPatch() {
-  const tokenClass = CONFIG?.Token?.objectClass || globalThis.Token;
-  if (!tokenClass?.prototype) return false;
-  const proto = tokenClass.prototype;
-  if (proto[TOKEN_EFFECT_BG_PATCH_FLAG] === true) return true;
-
-  const originalDrawEffects = proto.drawEffects;
-  if (typeof originalDrawEffects !== "function") return false;
-
-  proto.drawEffects = function (...args) {
-    const finalize = () => {
-      try {
-        applyTransparentTokenEffectBackground(this);
-      } catch (error) {
-        bmLog.warn("[bloodman] token effect background transparency patch skipped", error);
-      }
-    };
-
-    const result = originalDrawEffects.apply(this, args);
-    if (result && typeof result.then === "function") {
-      return result.then(value => {
-        finalize();
-        return value;
-      }).catch(error => {
-        finalize();
-        throw error;
-      });
-    }
-    finalize();
-    return result;
-  };
-
-  Object.defineProperty(proto, TOKEN_EFFECT_BG_PATCH_FLAG, {
-    value: true,
-    configurable: false,
-    enumerable: false,
-    writable: false
-  });
-
-  return true;
-}
-
 function getTokenActorType(tokenDoc) {
-  const actorType = tokenDoc?.actor?.type;
-  if (actorType) return actorType;
-  const worldActorType = tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId)?.type : "";
-  return worldActorType || "";
-}
-
-function shouldResetTokenScale(scaleValue) {
-  const numeric = Number(scaleValue);
-  if (!Number.isFinite(numeric)) return true;
-  return Math.abs(numeric) < 0.0001;
-}
-
-function shouldResetTokenOffset(offsetValue) {
-  if (offsetValue == null) return false;
-  const numeric = Number(offsetValue);
-  if (!Number.isFinite(numeric)) return true;
-  return Math.abs(numeric) > 0.0001;
-}
-
-function shouldResetTokenFit(fitValue) {
-  return String(fitValue || "").trim().toLowerCase() !== "fill";
+  return getZeroPvStatusController().getTokenActorType(tokenDoc);
 }
 
 function isPvBarAttribute(attribute) {
-  if (!attribute) return false;
-  return /(^|\\.)resources\\.pv(\\.|$)/.test(String(attribute));
+  return getZeroPvStatusController().isPvBarAttribute(attribute);
 }
 
 function getTokenBarPvValue(tokenDoc) {
-  const bar1Value = Number(foundry.utils.getProperty(tokenDoc, "bar1.value"));
-  const bar1Attr = foundry.utils.getProperty(tokenDoc, "bar1.attribute");
-  if (Number.isFinite(bar1Value) && isPvBarAttribute(bar1Attr)) return bar1Value;
-  const bar2Value = Number(foundry.utils.getProperty(tokenDoc, "bar2.value"));
-  const bar2Attr = foundry.utils.getProperty(tokenDoc, "bar2.attribute");
-  if (Number.isFinite(bar2Value) && isPvBarAttribute(bar2Attr)) return bar2Value;
-  return NaN;
+  return getZeroPvStatusController().getTokenBarPvValue(tokenDoc);
 }
 
 function getTokenCurrentPv(tokenDoc) {
-  const deltaCurrent = Number(foundry.utils.getProperty(tokenDoc, "delta.system.resources.pv.current"));
-  const actorDataCurrent = Number(foundry.utils.getProperty(tokenDoc, "actorData.system.resources.pv.current"));
-  const actorCurrent = Number(tokenDoc?.actor?.system?.resources?.pv?.current);
-  const barCurrent = getTokenBarPvValue(tokenDoc);
-  const isLinked = tokenDoc?.actorLink === true;
-  if (isLinked) {
-    if (Number.isFinite(actorCurrent)) return actorCurrent;
-    if (Number.isFinite(deltaCurrent)) return deltaCurrent;
-    if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
-  } else {
-    if (Number.isFinite(deltaCurrent)) return deltaCurrent;
-    if (Number.isFinite(actorDataCurrent)) return actorDataCurrent;
-    if (Number.isFinite(barCurrent)) return barCurrent;
-    if (Number.isFinite(actorCurrent)) return actorCurrent;
-  }
-  if (Number.isFinite(barCurrent)) return barCurrent;
-  const worldActorCurrent = Number(game.actors?.get(tokenDoc?.actorId)?.system?.resources?.pv?.current);
-  return worldActorCurrent;
+  return getZeroPvStatusController().getTokenCurrentPv(tokenDoc);
 }
 
 function getTokenPvFromUpdate(tokenDoc, changes) {
-  const deltaCurrent = foundry.utils.getProperty(changes, "delta.system.resources.pv.current");
-  if (deltaCurrent != null) return Number(deltaCurrent);
-  const actorDataCurrent = foundry.utils.getProperty(changes, "actorData.system.resources.pv.current");
-  if (actorDataCurrent != null) return Number(actorDataCurrent);
-  const legacyCurrent = foundry.utils.getProperty(changes, "system.resources.pv.current");
-  if (legacyCurrent != null) return Number(legacyCurrent);
-  const bar1Value = foundry.utils.getProperty(changes, "bar1.value");
-  const bar1Attr = foundry.utils.getProperty(tokenDoc, "bar1.attribute");
-  if (bar1Value != null && isPvBarAttribute(bar1Attr)) return Number(bar1Value);
-  const bar2Value = foundry.utils.getProperty(changes, "bar2.value");
-  const bar2Attr = foundry.utils.getProperty(tokenDoc, "bar2.attribute");
-  if (bar2Value != null && isPvBarAttribute(bar2Attr)) return Number(bar2Value);
-  return null;
+  return getZeroPvStatusController().getTokenPvFromUpdate(tokenDoc, changes);
 }
 
 async function syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent) {
-  if (!tokenDoc) return;
-  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
-
-  const isZeroOrLess = Number(pvCurrent) <= 0;
-  await syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess);
-  const bleeding = getBleedingStatusEffect();
-  const dead = getDeadStatusEffect();
-
-  const bleedingFamily = buildStatusFamilyIds(bleeding, PLAYER_ZERO_PV_STATUS_CANDIDATES);
-  const deadFamily = getNpcDeadStatusFamilyIds(dead);
-
-  if (tokenDoc.actorLink === true) {
-    await removeTokenStatusOverrides(tokenDoc, [...bleedingFamily, ...deadFamily]);
-  }
-
-  if (actorType === "personnage") {
-    if (bleeding) {
-      const okBleed = await setTokenStatusEffect(tokenDoc, bleeding, isZeroOrLess, bleedingFamily);
-      if (!okBleed) bmLog.warn("[bloodman] status:bleeding sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
-    }
-    if (dead) {
-      const okDeadClear = await setTokenStatusEffect(tokenDoc, dead, false, deadFamily);
-      if (!okDeadClear) bmLog.warn("[bloodman] status:dead clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
-    }
-  } else {
-    if (dead) {
-      const okDead = await setTokenStatusEffect(tokenDoc, dead, isZeroOrLess, deadFamily);
-      if (!okDead) bmLog.warn("[bloodman] status:dead sync failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
-    }
-    if (bleeding) {
-      const okBleedClear = await setTokenStatusEffect(tokenDoc, bleeding, false, bleedingFamily);
-      if (!okBleedClear) bmLog.warn("[bloodman] status:bleeding clear failed", { tokenId: tokenDoc.id, pvCurrent, actorType });
-    }
-  }
-
-  if (typeof tokenDoc?.object?.drawEffects === "function") {
-    tokenDoc.object.drawEffects();
-    applyTransparentTokenEffectBackground(tokenDoc.object);
-  }
+  return getZeroPvStatusController().syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
 }
 
 async function syncNpcDeadStatusToZeroPvForToken(tokenDoc, actorType = "") {
-  if (!tokenDoc) return false;
-  const resolvedActorType = String(actorType || getTokenActorType(tokenDoc) || "").trim();
-  if (resolvedActorType !== "personnage-non-joueur") return false;
-
-  const deadFamily = getNpcDeadStatusFamilyIds();
-  if (!deadFamily.length || !tokenHasStatusInFamily(tokenDoc, deadFamily)) return false;
-  const pvCurrent = getTokenCurrentPv(tokenDoc);
-  if (!Number.isFinite(pvCurrent) || pvCurrent <= 0) return false;
-
-  try {
-    if (tokenDoc.actorLink === true) {
-      const actor = tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null);
-      if (!actor?.update) return false;
-      await actor.update({ "system.resources.pv.current": 0 });
-    } else {
-      await tokenDoc.update({ "delta.system.resources.pv.current": 0 });
-    }
-  } catch (error) {
-    bmLog.warn("[bloodman] npc dead status HP sync failed", {
-      tokenId: tokenDoc.id,
-      actorType: resolvedActorType,
-      error
-    });
-    return false;
-  }
-
-  await syncZeroPvStatusForToken(tokenDoc, resolvedActorType, 0);
-  return true;
+  return getZeroPvStatusController().syncNpcDeadStatusToZeroPvForToken(tokenDoc, actorType);
 }
 
 async function syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc) {
-  if (!game.user?.isGM || !effectDoc) return false;
-  const actor = effectDoc.parent && String(effectDoc.parent.documentName || "") === "Actor"
-    ? effectDoc.parent
-    : null;
-  if (!actor || actor.type !== "personnage-non-joueur") return false;
-
-  if (actor.isToken) {
-    const tokenDoc = actor.token || actor.parent || null;
-    if (!tokenDoc) return false;
-    return syncNpcDeadStatusToZeroPvForToken(tokenDoc, actor.type);
-  }
-
-  const deadFamily = getNpcDeadStatusFamilyIds();
-  if (!deadFamily.length || !actorHasStatusInFamily(actor, deadFamily)) return false;
-  const pvCurrent = Number(actor.system?.resources?.pv?.current);
-  if (!Number.isFinite(pvCurrent) || pvCurrent <= 0) return false;
-  await actor.update({ "system.resources.pv.current": 0 });
-  await syncZeroPvStatusForActor(actor);
-  return true;
+  return getZeroPvStatusController().syncNpcDeadStatusToZeroPvFromActiveEffect(effectDoc);
 }
 if (!globalThis.__bmSyncZeroPvStatusForToken) {
   globalThis.__bmSyncZeroPvStatusForToken = syncZeroPvStatusForToken;
 }
 
 function getTokenDocumentsForActor(actor) {
-  const actorId = actor?.id;
-  if (!actorId) return [];
-  const caches = getResolvedActorDocumentCaches();
-  const cachedDocs = caches.tokenDocsByActorId.get(actorId);
-  if (Array.isArray(cachedDocs)) return cachedDocs;
-  const docs = [];
-  for (const scene of game.scenes || []) {
-    for (const tokenDoc of scene.tokens || []) {
-      if (tokenDoc.actorId === actorId) docs.push(tokenDoc);
-    }
-  }
-  caches.tokenDocsByActorId.set(actorId, docs);
-  return docs;
+  return getOpenActorSheetController().getTokenDocumentsForActor(actor);
 }
 
 function getActorDocumentInstanceKey(actorDoc) {
-  if (!actorDoc) return "";
-  return String(actorDoc.uuid || `${actorDoc.id}:${actorDoc.parent?.uuid || actorDoc.parent?.id || "world"}`);
+  return getOpenActorSheetController().getActorDocumentInstanceKey(actorDoc);
 }
 
-const RESOLVED_ACTOR_DOCUMENT_CACHES = {
-  tokenDocsByActorId: new Map(),
-  actorInstancesById: new Map(),
-  ownedCharacterActorInstances: null
-};
-
 function getResolvedActorDocumentCaches() {
-  return RESOLVED_ACTOR_DOCUMENT_CACHES;
+  return getOpenActorSheetController().getResolvedActorDocumentCaches();
 }
 
 function clearResolvedActorDocumentCaches() {
-  const caches = RESOLVED_ACTOR_DOCUMENT_CACHES;
-  caches.tokenDocsByActorId.clear();
-  caches.actorInstancesById.clear();
-  caches.ownedCharacterActorInstances = null;
+  return getOpenActorSheetController().clearResolvedActorDocumentCaches();
 }
 
 function getActorInstancesById(actorId) {
-  const id = String(actorId || "");
-  if (!id) return [];
-  const caches = getResolvedActorDocumentCaches();
-  const cachedInstances = caches.actorInstancesById.get(id);
-  if (Array.isArray(cachedInstances)) return cachedInstances;
-  const instances = [];
-  const seen = new Set();
-  const addInstance = actorDoc => {
-    if (!actorDoc) return;
-    const key = getActorDocumentInstanceKey(actorDoc);
-    if (seen.has(key)) return;
-    seen.add(key);
-    instances.push(actorDoc);
-  };
-
-  addInstance(game.actors?.get(id));
-  for (const scene of game.scenes || []) {
-    for (const tokenDoc of scene.tokens || []) {
-      if (String(tokenDoc.actorId || "") !== id) continue;
-      addInstance(tokenDoc.actor || null);
-    }
-  }
-  caches.actorInstancesById.set(id, instances);
-  return instances;
+  return getOpenActorSheetController().getActorInstancesById(actorId);
 }
 
 function getOwnedCharacterActorInstances() {
-  const caches = getResolvedActorDocumentCaches();
-  if (Array.isArray(caches.ownedCharacterActorInstances)) return caches.ownedCharacterActorInstances;
-  const instances = [];
-  const seen = new Set();
-  const addInstance = actorDoc => {
-    if (!actorDoc || !actorDoc.isOwner) return;
-    const type = String(actorDoc.type || "");
-    if (type !== "personnage" && type !== "personnage-non-joueur") return;
-    const key = getActorDocumentInstanceKey(actorDoc);
-    if (seen.has(key)) return;
-    seen.add(key);
-    instances.push(actorDoc);
-  };
-
-  for (const actor of game.actors || []) addInstance(actor);
-  for (const scene of game.scenes || []) {
-    for (const tokenDoc of scene.tokens || []) addInstance(tokenDoc.actor || null);
-  }
-  caches.ownedCharacterActorInstances = instances;
-  return instances;
+  return getOpenActorSheetController().getOwnedCharacterActorInstances();
 }
 
 function getOpenSheetActorInstances() {
-  const instances = [];
-  const seen = new Set();
-  for (const app of collectOpenApplications()) {
-    const actorDoc = getApplicationDocumentActor(app);
-    if (!actorDoc) continue;
-    const type = String(actorDoc.type || "");
-    if (type !== "personnage" && type !== "personnage-non-joueur") continue;
-    const key = getActorDocumentInstanceKey(actorDoc);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    instances.push(actorDoc);
-  }
-  return instances;
+  return getOpenActorSheetController().getOpenSheetActorInstances();
 }
 
 function getActorSheetMatchKeys(actor) {
-  if (!actor) return new Set();
-  return new Set([
-    String(actor.id || "").trim(),
-    String(actor.uuid || "").trim(),
-    String(actor.baseActor?.id || "").trim(),
-    String(actor.token?.actorId || "").trim()
-  ].filter(Boolean));
+  return getOpenActorSheetController().getActorSheetMatchKeys(actor);
 }
 
 function getActorSheetDomMatchTokens(actor) {
-  const tokens = new Set();
-  for (const key of getActorSheetMatchKeys(actor)) {
-    tokens.add(key);
-    tokens.add(key.replace(/\./g, "-"));
-  }
-  return [...tokens].filter(Boolean);
+  return getOpenActorSheetController().getActorSheetDomMatchTokens(actor);
 }
 
 function getOpenActorSheetApplicationsForActor(actor) {
-  const targetKeys = getActorSheetMatchKeys(actor);
-  const apps = [];
-  if (!targetKeys.size) return apps;
-  for (const app of collectOpenApplications()) {
-    const appActor = getApplicationDocumentActor(app);
-    if (!appActor) continue;
-    const appKeys = getActorSheetMatchKeys(appActor);
-    if (![...appKeys].some(key => targetKeys.has(key))) continue;
-    apps.push(app);
-  }
-  return apps;
+  return getOpenActorSheetController().getOpenActorSheetApplicationsForActor(actor);
 }
 
 function patchBackpackControlsInRoot(root, enabled) {
-  if (!root?.find) return false;
-  root.find(".bag-slots-toggle[data-bag-slots='yes']").prop("checked", Boolean(enabled));
-  root.find(".bag-slots-toggle[data-bag-slots='no']").prop("checked", !Boolean(enabled));
-  root.find(".objects-bag-list").toggleClass("is-disabled", !Boolean(enabled));
-  const limit = Boolean(enabled) ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
-  const indicator = root.find(".carry-slots-indicator").first();
-  if (indicator.length) {
-    const current = String(indicator.text() || "").split("/")[0]?.trim() || "0";
-    indicator.text(`${current} / ${limit}`);
-  }
-  return true;
+  return getOpenActorSheetController().patchBackpackControlsInRoot(root, enabled);
 }
 
 function patchOpenActorSheetBackpackControls(app, enabled) {
-  return patchBackpackControlsInRoot(getSheetElementWrapper(app), enabled);
+  return getOpenActorSheetController().patchOpenActorSheetBackpackControls(app, enabled);
 }
 
 function patchActorSheetDomBackpackControls(actor, enabled) {
-  const jq = globalThis.jQuery || globalThis.$;
-  if (typeof jq !== "function" || typeof document === "undefined") return 0;
-  const tokens = getActorSheetDomMatchTokens(actor);
-  if (!tokens.length) return 0;
-  let patched = 0;
-  const selector = ".app.bloodman.actor, .application.bloodman.actor, [id^='bloodman-actor-'], [id^='bloodman-npc-']";
-  for (const element of document.querySelectorAll(selector)) {
-    const id = String(element?.id || "");
-    if (!tokens.some(token => id.includes(token))) continue;
-    if (patchBackpackControlsInRoot(jq(element), enabled)) patched += 1;
-  }
-  return patched;
+  return getOpenActorSheetController().patchActorSheetDomBackpackControls(actor, enabled);
 }
 
 function renderOpenActorSheetsForActor(actor) {
-  for (const app of getOpenActorSheetApplicationsForActor(actor) || []) {
-    if (typeof app.render === "function") app.render(false);
-  }
+  return getOpenActorSheetController().renderOpenActorSheetsForActor(actor);
 }
 
 function updateOpenActorSheetsBackpackState(actor, enabled) {
-  for (const app of getOpenActorSheetApplicationsForActor(actor) || []) {
-    app._optimisticBagSlotsEnabled = Boolean(enabled);
-    patchOpenActorSheetBackpackControls(app, enabled);
-    if (typeof app.render === "function") app.render(false);
-  }
-  patchActorSheetDomBackpackControls(actor, enabled);
+  return getOpenActorSheetController().updateOpenActorSheetsBackpackState(actor, enabled);
 }
 
 function resolveAttackerActorInstancesForDamageApplied(data) {
-  const attackerId = String(data?.attackerId || data?.attaquant_id || "");
-  let instances = getActorInstancesById(attackerId);
-  if (instances.length) return instances;
-
-  const itemId = String(data?.itemId || "");
-  const candidates = [...getOwnedCharacterActorInstances(), ...getOpenSheetActorInstances()];
-  const deduped = [];
-  const seen = new Set();
-  for (const actor of candidates) {
-    const key = getActorDocumentInstanceKey(actor);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(actor);
-  }
-  if (!itemId) return deduped;
-  const withItem = deduped.filter(actor => actor.items?.get(itemId));
-  return withItem.length ? withItem : deduped;
+  return getOpenActorSheetController().resolveAttackerActorInstancesForDamageApplied(data);
 }
 
 async function syncZeroPvStatusForActor(actor) {
-  const actorType = actor?.type || "";
-  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return;
-  const pvCurrent = Number(actor.system?.resources?.pv?.current);
-  if (!Number.isFinite(pvCurrent)) return;
-  for (const tokenDoc of getTokenDocumentsForActor(actor)) {
-    if (!tokenDoc?.actorLink) continue;
-    await syncZeroPvStatusForToken(tokenDoc, actorType, pvCurrent);
-  }
+  return getZeroPvStatusController().syncZeroPvStatusForActor(actor);
 }
 
 async function syncInjuredStateStatusForActor(actor, active) {
-  const actorType = actor?.type || "";
-  if (actorType !== "personnage" && actorType !== "personnage-non-joueur") return false;
-  const bleeding = getBleedingStatusEffect();
-  const dead = getDeadStatusEffect();
-  const primaryEffect = actorType === "personnage" ? bleeding : dead;
-  const secondaryEffect = actorType === "personnage" ? dead : bleeding;
-  if (!primaryEffect) return false;
-  const bleedingFamily = buildStatusFamilyIds(bleeding, PLAYER_ZERO_PV_STATUS_CANDIDATES);
-  const deadFamily = getNpcDeadStatusFamilyIds(dead);
-  const primaryFamily = actorType === "personnage" ? bleedingFamily : deadFamily;
-  const secondaryFamily = actorType === "personnage" ? deadFamily : bleedingFamily;
-  const tokenDocs = actor.isToken
-    ? [actor.token || actor.parent || null].filter(Boolean)
-    : getTokenDocumentsForActor(actor);
-  let changed = false;
-  const targetDocs = tokenDocs.length ? tokenDocs : [{ actor, actorLink: true, id: actor.id }];
-
-  for (const tokenDoc of targetDocs) {
-    const okPrimary = await setTokenStatusEffect(tokenDoc, primaryEffect, Boolean(active), primaryFamily);
-    changed = changed || okPrimary;
-    if (secondaryEffect) {
-      const okSecondary = await setTokenStatusEffect(tokenDoc, secondaryEffect, false, secondaryFamily);
-      changed = changed || okSecondary;
-    }
-    if (typeof tokenDoc?.object?.drawEffects === "function") {
-      tokenDoc.object.drawEffects();
-      applyTransparentTokenEffectBackground(tokenDoc.object);
-    }
-  }
-  return changed;
+  return getZeroPvStatusController().syncInjuredStateStatusForActor(actor, active);
 }
 
 function resolveInjuredStateActive(label) {
-  return resolveStatePresetSelection(label).ids.includes(PLAYER_ZERO_PV_STATE_PRESET_ID);
+  return getZeroPvStatusController().resolveInjuredStateActive(label);
 }
 
 const CHARACTERISTICS = [
@@ -2793,30 +966,12 @@ async function setActorStatePresetActive(actor, stateId, active) {
 }
 
 async function syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess) {
-  if (!tokenDoc) return;
-
-  const actor = tokenDoc.actorLink === true
-    ? (tokenDoc.actor || (tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId) : null))
-    : (tokenDoc.actor || null);
-  if (!actor) return;
-
-  await syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess);
+  return getZeroPvStatusController().syncZeroPvBodyStateForToken(tokenDoc, actorType, isZeroOrLess);
 }
 
 async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
-  if (!actor) return;
-  const resolvedActorType = String(actorType || actor.type || "").trim();
-  if (resolvedActorType !== "personnage" && resolvedActorType !== "personnage-non-joueur") return;
-  await setActorStatePresetActive(actor, PLAYER_ZERO_PV_STATE_PRESET_ID, isZeroOrLess);
+  return getZeroPvStatusController().syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess);
 }
-
-const ACTOR_TOKEN_IMAGE_UPDATE_PATHS = [
-  "img",
-  "prototypeToken.texture.src"
-];
-const TOKEN_IMAGE_UPDATE_PATHS = [
-  "texture.src"
-];
 
 const CARRIED_ITEMS_PER_MAIN_COLUMN = 5;
 const CARRIED_MAIN_COLUMN_COUNT = 2;
@@ -2933,24 +1088,6 @@ function resetCombatRuntimeKeys() {
   LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
   LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
 }
-const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
-const PLAYER_ZERO_PV_STATUS_CANDIDATES = ["bleeding", "bleed", "bloodied"];
-const NPC_ZERO_PV_STATUS_CANDIDATES = ["dead", "defeated", "death", "mort"];
-const TOKEN_HUD_TURN_MIN = 1;
-const TOKEN_HUD_TURN_MAX = 12;
-const TOKEN_HUD_COUNTER_FLAG_KEY = "tokenHudTurnCounter";
-const TOKEN_HUD_RENDER_PATCH_FLAG = "__bmTokenHudRenderPatched";
-const TOKEN_EFFECT_BG_PATCH_FLAG = "__bmTokenEffectBackgroundPatched";
-const TOKEN_HUD_TURN_SELECTION_BY_TOKEN = new Map();
-const TOKEN_HUD_LAST_STATUS_BY_TOKEN = new Map();
-const TOKEN_HUD_ICON_SYNC_INTERVAL_MS = 2_000;
-let TOKEN_HUD_LOCAL_SVG_ICON_NAMES = new Set();
-let TOKEN_HUD_ICON_SYNC_PROMISE = null;
-let TOKEN_HUD_LAST_ICON_SYNC_AT = 0;
-let TOKEN_HUD_ICON_CACHE_BUSTER = Date.now();
-let TOKEN_HUD_DOM_OBSERVER = null;
-let TOKEN_HUD_DOM_SYNC_FRAME = null;
-
 const chaosDicePanelController = createChaosDicePanelController({
   systemId: SYSTEM_ID,
   systemSocket: SYSTEM_SOCKET,
@@ -3109,6 +1246,17 @@ function normalizeNonNegativeInteger(value, fallback = 0) {
   return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
 }
 
+const playerResourceActionRules = createPlayerResourceActionRules({
+  normalizeNonNegativeInteger,
+  translate: tl,
+  escapeMarkup: escapeChatMarkup,
+  getGame: () => globalThis.game,
+  getCanvas: () => globalThis.canvas,
+  createChatMessage: data => globalThis.ChatMessage?.create?.(data),
+  warn: (...args) => bmLog.warn(...args),
+  playerActorType: PLAYER_ACTOR_TYPE
+});
+
 const parseLooseNumericInput = ruleParseLooseNumericInput;
 const parseSimpleArithmeticInput = ruleParseSimpleArithmeticInput;
 const normalizeSignedModifierInput = (rawValue, fallback = 0) => (
@@ -3236,6 +1384,41 @@ const {
   resolveTextareaAutoGrowState,
   resolveSheetWindowTargetHeight
 } = actorSheetLayoutRules;
+const itemSheetLayoutController = createItemSheetLayoutController({
+  resolveTextareaAutoGrowState,
+  resolveDeferredRoot,
+  queueUiMicrotask,
+  clearUiMicrotask,
+  getWindow: () => globalThis,
+  getDocument: () => globalThis.document,
+  getHTMLElementClass: () => globalThis.HTMLElement,
+  getHTMLTextAreaElementClass: () => globalThis.HTMLTextAreaElement,
+  getResizeObserverClass: () => globalThis.ResizeObserver
+});
+const itemSheetControlsController = createItemSheetControlsController({
+  getFilePickerClass,
+  renderFilePickerSafely,
+  warn: safeWarn,
+  isPriceManagedItemType,
+  resolveSaleManualFlag: resolveItemSaleManualFlag,
+  resolveItemPricePreviewUiState,
+  resolveDeferredRoot,
+  queueUiMicrotask,
+  clearUiMicrotask
+});
+const itemSheetEquipWithController = createItemSheetEquipWithController({
+  normalizeItemLinkTemplateEntries,
+  buildItemLinkTemplateEntryFromItemDocument,
+  isItemLinkSupportedType,
+  resolveDroppedItemFromDropData: resolveDroppedItemFromDropDataCached,
+  getDragEventData,
+  fromUuid: compatFromUuid,
+  warn: safeWarn,
+  translateWithFallback: tl,
+  getHTMLElementClass: () => globalThis.HTMLElement
+});
+
+let actorItemDndController = null;
 
 const weaponAmmoRules = createWeaponAmmoRules({
   normalizeNonNegativeInteger,
@@ -3282,101 +1465,20 @@ const itemAudioPlaybackRules = createItemAudioPlaybackRules({
 });
 const { playItemAudio } = itemAudioPlaybackRules;
 
-const DROP_DATA_CACHE_MAX = 300;
-const DROP_DATA_CACHE_TTL_MS = 3_000;
-const dropDataDocumentCacheByEntry = new WeakMap();
-const dropDataDocumentCacheByKey = new Map();
-
 function buildDropDataCacheKey(entry) {
-  if (!entry || typeof entry !== "object") return "";
-  const type = String(entry.type || "").trim().toLowerCase();
-  const uuid = String(entry.uuid || "").trim();
-  const pack = String(entry.pack || "").trim();
-  const id = String(entry._id || entry.id || "").trim();
-  const parentUuid = String(entry.parentUuid || entry.actorUuid || "").trim();
-  if (!type && !uuid && !pack && !id && !parentUuid) return "";
-  return `${type}|${uuid}|${pack}|${id}|${parentUuid}`;
+  return getDropDocumentResolutionController().buildDropDataCacheKey(entry);
 }
 
 function pruneDropDataCache() {
-  if (dropDataDocumentCacheByKey.size <= DROP_DATA_CACHE_MAX) return;
-  const now = Date.now();
-  for (const [key, cached] of dropDataDocumentCacheByKey.entries()) {
-    if (!cached || cached.expiresAt <= now) dropDataDocumentCacheByKey.delete(key);
-    if (dropDataDocumentCacheByKey.size <= DROP_DATA_CACHE_MAX) return;
-  }
-  const overflow = dropDataDocumentCacheByKey.size - DROP_DATA_CACHE_MAX;
-  if (overflow <= 0) return;
-  for (const key of dropDataDocumentCacheByKey.keys()) {
-    dropDataDocumentCacheByKey.delete(key);
-    if (dropDataDocumentCacheByKey.size <= DROP_DATA_CACHE_MAX) break;
-  }
+  return getDropDocumentResolutionController().pruneDropDataCache();
 }
 
 async function resolveDroppedItemFromActorDropData(entry) {
-  const entryObject = entry && typeof entry === "object" ? entry : null;
-  if (!entryObject) return null;
-  const itemId = String(entryObject.itemId || entryObject._id || entryObject.id || "").trim();
-  if (!itemId) return null;
-
-  const uuid = String(entryObject.uuid || entryObject.documentUuid || "").trim();
-  const actorUuid = String(
-    entryObject.actorUuid
-    || entryObject.parentUuid
-    || (uuid.includes(".Item.") ? uuid.split(".Item.")[0] : "")
-    || ""
-  ).trim();
-  if (actorUuid) {
-    const resolvedActor = await compatFromUuid(actorUuid).catch(() => null);
-    const actor = resolvedActor?.documentName === "Actor"
-      ? resolvedActor
-      : (resolvedActor?.actor?.documentName === "Actor" ? resolvedActor.actor : null);
-    const item = actor?.items?.get?.(itemId) || null;
-    if (item) return item;
-  }
-
-  const actorId = String(entryObject.actorId || "").trim();
-  if (actorId) {
-    const item = game.actors?.get?.(actorId)?.items?.get?.(itemId) || null;
-    if (item) return item;
-  }
-  return null;
+  return getDropDocumentResolutionController().resolveDroppedItemFromActorDropData(entry);
 }
 
 function resolveDroppedItemFromDropDataCached(entry) {
-  const itemDocumentClass = Item?.implementation?.fromDropData ? Item.implementation : Item;
-  if (!itemDocumentClass?.fromDropData) return Promise.resolve(null);
-  const entryObject = entry && typeof entry === "object" ? entry : null;
-
-  if (entryObject) {
-    const cachedByEntry = dropDataDocumentCacheByEntry.get(entryObject);
-    if (cachedByEntry) return cachedByEntry;
-  }
-
-  const cacheKey = buildDropDataCacheKey(entryObject);
-  if (cacheKey) {
-    const now = Date.now();
-    const cachedByKey = dropDataDocumentCacheByKey.get(cacheKey);
-    if (cachedByKey && cachedByKey.expiresAt > now) {
-      if (entryObject) dropDataDocumentCacheByEntry.set(entryObject, cachedByKey.promise);
-      return cachedByKey.promise;
-    }
-    if (cachedByKey && cachedByKey.expiresAt <= now) dropDataDocumentCacheByKey.delete(cacheKey);
-  }
-
-  const promise = itemDocumentClass
-    .fromDropData(entry)
-    .catch(() => null)
-    .then(item => item || resolveDroppedItemFromActorDropData(entryObject));
-  if (entryObject) dropDataDocumentCacheByEntry.set(entryObject, promise);
-  if (cacheKey) {
-    dropDataDocumentCacheByKey.set(cacheKey, {
-      promise,
-      expiresAt: Date.now() + DROP_DATA_CACHE_TTL_MS
-    });
-    pruneDropDataCache();
-  }
-  return promise;
+  return getDropDocumentResolutionController().resolveDroppedItemFromDropDataCached(entry);
 }
 
 const dropDecisionRules = createDropDecisionRules({
@@ -3516,7 +1618,7 @@ function getActorAmmoPoolState(actor) {
 }
 
 function isMissingTokenImage(src) {
-  return !src || src === "icons/svg/mystery-man.svg";
+  return getTokenImageController().isMissingTokenImage(src);
 }
 
 function normalizeCharacteristicKey(value) {
@@ -3539,241 +1641,40 @@ function getActorArchetypeBonus(actor, characteristicKey) {
   return getArchetypeCharacteristicBonus(actor?.system?.profile || {}, characteristicKey);
 }
 
-const TOKEN_TEXTURE_VALIDITY_CACHE = new Map();
-const IMAGE_ELEMENT_LOAD_TIMEOUT_MS = 5000;
-
-function canCheckImageElementSource(src) {
-  if (!src || String(src).startsWith("#")) return false;
-  return typeof globalThis.Image === "function";
-}
-
-async function canLoadImageElementSource(src) {
-  if (!canCheckImageElementSource(src)) return null;
-  return new Promise(resolve => {
-    const image = new globalThis.Image();
-    let settled = false;
-    const finish = value => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeoutId);
-      image.onload = null;
-      image.onerror = null;
-      resolve(value);
-    };
-    const timeoutId = setTimeout(() => finish(false), IMAGE_ELEMENT_LOAD_TIMEOUT_MS);
-    image.onload = () => finish(true);
-    image.onerror = () => finish(false);
-    image.src = src;
-  });
-}
-
 async function canLoadTextureSource(src) {
-  if (!src) return false;
-  const key = String(src).trim();
-  if (!key) return false;
-  if (TOKEN_TEXTURE_VALIDITY_CACHE.has(key)) return TOKEN_TEXTURE_VALIDITY_CACHE.get(key);
-  const imageElementResult = await canLoadImageElementSource(key);
-  if (imageElementResult !== null) {
-    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, imageElementResult);
-    return imageElementResult;
-  }
-  const textureLoader = foundry?.canvas?.loadTexture ?? globalThis.loadTexture;
-  if (typeof textureLoader !== "function") {
-    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, false);
-    return false;
-  }
-  try {
-    await textureLoader(key);
-    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, true);
-    return true;
-  } catch (_error) {
-    TOKEN_TEXTURE_VALIDITY_CACHE.set(key, false);
-    return false;
-  }
+  return getTokenImageController().canLoadTextureSource(src);
 }
 
 async function needsTokenImageRepair(src) {
-  if (isMissingTokenImage(src)) return true;
-  return !(await canLoadTextureSource(src));
-}
-
-function getTokenActorImage(tokenDoc) {
-  if (!tokenDoc) return "";
-  const direct = tokenDoc.actor?.img;
-  if (direct) return direct;
-  const byId = tokenDoc.actorId ? game.actors?.get(tokenDoc.actorId)?.img : "";
-  return byId || "";
+  return getTokenImageController().needsTokenImageRepair(src);
 }
 
 function getSafeTokenTextureFallback(tokenDoc) {
-  const actorImg = getTokenActorImage(tokenDoc);
-  if (actorImg) return actorImg;
-  return "icons/svg/mystery-man.svg";
-}
-
-function getTokenTexturePresentationUpdates(tokenDoc) {
-  if (!tokenDoc) return {};
-  const actorType = getTokenActorType(tokenDoc);
-  if (!isCharacterLikeActorType(actorType)) return {};
-  const updates = {};
-  const scaleX = foundry.utils.getProperty(tokenDoc, "texture.scaleX");
-  const scaleY = foundry.utils.getProperty(tokenDoc, "texture.scaleY");
-  const offsetX = foundry.utils.getProperty(tokenDoc, "texture.offsetX");
-  const offsetY = foundry.utils.getProperty(tokenDoc, "texture.offsetY");
-  const fit = foundry.utils.getProperty(tokenDoc, "texture.fit");
-  if (shouldResetTokenScale(scaleX)) updates["texture.scaleX"] = 1;
-  if (shouldResetTokenScale(scaleY)) updates["texture.scaleY"] = 1;
-  if (shouldResetTokenOffset(offsetX)) updates["texture.offsetX"] = 0;
-  if (shouldResetTokenOffset(offsetY)) updates["texture.offsetY"] = 0;
-  if (shouldResetTokenFit(fit)) updates["texture.fit"] = "fill";
-  return updates;
-}
-
-function resolveTokenPlaceable(tokenLike) {
-  if (!tokenLike) return null;
-  if (tokenLike.mesh) return tokenLike;
-  if (tokenLike.object?.mesh) return tokenLike.object;
-  const tokenId = String(tokenLike.id || tokenLike._id || tokenLike.document?.id || "").trim();
-  if (!tokenId || !canvas?.tokens?.get) return null;
-  const placeable = canvas.tokens.get(tokenId);
-  return placeable?.mesh ? placeable : null;
+  return getTokenImageController().getSafeTokenTextureFallback(tokenDoc);
 }
 
 async function repairTokenTextureSource(tokenLike) {
-  const tokenDoc = tokenLike?.document || tokenLike;
-  if (!tokenDoc) return false;
-  const tokenObject = resolveTokenPlaceable(tokenLike);
-  const canPersistUpdate = Boolean(game.user?.isGM && tokenDoc?.update);
-  const canLocalUpdate = Boolean(tokenDoc?.updateSource);
-  if (!canPersistUpdate && !canLocalUpdate) return false;
-  const updates = getTokenTexturePresentationUpdates(tokenDoc);
-  const currentSrc = String(foundry.utils.getProperty(tokenDoc, "texture.src") || "");
-  const shouldRepairSource = canPersistUpdate ? await needsTokenImageRepair(currentSrc) : false;
-  if (!shouldRepairSource && !Object.keys(updates).length) return false;
-
-  if (shouldRepairSource) {
-    const actorSrc = getTokenActorImage(tokenDoc);
-    const fallbackSrc = "icons/svg/mystery-man.svg";
-    const actorSrcValid = actorSrc ? await canLoadTextureSource(actorSrc) : false;
-    const nextSrc = actorSrcValid ? actorSrc : fallbackSrc;
-    if (nextSrc && nextSrc !== currentSrc) updates["texture.src"] = nextSrc;
-  }
-  if (!Object.keys(updates).length) return false;
-  try {
-    if (canPersistUpdate) {
-      await tokenDoc.update(updates);
-    } else {
-      tokenDoc.updateSource(foundry.utils.expandObject(updates));
-      tokenObject?.renderFlags?.set?.({ refreshMesh: true });
-      tokenObject?.refresh?.();
-    }
-    return true;
-  } catch (_error) {
-    return false;
-  }
+  return getTokenImageController().repairTokenTextureSource(tokenLike);
 }
 
 async function syncPrototypeTokenImageFromActorImage(actor) {
-  if (!game.user?.isGM) return false;
-  if (!actor || !isCharacterLikeActorType(actor.type)) return false;
-  if (actor.isToken) return false;
-
-  const actorImg = String(actor.img || "").trim();
-  const currentPrototypeSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
-  const nextPrototypeSrc = actorImg || "icons/svg/mystery-man.svg";
-
-  if (!nextPrototypeSrc || nextPrototypeSrc === currentPrototypeSrc) return false;
-  try {
-    await actor.update(
-      {
-        "prototypeToken.texture.src": nextPrototypeSrc
-      },
-      { bloodmanSkipPrototypeImageSync: true }
-    );
-    return true;
-  } catch (_error) {
-    return false;
-  }
+  return getTokenImageController().syncPrototypeTokenImageFromActorImage(actor);
 }
 
 async function syncSceneTokenImagesFromActorImage(actor, options = {}) {
-  if (!game.user?.isGM) return 0;
-  if (!actor || !isCharacterLikeActorType(actor.type)) return 0;
-  if (actor.isToken) return 0;
-
-  const previousActorImage = String(options.previousActorImage || "").trim();
-  const previousPrototypeImage = String(options.previousPrototypeImage || "").trim();
-  const previousSources = new Set([previousActorImage, previousPrototypeImage].filter(Boolean));
-
-  const actorImg = String(actor.img || "").trim();
-  const nextTokenSrc = actorImg || "icons/svg/mystery-man.svg";
-  if (!nextTokenSrc) return 0;
-
-  let updatedCount = 0;
-  for (const tokenDoc of getTokenDocumentsForActor(actor)) {
-    if (!tokenDoc?.update) continue;
-    const currentTokenSrc = String(
-      foundry.utils.getProperty(tokenDoc, "texture.src")
-      || foundry.utils.getProperty(tokenDoc, "img")
-      || ""
-    ).trim();
-    const isMissing = isMissingTokenImage(currentTokenSrc);
-    const isLinkedToken = tokenDoc.actorLink === true;
-    const matchesPrevious = previousSources.has(currentTokenSrc);
-    if (!isLinkedToken && !isMissing && !matchesPrevious) continue;
-    if (currentTokenSrc === nextTokenSrc) continue;
-    try {
-      await tokenDoc.update(
-        { "texture.src": nextTokenSrc },
-        { bloodmanSkipActorImageSync: true }
-      );
-      updatedCount += 1;
-    } catch (_error) {
-      // non-fatal: keep syncing other token instances
-    }
-  }
-  return updatedCount;
+  return getTokenImageController().syncSceneTokenImagesFromActorImage(actor, options);
 }
 
 function resolveWorldActorFromTokenDocument(tokenDoc) {
-  if (!tokenDoc) return null;
-  const actorId = String(tokenDoc.actorId || "").trim();
-  if (actorId) return game.actors?.get(actorId) || null;
-  const actor = tokenDoc.actor || null;
-  if (!actor || actor.isToken) return null;
-  return actor;
+  return getTokenImageController().resolveWorldActorFromTokenDocument(tokenDoc);
 }
 
 async function syncActorAndPrototypeImageFromTokenImage(tokenDoc) {
-  if (!game.user?.isGM) return false;
-  const actor = resolveWorldActorFromTokenDocument(tokenDoc);
-  if (!actor) return false;
-  if (!isCharacterLikeActorType(actor.type)) return false;
+  return getTokenImageController().syncActorAndPrototypeImageFromTokenImage(tokenDoc);
+}
 
-  const tokenSrc = String(
-    foundry.utils.getProperty(tokenDoc, "texture.src")
-    || foundry.utils.getProperty(tokenDoc, "img")
-    || ""
-  ).trim();
-  if (!tokenSrc) return false;
-
-  const actorImg = String(actor.img || "").trim();
-  const protoSrc = String(foundry.utils.getProperty(actor, "prototypeToken.texture.src") || "").trim();
-  const needsUpdate = actorImg !== tokenSrc || protoSrc !== tokenSrc;
-  if (!needsUpdate) return false;
-
-  try {
-    await actor.update(
-      {
-        img: tokenSrc,
-        "prototypeToken.texture.src": tokenSrc
-      },
-      { bloodmanSkipPrototypeImageSync: true, bloodmanSkipSceneTokenImageSync: true }
-    );
-    return true;
-  } catch (_error) {
-    return false;
-  }
+async function getPrototypeTokenImageNormalizationUpdates(actor) {
+  return getTokenImageController().getPrototypeTokenImageNormalizationUpdates(actor);
 }
 
 function getActiveNonGMCount() {
@@ -3799,381 +1700,43 @@ function getPlayerCountOnScene() {
 }
 
 function getSelectedVoyageXpRecipientActors(controlledTokens = null) {
-  const tokens = Array.isArray(controlledTokens)
-    ? controlledTokens
-    : (globalThis.canvas?.tokens?.controlled || []);
-  const recipients = [];
-  const seen = new Set();
-  for (const token of tokens) {
-    const tokenDoc = token?.document || token || null;
-    const tokenActor = token?.actor || tokenDoc?.actor || null;
-    const worldActor = tokenDoc?.actorId ? game.actors?.get(tokenDoc.actorId) || null : null;
-    const actor = tokenActor || worldActor;
-    if (!actor) continue;
-    const type = String(actor.type || tokenActor?.type || "").trim().toLowerCase();
-    if (type !== "personnage") continue;
-    const key = String(actor.uuid || actor.id || tokenDoc?.uuid || tokenDoc?.id || tokenDoc?.actorId || "");
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    recipients.push(actor);
-  }
-  return recipients;
+  return playerResourceActionRules.getSelectedPlayerActors(controlledTokens);
 }
 
 function formatVoyageXpGrantLine(actorName, amount) {
-  const name = String(actorName || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
-  const fallback = `${name} a recu ${amount} point${amount > 1 ? "s" : ""} d'experience.`;
-  return tl("BLOODMAN.Notifications.VoyageXPGrantLine", fallback, { actor: name, amount });
+  return playerResourceActionRules.formatVoyageXpGrantLine(actorName, amount);
 }
 
 async function grantVoyageXpToSelectedPlayers(rawAmount, options = {}) {
-  const amount = normalizeNonNegativeInteger(rawAmount, 0);
-  const selectedTokens = Array.isArray(options.selectedTokens)
-    ? options.selectedTokens
-    : (globalThis.canvas?.tokens?.controlled || []);
-  if (amount <= 0) {
-    return {
-      amount,
-      selectedTokens,
-      grants: [],
-      failures: [],
-      reason: "no-points"
-    };
-  }
-
-  if (!selectedTokens.length) {
-    return {
-      amount,
-      selectedTokens,
-      grants: [],
-      failures: [],
-      reason: "no-selection"
-    };
-  }
-
-  const recipients = getSelectedVoyageXpRecipientActors(selectedTokens);
-  if (!recipients.length) {
-    return {
-      amount,
-      selectedTokens,
-      grants: [],
-      failures: [],
-      reason: "no-recipients"
-    };
-  }
-
-  const grants = [];
-  const failures = [];
-  for (const actor of recipients) {
-    const actorName = String(actor?.name || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
-    if (!actor?.update) {
-      failures.push({ actorName });
-      continue;
-    }
-    const voyageTotal = normalizeNonNegativeInteger(
-      actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
-      0
-    );
-    const voyageCurrent = Math.min(
-      normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0),
-      voyageTotal
-    );
-    const nextVoyageTotal = voyageTotal + amount;
-    const nextVoyageCurrent = voyageCurrent + amount;
-
-    try {
-      await actor.update({
-        "system.resources.voyage.total": nextVoyageTotal,
-        "system.resources.voyage.current": nextVoyageCurrent,
-        "system.resources.voyage.max": nextVoyageTotal
-      });
-      grants.push({ actorName, amount });
-    } catch (error) {
-      bmLog.warn("[bloodman] voyage XP grant failed", {
-        actorId: actor.id,
-        actorName,
-        amount,
-        error
-      });
-      failures.push({ actorName });
-    }
-  }
-
-  return {
-    amount,
-    selectedTokens,
-    grants,
-    failures,
-    reason: grants.length ? "ok" : "all-failed"
-  };
+  return playerResourceActionRules.grantVoyageXpToSelectedPlayers(rawAmount, options);
 }
 
 async function postVoyageXpGrantSummary(result) {
-  if (!result) return false;
-  const escapeHtml = escapeChatMarkup;
-  const titleText = tl("BLOODMAN.Dialogs.VoyageXPGrant.Title", "Attribution XP voyage");
-  const lines = [];
-
-  if (result.reason === "no-points") {
-    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantNoPoints", "Aucun point d'XP voyage octroye."));
-  } else if (result.reason === "no-selection") {
-    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantNoSelection", "Selectionnez au moins un token joueur pour attribuer de l'XP voyage."));
-  } else if (result.reason === "no-recipients") {
-    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantNoRecipients", "Aucun token joueur selectionne pour recevoir de l'XP voyage."));
-  } else if (result.reason === "all-failed") {
-    lines.push(tl("BLOODMAN.Notifications.VoyageXPGrantAllFailed", "Aucune attribution d'XP voyage n'a pu etre appliquee."));
-  } else {
-    for (const grant of result.grants || []) {
-      lines.push(formatVoyageXpGrantLine(grant.actorName, grant.amount));
-    }
-    const failureCount = Number(result.failures?.length || 0);
-    if (failureCount > 0) {
-      lines.push(
-        tl(
-          "BLOODMAN.Notifications.VoyageXPGrantPartialFailure",
-          "{count} attribution(s) d'XP voyage n'ont pas pu etre appliquees.",
-          { count: failureCount }
-        )
-      );
-    }
-  }
-
-  const contentLines = lines.map(line => `<p>${escapeHtml(line)}</p>`).join("");
-  const content = `<div class="bm-voyage-xp-grant-log"><p><strong>${escapeHtml(titleText)}</strong></p>${contentLines}</div>`;
-  await ChatMessage.create({ content }).catch(() => null);
-  return true;
+  return playerResourceActionRules.postVoyageXpGrantSummary(result);
 }
 
 function formatFullPpRestoreLine(actorName, restore = {}) {
-  const name = String(actorName || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
-  const maxPp = normalizeNonNegativeInteger(restore?.maxPp, 0);
-  const previousPp = normalizeNonNegativeInteger(restore?.previousPp, 0);
-  if (restore?.changed === false) {
-    const fallback = `${name} a deja tous ses PP (${maxPp}/${maxPp}).`;
-    return tl("BLOODMAN.Notifications.FullPPRestoreAlreadyFullLine", fallback, { actor: name, max: maxPp });
-  }
-  const fallback = `${name} : PP ${previousPp} -> ${maxPp}.`;
-  return tl("BLOODMAN.Notifications.FullPPRestoreLine", fallback, {
-    actor: name,
-    before: previousPp,
-    after: maxPp,
-    max: maxPp
-  });
+  return playerResourceActionRules.formatFullPpRestoreLine(actorName, restore);
 }
 
 function formatFullPvRestoreLine(actorName, restore = {}) {
-  const name = String(actorName || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
-  const maxPv = normalizeNonNegativeInteger(restore?.maxPv, 0);
-  const previousPv = normalizeNonNegativeInteger(restore?.previousPv, 0);
-  if (restore?.changed === false) {
-    const fallback = `${name} a deja tous ses PV (${maxPv}/${maxPv}).`;
-    return tl("BLOODMAN.Notifications.FullPVRestoreAlreadyFullLine", fallback, { actor: name, max: maxPv });
-  }
-  const fallback = `${name} : PV ${previousPv} -> ${maxPv}.`;
-  return tl("BLOODMAN.Notifications.FullPVRestoreLine", fallback, {
-    actor: name,
-    before: previousPv,
-    after: maxPv,
-    max: maxPv
-  });
+  return playerResourceActionRules.formatFullPvRestoreLine(actorName, restore);
 }
 
 async function restoreFullPpToSelectedPlayers(options = {}) {
-  const selectedTokens = Array.isArray(options.selectedTokens)
-    ? options.selectedTokens
-    : (globalThis.canvas?.tokens?.controlled || []);
-  if (!selectedTokens.length) {
-    return {
-      selectedTokens,
-      restores: [],
-      failures: [],
-      reason: "no-selection"
-    };
-  }
-
-  const recipients = getSelectedVoyageXpRecipientActors(selectedTokens);
-  if (!recipients.length) {
-    return {
-      selectedTokens,
-      restores: [],
-      failures: [],
-      reason: "no-recipients"
-    };
-  }
-
-  const restores = [];
-  const failures = [];
-  for (const actor of recipients) {
-    const actorName = String(actor?.name || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
-    if (!actor?.update) {
-      failures.push({ actorName });
-      continue;
-    }
-    const maxPp = normalizeNonNegativeInteger(actor.system?.resources?.pp?.max, 0);
-    const previousPp = normalizeNonNegativeInteger(actor.system?.resources?.pp?.current, 0);
-    const nextPp = maxPp;
-    if (previousPp === nextPp) {
-      restores.push({ actorName, previousPp, maxPp, changed: false });
-      continue;
-    }
-
-    try {
-      await actor.update(
-        { "system.resources.pp.current": nextPp },
-        { bloodmanAllowVitalResourceUpdate: true }
-      );
-      restores.push({ actorName, previousPp, maxPp, changed: true });
-    } catch (error) {
-      bmLog.warn("[bloodman] full PP restore failed", {
-        actorId: actor?.id,
-        actorName,
-        previousPp,
-        maxPp,
-        error
-      });
-      failures.push({ actorName });
-    }
-  }
-
-  return {
-    selectedTokens,
-    restores,
-    failures,
-    reason: restores.length ? "ok" : "all-failed"
-  };
+  return playerResourceActionRules.restoreFullPpToSelectedPlayers(options);
 }
 
 async function restoreFullPvToSelectedPlayers(options = {}) {
-  const selectedTokens = Array.isArray(options.selectedTokens)
-    ? options.selectedTokens
-    : (globalThis.canvas?.tokens?.controlled || []);
-  if (!selectedTokens.length) {
-    return {
-      selectedTokens,
-      restores: [],
-      failures: [],
-      reason: "no-selection"
-    };
-  }
-
-  const recipients = getSelectedVoyageXpRecipientActors(selectedTokens);
-  if (!recipients.length) {
-    return {
-      selectedTokens,
-      restores: [],
-      failures: [],
-      reason: "no-recipients"
-    };
-  }
-
-  const restores = [];
-  const failures = [];
-  for (const actor of recipients) {
-    const actorName = String(actor?.name || tl("TYPES.Actor.personnage", "Joueur")).trim() || "Joueur";
-    if (!actor?.update) {
-      failures.push({ actorName });
-      continue;
-    }
-    const maxPv = normalizeNonNegativeInteger(actor.system?.resources?.pv?.max, 0);
-    const previousPv = normalizeNonNegativeInteger(actor.system?.resources?.pv?.current, 0);
-    const nextPv = maxPv;
-    if (previousPv === nextPv) {
-      restores.push({ actorName, previousPv, maxPv, changed: false });
-      continue;
-    }
-
-    try {
-      await actor.update(
-        { "system.resources.pv.current": nextPv },
-        { bloodmanAllowVitalResourceUpdate: true }
-      );
-      restores.push({ actorName, previousPv, maxPv, changed: true });
-    } catch (error) {
-      bmLog.warn("[bloodman] full PV restore failed", {
-        actorId: actor?.id,
-        actorName,
-        previousPv,
-        maxPv,
-        error
-      });
-      failures.push({ actorName });
-    }
-  }
-
-  return {
-    selectedTokens,
-    restores,
-    failures,
-    reason: restores.length ? "ok" : "all-failed"
-  };
+  return playerResourceActionRules.restoreFullPvToSelectedPlayers(options);
 }
 
 async function postFullPpRestoreSummary(result) {
-  if (!result) return false;
-  const escapeHtml = escapeChatMarkup;
-  const titleText = tl("BLOODMAN.Dialogs.FullPPRestore.Title", "Restauration PP");
-  const lines = [];
-
-  if (result.reason === "no-selection") {
-    lines.push(tl("BLOODMAN.Notifications.FullPPRestoreNoSelection", "Selectionnez au moins un token joueur pour restaurer les PP."));
-  } else if (result.reason === "no-recipients") {
-    lines.push(tl("BLOODMAN.Notifications.FullPPRestoreNoRecipients", "Aucun token joueur selectionne pour restaurer les PP."));
-  } else if (result.reason === "all-failed") {
-    lines.push(tl("BLOODMAN.Notifications.FullPPRestoreAllFailed", "Aucune restauration de PP n'a pu etre appliquee."));
-  } else {
-    for (const restore of result.restores || []) {
-      lines.push(formatFullPpRestoreLine(restore.actorName, restore));
-    }
-    const failureCount = Number(result.failures?.length || 0);
-    if (failureCount > 0) {
-      lines.push(
-        tl(
-          "BLOODMAN.Notifications.FullPPRestorePartialFailure",
-          "{count} restauration(s) de PP n'ont pas pu etre appliquees.",
-          { count: failureCount }
-        )
-      );
-    }
-  }
-
-  const contentLines = lines.map(line => `<p>${escapeHtml(line)}</p>`).join("");
-  const content = `<div class="bm-full-pp-restore-log"><p><strong>${escapeHtml(titleText)}</strong></p>${contentLines}</div>`;
-  await ChatMessage.create({ content }).catch(() => null);
-  return true;
+  return playerResourceActionRules.postFullPpRestoreSummary(result);
 }
 
 async function postFullPvRestoreSummary(result) {
-  if (!result) return false;
-  const escapeHtml = escapeChatMarkup;
-  const titleText = tl("BLOODMAN.Dialogs.FullPVRestore.Title", "Restauration PV");
-  const lines = [];
-
-  if (result.reason === "no-selection") {
-    lines.push(tl("BLOODMAN.Notifications.FullPVRestoreNoSelection", "Selectionnez au moins un token joueur pour restaurer les PV."));
-  } else if (result.reason === "no-recipients") {
-    lines.push(tl("BLOODMAN.Notifications.FullPVRestoreNoRecipients", "Aucun token joueur selectionne pour restaurer les PV."));
-  } else if (result.reason === "all-failed") {
-    lines.push(tl("BLOODMAN.Notifications.FullPVRestoreAllFailed", "Aucune restauration de PV n'a pu etre appliquee."));
-  } else {
-    for (const restore of result.restores || []) {
-      lines.push(formatFullPvRestoreLine(restore.actorName, restore));
-    }
-    const failureCount = Number(result.failures?.length || 0);
-    if (failureCount > 0) {
-      lines.push(
-        tl(
-          "BLOODMAN.Notifications.FullPVRestorePartialFailure",
-          "{count} restauration(s) de PV n'ont pas pu etre appliquees.",
-          { count: failureCount }
-        )
-      );
-    }
-  }
-
-  const contentLines = lines.map(line => `<p>${escapeHtml(line)}</p>`).join("");
-  const content = `<div class="bm-full-pv-restore-log"><p><strong>${escapeHtml(titleText)}</strong></p>${contentLines}</div>`;
-  await ChatMessage.create({ content }).catch(() => null);
-  return true;
+  return playerResourceActionRules.postFullPvRestoreSummary(result);
 }
 
 function resolveItemLinkState(itemOrSystem = null) {
@@ -4787,7 +2350,7 @@ const damageConfigPopupHooks = buildDamageConfigPopupHooks({
   getUsersCollection: () => game.users,
   isAssistantOrHigherRole,
   escapeHtml: escapeChatMarkup,
-  dialogClass: getDialogClass(),
+  createDialog: createBloodmanDialog,
   wasDamageConfigPopupRequestProcessed,
   rememberDamageConfigPopupRequest,
   logWarn: (...args) => bmLog.warn(...args)
@@ -4801,7 +2364,7 @@ const damageSplitPopupHooks = buildDamageSplitPopupHooks({
   getUsersCollection: () => game.users,
   isAssistantOrHigherRole,
   escapeHtml: escapeChatMarkup,
-  dialogClass: getDialogClass(),
+  createDialog: createBloodmanDialog,
   wasDamageSplitPopupRequestProcessed,
   rememberDamageSplitPopupRequest,
   logWarn: (...args) => bmLog.warn(...args)
@@ -4936,6 +2499,32 @@ const {
   requestReorderActorItems,
   requestActorItemTransfer
 } = actorSocketRequestClient;
+
+actorItemDndController = createActorItemDndController({
+  getHTMLElementClass: () => globalThis.HTMLElement,
+  getSheetElementWrapper,
+  getGame: () => globalThis.game,
+  getUi: () => globalThis.ui,
+  getFoundryGeneration,
+  getDragEventData,
+  toFiniteNumber,
+  startPerfTimer,
+  endPerfTimer,
+  logSheetPerformance,
+  requestReorderActorItems,
+  safeWarn,
+  translateWithFallback: tl,
+  getCarriedItemInventorySlots,
+  sumCarriedItemInventorySlots,
+  carriedItemTypes: CARRIED_ITEM_TYPES,
+  carryColumnSet: CARRY_COLUMN_SET,
+  carryColumnCapacity: CARRY_COLUMN_CAPACITY,
+  carryColumnEquipment: CARRY_COLUMN_EQUIPMENT,
+  carryColumnObjectsOne: CARRY_COLUMN_OBJECTS_ONE,
+  carryColumnObjectsTwo: CARRY_COLUMN_OBJECTS_TWO,
+  carryColumnBag: CARRY_COLUMN_BAG,
+  carryColumnFullReason: CARRY_COLUMN_FULL_REASON
+});
 
 async function handleActorBackpackStateChangedMessage(data) {
   const requester = game.users?.get?.(String(data?.requesterId || ""));
@@ -5136,51 +2725,6 @@ async function resetCombatMovementHistory(combat) {
       bmLog.warn("[bloodman] combat move history reset failed (combatant.clearMovementHistory)", error);
     }
   }
-}
-
-function getTokenHudCounterPriorityValue(effectDoc) {
-  const fromFlag = Number(getTokenHudCounterFlagData(effectDoc)?.rounds);
-  if (Number.isFinite(fromFlag)) return Math.max(0, Math.floor(fromFlag));
-  const fromDuration = Number(foundry.utils.getProperty(effectDoc, "duration.rounds"));
-  if (Number.isFinite(fromDuration)) return Math.max(0, Math.floor(fromDuration));
-  return 0;
-}
-
-async function decrementTokenHudCountersForActorTurn(actor) {
-  if (!actor) return false;
-  const allCounters = getTokenHudCounterEffects(actor);
-  if (!allCounters.length) return false;
-
-  const statusIds = [...new Set(
-    allCounters
-      .map(effectDoc => normalizeStatusValue(getTokenHudCounterFlagData(effectDoc)?.statusId))
-      .filter(Boolean)
-  )];
-  if (!statusIds.length) return false;
-
-  let changed = false;
-  for (const statusId of statusIds) {
-    if (!actorHasStatusInFamily(actor, [statusId])) {
-      const cleared = await clearTokenHudCounterEffects(actor, statusId);
-      changed = changed || cleared;
-      continue;
-    }
-
-    const counters = getTokenHudCounterEffects(actor, statusId)
-      .sort((a, b) => getTokenHudCounterPriorityValue(b) - getTokenHudCounterPriorityValue(a));
-    if (!counters.length) continue;
-
-    const removed = await deleteStatusEffectDocuments([counters[0]]);
-    changed = changed || removed;
-
-    const remainingCounters = getTokenHudCounterEffects(actor, statusId);
-    if (remainingCounters.length) continue;
-    const cleared = await clearActorStatusFamily(actor, [statusId]);
-    changed = changed || cleared;
-  }
-
-  if (changed) await cleanupTokenHudOrphanCounterEffects(actor);
-  return changed;
 }
 
 async function decrementActiveCombatantTokenHudCounters(combat) {
@@ -5485,30 +3029,7 @@ async function applyStartupActorNormalization(actor) {
   if (!hasAmmoShape || !areAmmoStatesEqual(actor.system?.ammo, normalizedAmmo)) {
     updates["system.ammo"] = normalizedAmmo;
   }
-  if (actor.prototypeToken) {
-    if (isCharacter && actor.prototypeToken.actorLink === false) {
-      updates["prototypeToken.actorLink"] = true;
-    }
-    if (isNpc && actor.prototypeToken.actorLink !== false) {
-      updates["prototypeToken.actorLink"] = false;
-    }
-    const protoScaleX = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleX");
-    const protoScaleY = foundry.utils.getProperty(actor.prototypeToken, "texture.scaleY");
-    const protoOffsetX = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetX");
-    const protoOffsetY = foundry.utils.getProperty(actor.prototypeToken, "texture.offsetY");
-    const protoFit = foundry.utils.getProperty(actor.prototypeToken, "texture.fit");
-    if (shouldResetTokenScale(protoScaleX)) updates["prototypeToken.texture.scaleX"] = 1;
-    if (shouldResetTokenScale(protoScaleY)) updates["prototypeToken.texture.scaleY"] = 1;
-    if (shouldResetTokenOffset(protoOffsetX)) updates["prototypeToken.texture.offsetX"] = 0;
-    if (shouldResetTokenOffset(protoOffsetY)) updates["prototypeToken.texture.offsetY"] = 0;
-    if (shouldResetTokenFit(protoFit)) updates["prototypeToken.texture.fit"] = "fill";
-    const protoSrc = foundry.utils.getProperty(actor.prototypeToken, "texture.src");
-    if (await needsTokenImageRepair(protoSrc)) {
-      const actorImgValid = actor.img ? await canLoadTextureSource(actor.img) : false;
-      const nextProtoSrc = actorImgValid ? actor.img : "icons/svg/mystery-man.svg";
-      if (nextProtoSrc && nextProtoSrc !== protoSrc) updates["prototypeToken.texture.src"] = nextProtoSrc;
-    }
-  }
+  Object.assign(updates, await getPrototypeTokenImageNormalizationUpdates(actor));
 
   if (Object.keys(updates).length) await actor.update(updates);
   await applyItemResourceBonuses(actor);
@@ -7342,132 +4863,47 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   getItemListColumnCountFromElement(element) {
-    const list = element?.matches?.(".item-list")
-      ? element
-      : element?.closest?.(".item-list");
-    if (!list) return 1;
-    if (list.classList?.contains("item-list-three-columns")) return 3;
-    if (list.classList?.contains("item-list-two-columns")) return 2;
-    const rawColumns = Number(list.dataset?.gridColumns || list.getAttribute?.("data-grid-columns") || 1);
-    if (!Number.isFinite(rawColumns)) return 1;
-    return Math.max(1, Math.floor(rawColumns));
+    return actorItemDndController.getItemListColumnCountFromElement(this, element);
   }
 
   getItemListDropTargetFromEvent(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const currentTarget = eventLike?.currentTarget instanceof HTMLElement
-      ? eventLike.currentTarget
-      : null;
-    if (currentTarget?.matches?.("ol.item-list")) return currentTarget;
-    const currentList = currentTarget?.querySelector?.("ol.item-list");
-    if (currentList instanceof HTMLElement) return currentList;
-    const target = nativeEvent?.target instanceof HTMLElement ? nativeEvent.target : null;
-    const targetList = target?.closest?.("ol.item-list");
-    if (targetList instanceof HTMLElement) return targetList;
-    const dropContainer = target?.closest?.("[data-item-list-drop-target='true']");
-    const containerList = dropContainer?.querySelector?.("ol.item-list");
-    return containerList instanceof HTMLElement ? containerList : null;
+    return actorItemDndController.getItemListDropTargetFromEvent(this, eventLike);
   }
 
   shouldSkipItemListContainerDelegate(eventLike) {
-    const currentTarget = eventLike?.currentTarget;
-    if (!(currentTarget instanceof HTMLElement)) return false;
-    if (!currentTarget.matches?.("[data-item-list-drop-target='true']")) return false;
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const eventTarget = nativeEvent?.target instanceof HTMLElement ? nativeEvent.target : null;
-    if (!(eventTarget instanceof HTMLElement)) return false;
-    const nestedItemList = eventTarget.closest("ol.item-list");
-    return nestedItemList instanceof HTMLElement && currentTarget.contains(nestedItemList);
+    return actorItemDndController.shouldSkipItemListContainerDelegate(this, eventLike);
   }
 
   getItemListBagZoneFromElement(element) {
-    const list = element?.matches?.(".item-list")
-      ? element
-      : element?.closest?.(".item-list");
-    if (!list) return "";
-    const bagZone = String(list.dataset?.bagZone || list.getAttribute?.("data-bag-zone") || "").trim().toLowerCase();
-    return bagZone === "yes" || bagZone === "no" ? bagZone : "";
+    return actorItemDndController.getItemListBagZoneFromElement(this, element);
   }
 
   getItemListReorderScopeFromElement(element) {
-    const list = element?.matches?.(".item-list")
-      ? element
-      : element?.closest?.(".item-list");
-    if (!list) return "";
-    return String(list.dataset?.reorderScope || list.getAttribute?.("data-reorder-scope") || "").trim().toLowerCase();
+    return actorItemDndController.getItemListReorderScopeFromElement(this, element);
   }
 
   getItemListAcceptedTypesFromElement(element) {
-    const list = element?.matches?.(".item-list")
-      ? element
-      : element?.closest?.(".item-list");
-    if (!list) return null;
-    const raw = String(list.dataset?.acceptedTypes || list.getAttribute?.("data-accepted-types") || "").trim().toLowerCase();
-    if (!raw) return null;
-    const types = raw
-      .split(",")
-      .map(entry => String(entry || "").trim().toLowerCase())
-      .filter(Boolean);
-    return types.length ? new Set(types) : null;
+    return actorItemDndController.getItemListAcceptedTypesFromElement(this, element);
   }
 
   normalizeCarryColumn(value) {
-    const normalized = String(value || "").trim().toLowerCase();
-    return CARRY_COLUMN_SET.has(normalized) ? normalized : "";
+    return actorItemDndController.normalizeCarryColumn(value);
   }
 
   isCarryColumnAllowedForItemType(column, itemType, options = {}) {
-    const normalizedColumn = this.normalizeCarryColumn(column);
-    const normalizedType = String(itemType || "").trim().toLowerCase();
-    if (!normalizedColumn || !normalizedType || !CARRIED_ITEM_TYPES.has(normalizedType)) return false;
-    if (normalizedColumn === CARRY_COLUMN_EQUIPMENT) {
-      return normalizedType === "arme" || normalizedType === "protection";
-    }
-    if (normalizedColumn === CARRY_COLUMN_BAG) {
-      const bagEnabled = options?.bagEnabledOverride == null
-        ? this.isActorBagSlotsEnabled()
-        : Boolean(options.bagEnabledOverride);
-      return bagEnabled;
-    }
-    return normalizedColumn === CARRY_COLUMN_OBJECTS_ONE || normalizedColumn === CARRY_COLUMN_OBJECTS_TWO;
+    return actorItemDndController.isCarryColumnAllowedForItemType(this, column, itemType, options);
   }
 
   getItemListCarryColumnFromElement(element) {
-    const list = element?.matches?.(".item-list")
-      ? element
-      : element?.closest?.(".item-list");
-    if (!list) return "";
-    return this.normalizeCarryColumn(
-      list.dataset?.carryColumn || list.getAttribute?.("data-carry-column") || ""
-    );
+    return actorItemDndController.getItemListCarryColumnFromElement(this, element);
   }
 
   getItemListColumnCapacityFromElement(element) {
-    const list = element?.matches?.(".item-list")
-      ? element
-      : element?.closest?.(".item-list");
-    const carryColumn = this.getItemListCarryColumnFromElement(list);
-    const raw = Number(list?.dataset?.columnCapacity || list?.getAttribute?.("data-column-capacity"));
-    if (Number.isFinite(raw) && raw > 0) return Math.max(1, Math.floor(raw));
-    if (!carryColumn) return Number.POSITIVE_INFINITY;
-    return this.getCarryColumnCapacity(carryColumn);
+    return actorItemDndController.getItemListColumnCapacityFromElement(this, element);
   }
 
   getCarryColumnCapacity(column, options = {}) {
-    const normalizedColumn = this.normalizeCarryColumn(column);
-    if (!normalizedColumn) return Number.POSITIVE_INFINITY;
-    if (normalizedColumn === CARRY_COLUMN_BAG) {
-      const bagEnabled = options?.bagEnabledOverride == null
-        ? this.isActorBagSlotsEnabled()
-        : Boolean(options.bagEnabledOverride);
-      return bagEnabled
-        ? CARRY_COLUMN_CAPACITY[CARRY_COLUMN_BAG]
-        : 0;
-    }
-    if (Object.prototype.hasOwnProperty.call(CARRY_COLUMN_CAPACITY, normalizedColumn)) {
-      return CARRY_COLUMN_CAPACITY[normalizedColumn];
-    }
-    return Number.POSITIVE_INFINITY;
+    return actorItemDndController.getCarryColumnCapacity(this, column, options);
   }
 
   getLegacyItemBagState(item) {
@@ -7872,319 +5308,67 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   normalizeItemReorderPayload(payloadLike) {
-    const actorId = String(payloadLike?.actorId || "").trim();
-    const actorUuid = String(payloadLike?.actorUuid || "").trim();
-    const itemId = String(payloadLike?.itemId || "").trim();
-    const itemType = String(payloadLike?.itemType || "").trim().toLowerCase();
-    if (!actorId || !itemId || !itemType) return null;
-    return { actorId, actorUuid, itemId, itemType };
+    return actorItemDndController.normalizeItemReorderPayload(this, payloadLike);
   }
 
   buildItemReorderPayloadFromDocumentDragData(dataLike) {
-    const rawData = dataLike && typeof dataLike === "object" ? dataLike : null;
-    if (!rawData) return null;
-
-    const rawUuid = String(rawData.uuid || rawData.documentUuid || "").trim();
-    let itemId = String(rawData.itemId || rawData._id || "").trim();
-    if (!itemId && rawUuid) {
-      const itemMatch = rawUuid.match(/Item\.([^\.]+)/);
-      itemId = String(itemMatch?.[1] || "").trim();
-    }
-    if (!itemId) return null;
-
-    const actorItem = this.actor?.items?.get(itemId) || null;
-    let actorId = String(rawData.actorId || "").trim();
-    if (!actorId && rawUuid) {
-      const tokenActorMatch = rawUuid.match(/Token\.[^\.]+\.Actor\.([^\.]+)/);
-      if (tokenActorMatch?.[1]) actorId = String(tokenActorMatch[1]).trim();
-      if (!actorId) {
-        const actorMatch = rawUuid.match(/Actor\.([^\.]+)/);
-        if (actorMatch?.[1]) actorId = String(actorMatch[1]).trim();
-      }
-    }
-    if (!actorId && actorItem) actorId = String(this.actor?.id || "").trim();
-
-    let itemType = String(rawData.itemType || rawData.type || "").trim().toLowerCase();
-    if (itemType === "item" || !itemType) itemType = String(actorItem?.type || "").trim().toLowerCase();
-    if (!itemType) return null;
-    return this.normalizeItemReorderPayload({
-      actorId,
-      actorUuid: String(rawData.actorUuid || "").trim(),
-      itemId,
-      itemType
-    });
+    return actorItemDndController.buildItemReorderPayloadFromDocumentDragData(this, dataLike);
   }
 
   isItemReorderPayloadForCurrentActor(payloadLike) {
-    const payload = payloadLike && typeof payloadLike === "object" ? payloadLike : null;
-    if (!payload || !this.actor) return false;
-    const actorId = String(this.actor?.id || "").trim();
-    const payloadActorId = String(payload.actorId || "").trim();
-    const payloadItemId = String(payload.itemId || "").trim();
-    if (payloadActorId && actorId && payloadActorId === actorId) return true;
-    if (payloadItemId && this.actor.items?.has(payloadItemId)) return true;
-    return false;
+    return actorItemDndController.isItemReorderPayloadForCurrentActor(this, payloadLike);
   }
 
   getActiveItemReorderPayloadFromDom() {
-    const root = getSheetElementWrapper(this);
-    if (!root?.length) return null;
-    const draggingNode = root.find("li.item[data-item-id].is-reorder-dragging").first();
-    if (!draggingNode.length) return null;
-    const li = draggingNode.get(0);
-    const item = this.getItemFromListElement(li);
-    if (!item) return null;
-    return this.normalizeItemReorderPayload({
-      actorId: String(this.actor?.id || "").trim(),
-      actorUuid: String(this.actor?.uuid || "").trim(),
-      itemId: String(item.id || "").trim(),
-      itemType: String(item.type || "").trim().toLowerCase()
-    });
+    return actorItemDndController.getActiveItemReorderPayloadFromDom(this);
   }
 
   getGlobalItemReorderPayload() {
-    const payload = globalThis.__bloodmanActiveItemDragPayload || null;
-    const normalized = this.normalizeItemReorderPayload(payload);
-    if (!normalized) return null;
-    if ((Date.now() - Number(payload?.startedAt || 0)) > 10_000) return null;
-    return normalized;
+    return actorItemDndController.getGlobalItemReorderPayload(this);
   }
 
   getItemReorderPayloadFromEvent(eventLike) {
-    const event = eventLike?.originalEvent || eventLike;
-    const transfer = event?.dataTransfer;
-    if (transfer) {
-      let rawPayload = "";
-      try {
-        rawPayload = transfer.getData("application/x-bloodman-item-reorder");
-      } catch (_error) {
-        rawPayload = "";
-      }
-      if (rawPayload) {
-        try {
-          const parsed = JSON.parse(rawPayload);
-          const normalized = this.normalizeItemReorderPayload(parsed);
-          if (normalized) return normalized;
-        } catch (_error) {
-          // Falls back to in-memory payload when browser strips custom drag MIME types.
-        }
-      }
-
-      const plainTypes = ["text/plain", "text"];
-      for (const type of plainTypes) {
-        let rawText = "";
-        try {
-          rawText = transfer.getData(type);
-        } catch (_error) {
-          rawText = "";
-        }
-        if (!rawText) continue;
-        try {
-          const parsed = JSON.parse(rawText);
-          const normalized = this.buildItemReorderPayloadFromDocumentDragData(parsed);
-          if (normalized) return normalized;
-        } catch (_error) {
-          // Not JSON or not our drag payload.
-        }
-      }
-    }
-    const inMemoryPayload = this.normalizeItemReorderPayload(this._activeItemReorderPayload);
-    if (inMemoryPayload) return inMemoryPayload;
-    const globalPayload = this.getGlobalItemReorderPayload();
-    if (globalPayload) return globalPayload;
-    return this.getActiveItemReorderPayloadFromDom();
+    return actorItemDndController.getItemReorderPayloadFromEvent(this, eventLike);
   }
 
   buildFoundryItemDragPayload(item) {
-    if (!item) return null;
-    const uuid = String(item.uuid || "").trim();
-    const itemId = String(item.id || item._id || "").trim();
-    if (!uuid && !itemId) return null;
-    return {
-      type: "Item",
-      uuid,
-      id: itemId,
-      itemId,
-      itemType: String(item.type || ""),
-      actorId: String(this.actor?.id || ""),
-      actorUuid: String(this.actor?.uuid || "")
-    };
+    return actorItemDndController.buildFoundryItemDragPayload(this, item);
   }
 
   setDragTransferData(dataTransfer, mimeType, payload) {
-    if (!dataTransfer || !payload) return false;
-    try {
-      dataTransfer.setData(mimeType, JSON.stringify(payload));
-      return true;
-    } catch (_error) {
-      return false;
-    }
+    return actorItemDndController.setDragTransferData(this, dataTransfer, mimeType, payload);
   }
 
   getExternalItemDragTypeFromData(data) {
-    const candidates = [
-      data?.itemType,
-      data?.item?.type,
-      data?.data?.type,
-      data?.document?.type,
-      data?.type
-    ];
-    for (const candidate of candidates) {
-      const normalized = String(candidate || "").trim().toLowerCase();
-      if (!normalized || normalized === "item") continue;
-      return normalized;
-    }
-    return "";
+    return actorItemDndController.getExternalItemDragTypeFromData(this, data);
   }
 
   getItemDropInFlightKeys() {
-    if (!(this._itemDropInFlightKeys instanceof Set)) this._itemDropInFlightKeys = new Set();
-    return this._itemDropInFlightKeys;
+    return actorItemDndController.getItemDropInFlightKeys(this);
   }
 
   buildExternalItemDropKey(data, list = null) {
-    const itemRef = String(data?.uuid || data?.documentUuid || data?.id || data?._id || "").trim();
-    const targetRef = [
-      String(this.actor?.uuid || this.actor?.id || "").trim(),
-      list instanceof HTMLElement ? String(list.dataset?.carryColumn || "") : "",
-      list instanceof HTMLElement ? String(list.dataset?.bagZone || "") : "",
-      list instanceof HTMLElement ? String(list.dataset?.reorderScope || "") : ""
-    ].join("|");
-    return `${targetRef}|${itemRef || JSON.stringify(data || {})}`;
+    return actorItemDndController.buildExternalItemDropKey(this, data, list);
   }
 
   clearItemReorderVisualState(rootLike = null) {
-    const root = rootLike?.find ? rootLike : getSheetElementWrapper(this);
-    if (!root?.length) return;
-    root.find(".item-list.is-reorder-target").removeClass("is-reorder-target");
-    root.find(".item.is-reorder-drop-before").removeClass("is-reorder-drop-before");
-    root.find(".item.is-reorder-drop-after").removeClass("is-reorder-drop-after");
-    root.find(".item.is-reorder-dragging").removeClass("is-reorder-dragging");
+    return actorItemDndController.clearItemReorderVisualState(this, rootLike);
   }
 
   getItemReorderSortBefore(eventLike, targetLi, columns = 1) {
-    const event = eventLike?.originalEvent || eventLike;
-    const target = targetLi instanceof HTMLElement ? targetLi : null;
-    if (!target) return true;
-    const rect = target.getBoundingClientRect?.();
-    if (!rect || !(rect.width > 0) || !(rect.height > 0)) return true;
-    const pointerX = Number(event?.clientX);
-    const pointerY = Number(event?.clientY);
-    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) return true;
-    const midX = rect.left + (rect.width / 2);
-    const midY = rect.top + (rect.height / 2);
-    if (columns <= 1) return pointerY < midY;
-
-    const distanceX = Math.abs(pointerX - midX) / rect.width;
-    const distanceY = Math.abs(pointerY - midY) / rect.height;
-    if (distanceX >= distanceY) return pointerX < midX;
-    return pointerY < midY;
+    return actorItemDndController.getItemReorderSortBefore(this, eventLike, targetLi, columns);
   }
 
   buildItemReorderUpdates(sourceItem, targetItem, options = {}) {
-    if (!sourceItem || !targetItem || !this.actor) return [];
-    const sourceId = String(sourceItem.id || "");
-    const targetId = String(targetItem.id || "");
-    if (!sourceId || !targetId || sourceId === targetId) return [];
-    const sortBefore = options.sortBefore !== false;
-    const sourceType = String(sourceItem.type || "").trim().toLowerCase();
-    const targetType = String(targetItem.type || "").trim().toLowerCase();
-    const restrictToItemType = options.restrictToItemType !== false;
-    const scopeFilter = typeof options.scopeFilter === "function"
-      ? options.scopeFilter
-      : null;
-    if (!sourceType || !targetType) return [];
-    if (restrictToItemType && sourceType !== targetType) return [];
-    if (scopeFilter && (!scopeFilter(sourceItem) || !scopeFilter(targetItem))) return [];
-
-    const scopedSiblings = this.actor.items
-      .filter(entry => {
-        if (!entry) return false;
-        if (String(entry.id || "") === sourceId) return false;
-        if (restrictToItemType && String(entry.type || "").trim().toLowerCase() !== sourceType) return false;
-        if (scopeFilter && !scopeFilter(entry)) return false;
-        return true;
-      });
-
-    const performIntegerSort = globalThis.foundry?.utils?.performIntegerSort
-      || globalThis.foundry?.utils?.SortingHelpers?.performIntegerSort
-      || (getFoundryGeneration() < 13 ? globalThis.SortingHelpers?.performIntegerSort : null);
-    if (typeof performIntegerSort === "function") {
-      try {
-        const siblings = scopedSiblings.map(entry => entry.toObject());
-        return performIntegerSort(sourceItem, {
-          target: targetItem,
-          siblings,
-          sortBefore,
-          sortKey: "sort"
-        });
-      } catch (_error) {
-        // Fallback below if helper fails in synthetic contexts.
-      }
-    }
-
-    const ordered = [...scopedSiblings]
-      .sort((left, right) => {
-        const leftSort = toFiniteNumber(left?.sort, 0);
-        const rightSort = toFiniteNumber(right?.sort, 0);
-        if (leftSort !== rightSort) return leftSort - rightSort;
-        return String(left?.id || "").localeCompare(String(right?.id || ""));
-      });
-    if (!ordered.length) return [];
-
-    let insertIndex = ordered.findIndex(entry => String(entry?.id || "") === targetId);
-    if (insertIndex < 0) insertIndex = ordered.length - 1;
-    if (!sortBefore) insertIndex += 1;
-    insertIndex = Math.max(0, Math.min(insertIndex, ordered.length));
-
-    ordered.splice(insertIndex, 0, sourceItem);
-    const sortStep = 1000;
-    return ordered
-      .map((entry, index) => {
-        const normalizedSort = (index + 1) * sortStep;
-        const currentSort = Math.floor(toFiniteNumber(entry?.sort, 0));
-        if (currentSort === normalizedSort) return null;
-        return { _id: String(entry?.id || ""), sort: normalizedSort };
-      })
-      .filter(Boolean);
+    return actorItemDndController.buildItemReorderUpdates(this, sourceItem, targetItem, options);
   }
 
   async applyActorItemOrderUpdates(updates = []) {
-    const startedAt = startPerfTimer();
-    if (!this.actor || !Array.isArray(updates) || !updates.length) return false;
-    const sanitizedUpdates = updates
-      .map(entry => {
-        const itemId = String(entry?._id || entry?.id || "").trim();
-        if (!itemId) return null;
-        const sortValue = Math.max(0, Math.floor(toFiniteNumber(entry?.sort, 0)));
-        return { _id: itemId, sort: sortValue };
-      })
-      .filter(Boolean);
-    if (!sanitizedUpdates.length) return false;
-
-    if (this.actor?.isOwner || game.user?.isGM) {
-      await this.actor.updateEmbeddedDocuments("Item", sanitizedUpdates);
-      logSheetPerformance("actor-sheet.update.item-order", {
-        actorId: this.actor?.id || "",
-        updateCount: sanitizedUpdates.length,
-        mode: "owner",
-        durationMs: Number(endPerfTimer(startedAt).toFixed(2))
-      });
-      return true;
-    }
-    const sent = requestReorderActorItems(this.actor, sanitizedUpdates);
-    if (!sent) safeWarn(tl("BLOODMAN.Notifications.ActorUpdateRequiresGM", "Mise a jour impossible: aucun MJ ou assistant actif."));
-    logSheetPerformance("actor-sheet.update.item-order", {
-      actorId: this.actor?.id || "",
-      updateCount: sanitizedUpdates.length,
-      mode: sent ? "socket" : "socket-failed",
-      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
-    });
-    return sent;
+    return actorItemDndController.applyActorItemOrderUpdates(this, updates);
   }
 
   shouldManuallyRenderAfterUpdate() {
-    return !(this.actor?.isOwner || game.user?.isGM);
+    return actorItemDndController.shouldManuallyRenderAfterUpdate(this);
   }
 
   async handleCarryColumnDrop({
@@ -8194,350 +5378,33 @@ class BloodmanActorSheet extends BaseActorSheet {
     list,
     targetColumn
   } = {}) {
-    if (!sourceItem || !(list instanceof HTMLElement)) return this.buildCarryDropErrorResult("operation invalide");
-    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-    else nativeEvent?.preventDefault?.();
-    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
-    else nativeEvent?.stopPropagation?.();
-
-    const itemType = String(sourceItem.type || "").trim().toLowerCase();
-    if (!CARRIED_ITEM_TYPES.has(itemType)) return this.buildCarryDropErrorResult("operation invalide");
-    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
-    if (acceptedTypes && !acceptedTypes.has(itemType)) {
-      this.clearItemReorderVisualState();
-      return this.buildCarryDropErrorResult("type non autorise");
-    }
-
-    const bagEnabled = this.isActorBagSlotsEnabled();
-    const destinationColumn = this.normalizeCarryColumn(targetColumn);
-    if (!destinationColumn) return this.buildCarryDropErrorResult("operation invalide");
-    if (!this.isCarryColumnAllowedForItemType(destinationColumn, itemType, { bagEnabledOverride: bagEnabled })) {
-      this.clearItemReorderVisualState();
-      return this.buildCarryDropErrorResult("type non autorise");
-    }
-    if (destinationColumn === CARRY_COLUMN_BAG && !bagEnabled) {
-      ui.notifications?.warn("Le sac n'est pas actif.");
-      this.clearItemReorderVisualState();
-      return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
-    }
-
-    const stateBefore = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
-    const sourceId = String(sourceItem.id || "").trim();
-    const sourceColumn = this.getItemCarryColumn(sourceItem, { fallbackById: stateBefore.byId });
-    const destinationCapacity = this.getItemListColumnCapacityFromElement(list);
-    if (
-      destinationColumn !== sourceColumn
-      && Number.isFinite(destinationCapacity)
-      && destinationCapacity > 0
-    ) {
-      const destinationCount = sumCarriedItemInventorySlots(
-        (stateBefore.columns[destinationColumn] || [])
-          .filter(entry => String(entry?.id || "").trim() !== sourceId)
-      );
-      if ((destinationCount + getCarriedItemInventorySlots(sourceItem)) > destinationCapacity) {
-        ui.notifications?.warn("Colonne pleine.");
-        this.clearItemReorderVisualState();
-        return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
-      }
-    }
-
-    let movedAcrossColumns = false;
-    if (destinationColumn !== sourceColumn) {
-      const moved = await this.setItemCarryColumn(sourceItem, destinationColumn, {
-        bagEnabledOverride: bagEnabled
-      });
-      if (!moved) {
-        this.clearItemReorderVisualState();
-        return this.buildCarryDropErrorResult("deplacement impossible");
-      }
-      movedAcrossColumns = true;
-    }
-
-    const latestSourceItem = this.actor?.items?.get(sourceId) || sourceItem;
-    const stateAfterMove = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
-    let targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
-    if (!targetLi || !list.contains(targetLi)) targetLi = null;
-    let targetItem = targetLi ? this.getItemFromListElement(targetLi) : null;
-    const targetType = String(targetItem?.type || "").trim().toLowerCase();
-    if (targetItem && !CARRIED_ITEM_TYPES.has(targetType)) targetItem = null;
-
-    let sortBefore = false;
-    if (!targetItem || String(targetItem.id || "") === sourceId) {
-      targetItem = this.actor?.items
-        ?.filter(entry => (
-          entry
-          && CARRIED_ITEM_TYPES.has(String(entry.type || "").trim().toLowerCase())
-          && String(entry.id || "") !== sourceId
-          && (!acceptedTypes || acceptedTypes.has(String(entry.type || "").trim().toLowerCase()))
-          && this.getItemCarryColumn(entry, { fallbackById: stateAfterMove.byId }) === destinationColumn
-        ))
-        .sort((left, right) => {
-          const leftSort = toFiniteNumber(left?.sort, 0);
-          const rightSort = toFiniteNumber(right?.sort, 0);
-          if (leftSort !== rightSort) return leftSort - rightSort;
-          return String(left?.id || "").localeCompare(String(right?.id || ""));
-        })
-        .slice(-1)[0] || null;
-      sortBefore = false;
-    } else {
-      const columns = this.getItemListColumnCountFromElement(list);
-      sortBefore = this.getItemReorderSortBefore(nativeEvent, targetLi, columns);
-    }
-
-    if (!targetItem || String(targetItem.id || "") === sourceId) {
-      this.clearItemReorderVisualState();
-      if (movedAcrossColumns && this.shouldManuallyRenderAfterUpdate()) this.render(false);
-      return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
-    }
-
-    const scopeFilter = entry => {
-      if (!entry) return false;
-      const entryType = String(entry.type || "").trim().toLowerCase();
-      if (!CARRIED_ITEM_TYPES.has(entryType)) return false;
-      if (acceptedTypes && !acceptedTypes.has(entryType)) return false;
-      return this.getItemCarryColumn(entry, { fallbackById: stateAfterMove.byId }) === destinationColumn;
-    };
-    const updates = this.buildItemReorderUpdates(latestSourceItem, targetItem, {
-      sortBefore,
-      restrictToItemType: false,
-      scopeFilter
+    return actorItemDndController.handleCarryColumnDrop(this, {
+      eventLike,
+      nativeEvent,
+      sourceItem,
+      list,
+      targetColumn
     });
-    if (!updates.length) {
-      this.clearItemReorderVisualState();
-      if (movedAcrossColumns && this.shouldManuallyRenderAfterUpdate()) this.render(false);
-      return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
-    }
-
-    const applied = await this.applyActorItemOrderUpdates(updates);
-    this.clearItemReorderVisualState();
-    if ((applied || movedAcrossColumns) && this.shouldManuallyRenderAfterUpdate()) this.render(false);
-    return this.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
   }
 
   onItemReorderDragStart(eventLike) {
-    const startedAt = startPerfTimer();
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const delegatedTarget = eventLike?.currentTarget;
-    const li = delegatedTarget?.closest?.("li.item[data-item-id]")
-      || nativeEvent?.target?.closest?.("li.item[data-item-id]");
-    const item = this.getItemFromListElement(li);
-    if (!li || !item || !nativeEvent?.dataTransfer) return;
-
-    const payload = {
-      actorId: String(this.actor?.id || ""),
-      actorUuid: String(this.actor?.uuid || ""),
-      itemId: String(item.id || ""),
-      itemType: String(item.type || "").trim().toLowerCase()
-    };
-    if (!payload.actorId || !payload.itemId || !payload.itemType) return;
-
-    if (this._itemReorderPayloadClearTimer) {
-      clearTimeout(this._itemReorderPayloadClearTimer);
-      this._itemReorderPayloadClearTimer = null;
-    }
-    this._activeItemReorderPayload = payload;
-    globalThis.__bloodmanActiveItemDragPayload = {
-      ...payload,
-      startedAt: Date.now()
-    };
-    this.setDragTransferData(nativeEvent.dataTransfer, "application/x-bloodman-item-reorder", payload);
-    const foundryPayload = this.buildFoundryItemDragPayload(item);
-    this.setDragTransferData(nativeEvent.dataTransfer, "text/plain", foundryPayload);
-    this.setDragTransferData(nativeEvent.dataTransfer, "application/json", foundryPayload);
-    try {
-      nativeEvent.dataTransfer.effectAllowed = "move";
-    } catch (_error) {
-      // Keep in-memory payload fallback for browsers that refuse drag metadata.
-    }
-    li.classList.add("is-reorder-dragging");
-    logSheetPerformance("actor-sheet.drag.start", {
-      actorId: this.actor?.id || "",
-      itemId: String(item.id || ""),
-      itemType: String(item.type || ""),
-      durationMs: Number(endPerfTimer(startedAt).toFixed(2))
-    });
+    return actorItemDndController.onItemReorderDragStart(this, eventLike);
   }
 
   onItemReorderDragOver(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    if (this.getEquiperAvecDropContainerFromEvent(eventLike)) {
-      this.clearItemReorderVisualState();
-      return this.onEquiperAvecDragOver(eventLike);
-    }
-    const payload = this.getItemReorderPayloadFromEvent(eventLike);
-    if (!payload) return this.onExternalItemListDragOver(eventLike);
-    if (!this.isItemReorderPayloadForCurrentActor(payload)) return this.onExternalItemListDragOver(eventLike, payload);
-
-    const list = this.getItemListDropTargetFromEvent(eventLike);
-    if (!(list instanceof HTMLElement)) return;
-    const equiperAvecParent = this.rememberEquiperAvecDropTargetFromEvent(eventLike);
-    if (equiperAvecParent && String(equiperAvecParent.id || "") !== String(payload.itemId || "")) {
-      if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-      else nativeEvent?.preventDefault?.();
-      if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "move";
-      this.clearItemReorderVisualState();
-      this.highlightEquiperAvecDropTarget(equiperAvecParent);
-      return;
-    }
-    const bagZone = this.getItemListBagZoneFromElement(list);
-    const carryColumn = this.getItemListCarryColumnFromElement(list);
-    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
-    const reorderScope = this.getItemListReorderScopeFromElement(list);
-    const isCarryMixedScope = reorderScope === "carry-mixed";
-    if (carryColumn) {
-      if (!CARRIED_ITEM_TYPES.has(payload.itemType)) {
-        this.clearItemReorderVisualState();
-        return;
-      }
-      if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
-        this.clearItemReorderVisualState();
-        return;
-      }
-      const sourceItem = this.actor?.items?.get(String(payload.itemId || "").trim()) || null;
-      const state = this.getCarriedColumnState();
-      const sourceColumn = sourceItem
-        ? this.getItemCarryColumn(sourceItem, { fallbackById: state.byId })
-        : "";
-      const capacity = this.getItemListColumnCapacityFromElement(list);
-      if (
-        sourceColumn !== carryColumn
-        && Number.isFinite(capacity)
-        && capacity > 0
-      ) {
-        const currentCount = sumCarriedItemInventorySlots(
-          (state.columns[carryColumn] || [])
-            .filter(entry => String(entry?.id || "").trim() !== String(payload.itemId || "").trim())
-        );
-        const sourceSlots = sourceItem ? getCarriedItemInventorySlots(sourceItem) : 1;
-        if ((currentCount + sourceSlots) > capacity) {
-          this.clearItemReorderVisualState();
-          return;
-        }
-      }
-    }
-    if (acceptedTypes && !acceptedTypes.has(payload.itemType)) {
-      this.clearItemReorderVisualState();
-      return;
-    }
-    if (bagZone && !this.isBagZoneSupportedItemType(payload.itemType)) {
-      this.clearItemReorderVisualState();
-      return;
-    }
-    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-    else nativeEvent?.preventDefault?.();
-    if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "move";
-
-    this.clearItemReorderVisualState();
-    list.classList.add("is-reorder-target");
-    const targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
-    if (!targetLi || !list.contains(targetLi)) return;
-    const targetItem = this.getItemFromListElement(targetLi);
-    const targetType = String(targetItem?.type || "").trim().toLowerCase();
-    if (!targetItem) return;
-    if (acceptedTypes && !acceptedTypes.has(targetType)) return;
-    if (carryColumn) {
-      if (!CARRIED_ITEM_TYPES.has(targetType)) return;
-    } else if (isCarryMixedScope) {
-      if (!this.isBagZoneSupportedItemType(targetType)) return;
-    } else if (targetType !== payload.itemType) {
-      return;
-    }
-
-    const columns = this.getItemListColumnCountFromElement(list);
-    const sortBefore = this.getItemReorderSortBefore(nativeEvent, targetLi, columns);
-    targetLi.classList.add(sortBefore ? "is-reorder-drop-before" : "is-reorder-drop-after");
+    return actorItemDndController.onItemReorderDragOver(this, eventLike);
   }
 
   onExternalItemListDragOver(eventLike, payloadOverride = null) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const data = getDragEventData(nativeEvent);
-    const override = payloadOverride && typeof payloadOverride === "object" ? payloadOverride : null;
-
-    const list = this.getItemListDropTargetFromEvent(eventLike);
-    if (!(list instanceof HTMLElement)) return;
-
-    const dataType = String(data?.type || (override ? "Item" : "")).trim().toLowerCase();
-    const itemType = String(override?.itemType || this.getExternalItemDragTypeFromData(data)).trim().toLowerCase();
-    const carryColumn = this.getItemListCarryColumnFromElement(list);
-    const bagZone = this.getItemListBagZoneFromElement(list);
-    const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
-
-    if (dataType && dataType !== "item") return;
-    const equiperAvecParent = this.rememberEquiperAvecDropTargetFromEvent(eventLike);
-    if (equiperAvecParent) {
-      if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-      else nativeEvent?.preventDefault?.();
-      if (nativeEvent?.dataTransfer) {
-        nativeEvent.dataTransfer.dropEffect = String(override?.actorId || data?.actorId || data?.uuid || "").includes("Actor.")
-          ? "move"
-          : "copy";
-      }
-      this.clearItemReorderVisualState();
-      this.highlightEquiperAvecDropTarget(equiperAvecParent);
-      return;
-    }
-    if (acceptedTypes && itemType && !acceptedTypes.has(itemType)) {
-      this.clearItemReorderVisualState();
-      return;
-    }
-    if (carryColumn) {
-      if (itemType && !CARRIED_ITEM_TYPES.has(itemType)) {
-        this.clearItemReorderVisualState();
-        return;
-      }
-      if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
-        this.clearItemReorderVisualState();
-        return;
-      }
-    }
-    if (bagZone && itemType && !this.isBagZoneSupportedItemType(itemType)) {
-      this.clearItemReorderVisualState();
-      return;
-    }
-
-    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-    else nativeEvent?.preventDefault?.();
-    if (nativeEvent?.dataTransfer) {
-      nativeEvent.dataTransfer.dropEffect = String(override?.actorId || data?.actorId || data?.uuid || "").includes("Actor.")
-        ? "move"
-        : "copy";
-    }
-
-    this.clearItemReorderVisualState();
-    list.classList.add("is-reorder-target");
+    return actorItemDndController.onExternalItemListDragOver(this, eventLike, payloadOverride);
   }
 
   onItemReorderDragEnd() {
-    const endingPayload = this.normalizeItemReorderPayload(this._activeItemReorderPayload);
-    if (this._itemReorderPayloadClearTimer) clearTimeout(this._itemReorderPayloadClearTimer);
-    this._itemReorderPayloadClearTimer = setTimeout(() => {
-      this._activeItemReorderPayload = null;
-      this._itemReorderPayloadClearTimer = null;
-    }, 200);
-    setTimeout(() => {
-      const active = globalThis.__bloodmanActiveItemDragPayload || null;
-      if (
-        active
-        && String(active.actorId || "") === String(this.actor?.id || "")
-        && String(active.itemId || "") === String(endingPayload?.itemId || "")
-      ) {
-        globalThis.__bloodmanActiveItemDragPayload = null;
-      }
-    }, 250);
-    this.clearRememberedEquiperAvecDropTarget();
-    this.clearItemReorderVisualState();
+    return actorItemDndController.onItemReorderDragEnd(this);
   }
 
   onItemReorderDragLeave(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const list = this.getItemListDropTargetFromEvent(eventLike);
-    if (!(list instanceof HTMLElement)) return;
-    const relatedTarget = nativeEvent?.relatedTarget;
-    if (relatedTarget instanceof HTMLElement && list.contains(relatedTarget)) return;
-    this.clearRememberedEquiperAvecDropTarget();
-    list.classList.remove("is-reorder-target");
-    list.querySelectorAll(".is-reorder-drop-before").forEach(node => node.classList.remove("is-reorder-drop-before"));
-    list.querySelectorAll(".is-reorder-drop-after").forEach(node => node.classList.remove("is-reorder-drop-after"));
+    return actorItemDndController.onItemReorderDragLeave(this, eventLike);
   }
 
   async onExternalItemListDrop(eventLike) {
@@ -9871,7 +6738,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       this.captureActorSheetNumericFocus(ev);
     });
     this.queueActorSheetNumericFocusRestore(html);
-    html.find("li.item[data-item-id]").attr("draggable", true);
     this.refreshResourceVisuals(html);
     this.queueResourceGaugeRefresh(html);
     this.refreshAutoGrowTextareas(html);
@@ -10021,49 +6887,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.reloadWeapon(item);
     });
 
-    html.off("dragstart.bloodmanDnd", "li.item[data-item-id]");
-    html.off("dragover.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']");
-    html.off("dragleave.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']");
-    html.off("dragend.bloodmanDnd", "li.item[data-item-id]");
-    html.off("drop.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']");
-    html.off("dragover.bloodmanDnd", "[data-equiper-avec-drop='true']");
-    html.off("dragleave.bloodmanDnd", "[data-equiper-avec-drop='true']");
-    html.off("drop.bloodmanDnd", "[data-equiper-avec-drop='true']");
-
-    html.on("dragstart.bloodmanDnd", "li.item[data-item-id]", ev => {
-      this.onItemReorderDragStart(ev);
-    });
-
-    html.on("dragover.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']", ev => {
-      if (this.shouldSkipItemListContainerDelegate(ev)) return;
-      this.onItemReorderDragOver(ev);
-    });
-
-    html.on("dragleave.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']", ev => {
-      if (this.shouldSkipItemListContainerDelegate(ev)) return;
-      this.onItemReorderDragLeave(ev);
-    });
-
-    html.on("dragend.bloodmanDnd", "li.item[data-item-id]", () => {
-      this.onItemReorderDragEnd();
-    });
-
-    html.on("drop.bloodmanDnd", "ol.item-list, [data-item-list-drop-target='true']", async ev => {
-      if (this.shouldSkipItemListContainerDelegate(ev)) return;
-      await this.onItemReorderDrop(ev);
-    });
-
-    html.on("dragover.bloodmanDnd", "[data-equiper-avec-drop='true']", ev => {
-      this.onEquiperAvecDragOver(ev);
-    });
-
-    html.on("dragleave.bloodmanDnd", "[data-equiper-avec-drop='true']", ev => {
-      this.onEquiperAvecDragLeave(ev);
-    });
-
-    html.on("drop.bloodmanDnd", "[data-equiper-avec-drop='true']", async ev => {
-      await this.onEquiperAvecDrop(ev);
-    });
+    actorItemDndController.activateActorItemDndListeners(this, html);
 
     html.find(".ability-roll").click(ev => {
       const li = ev.currentTarget.closest(".item");
@@ -12081,22 +8905,7 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   static getResponsiveSheetSize() {
-    const viewportWidth = Math.max(
-      Number(globalThis?.innerWidth) || 0,
-      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
-      0
-    );
-    const viewportHeight = Math.max(
-      Number(globalThis?.innerHeight) || 0,
-      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
-      0
-    );
-    const safeWidth = viewportWidth > 0 ? viewportWidth : 1280;
-    const safeHeight = viewportHeight > 0 ? viewportHeight : 900;
-    return {
-      width: Math.round(Math.min(safeWidth - 40, Math.max(920, Math.min(1200, safeWidth * 0.52)))),
-      height: Math.round(Math.min(safeHeight - 56, Math.max(560, Math.min(800, safeHeight * 0.56))))
-    };
+    return itemSheetLayoutController.getResponsiveSheetSize();
   }
 
   async getData(options) {
@@ -12262,33 +9071,7 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   setPosition(options = {}) {
-    const viewportWidth = Math.max(
-      Number(globalThis?.innerWidth) || 0,
-      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
-      0
-    );
-    const viewportHeight = Math.max(
-      Number(globalThis?.innerHeight) || 0,
-      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
-      0
-    );
-    const maxWidth = Math.max(320, viewportWidth - 24);
-    const maxHeight = Math.max(320, viewportHeight - 32);
-    const nextPosition = { ...options };
-    const candidateWidth = Number(nextPosition.width ?? this.position?.width ?? this.options?.width);
-    const candidateHeight = Number(nextPosition.height ?? this.position?.height ?? this.options?.height);
-    const candidateLeft = Number(nextPosition.left ?? this.position?.left);
-    const candidateTop = Number(nextPosition.top ?? this.position?.top);
-
-    if (Number.isFinite(candidateWidth)) nextPosition.width = Math.min(candidateWidth, maxWidth);
-    if (Number.isFinite(candidateHeight)) nextPosition.height = Math.min(candidateHeight, maxHeight);
-    if (Number.isFinite(candidateLeft) && Number.isFinite(nextPosition.width)) {
-      nextPosition.left = Math.max(12, Math.min(candidateLeft, viewportWidth - nextPosition.width - 12));
-    }
-    if (Number.isFinite(candidateTop) && Number.isFinite(nextPosition.height)) {
-      nextPosition.top = Math.max(12, Math.min(candidateTop, viewportHeight - nextPosition.height - 12));
-    }
-
+    const nextPosition = itemSheetLayoutController.resolvePositionOptions(this, options);
     const position = super.setPosition(nextPosition);
     this.updateResponsiveSheetScale();
     return position;
@@ -12302,355 +9085,90 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   openItemAudioFilePicker() {
-    if (!this.item) return false;
-    const FilePickerClass = getFilePickerClass();
-    if (typeof FilePickerClass !== "function") {
-      safeWarn("Selection audio impossible: FilePicker indisponible.");
-      return false;
-    }
-
-    const current = String(this.item.system?.audioFile || "").trim();
-    const picker = new FilePickerClass({
-      type: "audio",
-      current,
-      callback: async path => {
-        const nextPath = String(path || "").trim();
-        if (!nextPath || nextPath === current) return;
-        await this.item.update({ "system.audioFile": nextPath });
-      }
-    });
-    return renderFilePickerSafely(picker, "item-audio-file-picker");
+    return itemSheetControlsController.openItemAudioFilePicker(this);
   }
 
   getResponsiveSheetScaleTarget(rootLike = null) {
-    const root = rootLike?.find ? rootLike[0] : rootLike;
-    const elementRoot = root instanceof HTMLElement
-      ? root
-      : (this.element?.[0] instanceof HTMLElement ? this.element[0] : null);
-    if (!elementRoot) return null;
-    const sheetRoot = elementRoot.matches?.(".bm-item-unified")
-      ? elementRoot
-      : elementRoot.querySelector?.(".bm-item-unified");
-    return sheetRoot instanceof HTMLElement ? sheetRoot : null;
+    return itemSheetLayoutController.getResponsiveSheetScaleTarget(this, rootLike);
   }
 
   getResponsiveSheetObserverTarget(rootLike = null) {
-    const root = rootLike?.find ? rootLike[0] : rootLike;
-    const elementRoot = root instanceof HTMLElement
-      ? root
-      : (this.element?.[0] instanceof HTMLElement ? this.element[0] : null);
-    if (!elementRoot) return null;
-    return elementRoot.closest?.(".app.window-app") || elementRoot;
+    return itemSheetLayoutController.getResponsiveSheetObserverTarget(this, rootLike);
   }
 
   resolveResponsiveItemSheetLayoutState(width = 0, height = 0) {
-    const safeWidth = Math.max(320, Math.round(Number(width) || 0));
-    const safeHeight = Math.max(320, Math.round(Number(height) || 0));
-    let layoutMode = "wide";
-    if (safeWidth < 640) layoutMode = "stacked";
-    else if (safeWidth < 860) layoutMode = "narrow";
-    else if (safeWidth < 1080) layoutMode = "compact";
-
-    let heightMode = "tall";
-    if (safeHeight < 520) heightMode = "short";
-    else if (safeHeight < 680) heightMode = "medium";
-
-    const useNoteScroll = layoutMode === "stacked" || heightMode === "short";
-    const noteMaxHeight = useNoteScroll
-      ? Math.max(120, Math.min(260, Math.round(safeHeight * 0.34)))
-      : 0;
-
-    return {
-      layoutMode,
-      heightMode,
-      useNoteScroll,
-      noteMaxHeight
-    };
+    return itemSheetLayoutController.resolveResponsiveItemSheetLayoutState(width, height);
   }
 
   applyResponsiveItemSheetLayoutState(rootLike = null, metrics = {}) {
-    const sheetRoot = this.getResponsiveSheetScaleTarget(rootLike);
-    if (!sheetRoot) return null;
-    const width = Math.max(320, Math.round(Number(metrics?.width) || 0));
-    const height = Math.max(320, Math.round(Number(metrics?.height) || 0));
-    const state = this.resolveResponsiveItemSheetLayoutState(width, height);
-    sheetRoot.dataset.bmLayout = state.layoutMode;
-    sheetRoot.dataset.bmHeight = state.heightMode;
-    sheetRoot.dataset.bmNoteScroll = state.useNoteScroll ? "true" : "false";
-
-    const noteField = sheetRoot.querySelector(".bm-item-note-textarea");
-    if (noteField instanceof HTMLTextAreaElement) {
-      if (state.noteMaxHeight > 0) {
-        noteField.dataset.autogrowMaxHeightPx = String(state.noteMaxHeight);
-      } else {
-        delete noteField.dataset.autogrowMaxHeightPx;
-      }
-    }
-
-    return state;
+    return itemSheetLayoutController.applyResponsiveItemSheetLayoutState(this, rootLike, metrics);
   }
 
   updateResponsiveSheetScale(rootLike = null) {
-    const sheetRoot = this.getResponsiveSheetScaleTarget(rootLike);
-    if (!sheetRoot) return 1;
-    const rect = sheetRoot.getBoundingClientRect();
-    const positionWidth = Number(this.position?.width);
-    const positionHeight = Number(this.position?.height);
-    const width = Number.isFinite(positionWidth) && positionWidth > 0
-      ? Math.max(positionWidth, 320)
-      : Math.max(Number(sheetRoot.clientWidth) || rect.width || 0, 320);
-    const height = Number.isFinite(positionHeight) && positionHeight > 0
-      ? Math.max(positionHeight - 40, 320)
-      : Math.max(Number(sheetRoot.clientHeight) || rect.height || 0, 320);
-    const viewportWidth = Math.max(
-      Number(globalThis?.innerWidth) || 0,
-      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
-      1280
-    );
-    const viewportHeight = Math.max(
-      Number(globalThis?.innerHeight) || 0,
-      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
-      720
-    );
-    const widthScale = width / 1180;
-    const heightScale = height / 760;
-    const viewportScaleBoost = Math.min(
-      1.16,
-      Math.max(1, Math.sqrt((viewportWidth / 1920) * (viewportHeight / 1080)))
-    );
-    const baseScale = Math.sqrt(widthScale * heightScale);
-    const scale = Math.min(1.7, Math.max(0.9, baseScale * viewportScaleBoost));
-    sheetRoot.style.setProperty("--bm-sheet-scale", scale.toFixed(3));
-    sheetRoot.style.setProperty("--bm-sheet-width", `${Math.round(width)}px`);
-    sheetRoot.style.setProperty("--bm-sheet-height", `${Math.round(height)}px`);
-    const responsiveState = this.applyResponsiveItemSheetLayoutState(sheetRoot, { width, height });
-    const layoutKey = [
-      Math.round(width),
-      Math.round(height),
-      responsiveState?.layoutMode || "",
-      responsiveState?.heightMode || "",
-      responsiveState?.noteMaxHeight || 0,
-      scale.toFixed(3)
-    ].join("|");
-    if (layoutKey !== this._lastResponsiveItemSheetLayoutKey) {
-      this._lastResponsiveItemSheetLayoutKey = layoutKey;
-      this.queueItemSheetAutoGrowTextareaRefresh(sheetRoot);
-    }
-    return scale;
+    return itemSheetLayoutController.updateResponsiveSheetScale(this, rootLike);
   }
 
   connectResponsiveSheetScaleObserver(html) {
-    this.disconnectResponsiveSheetScaleObserver();
-    const observerTarget = this.getResponsiveSheetObserverTarget(html);
-    if (!observerTarget) return;
-    this.updateResponsiveSheetScale(observerTarget);
-    const windowResizeHandler = () => {
-      this.updateResponsiveSheetScale(observerTarget);
-    };
-    this._responsiveItemSheetScaleWindowResize = windowResizeHandler;
-    globalThis?.addEventListener?.("resize", windowResizeHandler);
-    if (typeof ResizeObserver !== "function") return;
-    this._responsiveItemSheetScaleObserver = new ResizeObserver(() => {
-      this.updateResponsiveSheetScale(observerTarget);
-    });
-    this._responsiveItemSheetScaleObserver.observe(observerTarget);
+    return itemSheetLayoutController.connectResponsiveSheetScaleObserver(this, html);
   }
 
   disconnectResponsiveSheetScaleObserver() {
-    this._responsiveItemSheetScaleObserver?.disconnect?.();
-    this._responsiveItemSheetScaleObserver = null;
-    if (this._responsiveItemSheetScaleWindowResize) {
-      globalThis?.removeEventListener?.("resize", this._responsiveItemSheetScaleWindowResize);
-      this._responsiveItemSheetScaleWindowResize = null;
-    }
+    return itemSheetLayoutController.disconnectResponsiveSheetScaleObserver(this);
   }
 
   clearQueuedItemSheetAutoGrowRefresh() {
-    clearUiMicrotask(this._itemSheetAutoGrowRefreshTaskId);
-    this._itemSheetAutoGrowRefreshTaskId = null;
-    this._queuedItemSheetAutoGrowRoot = null;
+    return itemSheetLayoutController.clearQueuedItemSheetAutoGrowRefresh(this);
   }
 
   resizeItemSheetAutoGrowTextarea(textarea) {
-    if (!textarea || String(textarea.tagName || "").toUpperCase() !== "TEXTAREA") return;
-    textarea.style.maxHeight = "";
-    textarea.style.height = "auto";
-    const computedStyle = window.getComputedStyle ? window.getComputedStyle(textarea) : null;
-    const layout = resolveTextareaAutoGrowState({
-      style: computedStyle,
-      rows: textarea.getAttribute("rows"),
-      minRows: textarea.dataset?.autogrowMinRows,
-      maxRows: textarea.dataset?.autogrowMaxRows,
-      scrollHeight: textarea.scrollHeight
-    });
-    const requestedMaxHeight = Number(textarea.dataset?.autogrowMaxHeightPx);
-    const maxHeightPx = Number.isFinite(requestedMaxHeight) && requestedMaxHeight > 0
-      ? Math.max(layout.minHeight, Math.round(requestedMaxHeight))
-      : 0;
-    const nextHeight = maxHeightPx > 0
-      ? Math.min(layout.nextHeight, maxHeightPx)
-      : layout.nextHeight;
-    const overflowY = maxHeightPx > 0 && layout.contentHeight > nextHeight
-      ? "auto"
-      : layout.overflowY;
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.maxHeight = maxHeightPx > 0 ? `${maxHeightPx}px` : "";
-    textarea.style.overflowY = overflowY;
+    return itemSheetLayoutController.resizeItemSheetAutoGrowTextarea(this, textarea);
   }
 
   refreshItemSheetAutoGrowTextareas(htmlLike = null) {
-    const root = htmlLike?.find ? htmlLike : this.element;
-    if (!root?.length) return;
-    const fields = root.find("textarea[data-autogrow='true']");
-    if (!fields.length) return;
-    fields.each((_index, textarea) => {
-      this.resizeItemSheetAutoGrowTextarea(textarea);
-    });
+    return itemSheetLayoutController.refreshItemSheetAutoGrowTextareas(this, htmlLike);
   }
 
   queueItemSheetAutoGrowTextareaRefresh(rootLike = null) {
-    this._queuedItemSheetAutoGrowRoot = resolveDeferredRoot(this._queuedItemSheetAutoGrowRoot, rootLike);
-    if (this._itemSheetAutoGrowRefreshTaskId != null) return;
-    this._itemSheetAutoGrowRefreshTaskId = queueUiMicrotask(() => {
-      this._itemSheetAutoGrowRefreshTaskId = null;
-      const root = this._queuedItemSheetAutoGrowRoot?.find ? this._queuedItemSheetAutoGrowRoot : this.element;
-      this._queuedItemSheetAutoGrowRoot = null;
-      this.refreshItemSheetAutoGrowTextareas(root);
-    });
+    return itemSheetLayoutController.queueItemSheetAutoGrowTextareaRefresh(this, rootLike);
   }
 
   clearQueuedPricePreviewRefresh() {
-    clearUiMicrotask(this._pricePreviewRefreshTaskId);
-    this._pricePreviewRefreshTaskId = null;
-    this._queuedPricePreviewRoot = null;
+    return itemSheetControlsController.clearQueuedPricePreviewRefresh(this);
   }
 
   queuePricePreviewRefresh(rootLike = null) {
-    this._queuedPricePreviewRoot = resolveDeferredRoot(this._queuedPricePreviewRoot, rootLike);
-    if (this._pricePreviewRefreshTaskId != null) return;
-    this._pricePreviewRefreshTaskId = queueUiMicrotask(() => {
-      this._pricePreviewRefreshTaskId = null;
-      const root = this._queuedPricePreviewRoot?.find ? this._queuedPricePreviewRoot : this.element;
-      this._queuedPricePreviewRoot = null;
-      this.refreshPricePreview(root);
-    });
+    return itemSheetControlsController.queuePricePreviewRefresh(this, rootLike);
   }
 
   syncPricePreviewSaleManualState(htmlLike = null) {
-    if (!isPriceManagedItemType(this.item?.type)) return false;
-    const root = htmlLike?.find ? htmlLike : this.element;
-    if (!root?.length) return false;
-    const priceInput = root.find("input[name='system.price']").first();
-    const saleInput = root.find("input[name='system.salePrice']").first();
-    if (!priceInput.length || !saleInput.length) return false;
-    const manual = resolveItemSaleManualFlag(priceInput.val(), saleInput.val());
-    saleInput.attr("data-sale-manual", manual ? "true" : "false");
-    return manual;
+    return itemSheetControlsController.syncPricePreviewSaleManualState(this, htmlLike);
   }
 
   activateListeners(html) {
     super.activateListeners(html);
-    const audioPickerButtons = html.find(".bm-item-audio-field .file-picker");
-    audioPickerButtons.off("click");
-    audioPickerButtons.on("click", ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      this.openItemAudioFilePicker();
-    });
+    itemSheetControlsController.activateAudioFilePickerListeners(this, html);
     this.activatePricePreviewListeners(html);
     this.connectResponsiveSheetScaleObserver(html);
     this.refreshItemSheetAutoGrowTextareas(html);
     this.queueItemSheetAutoGrowTextareaRefresh(html);
-    html.find(".bm-item-top, .bm-item-img-el").attr("draggable", true);
-
-    html.on("dragstart", ".bm-item-top, .bm-item-img-el", ev => {
-      this.onItemSheetDragStart(ev);
-    });
+    itemSheetEquipWithController.activateItemSheetEquiperAvecListeners(this, html);
 
     html.on("input change", "textarea[data-autogrow='true']", ev => {
       this.resizeItemSheetAutoGrowTextarea(ev.currentTarget);
     });
 
-    html.on("dragover", "[data-item-equiper-avec-drop='true']", ev => {
-      const nativeEvent = ev.originalEvent || ev;
-      if (typeof ev.preventDefault === "function") ev.preventDefault();
-      else nativeEvent?.preventDefault?.();
-      const container = this.getItemSheetEquiperAvecDropContainerFromEvent(ev);
-      container?.classList?.add?.("is-drop-target");
-      if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "copy";
-    });
-
-    html.on("dragleave", "[data-item-equiper-avec-drop='true']", ev => {
-      const nativeEvent = ev.originalEvent || ev;
-      const container = this.getItemSheetEquiperAvecDropContainerFromEvent(ev);
-      if (!container) return;
-      const relatedTarget = nativeEvent?.relatedTarget;
-      if (relatedTarget instanceof HTMLElement && container.contains(relatedTarget)) return;
-      container.classList.remove("is-drop-target");
-    });
-
-    html.on("drop", "[data-item-equiper-avec-drop='true']", async ev => {
-      await this.onItemSheetEquiperAvecDrop(ev);
-    });
-
-    html.find(".bm-item-equiper-avec-remove").click(async ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const index = this.getItemSheetEquiperAvecTemplateIndexFromEvent(ev);
-      if (index < 0) return;
-      await this.removeItemSheetEquiperAvecTemplateByIndex(index);
-    });
-
-    html.find(".bm-item-equiper-avec-open").click(async ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const sourceUuid = String(ev.currentTarget?.dataset?.sourceUuid || "").trim();
-      if (!sourceUuid) return;
-      const sourceItem = await compatFromUuid(sourceUuid).catch(() => null);
-      sourceItem?.sheet?.render?.(true);
-    });
-
   }
 
   buildItemSheetDragPayload() {
-    const item = this.item;
-    if (!item) return null;
-    const uuid = String(item.uuid || "").trim();
-    const itemId = String(item.id || item._id || "").trim();
-    if (!uuid && !itemId) return null;
-    return {
-      type: "Item",
-      uuid,
-      id: itemId,
-      itemType: String(item.type || "").trim().toLowerCase(),
-      actorId: String(item.actor?.id || ""),
-      actorUuid: String(item.actor?.uuid || "")
-    };
+    return itemSheetEquipWithController.buildItemSheetDragPayload(this);
   }
 
   setItemSheetDragTransferData(dataTransfer, mimeType, payload) {
-    if (!dataTransfer || !payload) return false;
-    try {
-      dataTransfer.setData(mimeType, JSON.stringify(payload));
-      return true;
-    } catch (_error) {
-      return false;
-    }
+    return itemSheetEquipWithController.setItemSheetDragTransferData(dataTransfer, mimeType, payload);
   }
 
   onItemSheetDragStart(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const target = nativeEvent?.target;
-    if (target?.closest?.("input, textarea, select, button, a")) return;
-    const payload = this.buildItemSheetDragPayload();
-    if (!payload || !nativeEvent?.dataTransfer) return;
-    this.setItemSheetDragTransferData(nativeEvent.dataTransfer, "text/plain", payload);
-    this.setItemSheetDragTransferData(nativeEvent.dataTransfer, "application/json", payload);
-    try {
-      nativeEvent.dataTransfer.effectAllowed = "copyMove";
-    } catch (_error) {
-      // Some browsers can reject drag metadata changes; the plain payload above is enough.
-    }
+    return itemSheetEquipWithController.onItemSheetDragStart(this, eventLike);
   }
 
   async _onChangeInput(event) {
@@ -12744,176 +9262,51 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   getItemSheetEquiperAvecDropContainerFromEvent(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const currentTarget = eventLike?.currentTarget instanceof HTMLElement
-      ? eventLike.currentTarget
-      : null;
-    if (currentTarget?.matches?.("[data-item-equiper-avec-drop='true']")) return currentTarget;
-    const target = nativeEvent?.target instanceof HTMLElement ? nativeEvent.target : null;
-    const container = target?.closest?.("[data-item-equiper-avec-drop='true']");
-    return container instanceof HTMLElement ? container : null;
+    return itemSheetEquipWithController.getItemSheetEquiperAvecDropContainerFromEvent(eventLike);
   }
 
   getItemSheetEquiperAvecAcceptedTypes(container) {
-    if (!(container instanceof HTMLElement)) return null;
-    const raw = String(container.dataset?.acceptedTypes || "").trim().toLowerCase();
-    if (!raw) return null;
-    return new Set(raw.split(",").map(entry => entry.trim()).filter(Boolean));
+    return itemSheetEquipWithController.getItemSheetEquiperAvecAcceptedTypes(container);
   }
 
   getItemSheetEquiperAvecTemplateEntries() {
-    return normalizeItemLinkTemplateEntries(this.item?.system?.link?.equiperAvecTemplates, {
-      keepSourceReference: !this.item?.actor
-    });
+    return itemSheetEquipWithController.getItemSheetEquiperAvecTemplateEntries(this);
   }
 
   getItemSheetEquiperAvecTemplateIndexFromEvent(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const trigger = eventLike?.currentTarget || nativeEvent?.target || null;
-    const row = trigger?.closest?.("[data-template-index]") || null;
-    const value = Number(row?.dataset?.templateIndex);
-    if (!Number.isInteger(value) || value < 0) return -1;
-    return value;
+    return itemSheetEquipWithController.getItemSheetEquiperAvecTemplateIndexFromEvent(eventLike);
   }
 
   async resolveDroppedItemDocument(data) {
-    return resolveDroppedItemFromDropDataCached(data);
+    return itemSheetEquipWithController.resolveDroppedItemDocument(data);
   }
 
   isItemSheetEquiperAvecTypeAccepted(itemType, acceptedTypes = null) {
-    const normalized = String(itemType || "").trim().toLowerCase();
-    if (!isItemLinkSupportedType(normalized)) return false;
-    if (acceptedTypes && acceptedTypes.size && !acceptedTypes.has(normalized)) return false;
-    return true;
+    return itemSheetEquipWithController.isItemSheetEquiperAvecTypeAccepted(itemType, acceptedTypes);
   }
 
   async updateItemSheetEquiperAvecTemplates(nextTemplates, options = {}) {
-    if (!this.item?.update) return false;
-    const normalizedTemplates = normalizeItemLinkTemplateEntries(nextTemplates, {
-      keepSourceReference: !this.item?.actor
-    });
-    const updateData = {
-      "system.link.equiperAvecTemplates": normalizedTemplates
-    };
-    if (options.forceEnable === true) {
-      updateData["system.link.equiperAvecEnabled"] = true;
-    } else if (options.forceEnable === false) {
-      updateData["system.link.equiperAvecEnabled"] = false;
-    }
-    try {
-      await this.item.update(updateData);
-      return true;
-    } catch (_error) {
-      safeWarn(tl("BLOODMAN.Notifications.ItemLinkUpdateFailed", "Mise a jour impossible des objets equipes."));
-      return false;
-    }
+    return itemSheetEquipWithController.updateItemSheetEquiperAvecTemplates(this, nextTemplates, options);
   }
 
   async addItemSheetEquiperAvecTemplateFromDocument(itemDocument, acceptedTypes = null) {
-    const templateEntry = buildItemLinkTemplateEntryFromItemDocument(itemDocument, {
-      keepSourceReference: !this.item?.actor
-    });
-    if (!templateEntry) {
-      safeWarn(tl("BLOODMAN.Notifications.ItemLinkTypeIncompatible", "Type incompatible avec Equiper avec."));
-      return false;
-    }
-    if (!this.isItemSheetEquiperAvecTypeAccepted(templateEntry.type, acceptedTypes)) {
-      safeWarn(tl("BLOODMAN.Notifications.ItemLinkTypeIncompatible", "Type incompatible avec Equiper avec."));
-      return false;
-    }
-
-    const currentItemUuid = String(this.item?.uuid || "").trim();
-    const sourceUuid = String(templateEntry?._templateSourceUuid || "").trim();
-    const isSameUuid = currentItemUuid && sourceUuid && currentItemUuid === sourceUuid;
-    const isSameWorldItem = !this.item?.actor
-      && !itemDocument?.actor
-      && String(this.item?.id || "").trim()
-      && String(itemDocument?.id || "").trim()
-      && String(this.item.id).trim() === String(itemDocument.id).trim();
-    const isSameActorItem = this.item?.actor
-      && itemDocument?.actor
-      && String(this.item.actor?.id || "").trim()
-      && String(this.item.actor?.id || "").trim() === String(itemDocument.actor?.id || "").trim()
-      && String(this.item?.id || "").trim()
-      && String(this.item?.id || "").trim() === String(itemDocument?.id || "").trim();
-    if (isSameUuid || isSameWorldItem || isSameActorItem) {
-      safeWarn(tl("BLOODMAN.Notifications.ItemLinkSelfForbidden", "Un objet ne peut pas s'equiper avec lui-meme."));
-      return false;
-    }
-
-    const nextTemplates = this.getItemSheetEquiperAvecTemplateEntries();
-    nextTemplates.push(templateEntry);
-    const updated = await this.updateItemSheetEquiperAvecTemplates(nextTemplates, { forceEnable: true });
-    if (updated) this.render(false);
-    return updated;
+    return itemSheetEquipWithController.addItemSheetEquiperAvecTemplateFromDocument(this, itemDocument, acceptedTypes);
   }
 
   async removeItemSheetEquiperAvecTemplateByIndex(index) {
-    const entries = this.getItemSheetEquiperAvecTemplateEntries();
-    if (!entries.length) return false;
-    if (!Number.isInteger(index) || index < 0 || index >= entries.length) return false;
-    entries.splice(index, 1);
-    const updated = await this.updateItemSheetEquiperAvecTemplates(entries, {});
-    if (updated) this.render(false);
-    return updated;
+    return itemSheetEquipWithController.removeItemSheetEquiperAvecTemplateByIndex(this, index);
   }
 
   async onItemSheetEquiperAvecDrop(eventLike) {
-    const nativeEvent = eventLike?.originalEvent || eventLike;
-    const container = this.getItemSheetEquiperAvecDropContainerFromEvent(eventLike);
-    if (!container) return false;
-
-    if (typeof eventLike?.preventDefault === "function") eventLike.preventDefault();
-    else nativeEvent?.preventDefault?.();
-    if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
-    else nativeEvent?.stopPropagation?.();
-    container.classList.remove("is-drop-target");
-
-    const acceptedTypes = this.getItemSheetEquiperAvecAcceptedTypes(container);
-    const data = getDragEventData(nativeEvent);
-    if (!data) return false;
-    const dataType = String(data?.type || "").trim().toLowerCase();
-    if (dataType !== "item") return false;
-
-    const droppedItem = await this.resolveDroppedItemDocument(data);
-    if (!droppedItem) return false;
-    return this.addItemSheetEquiperAvecTemplateFromDocument(droppedItem, acceptedTypes);
+    return itemSheetEquipWithController.onItemSheetEquiperAvecDrop(this, eventLike);
   }
 
   refreshPricePreview(htmlLike = null) {
-    if (!isPriceManagedItemType(this.item?.type)) return;
-    const root = htmlLike?.find ? htmlLike : this.element;
-    if (!root?.length) return;
-    const priceInput = root.find("input[name='system.price']").first();
-    const saleInput = root.find("input[name='system.salePrice']").first();
-    const errorNode = root.find("[data-price-error]").first();
-    if (!priceInput.length || !saleInput.length || !errorNode.length) return;
-    const saleManual = saleInput.attr("data-sale-manual") === "true";
-    const uiState = resolveItemPricePreviewUiState({
-      priceValue: priceInput.val(),
-      saleValue: saleInput.val(),
-      saleManual
-    });
-    if (!saleManual && String(saleInput.val() ?? "") !== uiState.nextSaleValue) {
-      saleInput.val(uiState.nextSaleValue);
-    }
-    errorNode.text(uiState.errorMessage || "");
-    priceInput.toggleClass("is-invalid", uiState.invalid);
-    priceInput.attr("aria-invalid", uiState.ariaInvalid);
+    return itemSheetControlsController.refreshPricePreview(this, htmlLike);
   }
 
   activatePricePreviewListeners(html) {
-    if (!isPriceManagedItemType(this.item?.type)) return;
-    const refresh = () => this.queuePricePreviewRefresh(html);
-    html.on("input change blur", "input[name='system.price']", () => {
-      refresh();
-    });
-    html.on("input change blur", "input[name='system.salePrice']", () => {
-      this.syncPricePreviewSaleManualState(html);
-      refresh();
-    });
-    this.syncPricePreviewSaleManualState(html);
-    this.refreshPricePreview(html);
+    return itemSheetControlsController.activatePricePreviewListeners(this, html);
   }
 
   async rollAbilityDamage() {

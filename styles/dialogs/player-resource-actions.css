@@ -1,0 +1,34 @@
+.window-app.bloodman-damage-dialog .bm-voyage-xp-dialog,
+.window-app.dialog.bloodman-damage-dialog .bm-voyage-xp-dialog,
+.window-app.bloodman-damage-dialog .bm-full-pv-dialog,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pv-dialog,
+.window-app.bloodman-damage-dialog .bm-full-pp-dialog,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pp-dialog,
+.window-app.bloodman-damage-dialog .bm-voyage-xp-dialog p,
+.window-app.dialog.bloodman-damage-dialog .bm-voyage-xp-dialog p,
+.window-app.bloodman-damage-dialog .bm-full-pv-dialog p,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pv-dialog p,
+.window-app.bloodman-damage-dialog .bm-full-pp-dialog p,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pp-dialog p,
+.window-app.bloodman-damage-dialog .bm-full-pv-dialog small,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pv-dialog small,
+.window-app.bloodman-damage-dialog .bm-full-pp-dialog small,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pp-dialog small {
+  color: var(--bm-damage-fg) !important;
+}
+
+.window-app.bloodman-damage-dialog .bm-voyage-xp-dialog p,
+.window-app.dialog.bloodman-damage-dialog .bm-voyage-xp-dialog p,
+.window-app.bloodman-damage-dialog .bm-full-pv-dialog p,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pv-dialog p,
+.window-app.bloodman-damage-dialog .bm-full-pp-dialog p,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pp-dialog p {
+  margin: 0 0 8px;
+}
+
+.window-app.bloodman-damage-dialog .bm-full-pv-dialog small,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pv-dialog small,
+.window-app.bloodman-damage-dialog .bm-full-pp-dialog small,
+.window-app.dialog.bloodman-damage-dialog .bm-full-pp-dialog small {
+  color: var(--bm-damage-muted) !important;
+}

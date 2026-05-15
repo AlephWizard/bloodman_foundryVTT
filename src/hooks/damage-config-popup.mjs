@@ -5,6 +5,7 @@ export function buildDamageConfigPopupHooks({
   isAssistantOrHigherRole,
   escapeHtml,
   dialogClass,
+  createDialog,
   wasDamageConfigPopupRequestProcessed,
   rememberDamageConfigPopupRequest,
   logWarn
@@ -29,6 +30,13 @@ export function buildDamageConfigPopupHooks({
     ? escapeHtml
     : value => String(value || "");
   const popupDialogClass = dialogClass || globalThis.Dialog;
+  const createPopupDialog = typeof createDialog === "function"
+    ? createDialog
+    : (config, options) => (
+      typeof popupDialogClass === "function"
+        ? new popupDialogClass(config, options)
+        : null
+    );
   const wasProcessed = typeof wasDamageConfigPopupRequestProcessed === "function"
     ? wasDamageConfigPopupRequestProcessed
     : () => false;
@@ -144,7 +152,7 @@ export function buildDamageConfigPopupHooks({
   }
 
   function showDamageConfigObserverPopup(data) {
-    if (!data || typeof popupDialogClass !== "function") return false;
+    if (!data) return false;
     const requestId = String(data.requestId || "").trim();
     const action = String(data.action || "open").trim().toLowerCase() || "open";
     if (action === "close") return closeDamageConfigObserverDialog(requestId);
@@ -157,7 +165,7 @@ export function buildDamageConfigPopupHooks({
     if (existing) activeDamageConfigPopups.delete(requestId);
 
     const content = getDamageConfigObserverContent(state);
-    const dialog = new popupDialogClass(
+    const dialog = createPopupDialog(
       {
         title: state.title,
         content,
@@ -178,6 +186,7 @@ export function buildDamageConfigPopupHooks({
         width: 500
       }
     );
+    if (!dialog || typeof dialog.render !== "function") return false;
     dialog.render(true);
     if (requestId) activeDamageConfigPopups.set(requestId, dialog);
     return true;

@@ -256,7 +256,8 @@ function run() {
   }
 
   assert.equal(
-    runtimeSource.includes('html.find(".bm-item-top, .bm-item-img-el").attr("draggable", true);'),
+    runtimeSource.includes("activateItemSheetEquiperAvecListeners")
+      && readText("src/ui/item-sheet-equip-with.mjs").includes('html.find(".bm-item-top, .bm-item-img-el").attr("draggable", true);'),
     true,
     "Unified item sheet should expose a draggable item header/image"
   );

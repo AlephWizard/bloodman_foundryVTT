@@ -1,7 +1,13 @@
 import { SYSTEM_TEMPLATE_PARTIAL_PATHS } from "../core/constants.mjs";
 
+function getFoundryTemplateLoader() {
+  const namespacedLoader = globalThis.foundry?.applications?.handlebars?.loadTemplates;
+  if (typeof namespacedLoader === "function") return namespacedLoader;
+  return globalThis.loadTemplates;
+}
+
 export async function registerBloodmanTemplatePartials({
-  loadTemplatesFn = globalThis.loadTemplates,
+  loadTemplatesFn = getFoundryTemplateLoader(),
   partialPaths = SYSTEM_TEMPLATE_PARTIAL_PATHS,
   logger = null
 } = {}) {

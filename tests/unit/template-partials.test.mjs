@@ -68,6 +68,30 @@ async function run() {
   assert.equal(preloadResult.ok, true, "Template partial preload should succeed with a loader");
   assert.deepEqual(loadedPaths, SYSTEM_TEMPLATE_PARTIAL_PATHS, "Preload should use registered partial paths");
 
+  const previousFoundry = globalThis.foundry;
+  const previousLoadTemplates = globalThis.loadTemplates;
+  let namespacedLoadedPaths = null;
+  try {
+    globalThis.loadTemplates = async () => {
+      throw new Error("legacy loader should not be used when namespaced loader exists");
+    };
+    globalThis.foundry = {
+      applications: {
+        handlebars: {
+          loadTemplates: async paths => {
+            namespacedLoadedPaths = paths;
+          }
+        }
+      }
+    };
+    const namespacedResult = await registerBloodmanTemplatePartials();
+    assert.equal(namespacedResult.ok, true, "Foundry v14 namespaced template loader should be preferred");
+    assert.deepEqual(namespacedLoadedPaths, SYSTEM_TEMPLATE_PARTIAL_PATHS);
+  } finally {
+    globalThis.foundry = previousFoundry;
+    globalThis.loadTemplates = previousLoadTemplates;
+  }
+
   const warnings = [];
   const missingLoaderResult = await registerBloodmanTemplatePartials({
     loadTemplatesFn: null,

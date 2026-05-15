@@ -1,6 +1,7 @@
 ﻿@import url("./base/foundation.css");
 @import url("./ui/chaos-panel.css");
 @import url("./dialogs/bloodman-dialogs.css");
+@import url("./dialogs/player-resource-actions.css");
 @import url("./ui/document-create-type-icons.css");
 @import url("./dialogs/bloodman-dialog-responsive.css");
 @import url("./chat.css");

@@ -90,6 +90,7 @@ function run() {
     "./base/foundation.css",
     "./ui/chaos-panel.css",
     "./dialogs/bloodman-dialogs.css",
+    "./dialogs/player-resource-actions.css",
     "./ui/document-create-type-icons.css",
     "./dialogs/bloodman-dialog-responsive.css",
     "./chat.css",

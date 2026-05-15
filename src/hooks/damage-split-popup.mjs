@@ -14,6 +14,7 @@ export function buildDamageSplitPopupHooks({
   isAssistantOrHigherRole,
   escapeHtml,
   dialogClass,
+  createDialog,
   wasDamageSplitPopupRequestProcessed,
   rememberDamageSplitPopupRequest,
   logWarn
@@ -40,6 +41,13 @@ export function buildDamageSplitPopupHooks({
     ? escapeHtml
     : value => String(value || "");
   const popupDialogClass = dialogClass || globalThis.Dialog;
+  const createPopupDialog = typeof createDialog === "function"
+    ? createDialog
+    : (config, options) => (
+      typeof popupDialogClass === "function"
+        ? new popupDialogClass(config, options)
+        : null
+    );
   const wasProcessed = typeof wasDamageSplitPopupRequestProcessed === "function"
     ? wasDamageSplitPopupRequestProcessed
     : () => false;
@@ -153,7 +161,7 @@ export function buildDamageSplitPopupHooks({
   }
 
   function showDamageSplitObserverPopup(data) {
-    if (!data || typeof popupDialogClass !== "function") return false;
+    if (!data) return false;
     const requestId = String(data.requestId || "").trim();
     const action = String(data.action || "open").trim().toLowerCase() || "open";
     if (action === "close") return closeDamageSplitObserverDialog(requestId);
@@ -165,7 +173,7 @@ export function buildDamageSplitPopupHooks({
     }
     if (existing) activeDamageSplitPopups.delete(requestId);
 
-    const dialog = new popupDialogClass(
+    const dialog = createPopupDialog(
       {
         title: state.title,
         content: getDamageSplitObserverContent(state),
@@ -184,6 +192,7 @@ export function buildDamageSplitPopupHooks({
         width: 540
       }
     );
+    if (!dialog || typeof dialog.render !== "function") return false;
     dialog.render(true);
     if (requestId) activeDamageSplitPopups.set(requestId, dialog);
     return true;
