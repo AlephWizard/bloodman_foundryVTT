@@ -1,6 +1,11 @@
 import { applyDamageToActor, doCharacteristicRoll, doDamageRoll, doDirectDamageRoll, doGrowthRoll, doHealRoll, getWeaponCategory, normalizeWeaponType, postDamageTakenChatMessage } from "./src/dice/roll-helpers.mjs";
 import { bmLog } from "./src/core/logger.mjs";
 import {
+  CHAT_ROLL_TYPES,
+  buildChatRollFlags,
+  normalizeChatRollType
+} from "./src/core/chat-rolls.mjs";
+import {
   ITEM_SHEET_TEMPLATE_PATH,
   NPC_ACTOR_SHEET_TEMPLATE_PATH,
   NPC_ACTOR_TYPE,
@@ -11,6 +16,20 @@ import {
   SYSTEM_ROOT_PATH,
   SYSTEM_SOCKET
 } from "./src/core/constants.mjs";
+import {
+  normalizeNonNegativeInteger,
+  toCheckboxBoolean,
+  toFiniteNumber
+} from "./src/core/value-normalization.mjs";
+import {
+  CHARACTERISTICS,
+  CHARACTERISTIC_KEYS,
+  PLAYER_ZERO_PV_STATE_PRESET_ID,
+  STATE_MODIFIER_PATHS,
+  STATE_PRESETS,
+  STATE_PRESET_BY_ID,
+  STATE_PRESET_ORDER
+} from "./src/config/actors.mjs";
 import { registerBloodmanCoreSettings, initializeBloodmanLoggerFromSettings } from "./src/core/settings.mjs";
 import { registerSystemDocumentSheets } from "./src/sheets/register-sheets.mjs";
 import { registerBloodmanHandlebarsHelpers } from "./src/sheets/register-handlebars-helpers.mjs";
@@ -88,6 +107,7 @@ import {
 } from "./src/hooks/startup-normalization.mjs";
 import { buildDamageRollFlavorMarkup } from "./src/ui/damage-chat.mjs";
 import { buildDropDecisionDialogContent } from "./src/ui/drop-decision-dialog.mjs";
+import { createMultilineTextHtmlFormatter } from "./src/ui/multiline-text.mjs";
 import {
   collectOpenApplications,
   getApplicationDocumentActor
@@ -120,7 +140,6 @@ import {
   installTokenEffectBackgroundPatch
 } from "./src/ui/token-effect-background.mjs";
 import {
-  toFiniteNumber as ruleToFiniteNumber,
   normalizeCharacteristicKey as ruleNormalizeCharacteristicKey,
   normalizeArchetypeBonusValue as ruleNormalizeArchetypeBonusValue,
   computeArchetypeCharacteristicBonus as ruleComputeArchetypeCharacteristicBonus,
@@ -155,6 +174,7 @@ import { createAmmoStateRules } from "./src/rules/ammo-state.mjs";
 import { createDefaultDataBuilders } from "./src/rules/default-data.mjs";
 import { createUpdatePathHelpers } from "./src/rules/update-paths.mjs";
 import {
+  createItemLinkDeletionRules,
   createItemLinkRules,
   resolveItemLinkData
 } from "./src/rules/item-links.mjs";
@@ -169,6 +189,7 @@ import {
   createTokenImageController
 } from "./src/rules/token-images.mjs";
 import { createItemBucketRules } from "./src/rules/item-buckets.mjs";
+import { createItemBonusRules } from "./src/rules/item-bonuses.mjs";
 import { createItemAudioPlaybackRules } from "./src/rules/item-audio-playback.mjs";
 import { createItemTypeFlagRules } from "./src/rules/item-type-flags.mjs";
 import { validateNumericEquality as ruleValidateNumericEquality, createNumericValidationLogger } from "./src/rules/numeric-validation.mjs";
@@ -180,11 +201,30 @@ import { createCharacteristicRerollRules } from "./src/rules/characteristic-rero
 import { createItemRerollFlowRules } from "./src/rules/item-reroll-flow.mjs";
 import { createItemRerollExecutionRules } from "./src/rules/item-reroll-execution.mjs";
 import { createItemUseFlowRules } from "./src/rules/item-use-flow.mjs";
+import {
+  ITEM_SINGLE_USE_COUNT_PATH,
+  createItemNormalizationRules
+} from "./src/rules/item-normalization.mjs";
+import {
+  VOYAGE_XP_COST_ITEM_TYPES,
+  VOYAGE_XP_SKIP_CREATE_OPTION,
+  createItemVoyageXpRules
+} from "./src/rules/item-voyage-xp.mjs";
 import { createGrowthRollRules } from "./src/rules/growth-roll.mjs";
 import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
 import { installCombatantInitiativePatch } from "./src/rules/combatant-initiative-patch.mjs";
 import { createStartupNormalizationRunner } from "./src/rules/startup-normalization.mjs";
 import { resolveActorBackpackEnabled } from "./src/rules/backpack.mjs";
+import {
+  CHARACTERISTIC_BASE_MAX,
+  CHARACTERISTIC_BASE_MIN,
+  canUserRoleDropMenuItems,
+  canUserRoleEditCharacteristics,
+  canUserRoleOpenItemSheets,
+  clampCharacteristicBaseForRole,
+  isCharacteristicBaseRangeRestrictedRole,
+  isBasicPlayerRole
+} from "./src/rules/user-roles.mjs";
 import {
   getCarriedItemInventorySlots,
   normalizeCarriedItemInventorySlots,
@@ -195,6 +235,7 @@ import { createItemSheetControlsController } from "./src/ui/item-sheet-controls.
 import { createItemSheetEquipWithController } from "./src/ui/item-sheet-equip-with.mjs";
 import { createItemSheetLayoutController } from "./src/ui/item-sheet-layout.mjs";
 import { createItemSheetPricePreviewRules } from "./src/ui/item-sheet-price-preview.mjs";
+import { createItemDisplayDataBuilder } from "./src/ui/item-display-data.mjs";
 import {
   buildBloodmanSupplementalStatusEffects,
   registerBloodmanSupplementalStatusEffects
@@ -216,7 +257,6 @@ const ActorsCollection = getDocumentCollectionClass("Actors");
 const ItemsCollection = getDocumentCollectionClass("Items");
 
 const SIMPLE_ATTACK_REROLL_ID = "__bloodman-simple-attack__";
-const PLAYER_ZERO_PV_STATE_PRESET_ID = "body-injured";
 let zeroPvStatusController = null;
 let tokenImageController = null;
 let openActorSheetController = null;
@@ -286,27 +326,6 @@ function getSimpleAttackRerollLabel() {
   return tl("BLOODMAN.Common.SimpleAttack", "Attaque simple");
 }
 
-const CHAT_ROLL_TYPES = Object.freeze({
-  GENERIC: "generic",
-  CHARACTERISTIC: "characteristic",
-  DAMAGE: "damage",
-  EXPERIENCE: "experience",
-  HEAL: "heal",
-  LUCK: "luck"
-});
-const CHAT_ROLL_TYPE_SET = new Set(Object.values(CHAT_ROLL_TYPES));
-
-function normalizeChatRollType(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return CHAT_ROLL_TYPE_SET.has(normalized) ? normalized : CHAT_ROLL_TYPES.GENERIC;
-}
-
-function buildChatRollFlags(chatRollType, extraBloodman = null) {
-  const bloodmanFlags = { chatRollType: normalizeChatRollType(chatRollType) };
-  if (extraBloodman && typeof extraBloodman === "object") Object.assign(bloodmanFlags, extraBloodman);
-  return { bloodman: bloodmanFlags };
-}
-
 function safeWarn(message) {
   try {
     ui.notifications?.warn(message);
@@ -328,68 +347,23 @@ function getActorPlayerViewerIds(actor) {
     .filter(Boolean);
 }
 
-const MULTILINE_TEXT_HTML_CACHE_MAX = 400;
-const MULTILINE_TEXT_HTML_CACHE = new Map();
-
-function formatMultilineTextToHtml(value) {
-  const raw = String(value || "");
-  if (!raw.trim()) return "";
-  const cached = MULTILINE_TEXT_HTML_CACHE.get(raw);
-  if (typeof cached === "string") return cached;
-  const escaped = escapeChatMarkup(raw);
-  const html = escaped.replace(/\r\n|\r|\n/g, "<br>");
-  if (MULTILINE_TEXT_HTML_CACHE.size >= MULTILINE_TEXT_HTML_CACHE_MAX) {
-    const oldestKey = MULTILINE_TEXT_HTML_CACHE.keys().next().value;
-    if (oldestKey !== undefined) MULTILINE_TEXT_HTML_CACHE.delete(oldestKey);
-  }
-  MULTILINE_TEXT_HTML_CACHE.set(raw, html);
-  return html;
-}
+const formatMultilineTextToHtml = createMultilineTextHtmlFormatter({
+  escapeMarkup: escapeChatMarkup,
+  cacheMax: 400
+});
 
 const ENABLE_CREATE_TYPE_ICON_OBSERVER = false;
 
-function canUserRoleEditCharacteristics(role) {
-  const minRole = Number(CONST?.USER_ROLES?.TRUSTED ?? 2);
-  return Number(role ?? 0) >= minRole;
-}
-
 function canCurrentUserEditCharacteristics() {
   return canUserRoleEditCharacteristics(game.user?.role);
-}
-
-function canUserRoleDropMenuItems(role) {
-  const minRole = Number(CONST?.USER_ROLES?.TRUSTED ?? 2);
-  return Number(role ?? 0) >= minRole;
 }
 
 function canCurrentUserDropMenuItems() {
   return canUserRoleDropMenuItems(game.user?.role);
 }
 
-function isBasicPlayerRole(role) {
-  const playerRole = Number(CONST?.USER_ROLES?.PLAYER ?? 1);
-  return Number(role ?? 0) <= playerRole;
-}
-
-const CHARACTERISTIC_BASE_MIN = 30;
-const CHARACTERISTIC_BASE_MAX = 95;
-
-function canUserRoleOpenItemSheets(role) {
-  return isAssistantOrHigherRole(role);
-}
-
 function canCurrentUserOpenItemSheets() {
   return canUserRoleOpenItemSheets(game.user?.role);
-}
-
-function isCharacteristicBaseRangeRestrictedRole(role) {
-  return !isAssistantOrHigherRole(role);
-}
-
-function clampCharacteristicBaseForRole(role, value, fallback = CHARACTERISTIC_BASE_MIN) {
-  const numeric = toFiniteNumber(value, fallback);
-  if (!isCharacteristicBaseRangeRestrictedRole(role)) return numeric;
-  return Math.max(CHARACTERISTIC_BASE_MIN, Math.min(CHARACTERISTIC_BASE_MAX, numeric));
 }
 
 function normalizeCharacteristicBaseUpdatesForRole(updateData, role, actor = null) {
@@ -425,17 +399,6 @@ function normalizeCharacteristicBaseUpdatesForRole(updateData, role, actor = nul
     }
   }
   return changed;
-}
-
-function toCheckboxBoolean(value, fallback = false) {
-  if (value === true || value === false) return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes") return true;
-    if (normalized === "false" || normalized === "0" || normalized === "off" || normalized === "no" || normalized === "") return false;
-  }
-  return Boolean(fallback);
 }
 
 function normalizeCharacteristicXpUpdates(updateData, actor = null) {
@@ -732,167 +695,6 @@ function resolveInjuredStateActive(label) {
   return getZeroPvStatusController().resolveInjuredStateActive(label);
 }
 
-const CHARACTERISTICS = [
-  { key: "MEL", labelKey: "BLOODMAN.Characteristics.Keys.MEL", icon: "fa-hand-fist" },
-  { key: "VIS", labelKey: "BLOODMAN.Characteristics.Keys.VIS", icon: "fa-crosshairs" },
-  { key: "ESP", labelKey: "BLOODMAN.Characteristics.Keys.ESP", icon: "fa-brain" },
-  { key: "PHY", labelKey: "BLOODMAN.Characteristics.Keys.PHY", icon: "fa-heart-pulse" },
-  { key: "MOU", labelKey: "BLOODMAN.Characteristics.Keys.MOU", icon: "fa-person-running" },
-  { key: "ADR", labelKey: "BLOODMAN.Characteristics.Keys.ADR", icon: "fa-hand" },
-  { key: "PER", labelKey: "BLOODMAN.Characteristics.Keys.PER", icon: "fa-eye" },
-  { key: "SOC", labelKey: "BLOODMAN.Characteristics.Keys.SOC", icon: "fa-users" },
-  { key: "SAV", labelKey: "BLOODMAN.Characteristics.Keys.SAV", icon: "fa-book-open" }
-];
-const CHARACTERISTIC_KEYS = new Set(CHARACTERISTICS.map(characteristic => characteristic.key));
-const STATE_MODIFIER_PATHS = [
-  "system.modifiers.all",
-  "system.modifiers.label",
-  ...CHARACTERISTICS.map(char => `system.modifiers.${char.key}`)
-];
-const STATE_PRESETS = [
-  {
-    id: "psychic-1",
-    category: "psychic",
-    name: "NIV 1 : INQUIETUDE (12h)",
-    shortName: "INQUIETUDE",
-    duration: "12h",
-    description: "",
-    modifierAll: -2,
-    modifierByKey: {}
-  },
-  {
-    id: "psychic-2",
-    category: "psychic",
-    name: "NIV 2 : ANGOISSE (24h)",
-    shortName: "ANGOISSE",
-    duration: "24h",
-    description: "",
-    modifierAll: -4,
-    modifierByKey: {}
-  },
-  {
-    id: "psychic-3",
-    category: "psychic",
-    name: "NIV 3 : EFFROI (72h)",
-    shortName: "EFFROI",
-    duration: "72h",
-    description: "",
-    modifierAll: -6,
-    modifierByKey: {}
-  },
-  {
-    id: "psychic-4",
-    category: "psychic",
-    name: "NIV 4 : PANIQUE (168h)",
-    shortName: "PANIQUE",
-    duration: "168h",
-    description: "",
-    modifierAll: -8,
-    modifierByKey: {}
-  },
-  {
-    id: "psychic-5",
-    category: "psychic",
-    name: "NIV 5 : DELIRES (720h)",
-    shortName: "DELIRES",
-    duration: "720h",
-    description: "",
-    modifierAll: -10,
-    modifierByKey: {}
-  },
-  {
-    id: "psychic-6",
-    category: "psychic",
-    name: "NIV 6 : ALIENATION (87600h)",
-    shortName: "ALIENATION",
-    duration: "87600h",
-    description: "",
-    modifierAll: -12,
-    modifierByKey: {}
-  },
-  {
-    id: "psychic-7",
-    category: "psychic",
-    name: "NIV 7 : FOLIE",
-    shortName: "FOLIE",
-    duration: "",
-    description: "Vous devenez fou.",
-    modifierAll: 0,
-    modifierByKey: {}
-  },
-  {
-    id: "body-injured",
-    category: "body",
-    name: "BLESSE",
-    shortName: "BLESSE",
-    duration: "",
-    description: "",
-    modifierAll: -30,
-    modifierByKey: {}
-  },
-  {
-    id: "body-hunger",
-    category: "body",
-    name: "FAIM",
-    shortName: "FAIM",
-    duration: "",
-    description: "",
-    modifierAll: 0,
-    modifierByKey: { MOU: -10, PHY: -10, ADR: -10, SOC: -10 }
-  },
-  {
-    id: "body-thirst",
-    category: "body",
-    name: "SOIF",
-    shortName: "SOIF",
-    duration: "",
-    description: "",
-    modifierAll: 0,
-    modifierByKey: { MOU: -20, PHY: -20, ADR: -20, SOC: -20 }
-  },
-  {
-    id: "body-drowsy",
-    category: "body",
-    name: "SOMNOLENT",
-    shortName: "SOMNOLENT",
-    duration: "",
-    description: "",
-    modifierAll: 0,
-    modifierByKey: { MOU: -40, PHY: -40, ADR: -40 }
-  },
-  {
-    id: "body-sick",
-    category: "body",
-    name: "MALADE",
-    shortName: "MALADE",
-    duration: "",
-    description: "",
-    modifierAll: -10,
-    modifierByKey: {}
-  },
-  {
-    id: "body-hypothermia",
-    category: "body",
-    name: "HYPOTHERMIE",
-    shortName: "HYPOTHERMIE",
-    duration: "",
-    description: "",
-    modifierAll: 0,
-    modifierByKey: { MEL: -30, MOU: -30, PHY: -30, ADR: -30 }
-  },
-  {
-    id: "body-hyperthermia",
-    category: "body",
-    name: "HYPERTHERMIE",
-    shortName: "HYPERTHERMIE",
-    duration: "",
-    description: "",
-    modifierAll: 0,
-    modifierByKey: { MEL: -30, MOU: -30, PHY: -30, ADR: -30 }
-  }
-];
-const STATE_PRESET_BY_ID = new Map(STATE_PRESETS.map(preset => [preset.id, preset]));
-const STATE_PRESET_ORDER = STATE_PRESETS.map(preset => preset.id);
 const statePresetRules = createStatePresetRules({
   statePresets: STATE_PRESETS,
   statePresetById: STATE_PRESET_BY_ID,
@@ -1010,8 +812,6 @@ const CARRY_COLUMN_FULL_REASON = "colonne pleine";
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
 const PA_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
-const VOYAGE_XP_COST_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
-const VOYAGE_XP_SKIP_CREATE_OPTION = "bloodmanSkipVoyageXPCost";
 const PRICE_ITEM_TYPES = new Set(SYSTEM_ITEM_TYPES);
 const ITEM_BUCKET_TYPES = [...SYSTEM_ITEM_TYPES];
 const CHARACTERISTIC_REROLL_PP_COST = 4;
@@ -1112,10 +912,6 @@ const {
   positionChaosDiceUI,
   ensureChaosDiceUI
 } = chaosDicePanelController;
-
-function toFiniteNumber(value, fallback = 0) {
-  return ruleToFiniteNumber(value, fallback);
-}
 
 function areInternalCanvasPatchesEnabled() {
   try {
@@ -1242,10 +1038,6 @@ function registerBloodmanRuntimeSettings() {
   });
 }
 
-function normalizeNonNegativeInteger(value, fallback = 0) {
-  return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
-}
-
 const playerResourceActionRules = createPlayerResourceActionRules({
   normalizeNonNegativeInteger,
   translate: tl,
@@ -1285,6 +1077,13 @@ const itemLinkRules = createItemLinkRules({
   toCheckboxBoolean
 });
 const { normalizeItemLinkUpdate } = itemLinkRules;
+const itemLinkDeletionRules = createItemLinkDeletionRules({
+  resolveItemLinkState,
+  getCurrentUser: () => globalThis.game?.user,
+  translateWithFallback: tl,
+  warn: safeWarn
+});
+const { cleanupItemLinksAfterDeletion } = itemLinkDeletionRules;
 
 const equipmentCurrencyRules = createEquipmentCurrencyRules({
   parseSimpleArithmeticInput,
@@ -1315,6 +1114,20 @@ const itemBucketRules = createItemBucketRules({
   carriedItemTypes: CARRIED_ITEM_TYPES
 });
 const { buildTypedItemBuckets, getActorItemCounts } = itemBucketRules;
+const itemBonusRules = createItemBonusRules({
+  characteristics: CHARACTERISTICS,
+  characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
+  resourceBonusItemTypes: ITEM_RESOURCE_BONUS_ITEM_TYPES,
+  isActorItemLinkedChild,
+  computeItemCharacteristicBonusTotals,
+  computeItemResourceBonusTotals,
+  toCheckboxBoolean
+});
+const {
+  getVisibleActorItems,
+  getItemBonusTotals,
+  getItemResourceBonusTotals
+} = itemBonusRules;
 
 function waitMs(ms) {
   const delay = Math.max(0, Math.floor(toFiniteNumber(ms, 0)));
@@ -3313,254 +3126,43 @@ function showSelectedFullPvRestoreConfirmDialog() {
   if (dialog?.render) dialog.render(true);
 }
 
-async function applyVoyageXPCostOnCreate(actor, item, options = null) {
-  if (!actor || !item) return;
-  if (Boolean(options?.[VOYAGE_XP_SKIP_CREATE_OPTION])) return;
-  if (actor.type !== "personnage" || !isVoyageXPCostItemType(item.type)) return;
-
-  const cost = normalizeNonNegativeInteger(item.system?.xpVoyageCost, 0);
-  if (cost <= 0) return;
-
-  const voyageTotal = normalizeNonNegativeInteger(
-    actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
-    0
-  );
-  const voyageCurrent = Math.min(
-    normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0),
-    voyageTotal
-  );
-  const nextVoyageCurrent = Math.max(0, voyageCurrent - cost);
-  if (nextVoyageCurrent === voyageCurrent) return;
-
-  await actor.update({
-    "system.resources.voyage.current": nextVoyageCurrent,
-    "system.resources.voyage.total": voyageTotal,
-    "system.resources.voyage.max": voyageTotal
-  });
-}
-
-const ITEM_ROLL_FORMULA_FIELDS = Object.freeze({
-  arme: ["damageDie", "healDie"],
-  aptitude: ["damageDie", "healDie"],
-  pouvoir: ["damageDie", "healDie"],
-  soin: ["damageDie", "healDie"],
-  objet: ["damageDie", "healDie"],
-  ration: ["damageDie", "healDie"],
-  protection: ["damageDie", "healDie"]
+const itemNormalizationRules = createItemNormalizationRules({
+  normalizeNonNegativeInteger,
+  toCheckboxBoolean,
+  toBooleanFlag,
+  normalizeCarriedItemInventorySlots,
+  hasUpdatePath,
+  getUpdatedPathValue,
+  setProperty: foundry.utils.setProperty,
+  validateRollFormula,
+  normalizeRollDieFormula,
+  translate: t,
+  translateWithFallback: tl,
+  notifyError: message => ui.notifications?.error(message)
 });
-const ITEM_SINGLE_USE_ENABLED_PATH = "system.singleUseEnabled";
-const ITEM_SINGLE_USE_COUNT_PATH = "system.singleUseCount";
-const ITEM_INVENTORY_SLOTS_PATH = "system.inventorySlots";
+const {
+  normalizeItemInventorySlotsUpdate,
+  normalizeItemRollFormulaFields,
+  normalizeItemSingleUseUpdate,
+  normalizeSingleUseCountValue,
+  notifyInvalidItemRollFormula,
+  resolveItemSingleUseDisplayData
+} = itemNormalizationRules;
 
-function normalizeSingleUseCountValue(value, { enabled = false, fallbackEnabled = 1 } = {}) {
-  const fallback = Math.max(1, normalizeNonNegativeInteger(fallbackEnabled, 1));
-  let normalized = normalizeNonNegativeInteger(value, fallback);
-  if (enabled && normalized < 1) normalized = 1;
-  return normalized;
-}
-
-function formatSingleUseCountLabel(remainingCount) {
-  const normalizedCount = normalizeNonNegativeInteger(remainingCount, 0);
-  if (normalizedCount <= 0) return "";
-  const rawLabel = String(tl("BLOODMAN.Items.SingleUseCountLabel", "NB USAGES :")).replace(/\s*:\s*$/u, "").trim();
-  return rawLabel ? `${rawLabel} ${normalizedCount}` : String(normalizedCount);
-}
-
-function resolveItemSingleUseDisplayData(systemData = null) {
-  const enabled = toBooleanFlag(systemData?.singleUseEnabled, false);
-  const rawCount = systemData?.singleUseCount;
-  const hasCount = rawCount != null && String(rawCount).trim() !== "";
-  if (!enabled || !hasCount) {
-    return {
-      show: false,
-      count: 0,
-      label: ""
-    };
-  }
-
-  const count = normalizeSingleUseCountValue(rawCount, {
-    enabled: true,
-    fallbackEnabled: 1
-  });
-  if (count <= 1) {
-    return {
-      show: false,
-      count: 0,
-      label: ""
-    };
-  }
-
-  return {
-    show: true,
-    count,
-    label: formatSingleUseCountLabel(count)
-  };
-}
-
-function normalizeItemSingleUseUpdate(item, updateData = null, options = {}) {
-  const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
-  const hasEnabledUpdate = updateData ? hasUpdatePath(updateData, ITEM_SINGLE_USE_ENABLED_PATH) : false;
-  const hasCountUpdate = updateData ? hasUpdatePath(updateData, ITEM_SINGLE_USE_COUNT_PATH) : false;
-  const shouldNormalize = includeSourceWhenMissing || hasEnabledUpdate || hasCountUpdate;
-  if (!shouldNormalize) return { changed: false };
-
-  const rawEnabled = hasEnabledUpdate
-    ? getUpdatedPathValue(updateData, ITEM_SINGLE_USE_ENABLED_PATH, undefined)
-    : item?.system?.singleUseEnabled;
-  const normalizedEnabled = toCheckboxBoolean(rawEnabled, false);
-  const rawCount = hasCountUpdate
-    ? getUpdatedPathValue(updateData, ITEM_SINGLE_USE_COUNT_PATH, undefined)
-    : item?.system?.singleUseCount;
-  const normalizedCount = normalizeSingleUseCountValue(rawCount, { enabled: normalizedEnabled, fallbackEnabled: 1 });
-
-  let changed = false;
-  if (updateData) {
-    if (hasEnabledUpdate && rawEnabled !== normalizedEnabled) {
-      foundry.utils.setProperty(updateData, ITEM_SINGLE_USE_ENABLED_PATH, normalizedEnabled);
-      changed = true;
-    }
-    if (!hasCountUpdate || Number(rawCount) !== normalizedCount) {
-      foundry.utils.setProperty(updateData, ITEM_SINGLE_USE_COUNT_PATH, normalizedCount);
-      changed = true;
-    }
-  } else if (item?.updateSource) {
-    const sourceEnabled = toCheckboxBoolean(item?.system?.singleUseEnabled, false);
-    const sourceCount = normalizeSingleUseCountValue(item?.system?.singleUseCount, { enabled: sourceEnabled, fallbackEnabled: 1 });
-    if (sourceEnabled !== normalizedEnabled || sourceCount !== normalizedCount) {
-      item.updateSource({
-        [ITEM_SINGLE_USE_ENABLED_PATH]: normalizedEnabled,
-        [ITEM_SINGLE_USE_COUNT_PATH]: normalizedCount
-      });
-      changed = true;
-    }
-  }
-
-  return {
-    changed,
-    enabled: normalizedEnabled,
-    count: normalizedCount
-  };
-}
-
-function normalizeItemInventorySlotsUpdate(item, updateData = null, options = {}) {
-  const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
-  const hasInventorySlotsUpdate = updateData ? hasUpdatePath(updateData, ITEM_INVENTORY_SLOTS_PATH) : false;
-  if (!includeSourceWhenMissing && !hasInventorySlotsUpdate) return { changed: false };
-
-  const rawInventorySlots = hasInventorySlotsUpdate
-    ? getUpdatedPathValue(updateData, ITEM_INVENTORY_SLOTS_PATH, undefined)
-    : item?.system?.inventorySlots;
-  const normalizedInventorySlots = normalizeCarriedItemInventorySlots(rawInventorySlots, 1);
-
-  let changed = false;
-  if (updateData) {
-    if (!hasInventorySlotsUpdate || Number(rawInventorySlots) !== normalizedInventorySlots) {
-      foundry.utils.setProperty(updateData, ITEM_INVENTORY_SLOTS_PATH, normalizedInventorySlots);
-      changed = true;
-    }
-  } else if (item?.updateSource) {
-    const sourceInventorySlots = normalizeCarriedItemInventorySlots(item?.system?.inventorySlots, 1);
-    if (sourceInventorySlots !== normalizedInventorySlots) {
-      item.updateSource({
-        [ITEM_INVENTORY_SLOTS_PATH]: normalizedInventorySlots
-      });
-      changed = true;
-    }
-  }
-
-  return {
-    changed,
-    inventorySlots: normalizedInventorySlots
-  };
-}
-
-function getItemRollFormulaFieldLabels(fields = []) {
-  return fields.map(field => {
-    if (field === "damageDie") return tl("BLOODMAN.Items.DamageDieLabel", "de de degat");
-    if (field === "healDie") return tl("BLOODMAN.Items.HealDieLabel", "de de soin");
-    return String(field || "").trim();
-  });
-}
-
-function notifyInvalidItemRollFormula(item, invalidFields = [], invalidFieldErrors = {}) {
-  const itemName = String(item?.name || "").trim()
-    || t(`TYPES.Item.${String(item?.type || "").trim().toLowerCase()}`)
-    || tl("BLOODMAN.Common.Name", "Item");
-  const labelsByField = new Map(
-    invalidFields.map((field, index) => [field, getItemRollFormulaFieldLabels([field])[index] || field])
-  );
-  const detailsList = invalidFields.map(field => {
-    const label = String(labelsByField.get(field) || field).replace(/\s*:\s*$/, "").trim();
-    const rawError = String(invalidFieldErrors?.[field] || "").trim();
-    const compactError = rawError ? rawError.split(/\r?\n/u)[0].trim() : "";
-    return compactError ? `${label}: ${compactError}` : label;
-  }).filter(Boolean);
-  const details = detailsList.length ? ` (${detailsList.join(" ; ")})` : "";
-  const localizedMessage = t("BLOODMAN.Notifications.ItemRollFormulaInvalid", {
-    itemName,
-    details
-  });
-  const fallbackMessage = `Formule de des invalide pour ${itemName}${details}.`;
-  const errorMessage = localizedMessage && localizedMessage !== "BLOODMAN.Notifications.ItemRollFormulaInvalid"
-    ? localizedMessage
-    : fallbackMessage;
-  ui.notifications?.error(errorMessage);
-}
-
-function normalizeItemRollFormulaFields(item, updateData = null, options = {}) {
-  const type = String(item?.type || "").trim().toLowerCase();
-  const fields = ITEM_ROLL_FORMULA_FIELDS[type] || [];
-  if (!fields.length) return { invalid: false, changed: false, invalidFields: [] };
-  const includeSourceWhenMissing = options.includeSourceWhenMissing === true;
-  const invalidFields = [];
-  const invalidFieldErrors = {};
-  let changed = false;
-
-  for (const field of fields) {
-    const path = `system.${field}`;
-    const hasPathUpdate = updateData ? hasUpdatePath(updateData, path) : false;
-    if (!hasPathUpdate && !includeSourceWhenMissing) continue;
-
-    const rawValue = hasPathUpdate
-      ? getUpdatedPathValue(updateData, path, undefined)
-      : item?.system?.[field];
-    if (rawValue == null) continue;
-
-    const textValue = String(rawValue).trim();
-    if (!textValue) {
-      if (hasPathUpdate && rawValue !== "") {
-        foundry.utils.setProperty(updateData, path, "");
-        changed = true;
-      }
-      continue;
-    }
-
-    const validation = validateRollFormula(textValue, "d4", { useFallbackOnEmpty: false });
-    if (!validation.valid) {
-      invalidFields.push(field);
-      invalidFieldErrors[field] = validation.error;
-      continue;
-    }
-
-    const normalized = validation.normalized || normalizeRollDieFormula(textValue, "d4");
-    if (hasPathUpdate) {
-      if (String(rawValue) !== normalized) {
-        foundry.utils.setProperty(updateData, path, normalized);
-        changed = true;
-      }
-    } else if (String(rawValue) !== normalized) {
-      item.updateSource({ [path]: normalized });
-      changed = true;
-    }
-  }
-
-  return {
-    invalid: invalidFields.length > 0,
-    changed,
-    invalidFields,
-    invalidFieldErrors
-  };
-}
+const itemVoyageXpRules = createItemVoyageXpRules({
+  normalizeNonNegativeInteger,
+  isVoyageXPCostItemType,
+  getProperty: foundry.utils.getProperty,
+  setProperty: foundry.utils.setProperty,
+  translate: t,
+  warn: (...args) => bmLog.warn(...args),
+  notifyError: message => ui.notifications?.error(message)
+});
+const {
+  applyVoyageXPCostOnCreate,
+  normalizeVoyageXpCostOnCreate,
+  normalizeVoyageXpCostOnUpdate
+} = itemVoyageXpRules;
 
 const itemDerivedSyncHooks = buildItemDerivedSyncHooks({
   applyItemResourceBonuses,
@@ -3602,41 +3204,7 @@ Hooks.on("preCreateItem", (item, createData, options) => {
     return false;
   }
 
-  if (!isVoyageXPCostItemType(item?.type)) return;
-
-  const rawCost = foundry.utils.getProperty(createData || {}, "system.xpVoyageCost");
-  const normalizedCost = normalizeNonNegativeInteger(
-    rawCost === undefined ? item.system?.xpVoyageCost : rawCost,
-    0
-  );
-  item.updateSource({ "system.xpVoyageCost": normalizedCost });
-  if (Boolean(options?.[VOYAGE_XP_SKIP_CREATE_OPTION])) return;
-
-  const actor = item.actor || item.parent;
-  if (!actor || actor.type !== "personnage") return;
-
-  const availableVoyageXp = normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0);
-  if (availableVoyageXp >= normalizedCost) return;
-
-  const type = String(item?.type || "").trim().toLowerCase();
-  const typeFallbackLabel = type ? t(`TYPES.Item.${type}`) : t("BLOODMAN.Common.Name");
-  const itemName = item.name || typeFallbackLabel;
-  bmLog.warn("[bloodman] item acquisition blocked: not enough voyage XP", {
-    actorId: actor.id,
-    actorName: actor.name,
-    itemType: type,
-    item: itemName,
-    required: normalizedCost,
-    available: availableVoyageXp
-  });
-  ui.notifications?.error(
-    t("BLOODMAN.Notifications.NotEnoughVoyageXPForAptitude", {
-      aptitude: itemName,
-      required: normalizedCost,
-      available: availableVoyageXp
-    })
-  );
-  return false;
+  return normalizeVoyageXpCostOnCreate(item, createData, options);
 });
 
 Hooks.on("preUpdateItem", (item, updateData) => {
@@ -3657,14 +3225,7 @@ Hooks.on("preUpdateItem", (item, updateData) => {
     return false;
   }
 
-  if (!isVoyageXPCostItemType(item?.type)) return;
-  const costPath = "system.xpVoyageCost";
-  const rawUpdateCost = foundry.utils.getProperty(updateData, costPath);
-  const hasCostUpdate = Object.prototype.hasOwnProperty.call(updateData, costPath)
-    || rawUpdateCost !== undefined;
-  if (!hasCostUpdate) return;
-  const nextCost = normalizeNonNegativeInteger(rawUpdateCost, item.system?.xpVoyageCost ?? 0);
-  foundry.utils.setProperty(updateData, costPath, nextCost);
+  normalizeVoyageXpCostOnUpdate(item, updateData);
 });
 
 const chatMessageRoutingHooks = buildChatMessageRoutingHooks({
@@ -3707,72 +3268,6 @@ Hooks.on("updateItem", (item, _changes, options, userId) => {
   void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "updateItem", { options, userId });
 });
 
-async function cleanupItemLinksAfterDeletion(item) {
-  const actor = item?.actor || item?.parent || item?._parent || null;
-  const canMutateActorItems = Boolean(globalThis.game?.user?.isGM || actor?.isOwner);
-  if (!canMutateActorItems) return false;
-  const deletedItemId = String(item?.id || "").trim();
-  if (!deletedItemId) return false;
-
-  // If a parent item is deleted, detach linked children so they remain on the actor sheet.
-  const deletedLink = resolveItemLinkState(item);
-  const linkedChildIds = new Set();
-  const deletedFromParentList = Array.isArray(deletedLink?.equiperAvec)
-    ? deletedLink.equiperAvec.map(entry => String(entry || "").trim()).filter(Boolean)
-    : [];
-  for (const childId of deletedFromParentList) {
-    if (!childId || childId === deletedItemId) continue;
-    const child = actor.items?.get?.(childId) || null;
-    if (!child) continue;
-    const childLink = resolveItemLinkState(child);
-    const childParentId = String(childLink?.parentItemId || "").trim();
-    // Keep backward compatibility with legacy records where parent id was not persisted.
-    if (!childParentId || childParentId === deletedItemId) linkedChildIds.add(childId);
-  }
-
-  for (const sibling of actor.items || []) {
-    const siblingId = String(sibling?.id || "").trim();
-    if (!siblingId || siblingId === deletedItemId) continue;
-    const siblingLink = resolveItemLinkState(sibling);
-    if (String(siblingLink.parentItemId || "").trim() === deletedItemId) {
-      linkedChildIds.add(siblingId);
-    }
-  }
-
-  const updates = [];
-  for (const sibling of actor.items || []) {
-    const siblingId = String(sibling?.id || "").trim();
-    if (!siblingId || siblingId === deletedItemId) continue;
-    const siblingLink = resolveItemLinkState(sibling);
-    let changed = false;
-    const update = { _id: siblingId };
-    if (String(siblingLink.parentItemId || "").trim() === deletedItemId) {
-      update["system.link.parentItemId"] = "";
-      changed = true;
-    }
-    if (linkedChildIds.has(siblingId) && String(siblingLink.parentItemId || "").trim()) {
-      update["system.link.parentItemId"] = "";
-      changed = true;
-    }
-    if (Array.isArray(siblingLink.equiperAvec)) {
-      const filteredChildren = siblingLink.equiperAvec.filter(itemId => String(itemId || "").trim() !== deletedItemId);
-      if (filteredChildren.length !== siblingLink.equiperAvec.length) {
-        update["system.link.equiperAvec"] = filteredChildren;
-        changed = true;
-      }
-    }
-    if (changed) updates.push(update);
-  }
-  if (!updates.length) return false;
-  try {
-    await actor.updateEmbeddedDocuments("Item", updates);
-    return true;
-  } catch (_error) {
-    safeWarn(tl("BLOODMAN.Notifications.ItemLinkUpdateFailed", "Mise a jour impossible des objets equipes."));
-  }
-  return false;
-}
-
 Hooks.on("deleteItem", (item, options, userId) => {
   const actor = item?.actor || item?.parent || item?._parent || null;
   const sourceUserId = String(userId || options?.userId || "");
@@ -3785,36 +3280,6 @@ Hooks.on("deleteItem", (item, options, userId) => {
   });
   void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "deleteItem", { options, userId });
 });
-
-function getVisibleActorItems(actor) {
-  return (actor?.items || []).filter(item => {
-    if (!item) return false;
-    if (isActorItemLinkedChild(item, actor)) return false;
-    return true;
-  });
-}
-
-function getItemBonusTotals(actor, options = {}) {
-  const filteredItems = Array.isArray(options?.items)
-    ? options.items.filter(Boolean)
-    : getVisibleActorItems(actor);
-  return computeItemCharacteristicBonusTotals({
-    items: filteredItems,
-    characteristics: CHARACTERISTICS,
-    characteristicBonusItemTypes: CHARACTERISTIC_BONUS_ITEM_TYPES,
-    isBonusEnabled: value => toCheckboxBoolean(value, false)
-  });
-}
-
-function getItemResourceBonusTotals(actor, options = {}) {
-  const filteredItems = Array.isArray(options?.items)
-    ? options.items.filter(Boolean)
-    : getVisibleActorItems(actor);
-  return computeItemResourceBonusTotals({
-    items: filteredItems,
-    resourceBonusItemTypes: ITEM_RESOURCE_BONUS_ITEM_TYPES
-  });
-}
 
 async function applyItemResourceBonuses(actor) {
   const isCharacter = actor?.type === "personnage";
@@ -3889,26 +3354,13 @@ const powerCostRules = buildPowerCostRules({
 });
 const { applyPowerCost } = powerCostRules;
 
-function buildItemDisplayData(item) {
-  const data = item.toObject();
-  data._id = data._id ?? item.id;
-  data.usableEnabled = isPowerUsableEnabled(item.system?.usableEnabled);
-  data.displayNoteHtml = formatMultilineTextToHtml(item.system?.note || item.system?.notes || "");
-  const singleUseDisplay = resolveItemSingleUseDisplayData(data.system || item.system || {});
-  data.showSingleUseCount = singleUseDisplay.show;
-  data.singleUseCountLabel = singleUseDisplay.label;
-  data.singleUseCountClass = "item-chip item-meta bm-btn-usage-count";
-
-  if (item.system?.damageEnabled && item.system?.damageDie) {
-    const rawDie = item.system.damageDie.toString();
-    data.displayDamageDie = normalizeRollDieFormula(rawDie, "d4");
-  }
-  if (toCheckboxBoolean(item.system?.healEnabled, false) && item.system?.healDie) {
-    const rawHealDie = item.system.healDie.toString();
-    data.displayHealDie = normalizeRollDieFormula(rawHealDie, "d4");
-  }
-  return data;
-}
+const buildItemDisplayData = createItemDisplayDataBuilder({
+  isPowerUsableEnabled,
+  formatMultilineTextToHtml,
+  resolveItemSingleUseDisplayData,
+  normalizeRollDieFormula,
+  toCheckboxBoolean
+});
 
 function getTransportNpcRefs(actor) {
   const refs = actor?.system?.equipment?.transportNpcs;

@@ -4,6 +4,7 @@ import {
   ITEM_LINK_APPLY_MODE_ON_USE,
   ITEM_LINK_TRIGGER_DAMAGE_ROLL,
   ITEM_LINK_TRIGGER_ITEM_USE,
+  createItemLinkDeletionRules,
   createItemLinkRules,
   isUsageLinkedItem,
   resolveItemLinkData,
@@ -59,7 +60,7 @@ function toCheckboxBoolean(value, fallback = false) {
   return Boolean(fallback);
 }
 
-function run() {
+async function run() {
   assert.deepEqual(
     resolveItemLinkData({ system: {} }),
     {
@@ -221,7 +222,76 @@ function run() {
   assert.deepEqual(normalizedLinkedChild.link.equiperAvec, []);
   assert.equal(getProperty(linkedChildUpdate, "system.link.equiperAvecEnabled"), false);
   assert.deepEqual(getProperty(linkedChildUpdate, "system.link.equiperAvec"), []);
+
+  const updates = [];
+  const childA = {
+    id: "child-a",
+    system: { link: { parentItemId: "parent-a", equiperAvec: [] } }
+  };
+  const childB = {
+    id: "child-b",
+    system: { link: { parentItemId: "", equiperAvec: [] } }
+  };
+  const sibling = {
+    id: "sibling",
+    system: { link: { parentItemId: "", equiperAvec: ["parent-a", "child-a"] } }
+  };
+  const deletedParent = {
+    id: "parent-a",
+    system: { link: { parentItemId: "", equiperAvec: ["child-a", "child-b"] } }
+  };
+  const actorItems = [childA, childB, sibling];
+  const actor = {
+    isOwner: true,
+    items: {
+      get: id => actorItems.find(itemEntry => itemEntry.id === id) || null,
+      [Symbol.iterator]: function* iterateItems() {
+        yield* actorItems;
+      }
+    },
+    updateEmbeddedDocuments: async (documentName, updateData) => {
+      updates.push({ documentName, updateData });
+    }
+  };
+  deletedParent.actor = actor;
+  childA.actor = actor;
+  childB.actor = actor;
+  sibling.actor = actor;
+
+  const deletionRules = createItemLinkDeletionRules({
+    getCurrentUser: () => ({ isGM: false }),
+    warn: message => {
+      throw new Error(`Unexpected warning: ${message}`);
+    }
+  });
+  const changed = await deletionRules.cleanupItemLinksAfterDeletion(deletedParent);
+  assert.equal(changed, true);
+  assert.equal(updates[0].documentName, "Item");
+  assert.deepEqual(updates[0].updateData, [
+    { _id: "child-a", "system.link.parentItemId": "" },
+    { _id: "sibling", "system.link.equiperAvec": ["child-a"] }
+  ]);
+
+  const deniedUpdates = [];
+  const deniedActor = {
+    isOwner: false,
+    items: new Map(),
+    updateEmbeddedDocuments: async (_documentName, updateData) => deniedUpdates.push(updateData)
+  };
+  const deniedResult = await deletionRules.cleanupItemLinksAfterDeletion({
+    id: "parent-a",
+    actor: deniedActor,
+    system: { link: { equiperAvec: [] } }
+  });
+  assert.equal(deniedResult, false);
+  assert.equal(deniedUpdates.length, 0);
 }
 
-run();
-console.log("item-links.test.mjs: OK");
+run()
+  .then(() => {
+    console.log("item-links.test.mjs: OK");
+  })
+  .catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });

@@ -174,6 +174,13 @@ async function run() {
     itemType: "objet"
   });
 
+  assert.equal(controller.buildItemReorderPayloadFromDocumentDragData(sheet, {
+    type: "Item",
+    uuid: "Item.a",
+    id: "a"
+  }), null);
+  assert.equal(controller.isFoundryItemDocumentDragData({ type: "Item", uuid: "Item.a" }), true);
+
   const transferData = new Map();
   const dataTransfer = {
     effectAllowed: "",
@@ -192,6 +199,20 @@ async function run() {
 
   const payload = controller.getItemReorderPayloadFromEvent(sheet, { dataTransfer });
   assert.equal(payload.itemId, "a");
+
+  const externalTransferData = new Map([
+    ["text/plain", JSON.stringify({ type: "Item", uuid: "Item.a", id: "a" })]
+  ]);
+  const externalDataTransfer = {
+    getData(type) {
+      return externalTransferData.get(type) || "";
+    }
+  };
+  assert.equal(controller.getItemReorderPayloadFromEvent(sheet, { dataTransfer: externalDataTransfer }), null);
+
+  assert.equal(controller.getItemReorderPayloadFromEvent(sheet, {
+    dropData: { type: "Item", uuid: "Item.a", id: "a" }
+  }), null);
 
   assert.deepEqual(controller.buildItemReorderUpdates(sheet, itemA, itemC, { sortBefore: false }), [
     { _id: "b", sort: 1000 },

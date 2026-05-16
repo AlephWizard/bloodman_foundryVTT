@@ -1,11 +1,7 @@
-function toFiniteNumber(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
-}
-
-function normalizeNonNegativeInteger(value, fallback = 0) {
-  return Math.max(0, Math.floor(toFiniteNumber(value, fallback)));
-}
+import {
+  normalizeNonNegativeInteger,
+  toFiniteNumber
+} from "../core/value-normalization.mjs";
 
 const VOYAGE_ROOT_PATH = "system.resources.voyage";
 const VOYAGE_CURRENT_PATH = "system.resources.voyage.current";

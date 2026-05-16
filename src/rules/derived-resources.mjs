@@ -1,7 +1,6 @@
-export function toFiniteNumber(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
-}
+import { toFiniteNumber } from "../core/value-normalization.mjs";
+
+export { toFiniteNumber };
 
 export function normalizeCharacteristicKey(value, characteristicKeys) {
   const key = String(value || "").trim().toUpperCase();

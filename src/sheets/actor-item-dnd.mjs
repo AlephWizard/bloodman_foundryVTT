@@ -179,14 +179,26 @@ export function createActorItemDndController({
 
     const actorItem = sheet.actor?.items?.get?.(itemId) || null;
     let actorId = String(rawData.actorId || "").trim();
+    let uuidReferencesActor = false;
     if (!actorId && rawUuid) {
       const tokenActorMatch = rawUuid.match(/Token\.[^\.]+\.Actor\.([^\.]+)/);
-      if (tokenActorMatch?.[1]) actorId = String(tokenActorMatch[1]).trim();
+      if (tokenActorMatch?.[1]) {
+        actorId = String(tokenActorMatch[1]).trim();
+        uuidReferencesActor = true;
+      }
       if (!actorId) {
         const actorMatch = rawUuid.match(/Actor\.([^\.]+)/);
-        if (actorMatch?.[1]) actorId = String(actorMatch[1]).trim();
+        if (actorMatch?.[1]) {
+          actorId = String(actorMatch[1]).trim();
+          uuidReferencesActor = true;
+        }
       }
     }
+    const hasExplicitActorReference = Boolean(
+      String(rawData.actorId || rawData.actorUuid || "").trim()
+      || uuidReferencesActor
+    );
+    if (!hasExplicitActorReference) return null;
     if (!actorId && actorItem) actorId = String(sheet.actor?.id || "").trim();
 
     let itemType = String(rawData.itemType || rawData.type || "").trim().toLowerCase();
@@ -198,6 +210,15 @@ export function createActorItemDndController({
       itemId,
       itemType
     });
+  }
+
+  function isFoundryItemDocumentDragData(dataLike) {
+    const rawData = dataLike && typeof dataLike === "object" ? dataLike : null;
+    if (!rawData) return false;
+    const type = String(rawData.type || "").trim().toLowerCase();
+    if (type === "item") return true;
+    const uuid = String(rawData.uuid || rawData.documentUuid || "").trim();
+    return Boolean(uuid && /(?:^|\.)Item\.[^\.]+/.test(uuid));
   }
 
   function isItemReorderPayloadForCurrentActor(sheet, payloadLike) {
@@ -238,6 +259,7 @@ export function createActorItemDndController({
   function getItemReorderPayloadFromEvent(sheet, eventLike) {
     const event = eventLike?.originalEvent || eventLike;
     const transfer = event?.dataTransfer;
+    let sawFoundryItemDocumentPayload = false;
     if (transfer) {
       let rawPayload = "";
       try {
@@ -263,13 +285,23 @@ export function createActorItemDndController({
         }
         if (!rawText) continue;
         try {
-          const normalized = buildItemReorderPayloadFromDocumentDragData(sheet, JSON.parse(rawText));
+          const parsed = JSON.parse(rawText);
+          if (isFoundryItemDocumentDragData(parsed)) sawFoundryItemDocumentPayload = true;
+          const normalized = buildItemReorderPayloadFromDocumentDragData(sheet, parsed);
           if (normalized) return normalized;
         } catch (_error) {
           // Not JSON or not a Foundry item payload.
         }
       }
     }
+    const dragData = getDragEventData(event);
+    if (isFoundryItemDocumentDragData(dragData)) {
+      sawFoundryItemDocumentPayload = true;
+      const normalized = buildItemReorderPayloadFromDocumentDragData(sheet, dragData);
+      if (normalized) return normalized;
+    }
+    if (sawFoundryItemDocumentPayload) return null;
+
     return normalizeItemReorderPayload(sheet, sheet._activeItemReorderPayload)
       || getGlobalItemReorderPayload(sheet)
       || getActiveItemReorderPayloadFromDom(sheet);
@@ -830,6 +862,7 @@ export function createActorItemDndController({
     getCarryColumnCapacity,
     normalizeItemReorderPayload,
     buildItemReorderPayloadFromDocumentDragData,
+    isFoundryItemDocumentDragData,
     isItemReorderPayloadForCurrentActor,
     getActiveItemReorderPayloadFromDom,
     getGlobalItemReorderPayload,

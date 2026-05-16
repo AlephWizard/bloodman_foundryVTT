@@ -340,6 +340,90 @@ export function createItemLinkRules({
   };
 }
 
+export function createItemLinkDeletionRules({
+  resolveItemLinkState = resolveItemLinkData,
+  getCurrentUser = () => globalThis.game?.user,
+  translateWithFallback = (_key, fallback) => fallback,
+  warn = () => {}
+} = {}) {
+  const resolveLink = typeof resolveItemLinkState === "function"
+    ? resolveItemLinkState
+    : resolveItemLinkData;
+
+  async function cleanupItemLinksAfterDeletion(item) {
+    const actor = item?.actor || item?.parent || item?._parent || null;
+    const currentUser = getCurrentUser();
+    const canMutateActorItems = Boolean(currentUser?.isGM || actor?.isOwner);
+    if (!canMutateActorItems) return false;
+
+    const deletedItemId = String(item?.id || "").trim();
+    if (!deletedItemId) return false;
+
+    const deletedLink = resolveLink(item);
+    const linkedChildIds = new Set();
+    const deletedFromParentList = Array.isArray(deletedLink?.equiperAvec)
+      ? deletedLink.equiperAvec.map(entry => String(entry || "").trim()).filter(Boolean)
+      : [];
+
+    for (const childId of deletedFromParentList) {
+      if (!childId || childId === deletedItemId) continue;
+      const child = actor.items?.get?.(childId) || null;
+      if (!child) continue;
+      const childLink = resolveLink(child);
+      const childParentId = String(childLink?.parentItemId || "").trim();
+      // Keep backward compatibility with legacy records where parent id was not persisted.
+      if (!childParentId || childParentId === deletedItemId) linkedChildIds.add(childId);
+    }
+
+    for (const sibling of actor.items || []) {
+      const siblingId = String(sibling?.id || "").trim();
+      if (!siblingId || siblingId === deletedItemId) continue;
+      const siblingLink = resolveLink(sibling);
+      if (String(siblingLink.parentItemId || "").trim() === deletedItemId) {
+        linkedChildIds.add(siblingId);
+      }
+    }
+
+    const updates = [];
+    for (const sibling of actor.items || []) {
+      const siblingId = String(sibling?.id || "").trim();
+      if (!siblingId || siblingId === deletedItemId) continue;
+      const siblingLink = resolveLink(sibling);
+      let changed = false;
+      const update = { _id: siblingId };
+      if (String(siblingLink.parentItemId || "").trim() === deletedItemId) {
+        update["system.link.parentItemId"] = "";
+        changed = true;
+      }
+      if (linkedChildIds.has(siblingId) && String(siblingLink.parentItemId || "").trim()) {
+        update["system.link.parentItemId"] = "";
+        changed = true;
+      }
+      if (Array.isArray(siblingLink.equiperAvec)) {
+        const filteredChildren = siblingLink.equiperAvec.filter(itemId => String(itemId || "").trim() !== deletedItemId);
+        if (filteredChildren.length !== siblingLink.equiperAvec.length) {
+          update["system.link.equiperAvec"] = filteredChildren;
+          changed = true;
+        }
+      }
+      if (changed) updates.push(update);
+    }
+
+    if (!updates.length) return false;
+    try {
+      await actor.updateEmbeddedDocuments("Item", updates);
+      return true;
+    } catch (_error) {
+      warn(translateWithFallback("BLOODMAN.Notifications.ItemLinkUpdateFailed", "Mise a jour impossible des objets equipes."));
+    }
+    return false;
+  }
+
+  return {
+    cleanupItemLinksAfterDeletion
+  };
+}
+
 export {
   ITEM_LINK_APPLY_MODE_GLOBAL,
   ITEM_LINK_APPLY_MODE_ON_USE,

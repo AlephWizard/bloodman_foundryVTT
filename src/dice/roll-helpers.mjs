@@ -1,5 +1,6 @@
 import { bmLog } from "../core/logger.mjs";
 import { SYSTEM_ID, SYSTEM_SOCKET } from "../core/constants.mjs";
+import { toCheckboxBoolean } from "../core/value-normalization.mjs";
 import {
   canUserProcessPrivilegedRequests,
   getActiveGMUserIds,
@@ -171,17 +172,6 @@ function safeWarn(message) {
   } catch (error) {
     bmLog.warn("notify.warn failed", { message, error });
   }
-}
-
-function toCheckboxBoolean(value, fallback = false) {
-  if (value === true || value === false) return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes") return true;
-    if (normalized === "false" || normalized === "0" || normalized === "off" || normalized === "no" || normalized === "") return false;
-  }
-  return Boolean(fallback);
 }
 
 function isBonusItem(item) {
