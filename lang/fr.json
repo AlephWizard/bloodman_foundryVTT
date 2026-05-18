@@ -136,6 +136,7 @@
       "VoyageXPCostLabel": "COÛT XP VOYAGE :",
       "AudioFileLabel": "FICHIER SON :",
       "AudioFilePlaceholder": "systems/bloodman/sounds/effet.ogg",
+      "AudioPreview": "Ecouter le fichier audio",
       "PriceLabel": "PRIX :",
       "SalePriceLabel": "PRIX DE VENTE :",
       "SectionPricingTitle": "ÉCONOMIE & USAGE",

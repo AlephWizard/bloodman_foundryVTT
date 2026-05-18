@@ -1240,6 +1240,7 @@ const itemSheetControlsController = createItemSheetControlsController({
   normalizeNonNegativeInteger,
   resolveSaleManualFlag: resolveItemSaleManualFlag,
   resolveItemPricePreviewUiState,
+  playItemAudio: (item, options) => playItemAudio(item, options),
   resolveDeferredRoot,
   queueUiMicrotask,
   clearUiMicrotask

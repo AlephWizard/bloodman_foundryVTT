@@ -287,7 +287,7 @@
 
 .bloodman-item.bm-item-sheet .bm-item-audio-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(0, 1fr) 32px 32px;
   gap: 6px;
   align-items: center;
 }
@@ -296,6 +296,7 @@
   min-width: 0;
 }
 
+.bloodman-item.bm-item-sheet .bm-item-audio-field .bm-item-audio-preview,
 .bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker {
   width: 32px;
   height: 31px;
@@ -310,6 +311,8 @@
   cursor: pointer;
 }
 
+.bloodman-item.bm-item-sheet .bm-item-audio-field .bm-item-audio-preview:hover,
+.bloodman-item.bm-item-sheet .bm-item-audio-field .bm-item-audio-preview:focus,
 .bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker:hover,
 .bloodman-item.bm-item-sheet .bm-item-audio-field .file-picker:focus {
   border-color: var(--bm-item-accent);

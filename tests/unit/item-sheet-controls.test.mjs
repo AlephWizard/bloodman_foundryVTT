@@ -59,6 +59,7 @@ class FakeSelection {
 }
 
 function createRoot() {
+  const audioPreviewButton = new FakeSelection();
   const audioButton = new FakeSelection();
   const priceInput = new FakeSelection({ value: "20" });
   const saleInput = new FakeSelection({ value: "" });
@@ -67,6 +68,7 @@ function createRoot() {
     length: 1,
     handlers: new Map(),
     find(selector) {
+      if (selector === ".bm-item-audio-field .bm-item-audio-preview") return audioPreviewButton;
       if (selector === ".bm-item-audio-field .file-picker") return audioButton;
       if (selector === "input[name='system.price']") return priceInput;
       if (selector === "input[name='system.salePrice']") return saleInput;
@@ -78,12 +80,13 @@ function createRoot() {
       return this;
     }
   };
-  return { root, audioButton, priceInput, saleInput, errorNode };
+  return { root, audioPreviewButton, audioButton, priceInput, saleInput, errorNode };
 }
 
 async function run() {
   const warnings = [];
   const renderedPickers = [];
+  const audioPreviewCalls = [];
   const queued = [];
   const cleared = [];
   let pickerOptions = null;
@@ -101,6 +104,10 @@ async function run() {
     },
     warn: message => warnings.push(message),
     isPriceManagedItemType: type => type === "arme",
+    playItemAudio: async (item, options) => {
+      audioPreviewCalls.push({ item, options });
+      return true;
+    },
     resolveSaleManualFlag: (_price, sale) => String(sale || "") === "manual",
     resolveItemPricePreviewUiState: ({ priceValue, saleValue, saleManual }) => {
       if (String(priceValue) === "bad") {
@@ -143,18 +150,38 @@ async function run() {
   assert.equal(missingPickerController.openItemAudioFilePicker(sheet), false);
   assert.equal(warnings.at(-1), "Selection audio impossible: FilePicker indisponible.");
 
-  const { root, audioButton, priceInput, saleInput, errorNode } = createRoot();
+  assert.equal(await controller.playItemAudioPreview(sheet), true);
+  assert.deepEqual(audioPreviewCalls.at(-1), {
+    item: sheet.item,
+    options: { delayMs: 0, broadcast: false }
+  });
+
+  const missingPreviewController = createItemSheetControlsController();
+  assert.equal(await missingPreviewController.playItemAudioPreview(sheet), false);
+
+  const { root, audioPreviewButton, audioButton, priceInput, saleInput, errorNode } = createRoot();
   sheet.element = root;
   assert.equal(controller.activateAudioFilePickerListeners(sheet, root), true);
+  assert.deepEqual(audioPreviewButton.offCalls, ["click"]);
   assert.deepEqual(audioButton.offCalls, ["click"]);
-  let prevented = false;
-  let stopped = false;
-  audioButton.handlers.get("click")({
-    preventDefault: () => { prevented = true; },
-    stopPropagation: () => { stopped = true; }
+  let previewPrevented = false;
+  let previewStopped = false;
+  audioPreviewButton.handlers.get("click")({
+    preventDefault: () => { previewPrevented = true; },
+    stopPropagation: () => { previewStopped = true; }
   });
-  assert.equal(prevented, true);
-  assert.equal(stopped, true);
+  assert.equal(previewPrevented, true);
+  assert.equal(previewStopped, true);
+  assert.equal(audioPreviewCalls.length, 2);
+
+  let pickerPrevented = false;
+  let pickerStopped = false;
+  audioButton.handlers.get("click")({
+    preventDefault: () => { pickerPrevented = true; },
+    stopPropagation: () => { pickerStopped = true; }
+  });
+  assert.equal(pickerPrevented, true);
+  assert.equal(pickerStopped, true);
 
   assert.equal(controller.syncPricePreviewSaleManualState(sheet, root), false);
   assert.equal(saleInput.attrs.get("data-sale-manual"), "false");

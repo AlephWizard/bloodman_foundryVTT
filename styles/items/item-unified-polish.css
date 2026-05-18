@@ -336,11 +336,13 @@
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-remove,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-audio-preview,
 .bloodman-item.bm-item-sheet.bm-item-unified .file-picker {
   border-radius: 4px;
   color: var(--bm-item-text);
 }
 
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-audio-preview,
 .bloodman-item.bm-item-sheet.bm-item-unified .file-picker {
   border-color: rgba(208, 71, 63, 0.58);
   background:
@@ -348,6 +350,8 @@
     linear-gradient(180deg, #2b1110 0%, #100707 100%);
 }
 
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-audio-preview:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-audio-preview:focus-visible,
 .bloodman-item.bm-item-sheet.bm-item-unified .file-picker:hover,
 .bloodman-item.bm-item-sheet.bm-item-unified .file-picker:focus-visible {
   border-color: #f24d46;

@@ -18,6 +18,7 @@ export function createItemSheetControlsController({
     nextSaleValue: "",
     ariaInvalid: "false"
   }),
+  playItemAudio = null,
   resolveDeferredRoot = (_previous, next) => next,
   queueUiMicrotask = callback => {
     callback?.();
@@ -46,11 +47,23 @@ export function createItemSheetControlsController({
     return renderFilePickerSafely(picker, "item-audio-file-picker");
   }
 
+  async function playItemAudioPreview(sheet) {
+    if (!sheet?.item || typeof playItemAudio !== "function") return false;
+    return playItemAudio(sheet.item, { delayMs: 0, broadcast: false });
+  }
+
   function activateAudioFilePickerListeners(sheet, html) {
+    const audioPreviewButtons = html?.find?.(".bm-item-audio-field .bm-item-audio-preview");
     const audioPickerButtons = html?.find?.(".bm-item-audio-field .file-picker");
-    if (!audioPickerButtons) return false;
-    audioPickerButtons.off?.("click");
-    audioPickerButtons.on?.("click", ev => {
+    if (!audioPreviewButtons && !audioPickerButtons) return false;
+    audioPreviewButtons?.off?.("click");
+    audioPreviewButtons?.on?.("click", ev => {
+      ev.preventDefault?.();
+      ev.stopPropagation?.();
+      void playItemAudioPreview(sheet);
+    });
+    audioPickerButtons?.off?.("click");
+    audioPickerButtons?.on?.("click", ev => {
       ev.preventDefault?.();
       ev.stopPropagation?.();
       openItemAudioFilePicker(sheet);
@@ -175,6 +188,7 @@ export function createItemSheetControlsController({
 
   return {
     openItemAudioFilePicker,
+    playItemAudioPreview,
     activateAudioFilePickerListeners,
     clearQueuedPricePreviewRefresh,
     queuePricePreviewRefresh,

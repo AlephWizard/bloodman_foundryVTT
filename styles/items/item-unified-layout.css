@@ -554,6 +554,7 @@
   gap: var(--bm-sheet-space-2);
 }
 
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-row-audio .bm-item-audio-preview,
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-row-audio .file-picker {
   width: calc(28px * var(--bm-sheet-scale));
   min-width: calc(28px * var(--bm-sheet-scale));
