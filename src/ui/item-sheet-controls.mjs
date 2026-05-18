@@ -7,6 +7,10 @@ export function createItemSheetControlsController({
   renderFilePickerSafely = () => false,
   warn = () => {},
   isPriceManagedItemType = () => false,
+  normalizeNonNegativeInteger = (value, fallback = 0) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric >= 0 ? Math.floor(numeric) : fallback;
+  },
   resolveSaleManualFlag = () => false,
   resolveItemPricePreviewUiState = () => ({
     invalid: false,
@@ -119,6 +123,56 @@ export function createItemSheetControlsController({
     refreshPricePreview(sheet, html);
   }
 
+  function syncSwitchDependentUi(sheet, changedField = "", nextValue = false, htmlLike = null) {
+    const root = getSheetRoot(sheet, htmlLike);
+    if (!root?.length) return false;
+    const setDisabled = (selector, disabled) => {
+      root.find(selector).prop("disabled", Boolean(disabled));
+    };
+    const toggleClass = (selector, className, enabled) => {
+      root.find(selector).toggleClass(className, Boolean(enabled));
+    };
+
+    switch (String(changedField || "").trim()) {
+      case "system.singleUseEnabled":
+        setDisabled("input[name='system.singleUseCount']", !nextValue);
+        break;
+      case "system.powerCostEnabled":
+        setDisabled("input[name='system.powerCost']", !nextValue);
+        break;
+      case "system.damageEnabled":
+        setDisabled("input[name='system.damageDie']", !nextValue);
+        break;
+      case "system.protectionEnabled":
+        setDisabled("input[name='system.pa']", !nextValue);
+        break;
+      case "system.healEnabled":
+        setDisabled("input[name='system.healDie']", !nextValue);
+        break;
+      case "system.characteristicBonusEnabled":
+        setDisabled("input[name^='system.characteristicBonuses.']", !nextValue);
+        toggleClass(".bonus-grid-characteristics", "is-disabled", !nextValue);
+        break;
+      case "system.rawBonusEnabled":
+        setDisabled("input[name^='system.rawBonuses.']", !nextValue);
+        toggleClass(".bonus-grid-compact", "is-disabled", !nextValue);
+        break;
+      case "system.infiniteAmmo": {
+        const weaponType = String(root.find("input[name='system.weaponType']:checked").val() || "").trim().toLowerCase();
+        const magazineCapacity = normalizeNonNegativeInteger(root.find("input[name='system.magazineCapacity']").val(), 0);
+        const usesMagazine = weaponType === "distance" && !nextValue && magazineCapacity > 0;
+        setDisabled("input[name='system.loadedAmmo']", !usesMagazine);
+        break;
+      }
+      case "system.link.equiperAvecEnabled":
+        toggleClass(".bm-item-equiper-avec-builder", "is-disabled", !nextValue);
+        break;
+      default:
+        break;
+    }
+    return true;
+  }
+
   return {
     openItemAudioFilePicker,
     activateAudioFilePickerListeners,
@@ -126,6 +180,7 @@ export function createItemSheetControlsController({
     queuePricePreviewRefresh,
     syncPricePreviewSaleManualState,
     refreshPricePreview,
-    activatePricePreviewListeners
+    activatePricePreviewListeners,
+    syncSwitchDependentUi
   };
 }

@@ -6,6 +6,7 @@ class FakeSelection {
     this.length = length;
     this._value = value;
     this.attrs = new Map();
+    this.props = new Map();
     this.classes = new Map();
     this.textValue = "";
     this.handlers = new Map();
@@ -25,6 +26,12 @@ class FakeSelection {
   attr(name, value) {
     if (value === undefined) return this.attrs.get(name);
     this.attrs.set(name, value);
+    return this;
+  }
+
+  prop(name, value) {
+    if (value === undefined) return this.props.get(name);
+    this.props.set(name, value);
     return this;
   }
 
@@ -179,6 +186,47 @@ async function run() {
   controller.activatePricePreviewListeners(sheet, listenerRoot);
   assert.ok(listenerRoot.handlers.has("input change blur|input[name='system.price']"));
   assert.ok(listenerRoot.handlers.has("input change blur|input[name='system.salePrice']"));
+
+  const switchSelections = new Map([
+    ["input[name='system.singleUseCount']", new FakeSelection()],
+    ["input[name='system.powerCost']", new FakeSelection()],
+    ["input[name='system.damageDie']", new FakeSelection()],
+    ["input[name='system.pa']", new FakeSelection()],
+    ["input[name='system.healDie']", new FakeSelection()],
+    ["input[name^='system.characteristicBonuses.']", new FakeSelection()],
+    [".bonus-grid-characteristics", new FakeSelection()],
+    ["input[name^='system.rawBonuses.']", new FakeSelection()],
+    [".bonus-grid-compact", new FakeSelection()],
+    ["input[name='system.weaponType']:checked", new FakeSelection({ value: "distance" })],
+    ["input[name='system.magazineCapacity']", new FakeSelection({ value: "3" })],
+    ["input[name='system.loadedAmmo']", new FakeSelection()],
+    [".bm-item-equiper-avec-builder", new FakeSelection()]
+  ]);
+  const switchRoot = {
+    length: 1,
+    find(selector) {
+      return switchSelections.get(selector) || new FakeSelection({ length: 0 });
+    }
+  };
+  const switchSheet = { element: switchRoot };
+
+  assert.equal(controller.syncSwitchDependentUi(switchSheet, "system.singleUseEnabled", true), true);
+  assert.equal(switchSelections.get("input[name='system.singleUseCount']").props.get("disabled"), false);
+  controller.syncSwitchDependentUi(switchSheet, "system.damageEnabled", false);
+  assert.equal(switchSelections.get("input[name='system.damageDie']").props.get("disabled"), true);
+  controller.syncSwitchDependentUi(switchSheet, "system.characteristicBonusEnabled", false);
+  assert.equal(switchSelections.get("input[name^='system.characteristicBonuses.']").props.get("disabled"), true);
+  assert.equal(switchSelections.get(".bonus-grid-characteristics").classes.get("is-disabled"), true);
+  controller.syncSwitchDependentUi(switchSheet, "system.rawBonusEnabled", true);
+  assert.equal(switchSelections.get("input[name^='system.rawBonuses.']").props.get("disabled"), false);
+  assert.equal(switchSelections.get(".bonus-grid-compact").classes.get("is-disabled"), false);
+  controller.syncSwitchDependentUi(switchSheet, "system.infiniteAmmo", false);
+  assert.equal(switchSelections.get("input[name='system.loadedAmmo']").props.get("disabled"), false);
+  controller.syncSwitchDependentUi(switchSheet, "system.infiniteAmmo", true);
+  assert.equal(switchSelections.get("input[name='system.loadedAmmo']").props.get("disabled"), true);
+  controller.syncSwitchDependentUi(switchSheet, "system.link.equiperAvecEnabled", false);
+  assert.equal(switchSelections.get(".bm-item-equiper-avec-builder").classes.get("is-disabled"), true);
+  assert.equal(controller.syncSwitchDependentUi({ element: { length: 0 } }, "system.damageEnabled", true), false);
 }
 
 run()

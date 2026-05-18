@@ -82,7 +82,9 @@ import {
 } from "./src/migrations/index.mjs";
 import { buildCanvasReadyHooks } from "./src/hooks/canvas-ready.mjs";
 import { buildItemDerivedSyncHooks } from "./src/hooks/item-derived-sync.mjs";
+import { createItemLifecycleHooks } from "./src/hooks/item-lifecycle.mjs";
 import { buildActorUpdateHooks } from "./src/hooks/actor-update.mjs";
+import { createActorLifecycleHooks } from "./src/hooks/actor-lifecycle.mjs";
 import { buildActorPreUpdateHooks } from "./src/hooks/actor-pre-update.mjs";
 import { buildActorUpdateSanitizer } from "./src/hooks/actor-update-sanitize.mjs";
 import { buildActorSocketRequestHandlers } from "./src/hooks/actor-socket-requests.mjs";
@@ -99,6 +101,7 @@ import { buildChatRelayHelpers } from "./src/hooks/chat-relay.mjs";
 import { buildChatRollDecorationHooks } from "./src/hooks/chat-roll-decoration.mjs";
 import { buildChatMessageRoutingHooks } from "./src/hooks/chat-message-routing.mjs";
 import { buildTokenCombatHooks } from "./src/hooks/token-combat.mjs";
+import { createTokenHudLifecycleHooks } from "./src/hooks/token-hud-lifecycle.mjs";
 import { registerTokenCombatHooks } from "./src/hooks/register-token-combat-hooks.mjs";
 import {
   buildStartupCombatantNameNormalization,
@@ -118,6 +121,11 @@ import {
   registerCreateTypeIconRenderHooks
 } from "./src/ui/document-create-type-icons.mjs";
 import { createChaosDicePanelController } from "./src/ui/chaos-dice-panel.mjs";
+import {
+  ACTOR_SHEET_NUMERIC_FOCUS_SELECTOR,
+  createActorSheetNumericFocusController
+} from "./src/ui/actor-sheet-numeric-focus.mjs";
+import { createActorSheetPermissionController } from "./src/ui/actor-sheet-permissions.mjs";
 import {
   createBloodmanDialog,
   renderBloodmanDialog
@@ -841,7 +849,6 @@ const VITAL_RESOURCE_INPUT_SELECTOR = VITAL_RESOURCE_PATH_LIST
   .map(path => `input[name='${path}']`)
   .join(", ");
 const CHARACTERISTIC_BASE_INPUT_SELECTOR = "input[name^='system.characteristics.'][name$='.base']";
-const ACTOR_SHEET_NUMERIC_FOCUS_SELECTOR = "input[type='number'][name]";
 const AMMO_UPDATE_PATHS = [
   "system.ammo",
   "system.ammo.type",
@@ -1192,10 +1199,27 @@ const {
   resolveDeferredRoot
 } = uiRefreshQueueRules;
 const actorSheetLayoutRules = createActorSheetLayoutRules({ toFiniteNumber });
+const actorSheetNumericFocusController = createActorSheetNumericFocusController({
+  getSheetHTMLElement,
+  getSheetElementWrapper,
+  queueUiMicrotask,
+  clearUiMicrotask,
+  getDocument: () => globalThis.document
+});
+const actorSheetPermissionController = createActorSheetPermissionController({
+  isBasicPlayerRole,
+  canCurrentUserEditCharacteristics,
+  getUserRole: () => game.user?.role,
+  getSheetElementWrapper,
+  vitalResourceInputSelector: VITAL_RESOURCE_INPUT_SELECTOR,
+  characteristicBaseInputSelector: CHARACTERISTIC_BASE_INPUT_SELECTOR
+});
 const {
   resolveAutoResizeKey: resolveActorSheetAutoResizeKey,
   resolveTextareaAutoGrowState,
-  resolveSheetWindowTargetHeight
+  resolveSheetWindowTargetHeight,
+  resolveSheetWindowPosition,
+  resolveResponsiveLayoutMode: resolveActorSheetResponsiveLayoutMode
 } = actorSheetLayoutRules;
 const itemSheetLayoutController = createItemSheetLayoutController({
   resolveTextareaAutoGrowState,
@@ -1213,6 +1237,7 @@ const itemSheetControlsController = createItemSheetControlsController({
   renderFilePickerSafely,
   warn: safeWarn,
   isPriceManagedItemType,
+  normalizeNonNegativeInteger,
   resolveSaleManualFlag: resolveItemSaleManualFlag,
   resolveItemPricePreviewUiState,
   resolveDeferredRoot,
@@ -2614,41 +2639,24 @@ const canvasReadyHooks = buildCanvasReadyHooks({
   shouldApplyTokenHudPatches: areInternalCanvasPatchesEnabled
 });
 
-Hooks.on("renderTokenHUD", (hud, html) => {
-  if (!areInternalCanvasPatchesEnabled()) return;
-  try {
-    configureTokenHudEnhancements(hud, html);
-  } catch (error) {
-    bmLog.warn("token HUD enhancement skipped", { error });
-  }
+const tokenHudLifecycleHooks = createTokenHudLifecycleHooks({
+  shouldApplyTokenHudPatches: areInternalCanvasPatchesEnabled,
+  configureTokenHudEnhancements,
+  canvasReadyHooks,
+  initializeLoggerFromSettings: initializeBloodmanLoggerFromSettings,
+  logger: bmLog,
+  installTokenEffectBackgroundPatch,
+  ensureTokenHudLocalSvgIcons,
+  refreshTokenHudStatusEffectIconPaths,
+  installTokenHudRenderPatch,
+  installTokenHudDomObserver,
+  scheduleTokenHudDomEnhancement
 });
 
-Hooks.on("canvasReady", async () => {
-  await canvasReadyHooks.onCanvasReady();
-});
-
-Hooks.on("controlToken", () => {
-  if (!areInternalCanvasPatchesEnabled()) return;
-  scheduleTokenHudDomEnhancement();
-});
-
-Hooks.once("ready", () => {
-  initializeBloodmanLoggerFromSettings();
-  if (!areInternalCanvasPatchesEnabled()) {
-    bmLog.info("HUD patch build disabled by world setting");
-    return;
-  }
-  bmLog.info("HUD patch build 2026-02-13-b loaded");
-  installTokenEffectBackgroundPatch();
-  void ensureTokenHudLocalSvgIcons({ copyMissing: true, force: true }).then(() => {
-    refreshTokenHudStatusEffectIconPaths({ bumpCache: true });
-  }).catch(error => {
-    bmLog.warn("token HUD svg icon sync skipped", { error });
-  });
-  installTokenHudRenderPatch();
-  installTokenHudDomObserver();
-  scheduleTokenHudDomEnhancement();
-});
+Hooks.on("renderTokenHUD", tokenHudLifecycleHooks.onRenderTokenHud);
+Hooks.on("canvasReady", tokenHudLifecycleHooks.onCanvasReady);
+Hooks.on("controlToken", tokenHudLifecycleHooks.onControlToken);
+Hooks.once("ready", tokenHudLifecycleHooks.onReadyTokenHudPatches);
 
 Hooks.once("init", () => {
   registerCreateTypeIconRenderHooks();
@@ -3175,58 +3183,31 @@ const itemDerivedSyncHooks = buildItemDerivedSyncHooks({
   }
 });
 
-Hooks.on("createItem", async (item, options, userId) => {
-  if (!item?.actor) return;
-
-  const sourceUserId = String(userId || options?.userId || "");
-  if (sourceUserId && sourceUserId !== game.user?.id) return;
-
-  await applyVoyageXPCostOnCreate(item.actor, item, options);
-  await itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "createItem", { options, userId });
-});
-
-Hooks.on("preCreateItem", (item, createData, options) => {
-  const normalizedAudio = normalizeItemAudioUpdate(item, createData);
-  if (normalizedAudio.invalid) {
+const itemLifecycleHooks = createItemLifecycleHooks({
+  getCurrentUserId: () => game.user?.id,
+  notifyInvalidAudioSelection: item => {
     ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
-  }
-
-  normalizeItemLinkUpdate(item, createData, { includeSourceWhenMissing: true });
-  normalizeItemPriceUpdate(item, createData);
-  const normalizedWeaponAmmo = normalizeWeaponMagazineCapacityUpdate(item, createData);
-  if (!normalizedWeaponAmmo) normalizeWeaponMagazineCapacityUpdate(item);
-  normalizeItemSingleUseUpdate(item, createData, { includeSourceWhenMissing: true });
-  normalizeItemInventorySlotsUpdate(item, createData, { includeSourceWhenMissing: true });
-  normalizeCharacteristicBonusItemUpdate(item, createData);
-  const normalizedRollFormula = normalizeItemRollFormulaFields(item, createData, { includeSourceWhenMissing: true });
-  if (normalizedRollFormula.invalid) {
-    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields, normalizedRollFormula.invalidFieldErrors);
-    return false;
-  }
-
-  return normalizeVoyageXpCostOnCreate(item, createData, options);
+  },
+  normalizeItemAudioUpdate,
+  normalizeItemLinkUpdate,
+  normalizeItemPriceUpdate,
+  normalizeWeaponMagazineCapacityUpdate,
+  normalizeItemSingleUseUpdate,
+  normalizeItemInventorySlotsUpdate,
+  normalizeCharacteristicBonusItemUpdate,
+  normalizeItemRollFormulaFields,
+  notifyInvalidItemRollFormula,
+  normalizeVoyageXpCostOnCreate,
+  normalizeVoyageXpCostOnUpdate,
+  applyVoyageXPCostOnCreate,
+  handleItemDerivedSyncHook: (...args) => itemDerivedSyncHooks.handleItemDerivedSyncHook(...args),
+  cleanupItemLinksAfterDeletion,
+  renderOpenActorSheetsForActor
 });
 
-Hooks.on("preUpdateItem", (item, updateData) => {
-  const normalizedAudio = normalizeItemAudioUpdate(item, updateData);
-  if (normalizedAudio.invalid) {
-    ui.notifications?.error(t("BLOODMAN.Notifications.ItemAudioInvalidSelection", { item: getItemAudioName(item) }));
-  }
-
-  normalizeItemLinkUpdate(item, updateData, { includeSourceWhenMissing: false });
-  normalizeItemPriceUpdate(item, updateData);
-  normalizeWeaponMagazineCapacityUpdate(item, updateData);
-  normalizeItemSingleUseUpdate(item, updateData, { includeSourceWhenMissing: false });
-  normalizeItemInventorySlotsUpdate(item, updateData, { includeSourceWhenMissing: false });
-  normalizeCharacteristicBonusItemUpdate(item, updateData);
-  const normalizedRollFormula = normalizeItemRollFormulaFields(item, updateData, { includeSourceWhenMissing: false });
-  if (normalizedRollFormula.invalid) {
-    notifyInvalidItemRollFormula(item, normalizedRollFormula.invalidFields, normalizedRollFormula.invalidFieldErrors);
-    return false;
-  }
-
-  normalizeVoyageXpCostOnUpdate(item, updateData);
-});
+Hooks.on("createItem", itemLifecycleHooks.onCreateItem);
+Hooks.on("preCreateItem", itemLifecycleHooks.onPreCreateItem);
+Hooks.on("preUpdateItem", itemLifecycleHooks.onPreUpdateItem);
 
 const chatMessageRoutingHooks = buildChatMessageRoutingHooks({
   getProperty: foundry.utils.getProperty,
@@ -3264,22 +3245,8 @@ Hooks.on("renderHotbar", () => {
   positionChaosDiceUI();
 });
 
-Hooks.on("updateItem", (item, _changes, options, userId) => {
-  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "updateItem", { options, userId });
-});
-
-Hooks.on("deleteItem", (item, options, userId) => {
-  const actor = item?.actor || item?.parent || item?._parent || null;
-  const sourceUserId = String(userId || options?.userId || "");
-  if (sourceUserId && sourceUserId !== game.user?.id) {
-    renderOpenActorSheetsForActor(actor);
-    return;
-  }
-  void cleanupItemLinksAfterDeletion(item).then(changed => {
-    if (changed) renderOpenActorSheetsForActor(actor);
-  });
-  void itemDerivedSyncHooks.handleItemDerivedSyncHook(item, "deleteItem", { options, userId });
-});
+Hooks.on("updateItem", itemLifecycleHooks.onUpdateItem);
+Hooks.on("deleteItem", itemLifecycleHooks.onDeleteItem);
 
 async function applyItemResourceBonuses(actor) {
   const isCharacter = actor?.type === "personnage";
@@ -3526,28 +3493,24 @@ const actorUpdateHooks = buildActorUpdateHooks({
   bmLog
 });
 
-Hooks.on("updateActor", async (actor, changes, options, userId) => {
-  clearResolvedActorDocumentCaches();
-  await actorUpdateHooks.onUpdateActor(actor, changes, options, userId);
-  if (foundry.utils.getProperty(changes, "system.equipment.bagSlotsEnabled") != null) {
-    if (game.user?.isGM || isCurrentUserPrimaryPrivilegedOperator()) {
-      socketEmit(SYSTEM_SOCKET, {
-        type: "actorBackpackStateChanged",
-        requesterId: String(game.user?.id || userId || ""),
-        actorUuid: String(actor?.uuid || ""),
-        actorId: String(actor?.id || ""),
-        actorBaseId: String(actor?.token?.actorId || actor?.baseActor?.id || actor?.id || ""),
-        enabled: resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled
-      });
-    }
-    updateOpenActorSheetsBackpackState(actor, resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled);
-  }
+const actorLifecycleHooks = createActorLifecycleHooks({
+  clearResolvedActorDocumentCaches,
+  onUpdateActorCore: (...args) => actorUpdateHooks.onUpdateActor(...args),
+  getProperty: foundry.utils.getProperty,
+  getCurrentUser: () => game.user,
+  isCurrentUserPrimaryPrivilegedOperator,
+  socketEmit,
+  systemSocket: SYSTEM_SOCKET,
+  resolveActorBackpackEnabled,
+  updateOpenActorSheetsBackpackState
 });
-Hooks.on("createActor", clearResolvedActorDocumentCaches);
-Hooks.on("deleteActor", clearResolvedActorDocumentCaches);
-Hooks.on("createScene", clearResolvedActorDocumentCaches);
-Hooks.on("updateScene", clearResolvedActorDocumentCaches);
-Hooks.on("deleteScene", clearResolvedActorDocumentCaches);
+
+Hooks.on("updateActor", actorLifecycleHooks.onUpdateActor);
+Hooks.on("createActor", actorLifecycleHooks.onActorDocumentCacheInvalidated);
+Hooks.on("deleteActor", actorLifecycleHooks.onActorDocumentCacheInvalidated);
+Hooks.on("createScene", actorLifecycleHooks.onActorDocumentCacheInvalidated);
+Hooks.on("updateScene", actorLifecycleHooks.onActorDocumentCacheInvalidated);
+Hooks.on("deleteScene", actorLifecycleHooks.onActorDocumentCacheInvalidated);
 
 class BloodmanActorSheet extends BaseActorSheet {
   constructor(object, options = {}) {
@@ -3666,28 +3629,13 @@ class BloodmanActorSheet extends BaseActorSheet {
       Number(globalThis?.document?.documentElement?.clientHeight) || 0,
       0
     );
-    const minWidth = 320;
-    const minHeight = 420;
-    const maxWidth = Math.max(minWidth, viewportWidth - 24);
-    const maxHeight = Math.max(minHeight, viewportHeight - 32);
-    const nextPosition = { ...options };
-    const candidateWidth = Number(nextPosition.width ?? this.position?.width ?? this.options?.width);
-    const candidateHeight = Number(nextPosition.height ?? this.position?.height ?? this.options?.height);
-    const candidateLeft = Number(nextPosition.left ?? this.position?.left);
-    const candidateTop = Number(nextPosition.top ?? this.position?.top);
-
-    if (Number.isFinite(candidateWidth)) {
-      nextPosition.width = Math.min(Math.max(candidateWidth, minWidth), maxWidth);
-    }
-    if (Number.isFinite(candidateHeight)) {
-      nextPosition.height = Math.min(Math.max(candidateHeight, minHeight), maxHeight);
-    }
-    if (Number.isFinite(candidateLeft) && Number.isFinite(nextPosition.width)) {
-      nextPosition.left = Math.max(12, Math.min(candidateLeft, viewportWidth - nextPosition.width - 12));
-    }
-    if (Number.isFinite(candidateTop) && Number.isFinite(nextPosition.height)) {
-      nextPosition.top = Math.max(12, Math.min(candidateTop, viewportHeight - nextPosition.height - 12));
-    }
+    const nextPosition = resolveSheetWindowPosition({
+      requestedPosition: options,
+      currentPosition: this.position,
+      defaultOptions: this.options,
+      viewportWidth,
+      viewportHeight
+    });
 
     const position = super.setPosition(nextPosition);
     this.applyResponsiveActorSheetLayoutState();
@@ -3735,77 +3683,19 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   isActorSheetNumericFocusInput(element) {
-    if (!(element instanceof HTMLInputElement)) return false;
-    if (String(element.type || "").toLowerCase() !== "number") return false;
-    if (!String(element.name || "").trim()) return false;
-    const sheetRoot = getSheetHTMLElement(this);
-    return !sheetRoot || sheetRoot.contains(element);
+    return actorSheetNumericFocusController.isNumericFocusInput(this, element);
   }
 
   captureActorSheetNumericFocus(eventOrElement = null) {
-    const candidate = eventOrElement?.currentTarget || eventOrElement || null;
-    const element = this.isActorSheetNumericFocusInput(candidate)
-      ? candidate
-      : (globalThis.document?.activeElement || null);
-    if (!this.isActorSheetNumericFocusInput(element)) return false;
-    let selectionStart = null;
-    let selectionEnd = null;
-    try {
-      selectionStart = element.selectionStart;
-      selectionEnd = element.selectionEnd;
-    } catch (_error) {
-      selectionStart = null;
-      selectionEnd = null;
-    }
-    this._actorSheetNumericFocusState = {
-      name: String(element.name || ""),
-      value: String(element.value ?? ""),
-      selectionStart,
-      selectionEnd,
-      capturedAt: Date.now()
-    };
-    return true;
+    return actorSheetNumericFocusController.captureNumericFocus(this, eventOrElement);
   }
 
   restoreActorSheetNumericFocus(htmlLike = null) {
-    const state = this._actorSheetNumericFocusState;
-    if (!state?.name) return false;
-    if (Date.now() - Number(state.capturedAt || 0) > 5000) {
-      this._actorSheetNumericFocusState = null;
-      return false;
-    }
-
-    const root = htmlLike?.find ? htmlLike : getSheetElementWrapper(this);
-    const field = root?.find?.(`input[type='number'][name='${state.name}']`)?.get?.(0)
-      || getSheetHTMLElement(this)?.querySelector?.(`input[type="number"][name="${state.name}"]`)
-      || null;
-    if (!(field instanceof HTMLInputElement) || field.disabled || field.readOnly) return false;
-
-    const active = globalThis.document?.activeElement || null;
-    const sheetRoot = getSheetHTMLElement(this);
-    if (active instanceof HTMLElement && sheetRoot?.contains(active) && active !== field) return false;
-
-    try {
-      field.focus({ preventScroll: true });
-      if (Number.isInteger(state.selectionStart) && Number.isInteger(state.selectionEnd)) {
-        field.setSelectionRange(state.selectionStart, state.selectionEnd);
-      }
-    } catch (_error) {
-      try {
-        field.focus();
-      } catch (_focusError) {
-        return false;
-      }
-    }
-    return true;
+    return actorSheetNumericFocusController.restoreNumericFocus(this, htmlLike);
   }
 
   queueActorSheetNumericFocusRestore(htmlLike = null) {
-    clearUiMicrotask(this._numericFocusRestoreTaskId);
-    this._numericFocusRestoreTaskId = queueUiMicrotask(() => {
-      this._numericFocusRestoreTaskId = null;
-      this.restoreActorSheetNumericFocus(htmlLike);
-    });
+    actorSheetNumericFocusController.queueNumericFocusRestore(this, htmlLike);
   }
 
   getResponsiveActorSheetRoot(rootLike = null) {
@@ -3831,13 +3721,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     height = 0,
     activeTab = ""
   } = {}) {
-    const safeWidth = Math.max(0, Math.round(Number(width) || 0));
-    const safeHeight = Math.max(0, Math.round(Number(height) || 0));
-    const tab = String(activeTab || "").trim().toLowerCase();
-    if (safeWidth < 980) return "narrow";
-    if (safeWidth < 1260 || safeHeight < 680) return "compact";
-    if ((tab === "pouvoirs" || tab === "equipement") && safeWidth < 1420) return "compact";
-    return "wide";
+    return resolveActorSheetResponsiveLayoutMode({ width, height, activeTab });
   }
 
   applyResponsiveActorSheetLayoutState(rootLike = null) {
@@ -4038,45 +3922,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   applyActorSheetInteractivePermissions(htmlLike = null) {
-    const root = htmlLike?.find ? htmlLike : getSheetElementWrapper(this);
-    if (!root?.length) return;
-    const basicPlayer = isBasicPlayerRole(game.user?.role);
-    const canToggleCharacteristicsEdit = canCurrentUserEditCharacteristics();
-    const characteristicsUnlocked = canToggleCharacteristicsEdit && Boolean(this._characteristicsEditEnabled);
-    root.toggleClass?.("characteristics-edit-active", this.actor?.type === "personnage" && characteristicsUnlocked);
-
-    if (basicPlayer) {
-      root.find("input, textarea, select, button").prop("disabled", false).removeAttr("disabled");
-      root.find(".bag-slots-toggle").prop("disabled", true).attr("disabled", "disabled");
-    }
-    if (canToggleCharacteristicsEdit) {
-      root.find(".char-edit-toggle").prop("disabled", false).removeAttr("disabled");
-      root
-        .find(VITAL_RESOURCE_INPUT_SELECTOR)
-        .prop("disabled", false)
-        .prop("readonly", false)
-        .removeAttr("disabled")
-        .removeAttr("readonly");
-    }
-
-    if (this.actor?.type === "personnage") {
-      const characteristicInputs = root.find(CHARACTERISTIC_BASE_INPUT_SELECTOR);
-      if (characteristicsUnlocked) {
-        characteristicInputs
-          .prop("disabled", false)
-          .prop("readonly", false)
-          .removeAttr("disabled")
-          .removeAttr("readonly")
-          .removeClass("is-locked");
-        root.find(".char-edit-toggle").addClass("is-active");
-      } else {
-        characteristicInputs
-          .prop("readonly", true)
-          .attr("readonly", "readonly")
-          .addClass("is-locked");
-        root.find(".char-edit-toggle").removeClass("is-active");
-      }
-    }
+    actorSheetPermissionController.applyInteractivePermissions(this, htmlLike);
   }
 
   clearActorSheetNativeEditHandlers() {
@@ -8665,52 +8511,7 @@ class BloodmanItemSheet extends BaseItemSheet {
   }
 
   syncItemSheetSwitchDependentUi(changedField = "", nextValue = false, htmlLike = null) {
-    const root = htmlLike?.find ? htmlLike : this.element;
-    if (!root?.length) return;
-    const setDisabled = (selector, disabled) => {
-      root.find(selector).prop("disabled", Boolean(disabled));
-    };
-    const toggleClass = (selector, className, enabled) => {
-      root.find(selector).toggleClass(className, Boolean(enabled));
-    };
-
-    switch (String(changedField || "").trim()) {
-      case "system.singleUseEnabled":
-        setDisabled("input[name='system.singleUseCount']", !nextValue);
-        break;
-      case "system.powerCostEnabled":
-        setDisabled("input[name='system.powerCost']", !nextValue);
-        break;
-      case "system.damageEnabled":
-        setDisabled("input[name='system.damageDie']", !nextValue);
-        break;
-      case "system.protectionEnabled":
-        setDisabled("input[name='system.pa']", !nextValue);
-        break;
-      case "system.healEnabled":
-        setDisabled("input[name='system.healDie']", !nextValue);
-        break;
-      case "system.characteristicBonusEnabled":
-        setDisabled("input[name^='system.characteristicBonuses.']", !nextValue);
-        toggleClass(".bonus-grid-characteristics", "is-disabled", !nextValue);
-        break;
-      case "system.rawBonusEnabled":
-        setDisabled("input[name^='system.rawBonuses.']", !nextValue);
-        toggleClass(".bonus-grid-compact", "is-disabled", !nextValue);
-        break;
-      case "system.infiniteAmmo": {
-        const weaponType = String(root.find("input[name='system.weaponType']:checked").val() || "").trim().toLowerCase();
-        const magazineCapacity = normalizeNonNegativeInteger(root.find("input[name='system.magazineCapacity']").val(), 0);
-        const usesMagazine = weaponType === "distance" && !nextValue && magazineCapacity > 0;
-        setDisabled("input[name='system.loadedAmmo']", !usesMagazine);
-        break;
-      }
-      case "system.link.equiperAvecEnabled":
-        toggleClass(".bm-item-equiper-avec-builder", "is-disabled", !nextValue);
-        break;
-      default:
-        break;
-    }
+    return itemSheetControlsController.syncSwitchDependentUi(this, changedField, nextValue, htmlLike);
   }
 
   getItemSheetEquiperAvecDropContainerFromEvent(eventLike) {
