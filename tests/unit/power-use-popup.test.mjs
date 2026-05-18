@@ -92,6 +92,33 @@ async function run() {
   assert.equal(dialogs.length, 1);
   assert.equal(dialogs[0].config.title.includes("Hero&lt;"), true);
 
+  const factoryDialogs = [];
+  const factoryHooks = buildPowerUsePopupHooks({
+    getCurrentUser: () => currentUser,
+    formatMultilineTextToHtml: value => String(value || ""),
+    escapeHtml: value => String(value || "").replace(/</g, "&lt;"),
+    createDialog: (config, options) => {
+      const dialog = {
+        config,
+        options,
+        rendered: false,
+        render(_value) {
+          this.rendered = true;
+        }
+      };
+      factoryDialogs.push(dialog);
+      return dialog;
+    }
+  });
+  assert.equal(factoryHooks.showPowerUsePopup({
+    actorName: "Hero",
+    requesterUserName: "Player",
+    itemType: "aptitude",
+    itemName: "Sprint"
+  }), true);
+  assert.equal(factoryDialogs.length, 1);
+  assert.equal(factoryDialogs[0].rendered, true);
+
   const handledOnce = await hooks.handlePowerUsePopupMessage({
     eventId: "evt-1",
     requesterUserId: "u2",

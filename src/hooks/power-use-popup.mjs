@@ -15,6 +15,7 @@ export function buildPowerUsePopupHooks({
   formatMultilineTextToHtml,
   escapeHtml,
   dialogClass,
+  createDialog,
   wasPowerUsePopupRequestProcessed,
   rememberPowerUsePopupRequest,
   logWarn,
@@ -51,6 +52,13 @@ export function buildPowerUsePopupHooks({
     ? escapeHtml
     : value => String(value || "");
   const renderDialogClass = dialogClass || globalThis.Dialog;
+  const createPopupDialog = typeof createDialog === "function"
+    ? createDialog
+    : (config, options) => (
+      typeof renderDialogClass === "function"
+        ? new renderDialogClass(config, options)
+        : null
+    );
   const canAssistantRole = typeof isAssistantOrHigherRole === "function"
     ? isAssistantOrHigherRole
     : () => false;
@@ -159,7 +167,7 @@ export function buildPowerUsePopupHooks({
   }
 
   function showPowerUsePopup(data) {
-    if (!data || typeof renderDialogClass !== "function") return false;
+    if (!data) return false;
     const actorName = String(data.actorName || "").trim();
     const requesterUserName = String(data.requesterUserName || "").trim();
     const popupItemType = String(data.itemType || "").trim().toLowerCase();
@@ -189,7 +197,7 @@ export function buildPowerUsePopupHooks({
     <p><strong>Description :</strong></p>
     <p>${descriptionHtml || noDescriptionText}</p>
   </div>`;
-    const dialog = new renderDialogClass(
+    const dialog = createPopupDialog(
       {
         title,
         content,
@@ -203,6 +211,7 @@ export function buildPowerUsePopupHooks({
         width: 480
       }
     );
+    if (!dialog || typeof dialog.render !== "function") return false;
     dialog.render(true);
     return true;
   }

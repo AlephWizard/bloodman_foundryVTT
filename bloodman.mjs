@@ -2225,7 +2225,7 @@ const powerUsePopupHooks = buildPowerUsePopupHooks({
   isAssistantOrHigherRole,
   formatMultilineTextToHtml,
   escapeHtml: escapeChatMarkup,
-  dialogClass: getDialogClass(),
+  createDialog: createBloodmanDialog,
   wasPowerUsePopupRequestProcessed,
   rememberPowerUsePopupRequest,
   logWarn: (...args) => bmLog.warn(...args),
