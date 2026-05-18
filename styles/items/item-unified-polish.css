@@ -78,18 +78,134 @@
   --bm-item-metal-raised: #1b1715;
   --bm-item-line: #4f413c;
   --bm-item-border: #806962;
+  --bm-item-type-accent: #d0473f;
+  --bm-item-type-accent-rgb: 208, 71, 63;
+  --bm-item-type-label: "TYPE: OBJET";
+  --bm-item-type-badge-text: #f4eee6;
   --bm-item-accent: #d0473f;
   --bm-item-accent-glow: rgba(208, 71, 63, 0.24);
   --bm-item-text: #f4eee6;
   --bm-item-muted: #b9ab98;
+  position: relative;
   border-color: rgba(128, 105, 98, 0.78);
   border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 34%),
+    radial-gradient(80% 72% at 100% 0%, rgba(var(--bm-item-type-accent-rgb), 0.22), transparent 52%),
+    linear-gradient(135deg, rgba(var(--bm-item-type-accent-rgb), 0.1), transparent 34%),
     linear-gradient(180deg, var(--bm-item-metal-raised) 0%, var(--bm-item-metal) 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 16px 30px rgba(0, 0, 0, 0.48);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified::before {
+  content: var(--bm-item-type-label);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  min-height: 22px;
+  padding: 3px 10px;
+  border: 1px solid rgba(var(--bm-item-type-accent-rgb), 0.72);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    var(--bm-item-type-accent);
+  color: var(--bm-item-type-badge-text);
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: none;
+  box-shadow:
+    0 0 0 2px rgba(var(--bm-item-type-accent-rgb), 0.16),
+    0 8px 16px rgba(0, 0, 0, 0.32);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-aptitude {
+  --bm-item-type-accent: #FBC200;
+  --bm-item-type-accent-rgb: 251, 194, 0;
+  --bm-item-type-label: "TYPE: APTITUDE";
+  --bm-item-type-badge-text: #17120a;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(251, 194, 0, 0.22);
+  --bm-item-line: #7f6730;
+  --bm-item-border: #b89435;
+  --bm-item-muted: #e0c878;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-arme {
+  --bm-item-type-accent: #8A000B;
+  --bm-item-type-accent-rgb: 138, 0, 11;
+  --bm-item-type-label: "TYPE: ARME";
+  --bm-item-type-badge-text: #fff2ee;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(138, 0, 11, 0.28);
+  --bm-item-line: #713438;
+  --bm-item-border: #9a3a41;
+  --bm-item-muted: #e2a0a5;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-objet {
+  --bm-item-type-accent: #D9D9D9;
+  --bm-item-type-accent-rgb: 217, 217, 217;
+  --bm-item-type-label: "TYPE: OBJET";
+  --bm-item-type-badge-text: #151515;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(217, 217, 217, 0.18);
+  --bm-item-line: #5a626a;
+  --bm-item-border: #828a92;
+  --bm-item-muted: #c4c8cc;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-pouvoir {
+  --bm-item-type-accent: #461D85;
+  --bm-item-type-accent-rgb: 70, 29, 133;
+  --bm-item-type-label: "TYPE: POUVOIR";
+  --bm-item-type-badge-text: #f6edff;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(70, 29, 133, 0.3);
+  --bm-item-line: #60438d;
+  --bm-item-border: #7c59ad;
+  --bm-item-muted: #c5b1e8;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-protection {
+  --bm-item-type-accent: #8C6F56;
+  --bm-item-type-accent-rgb: 140, 111, 86;
+  --bm-item-type-label: "TYPE: PROTECTION";
+  --bm-item-type-badge-text: #fff5ea;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(140, 111, 86, 0.26);
+  --bm-item-line: #695343;
+  --bm-item-border: #95765c;
+  --bm-item-muted: #d0baa5;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-ration {
+  --bm-item-type-accent: #019875;
+  --bm-item-type-accent-rgb: 1, 152, 117;
+  --bm-item-type-label: "TYPE: RATION";
+  --bm-item-type-badge-text: #eafff8;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(1, 152, 117, 0.25);
+  --bm-item-line: #2f7567;
+  --bm-item-border: #39a58d;
+  --bm-item-muted: #8fdac9;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified.item-soin {
+  --bm-item-type-accent: #1693CB;
+  --bm-item-type-accent-rgb: 22, 147, 203;
+  --bm-item-type-label: "TYPE: SOIN";
+  --bm-item-type-badge-text: #effaff;
+  --bm-item-accent: var(--bm-item-type-accent);
+  --bm-item-accent-glow: rgba(22, 147, 203, 0.25);
+  --bm-item-line: #346c86;
+  --bm-item-border: #3f98bf;
+  --bm-item-muted: #a3d5ec;
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-img {

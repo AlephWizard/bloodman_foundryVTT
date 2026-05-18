@@ -138,6 +138,15 @@ function run() {
     const cssText = readText(cssPath);
     assert.equal(cssText.includes("#bm-chaos-dice"), false, `${cssPath} should not style the chaos panel`);
   }
+
+  const itemPolishCss = readText("styles/items/item-unified-polish.css");
+  for (const itemType of ["aptitude", "arme", "objet", "pouvoir", "protection", "ration", "soin"]) {
+    assert.equal(
+      itemPolishCss.includes(`.bloodman-item.bm-item-sheet.bm-item-unified.item-${itemType}`),
+      true,
+      `Unified item sheet should define a visual identity for item type: ${itemType}`
+    );
+  }
 }
 
 run();
