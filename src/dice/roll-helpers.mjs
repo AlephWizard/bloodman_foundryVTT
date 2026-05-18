@@ -5,7 +5,6 @@ import {
   canUserProcessPrivilegedRequests,
   getActiveGMUserIds,
   getActivePrivilegedOperatorIds,
-  isAssistantOrHigherRole,
   isCurrentUserPrimaryPrivilegedOperator
 } from "../core/privileged-users.mjs";
 import {
@@ -32,9 +31,7 @@ import {
 } from "./weapon-category.mjs";
 import {
   createCustomDamageOption,
-  DAMAGE_CONFIG_OPTIONS,
   getDamageOptionByFormula,
-  getDefaultDamageOption,
   normalizeDamageFormula,
   validateDamageFormula
 } from "./damage-config-options.mjs";

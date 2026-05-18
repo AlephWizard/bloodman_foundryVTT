@@ -15,6 +15,8 @@
       "SimpleAttack": "Attaque simple",
       "Reload": "Recharger",
       "Delete": "Supprimer",
+      "OK": "OK",
+      "Target": "Cible",
       "Total": "Total",
       "Name": "NOM",
       "Note": "NOTE",
@@ -186,6 +188,9 @@
         "Title": "Configuration du jet de dégâts",
         "SimpleAttackEyebrow": "Attaque",
         "SimpleAttackHint": "Configuration de l'attaque",
+        "SourceLabel": "Source",
+        "ModifiersLabel": "Modificateurs",
+        "FormulaSectionCompactLabel": "Dégâts",
         "FormulaHint": "Formule libre : 1d8, 4d6kh3, 10d6cs>=4",
         "FormulaHelpSummary": "Aide rapide des formules",
         "FormulaHelpItemStandard": "<code>NdF</code> : <code>1d20</code>, <code>2d6</code>, <code>4d10+3</code>",
@@ -209,6 +214,12 @@
       },
       "DamageSplit": {
         "Title": "Répartition des dégâts",
+        "Eyebrow": "Répartition",
+        "ObserverEyebrow": "Suivi MJ",
+        "RolledTotal": "Jet",
+        "AllocatedTotal": "Total attribué",
+        "TargetCount": "Cibles",
+        "FreeHint": "Le total attribué peut être libre et dépasser le jet.",
         "Prompt": "Répartir {damage} dégâts entre {targets} cibles."
       },
       "VoyageXPGrant": {
@@ -237,6 +248,10 @@
       "DropDecision": {
         "Title": "Transfert d'objet",
         "Eyebrow": "Deplacement d'objet",
+        "ItemLabel": "Objet",
+        "TargetLabel": "Destination",
+        "WarningLabel": "Attention",
+        "InvalidPriceWarning": "Le prix de l'objet est invalide.",
         "Intro": "Vous vous appretez a glisser '{item}' sur la fiche de '{sheet}'.",
         "Question": "Voulez-vous deplacer cet objet gratuitement ?",
         "CostLabel": "Cout",
@@ -320,7 +335,12 @@
     },
     "Chat": {
       "RollTypes": {
-        "Experience": "Experience"
+        "Generic": "Jet",
+        "Characteristic": "Caracteristique",
+        "Damage": "Degats",
+        "Experience": "Experience",
+        "Heal": "Soin",
+        "Luck": "Chance"
       }
     }
   },

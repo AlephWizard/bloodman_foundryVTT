@@ -16,6 +16,7 @@ function run() {
   assert.equal(normalizeWeaponType("arme a distance"), "distance");
   assert.equal(normalizeWeaponType("corps"), "corps");
   assert.equal(normalizeWeaponType("arme blanche"), "corps");
+  assert.equal(normalizeWeaponType("arme de mêlée"), "corps");
   assert.equal(normalizeWeaponType("melee"), "corps");
   assert.equal(normalizeWeaponType("arme de jet"), "distance");
   assert.equal(normalizeWeaponType("tactique"), "distance");
