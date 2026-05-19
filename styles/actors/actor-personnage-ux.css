@@ -3,6 +3,8 @@
   --bm-actor-focus: #c8372e;
   --bm-actor-focus-glow: rgba(200, 55, 46, 0.24);
   --bm-actor-row-focus: rgba(200, 55, 46, 0.1);
+  --bm-item-hover-bg: rgba(255, 255, 255, 0.74);
+  --bm-item-hover-border: rgba(0, 0, 0, 0.36);
 }
 
 .bloodman-sheet.npc-sheet {
@@ -32,16 +34,240 @@
 }
 
 .bloodman-sheet .item.item--stacked {
+  overflow: hidden;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(242, 242, 242, 0.62));
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
-    box-shadow 120ms ease;
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.bloodman-sheet .item.item--stacked:hover {
+  border-color: var(--bm-item-hover-border);
+  background:
+    linear-gradient(180deg, var(--bm-item-hover-bg), rgba(236, 236, 236, 0.96));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.78),
+    0 4px 10px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .item.item--stacked:hover .item-name,
+.bloodman-sheet .item.item--stacked:focus-within .item-name {
+  color: #000000;
+}
+
+.bloodman-sheet .equiper-avec-item {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.bloodman-sheet .equiper-avec-item:hover {
+  border-color: rgba(0, 0, 0, 0.42);
+  background: #ffffff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .ammo-line-select {
+  width: 12px !important;
+  min-width: 12px !important;
+  max-width: 12px !important;
+  height: 12px !important;
+  min-height: 12px !important;
+  max-height: 12px !important;
+  padding: 0 !important;
+  border: 1px solid #111111 !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  box-shadow: inset 0 0 0 2px #ffffff;
+  align-self: center;
+}
+
+.bloodman-sheet .ammo-line-select.is-active {
+  background: #111111 !important;
+  box-shadow: inset 0 0 0 2px #111111;
+}
+
+.bloodman-sheet .ammo-line-select:hover,
+.bloodman-sheet .ammo-line-select:focus-visible {
+  border-color: #000000 !important;
+  box-shadow:
+    inset 0 0 0 2px #ffffff,
+    0 0 0 2px rgba(0, 0, 0, 0.16);
+}
+
+.bloodman-sheet .ammo-line-select.is-active:hover,
+.bloodman-sheet .ammo-line-select.is-active:focus-visible {
+  box-shadow:
+    inset 0 0 0 2px #111111,
+    0 0 0 2px rgba(0, 0, 0, 0.18);
+}
+
+.bloodman-sheet .ammo-line-toolbar {
+  gap: 5px;
+}
+
+.bloodman-sheet .ammo-line-toolbar-button,
+.bloodman-sheet .equip-title .ammo-line-toolbar-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  padding: 0 !important;
+  border: 1px solid #000000 !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  background-image: none !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 14px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 100ms ease, box-shadow 100ms ease, background-color 100ms ease;
+}
+
+.bloodman-sheet .ammo-line-toolbar-button:hover:not(:disabled),
+.bloodman-sheet .ammo-line-toolbar-button:focus-visible:not(:disabled) {
+  background: #f7f7f7 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 0 0 2px rgba(255, 255, 255, 0.22),
+    0 2px 4px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .ammo-line-toolbar-button:active:not(:disabled) {
+  background: #e9e9e9 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.32);
+  transform: translateY(0);
 }
 
 .bloodman-sheet .item.item--stacked:focus-within {
   background: var(--bm-actor-row-focus);
   border-bottom-color: var(--bm-actor-focus);
   box-shadow: inset 3px 0 0 var(--bm-actor-focus);
+}
+
+.bloodman-sheet .ammo-row {
+  min-height: 24px;
+  align-items: center;
+}
+
+.bloodman-sheet .ammo-row input,
+.bloodman-sheet .ammo-row textarea {
+  align-self: center;
+}
+
+.bloodman-sheet .bm-btn-damage {
+  background: linear-gradient(180deg, #bd3131 0%, #781414 100%) !important;
+  border-color: #4f0d0d !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-heal {
+  background: linear-gradient(180deg, #238d4c 0%, #0f6030 100%) !important;
+  border-color: #0a4622 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-magic {
+  background: linear-gradient(180deg, #345fbf 0%, #173f8b 100%) !important;
+  border-color: #0e2c65 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .bm-btn-pa {
+  background: linear-gradient(180deg, #c66d10 0%, #8a3f05 100%) !important;
+  border-color: #5f2a03 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .item-chip.bm-btn-usage-count,
+.bloodman-sheet .bm-btn-usage-count {
+  background: #2f2f2f !important;
+  border-color: #111111 !important;
+  color: #ffffff !important;
+}
+
+.bloodman-sheet .ability-show-gm,
+.bloodman-sheet .power-use,
+.bloodman-sheet .equiper-avec-power-use,
+.bloodman-sheet .equiper-avec-aptitude-use {
+  font-weight: 400 !important;
+  letter-spacing: 0.08px !important;
+  padding-left: 7px !important;
+  padding-right: 7px !important;
+}
+
+.bloodman-sheet .item--stacked .item-actions button:not(:disabled),
+.bloodman-sheet .item--stacked .item-actions .weapon-roll,
+.bloodman-sheet .item--stacked .item-actions .ability-roll,
+.bloodman-sheet .item--stacked .item-actions .item-use,
+.bloodman-sheet .item--stacked .item-actions .item-chip,
+.bloodman-sheet .equiper-avec-meta button:not(:disabled),
+.bloodman-sheet .equiper-avec-meta .equiper-avec-item-use,
+.bloodman-sheet .equiper-avec-meta .item-chip,
+.bloodman-sheet button.weapon-simple-attack:not(:disabled) {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease,
+    transform 100ms ease;
+}
+
+.bloodman-sheet .item--stacked .item-actions button:not(:disabled):hover,
+.bloodman-sheet .item--stacked .item-actions button:not(:disabled):focus-visible,
+.bloodman-sheet .item--stacked .item-actions .weapon-roll:hover,
+.bloodman-sheet .item--stacked .item-actions .weapon-roll:focus-visible,
+.bloodman-sheet .item--stacked .item-actions .ability-roll:hover,
+.bloodman-sheet .item--stacked .item-actions .ability-roll:focus-visible,
+.bloodman-sheet .item--stacked .item-actions .item-use:hover,
+.bloodman-sheet .item--stacked .item-actions .item-use:focus-visible,
+.bloodman-sheet .item--stacked .item-actions .item-chip:hover,
+.bloodman-sheet .item--stacked .item-actions .item-chip:focus-visible,
+.bloodman-sheet .equiper-avec-meta button:not(:disabled):hover,
+.bloodman-sheet .equiper-avec-meta button:not(:disabled):focus-visible,
+.bloodman-sheet .equiper-avec-meta .equiper-avec-item-use:hover,
+.bloodman-sheet .equiper-avec-meta .equiper-avec-item-use:focus-visible,
+.bloodman-sheet .equiper-avec-meta .item-chip:hover,
+.bloodman-sheet .equiper-avec-meta .item-chip:focus-visible,
+.bloodman-sheet button.weapon-simple-attack:not(:disabled):hover,
+.bloodman-sheet button.weapon-simple-attack:not(:disabled):focus-visible {
+  border-color: #000000 !important;
+  filter: brightness(1.2);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.2),
+    0 0 0 3px rgba(0, 0, 0, 0.12),
+    0 3px 7px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .item--stacked .item-actions button:not(:disabled):active,
+.bloodman-sheet .item--stacked .item-actions .weapon-roll:active,
+.bloodman-sheet .item--stacked .item-actions .ability-roll:active,
+.bloodman-sheet .item--stacked .item-actions .item-use:active,
+.bloodman-sheet .item--stacked .item-actions .item-chip:active,
+.bloodman-sheet .equiper-avec-meta button:not(:disabled):active,
+.bloodman-sheet .equiper-avec-meta .equiper-avec-item-use:active,
+.bloodman-sheet .equiper-avec-meta .item-chip:active,
+.bloodman-sheet button.weapon-simple-attack:not(:disabled):active {
+  filter: brightness(0.92);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.32);
+  transform: translateY(0);
 }
 
 .bloodman-sheet .item-name.item-edit {

@@ -88,7 +88,7 @@ async function run() {
     rules.resolveSheetWindowPosition({
       requestedPosition: { width: 1600, height: 100, left: 2000, top: -20 },
       currentPosition: { width: 800, height: 600 },
-      defaultOptions: { width: 1195, height: 650 },
+      defaultOptions: { width: 1195, height: 670 },
       viewportWidth: 1280,
       viewportHeight: 720
     }),
@@ -98,7 +98,7 @@ async function run() {
     rules.resolveSheetWindowPosition({
       requestedPosition: {},
       currentPosition: { width: 900, height: 500, left: 40, top: 50 },
-      defaultOptions: { width: 1195, height: 650 },
+      defaultOptions: { width: 1195, height: 670 },
       viewportWidth: 1440,
       viewportHeight: 900
     }),

@@ -3526,7 +3526,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       classes: ["bloodman", "sheet", "actor"],
       template: PLAYER_ACTOR_SHEET_TEMPLATE_PATH,
       width: 1195,
-      height: 650,
+      height: 670,
       popOut: true,
       minimizable: true,
       resizable: true,
@@ -7952,7 +7952,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
     tag: "div",
     position: {
       width: 1195,
-      height: 650
+      height: 670
     },
     window: {
       contentTag: "form",

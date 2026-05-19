@@ -348,6 +348,15 @@
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 40%),
     linear-gradient(180deg, #2b1110 0%, #100707 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.34);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease,
+    transform 100ms ease;
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-audio-preview:hover,
@@ -355,7 +364,66 @@
 .bloodman-item.bm-item-sheet.bm-item-unified .file-picker:hover,
 .bloodman-item.bm-item-sheet.bm-item-unified .file-picker:focus-visible {
   border-color: #f24d46;
+  filter: brightness(1.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 2px rgba(242, 77, 70, 0.18),
+    0 4px 8px rgba(0, 0, 0, 0.38);
+  transform: translateY(-1px);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified button:not(:disabled) {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease,
+    transform 100ms ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified button:not(:disabled):hover,
+.bloodman-item.bm-item-sheet.bm-item-unified button:not(:disabled):focus-visible {
+  filter: brightness(1.14);
+  box-shadow:
+    0 0 0 2px rgba(var(--bm-item-type-accent-rgb), 0.18),
+    0 4px 8px rgba(0, 0, 0, 0.34);
+  transform: translateY(-1px);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified button:not(:disabled):active {
+  filter: brightness(0.92);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.42);
+  transform: translateY(0);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .toggle-option,
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-switch-track {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease,
+    transform 100ms ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .toggle-option:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-switch:hover .bm-switch-track {
+  border-color: var(--bm-item-accent);
   filter: brightness(1.12);
+  box-shadow:
+    0 0 0 1px var(--bm-item-accent-glow),
+    0 3px 8px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .toggle-option:active,
+.bloodman-item.bm-item-sheet.bm-item-unified .weapon-type-option:active,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-switch:active .bm-switch-track {
+  filter: brightness(0.92);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.34);
+  transform: translateY(0);
 }
 
 .bloodman-item.bm-item-sheet.bm-item-unified .bm-price-error:not(:empty) {
