@@ -135,6 +135,69 @@
   color: #ffffff;
 }
 
+.bloodman-sheet:not(.characteristics-edit-active) .char-icon {
+  border-color: transparent;
+  background: transparent;
+  color: #7f7f7f;
+  box-shadow: none;
+}
+
+.bloodman-sheet:not(.characteristics-edit-active) .char-row {
+  border-bottom-color: #d6d6d6;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.bloodman-sheet:not(.characteristics-edit-active) .char-base {
+  gap: 3px;
+}
+
+.bloodman-sheet:not(.characteristics-edit-active) .char-base input {
+  border-color: transparent;
+  background: transparent;
+  color: #6f6f6f;
+  -webkit-text-fill-color: #6f6f6f;
+  box-shadow: none !important;
+}
+
+.bloodman-sheet:not(.characteristics-edit-active) .char-base input[readonly] {
+  background: transparent;
+  color: #6f6f6f;
+  -webkit-text-fill-color: #6f6f6f;
+}
+
+.bloodman-sheet:not(.characteristics-edit-active) .char-base input:focus,
+.bloodman-sheet:not(.characteristics-edit-active) .char-base input:focus-visible {
+  border-color: #9a9a9a;
+  background: #ffffff;
+}
+
+.bloodman-sheet.characteristics-edit-active .char-icon {
+  border-color: transparent;
+  background: transparent;
+  color: #111111;
+}
+
+.bloodman-sheet.characteristics-edit-active .char-base input:not([readonly]) {
+  border-color: #c8372e;
+  border-radius: 6px;
+  background: #fff9f8;
+  color: #111111;
+  -webkit-text-fill-color: #111111;
+}
+
+.bloodman-sheet .char-score .char-effective {
+  min-width: 42px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.bloodman-sheet .char-score .char-modifier {
+  font-size: 14px;
+  font-weight: 900;
+}
+
 .bloodman-sheet .item.item--stacked {
   border-bottom-color: rgba(18, 18, 18, 0.2);
   border-radius: 8px;

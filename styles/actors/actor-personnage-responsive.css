@@ -162,6 +162,16 @@
   -webkit-text-fill-color: #111111 !important;
 }
 
+.bloodman-sheet:not(.characteristics-edit-active) .char-base input[type="number"]:not(:focus) {
+  color: #7f7f7f !important;
+  -webkit-text-fill-color: #7f7f7f !important;
+}
+
+.bloodman-sheet.characteristics-edit-active .char-base input[type="number"]:not([readonly]) {
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+}
+
 .bloodman-sheet input::placeholder,
 .bloodman-sheet textarea::placeholder {
   color: #6b6258 !important;
@@ -203,6 +213,21 @@
 .bloodman-sheet .voyage-input {
   color: #111111 !important;
   -webkit-text-fill-color: #111111 !important;
+}
+
+.bloodman-sheet.pj-sheet .voyage-banner input.voyage-input,
+.bloodman-sheet.pj-sheet .voyage-banner input.voyage-input:hover,
+.bloodman-sheet.pj-sheet .voyage-banner input.voyage-input:focus,
+.bloodman-sheet.pj-sheet .voyage-banner input.voyage-input:focus-visible,
+.bloodman-sheet.pj-sheet .voyage-banner input.voyage-input[readonly],
+.bloodman-sheet.pj-sheet .voyage-banner input.voyage-input:disabled {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
 }
 
 .bloodman-sheet .sheet-tabs .item {
