@@ -70,7 +70,6 @@
 
 /* Foundry v14 ApplicationV2 applies stronger default form styling than V1.
    Keep Bloodman sheet values visually neutral and restore the custom XP boxes. */
-.bloodman-sheet .state-field input[type="number"],
 .bloodman-sheet .card-total input[type="number"],
 .bloodman-sheet .char-base input[type="number"],
 .bloodman-sheet .move-box,
@@ -168,6 +167,37 @@
   color: #6b6258 !important;
   -webkit-text-fill-color: #6b6258 !important;
   opacity: 1 !important;
+}
+
+.bloodman-sheet .state-field:not(.is-positive):not(.is-negative) input[type="number"] {
+  color: #c7c7c7 !important;
+  -webkit-text-fill-color: #c7c7c7 !important;
+}
+
+.bloodman-sheet .state-field.is-negative input[type="number"] {
+  color: #b83228 !important;
+  -webkit-text-fill-color: #b83228 !important;
+}
+
+.bloodman-sheet .state-field.is-positive input[type="number"] {
+  color: #2f8a42 !important;
+  -webkit-text-fill-color: #2f8a42 !important;
+}
+
+.bloodman-sheet .state-name:placeholder-shown {
+  color: #d2d2d2 !important;
+  -webkit-text-fill-color: #d2d2d2 !important;
+}
+
+.bloodman-sheet .state-name::placeholder {
+  color: #d6d6d6 !important;
+  -webkit-text-fill-color: #d6d6d6 !important;
+}
+
+.bloodman-sheet .state-name:not(:placeholder-shown),
+.bloodman-sheet .state-name:focus {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
 }
 
 .bloodman-sheet .voyage-input {
