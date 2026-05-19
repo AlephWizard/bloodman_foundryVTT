@@ -171,6 +171,22 @@ function safeWarn(message) {
   }
 }
 
+function buildCharacteristicSummaryFlavor({
+  outcome = "",
+  characteristicLabel = "",
+  rollTotal = 0,
+  success = false
+} = {}) {
+  const statusClass = success ? "success" : "failure";
+  return `<div class="bm-char-roll-summary bm-char-roll-summary--${statusClass}">
+    <span class="bm-char-roll-status bm-char-roll-status--${statusClass}">${escapeHtml(outcome)}</span>
+    <span class="bm-char-roll-summary-separator">-</span>
+    <span class="bm-char-roll-summary-label">${escapeHtml(characteristicLabel)}</span>
+    <span class="bm-char-roll-summary-separator">-</span>
+    <span class="bm-char-roll-summary-total">${escapeHtml(rollTotal)}</span>
+  </div>`;
+}
+
 function isBonusItem(item) {
   return BONUS_ITEM_TYPES.has(item?.type);
 }
@@ -1614,10 +1630,13 @@ export async function doCharacteristicRoll(actor, key, options = {}) {
   const flavor = critical
     ? `<div class="bm-char-roll-result bm-char-roll-result--critical">
       <div class="bm-char-roll-title bm-char-roll-title--critical bm-char-roll-title--crit-${critical}">${outcome}</div>
-      <div class="bm-char-roll-meta">${characteristicLabel}</div>
-      <div class="bm-char-roll-total">${rollTotal}</div>
+      <div class="bm-char-roll-critical-summary">
+        <span class="bm-char-roll-meta">${characteristicLabel}</span>
+        <span class="bm-char-roll-summary-separator">-</span>
+        <span class="bm-char-roll-total">${rollTotal}</span>
+      </div>
     </div>`
-    : `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`;
+    : buildCharacteristicSummaryFlavor({ outcome, characteristicLabel, rollTotal, success });
   const shouldHideForGm = options?.hidden === true
     && actor?.type === "personnage-non-joueur"
     && game.user?.isGM === true;
@@ -2287,7 +2306,7 @@ export async function doGrowthRoll(actor, key) {
 
   roll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
+    flavor: buildCharacteristicSummaryFlavor({ outcome, characteristicLabel, rollTotal, success }),
     flags: buildChatRollFlags(CHAT_ROLL_TYPES.EXPERIENCE)
   });
 

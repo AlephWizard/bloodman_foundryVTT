@@ -114,7 +114,7 @@ export function buildDamageRollFlavorMarkup({
   return `<section class="bm-damage-chat bm-damage-chat--public">
     <div class="bm-damage-chat-head">
       <p class="bm-damage-chat-eyebrow">Attaque</p>
-      <p class="bm-damage-chat-title"><strong>${escapeHtml(safeAttacker)}</strong> inflige <strong>${safeTotalDamage}</strong> degats a <strong>${escapeHtml(targetSummary.label)}</strong></p>
+      <p class="bm-damage-chat-title"><strong>${escapeHtml(safeAttacker)}</strong> inflige <strong class="bm-damage-chat-title-damage">${safeTotalDamage}</strong> degats a <strong>${escapeHtml(targetSummary.label)}</strong></p>
     </div>
     <div class="bm-damage-chat-grid">${buildCards(cards, escapeHtml)}</div>
     ${buildMetaPills(metaEntries, escapeHtml)}
@@ -161,7 +161,7 @@ export function buildGmDamageSummaryMarkup({
   return `<section class="bm-damage-chat bm-damage-chat--gm">
     <div class="bm-damage-chat-head">
       <p class="bm-damage-chat-eyebrow">Suivi MJ</p>
-      <p class="bm-damage-chat-title"><strong>${escapeHtml(safeAttacker)}</strong> inflige <strong>${safeFinalDamage}</strong> degats a <strong>${escapeHtml(safeTarget)}</strong></p>
+      <p class="bm-damage-chat-title"><strong>${escapeHtml(safeAttacker)}</strong> inflige <strong class="bm-damage-chat-title-damage">${safeFinalDamage}</strong> degats a <strong>${escapeHtml(safeTarget)}</strong></p>
     </div>
     <div class="bm-damage-chat-grid">${buildCards(cards, escapeHtml)}</div>
     ${buildMetaPills(metaEntries, escapeHtml)}

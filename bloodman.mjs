@@ -2057,6 +2057,22 @@ function escapeChatMarkup(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+function buildCharacteristicSummaryFlavor({
+  outcome = "",
+  characteristicLabel = "",
+  rollTotal = 0,
+  success = false
+} = {}) {
+  const statusClass = success ? "success" : "failure";
+  return `<div class="bm-char-roll-summary bm-char-roll-summary--${statusClass}">
+    <span class="bm-char-roll-status bm-char-roll-status--${statusClass}">${escapeChatMarkup(outcome)}</span>
+    <span class="bm-char-roll-summary-separator">-</span>
+    <span class="bm-char-roll-summary-label">${escapeChatMarkup(characteristicLabel)}</span>
+    <span class="bm-char-roll-summary-separator">-</span>
+    <span class="bm-char-roll-summary-total">${escapeChatMarkup(rollTotal)}</span>
+  </div>`;
+}
 const chatRollDecorationHooks = buildChatRollDecorationHooks({
   getGame: () => game,
   getCanvas: () => canvas,
@@ -7850,7 +7866,7 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: `<b>${outcome}</b> - ${characteristicLabel}<br>${rollTotal}`,
+      flavor: buildCharacteristicSummaryFlavor({ outcome, characteristicLabel, rollTotal, success }),
       flags: buildChatRollFlags(CHAT_ROLL_TYPES.EXPERIENCE)
     });
     this.render(false);
