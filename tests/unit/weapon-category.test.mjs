@@ -17,6 +17,7 @@ function run() {
   assert.equal(normalizeWeaponType("corps"), "corps");
   assert.equal(normalizeWeaponType("arme blanche"), "corps");
   assert.equal(normalizeWeaponType("arme de mêlée"), "corps");
+  assert.equal(normalizeWeaponType(`arme de m${String.fromCodePoint(0xc3)}${String.fromCodePoint(0xaa)}l${String.fromCodePoint(0xc3)}${String.fromCodePoint(0xa9)}e`), "corps");
   assert.equal(normalizeWeaponType("melee"), "corps");
   assert.equal(normalizeWeaponType("arme de jet"), "distance");
   assert.equal(normalizeWeaponType("tactique"), "distance");

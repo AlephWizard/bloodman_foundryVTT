@@ -7,7 +7,8 @@ export function normalizeWeaponType(value) {
     raw === "corps"
     || raw.includes("corps")
     || raw.includes("blanche")
-    || raw.includes("mÃªlÃ©e")
+    || raw.includes("m\u00eal\u00e9e")
+    || raw.includes("m\u00e3\u00aal\u00e3\u00a9e")
     || ascii.includes("melee")
   ) return "corps";
   if (raw.includes("tactique") || raw.includes("jet") || raw.includes("poing")) return "distance";
