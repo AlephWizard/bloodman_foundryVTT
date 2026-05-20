@@ -16,8 +16,8 @@ async function run() {
     id: "actor-linked",
     name: "Linked Actor",
     system: { resources: { pv: { current: 11 } } },
-    update: async data => {
-      actorUpdates.push(data);
+    update: async (data, options) => {
+      actorUpdates.push({ data, options });
       const next = Number(data?.["system.resources.pv.current"]);
       if (Number.isFinite(next)) linkedActor.system.resources.pv.current = next;
     }
@@ -135,6 +135,7 @@ async function run() {
   });
 
   assert.equal(actorUpdates.length >= 1, true);
+  assert.equal(actorUpdates[0].options?.bloodmanAllowVitalResourceUpdate, true);
   assert.equal(tokenUpdates.length >= 2, true);
   assert.equal(damageCalls.length, 1);
   assert.equal(postedMessages.length, 1);

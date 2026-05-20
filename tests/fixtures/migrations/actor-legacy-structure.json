@@ -10,7 +10,7 @@
     "equipment": {
       "monnaies": "  Couronnes ",
       "monnaiesActuel": "abc",
-      "bagSlotsEnabled": "yes",
+      "carriedItemsMax": "abc",
       "transportNpcs": [
         " Actor.abc ",
         "",

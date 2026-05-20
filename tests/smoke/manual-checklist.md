@@ -48,16 +48,16 @@ Objectif: valider rapidement le systeme Bloodman dans Foundry VTT v14 apres une 
 - [ ] Depuis le GM, modifier un parametre visible et confirmer que le joueur voit la mise a jour.
 - [ ] Verifier qu'une action joueur necessitant relais GM ne produit pas d'erreur socket ou console.
 
-## Inventaire, Sacs Et Equipement
+## Inventaire, Portage Et Equipement
 
 - [ ] Ajouter une arme, un objet, une aptitude et un pouvoir sur la fiche joueur.
 - [ ] Verifier que chaque item apparait dans la bonne section.
-- [ ] Activer le sac cote GM avec la bascule `Oui`.
-- [ ] Verifier que la bascule `Oui/Non` se comporte comme un choix exclusif sur PJ et PNJ.
-- [ ] Verifier que le joueur voit le sac deverrouille.
-- [ ] Glisser un objet dans le sac cote joueur.
-- [ ] Fermer et rouvrir la fiche, puis confirmer que l'objet reste dans le sac.
-- [ ] Desactiver le sac et verifier que la zone sac devient inactive sans perdre les items existants.
+- [ ] Modifier la limite maximale d'objets transportables cote GM sur PJ et PNJ.
+- [ ] Verifier que le compteur affiche bien objets portes / limite maximale.
+- [ ] Verifier qu'un joueur non-GM voit la limite sans pouvoir la modifier.
+- [ ] Glisser des objets entre les colonnes de portage cote joueur.
+- [ ] Fermer et rouvrir la fiche, puis confirmer que la limite maximale reste enregistree.
+- [ ] Baisser la limite et verifier que l'ajout de nouveaux objets respecte le maximum.
 - [ ] Tester le reordonnancement d'items cote GM.
 - [ ] Tester le reordonnancement d'items cote joueur non-GM si l'acteur lui appartient.
 - [ ] Supprimer un item lie/equipe et verifier que les liens enfants sont nettoyes sans erreur console.
@@ -164,7 +164,7 @@ Objectif: valider rapidement le systeme Bloodman dans Foundry VTT v14 apres une 
 - [ ] Aucune erreur rouge persistante au lancement.
 - [ ] Aucune erreur console pendant ouverture de fiches, drops, jets, degats et dialogs.
 - [ ] Sheets PJ/PNJ ouvrables depuis sidebar et token.
-- [ ] Inventaire, sac, aptitudes et pouvoirs stables apres fermeture/reouverture.
+- [ ] Inventaire, portage, aptitudes et pouvoirs stables apres fermeture/reouverture.
 - [ ] Jets simples, degats, soins et rerolls fonctionnels cote GM et joueur.
 - [ ] Panneau du chaos fonctionnel et position conservee.
 - [ ] Aucun ralentissement majeur ou rerender continu observe.

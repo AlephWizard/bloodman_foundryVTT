@@ -18,7 +18,7 @@ function run() {
     "system.profile.quickNotes": "",
     "system.equipment.monnaies": "Couronnes",
     "system.equipment.monnaiesActuel": 0,
-    "system.equipment.bagSlotsEnabled": true,
+    "system.equipment.carriedItemsMax": 10,
     "system.equipment.transportNpcs": ["Actor.abc", "Actor.xyz"],
     "system.characteristics.PHY.xp": [true, false, false],
     "system.characteristics.ESP.xp": [false, false, false]
@@ -32,7 +32,7 @@ function run() {
       equipment: {
         monnaies: "Couronnes",
         monnaiesActuel: 12.5,
-        bagSlotsEnabled: false,
+        carriedItemsMax: 10,
         transportNpcs: []
       },
       characteristics: {
@@ -50,7 +50,7 @@ function run() {
       equipment: {
         monnaies: "Couronnes",
         monnaiesActuel: 12.5,
-        bagSlotsEnabled: false,
+        carriedItemsMax: 10,
         transportNpcs: [" Actor.abc ", 123, { bad: true }, "Actor.xyz", ""]
       },
       characteristics: {
@@ -63,7 +63,7 @@ function run() {
     "system.characteristics.PHY.xp": [false, false, true]
   });
 
-  const staleBackpackActor = {
+  const legacyLimitActor = {
     type: "personnage",
     system: {
       npcRole: "",
@@ -71,20 +71,14 @@ function run() {
       equipment: {
         monnaies: "Couronnes",
         monnaiesActuel: 12.5,
-        bagSlotsEnabled: false,
+        carriedItemsMax: "14.9",
         transportNpcs: []
       },
       characteristics: {}
-    },
-    items: [
-      {
-        type: "objet",
-        flags: { bloodman: { carryColumn: "bag" } }
-      }
-    ]
+    }
   };
-  assert.deepEqual(computeActorStructureMigrationData(staleBackpackActor), {
-    "system.equipment.bagSlotsEnabled": true
+  assert.deepEqual(computeActorStructureMigrationData(legacyLimitActor), {
+    "system.equipment.carriedItemsMax": 14
   });
 
   assert.deepEqual(

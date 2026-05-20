@@ -1,0 +1,71 @@
+.equip-block-objects .objects-carry-layout {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.equip-block-objects .objects-column-list {
+  align-self: stretch;
+  max-height: none;
+  min-height: 220px;
+  height: 100%;
+  padding: 2px 4px 16px 0;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  background: transparent;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.equip-block-objects .objects-column-list.is-reorder-target {
+  border-color: rgba(0, 0, 0, 0.38);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.equip-block-objects .objects-column-list-one,
+.equip-block-objects .objects-column-list-two,
+.equip-block-objects .objects-column-list-three {
+  padding-left: 2px;
+  padding-right: 6px;
+}
+
+.carry-slots-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  padding: 1px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  line-height: 1.2;
+}
+
+.carried-items-limit-input {
+  width: 34px;
+  min-width: 34px;
+  height: 18px;
+  padding: 0 3px;
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  border-radius: 5px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .equip-block-objects .objects-carry-layout {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .equip-block-objects .objects-column-list {
+    min-height: 180px;
+  }
+}

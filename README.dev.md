@@ -9,13 +9,13 @@
 - `src/compat/`: couche de compatibilite Foundry (version + wrappers API instables).
 - `src/migrations/`: migrations de donnees versionnees et idempotentes.
 - `src/hooks/`: handlers et wrappers de hooks Foundry extraits par domaine (canvas, cycles de vie actor/item, items derives, combat/tokens, HUD).
-- `src/hooks/actor-lifecycle.mjs`: orchestration `updateActor` et invalidation des caches de fiches ouvertes, incluant la propagation de l'etat des sacs.
+- `src/hooks/actor-lifecycle.mjs`: orchestration `updateActor` et invalidation des caches de fiches ouvertes.
 - `src/hooks/item-lifecycle.mjs`: orchestration `createItem` / `preCreateItem` / `preUpdateItem` / `updateItem` / `deleteItem`, en gardant l'ordre des normalisations.
 - `src/hooks/token-hud-lifecycle.mjs`: hooks Foundry du TokenHUD (`renderTokenHUD`, `canvasReady`, `controlToken`, `ready`) et activation defensive des patches HUD.
 - `src/sheets/`: enregistrement, partials Handlebars, options de rendu et glue des sheets Foundry.
 - `src/sheets/actor-item-dnd.mjs`: orchestration drag/drop acteur (payloads, handlers DOM, survols, tri, colonnes et relais de reorder) appelee par `BloodmanActorSheet`.
 - `src/sheets/drop-document-resolution.mjs`: adaptateur Foundry pour resoudre et cacher les documents Item issus des drag/drop.
-- `src/sheets/open-actor-sheets.mjs`: cache des acteurs/tokens resolus, matching des fiches ouvertes et patch DOM backpack.
+- `src/sheets/open-actor-sheets.mjs`: cache des acteurs/tokens resolus et matching des fiches ouvertes.
 - `src/sheets/sheet-dom.mjs`: helpers DOM/base-data partages par les sheets v1/v2.
 - `src/ui/`: helpers UI extraits des sheets et dialogues (chat, layout, dialogues, panneau du chaos, decoration des types de documents).
 - `src/ui/actor-sheet-layout.mjs`: regles pures de layout de la fiche acteur (auto-resize, taille/position de fenetre, mode responsive).
@@ -65,18 +65,18 @@
 - Le patch visuel des fonds d'effets token est isole dans `src/ui/token-effect-background.mjs` et reste appele par les hooks canvas/combat.
 - Passage C: la logique PV a zero est isolee dans `src/rules/zero-pv-status.mjs`; `bloodman.mjs` conserve des wrappers stables pour les hooks Foundry v14 existants.
 - Passage D: la logique images Actor/Token/prototype est isolee dans `src/rules/token-images.mjs`; les hooks continuent d'utiliser les wrappers de `bloodman.mjs`.
-- Passage E: la glue acteurs/tokens resolus, fiches ouvertes et backpack DOM est isolee dans `src/sheets/open-actor-sheets.mjs`.
+- Passage E: la glue acteurs/tokens resolus et fiches ouvertes est isolee dans `src/sheets/open-actor-sheets.mjs`.
 - Passage G: la resolution Foundry des drag/drop Item est isolee dans `src/sheets/drop-document-resolution.mjs`, avec cache TTL et fallback Actor.Item.
 - Passage H1: le layout responsive et l'autogrow de `BloodmanItemSheet` sont isoles dans `src/ui/item-sheet-layout.mjs`.
 - Passage H2: les controles audio FilePicker et preview prix de `BloodmanItemSheet` sont isoles dans `src/ui/item-sheet-controls.mjs`.
 - Passage H3: le drag/drop `Equiper avec` de `BloodmanItemSheet` est isole dans `src/ui/item-sheet-equip-with.mjs`.
 - Passage I: les actions GM de ressources joueurs (XP voyage, restauration PP/PV) sont isolees dans `src/rules/player-resource-actions.mjs`; `bloodman.mjs` conserve les wrappers appeles par le panneau du chaos et les dialogues. Le CSS de ces dialogues est separe dans `styles/dialogs/player-resource-actions.css`.
 - Passage J: compatibilite Foundry v14 nettoyee sur les partials Handlebars (`foundry.applications.handlebars.loadTemplates`) et les popups de suivi degats, qui passent par la facade DialogV2. Le cache de resolution drag/drop Item ne conserve plus les echecs temporaires.
-- Passage K: le coeur drag/drop acteur (helpers DOM, payloads, dragover/dragstart, reorder et handler binding) est isole dans `src/sheets/actor-item-dnd.mjs`; `BloodmanActorSheet` garde les wrappers et les regles metier sac/liens existantes.
+- Passage K: le coeur drag/drop acteur (helpers DOM, payloads, dragover/dragstart, reorder et handler binding) est isole dans `src/sheets/actor-item-dnd.mjs`; `BloodmanActorSheet` garde les wrappers et les regles metier d'equipement/liens existantes.
 
 ### Points a reduire en priorite
 - `bloodman.mjs`: concentre encore les classes de sheets Actor/Item et les flux inventaire complexes; les domaines TokenHUD, PV a zero, images token, fiches ouvertes, resolution drop Item, layout/permissions/focus Actor, layout/controles Item, cycle de vie Actor/Item et drag/drop Equiper avec sont maintenant des modules appeles par wrappers.
-- `bloodman.mjs`: les prochains blocs a extraire proprement sont les dialogues de cout XP voyage a la creation, les flux d'inventaire acteur restants (etat des colonnes/sac et payload equipement) et les classes de sheets elles-memes, idealement par facade `src/sheets/` avant de deplacer les classes.
+- `bloodman.mjs`: les prochains blocs a extraire proprement sont les dialogues de cout XP voyage a la creation, les flux d'inventaire acteur restants (etat des colonnes et payload equipement) et les classes de sheets elles-memes, idealement par facade `src/sheets/` avant de deplacer les classes.
 - `styles/dialogs/bloodman-dialog-overrides.css`: regroupe plusieurs familles de dialogues; le separer par domaine visuel gardera l'ordre d'import actuel plus lisible.
 - `src/dice/roll-helpers.mjs`: orchestre de nombreux flux de jets; les branches pures devraient continuer a migrer vers `src/rules/` et les rendus vers `src/ui/`.
 - `templates/actor-joueur.html` et `templates/actor-non-joueur.html`: fortement charges; extraire de nouveaux partials par section reduira le risque lors des evolutions de fiche.

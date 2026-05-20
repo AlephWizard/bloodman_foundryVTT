@@ -163,6 +163,78 @@ async function run() {
     });
     assert.equal(calls.length, callsBeforeDuplicate);
   });
+
+  await withGameContext({
+    user: { id: "gm", isGM: true },
+    actors: new Map()
+  }, async () => {
+    const calls = [];
+    const targetActor = {
+      id: "target-actor",
+      name: "Linked Target",
+      system: { resources: { pv: { current: 3 } } },
+      update: async (data, options) => {
+        calls.push({ kind: "actor-update", data, options });
+        const next = Number(data?.["system.resources.pv.current"]);
+        if (Number.isFinite(next)) targetActor.system.resources.pv.current = next;
+      }
+    };
+    const tokenDoc = {
+      actorLink: true,
+      actor: targetActor,
+      actorId: "target-actor",
+      name: "Linked Token"
+    };
+    const hooks = buildDamageRerollHooks({
+      toFiniteNumber: (value, fallback = 0) => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : Number(fallback) || 0;
+      },
+      validateNumericEquality: (left, right) => Number(left) === Number(right),
+      resolveAttackerActorInstancesForDamageApplied: () => [],
+      normalizeRerollTarget: target => target,
+      getRerollTargetKey: () => "",
+      isSameRerollTarget: () => false,
+      getActorInstancesById: () => [],
+      wasRerollRequestProcessed: () => false,
+      rememberRerollRequest: () => {},
+      isDamageRerollItemType: type => type === "arme",
+      normalizeRerollTargets: targets => Array.isArray(targets) ? targets : [],
+      resolveDamageTokenDocument: async () => tokenDoc,
+      toBooleanFlag: value => value === true,
+      getTokenCurrentPv: () => Number.NaN,
+      getProtectionPA: () => 0,
+      resolveCombatTargetName: (tokenName, actorName, fallback) => tokenName || actorName || fallback,
+      applyDamageToActor: async (actor, share) => {
+        calls.push({ kind: "apply-damage-actor", share, hpBeforeRead: actor.system.resources.pv.current });
+        actor.system.resources.pv.current = Math.max(0, actor.system.resources.pv.current - share);
+        return {
+          hpBefore: 10,
+          hpAfter: actor.system.resources.pv.current,
+          finalDamage: share,
+          paEffective: 0
+        };
+      },
+      postDamageTakenChatMessage: async () => {},
+      getTokenActorType: () => "personnage",
+      syncZeroPvStatusForToken: async () => {},
+      logDamageRerollValidation: () => {},
+      emitDamageAppliedMessage: () => {},
+      bmLog: { warn: () => {}, debug: () => {} }
+    });
+
+    await hooks.handleDamageRerollRequest({
+      requestId: "req-linked",
+      kind: "item-damage",
+      itemType: "arme",
+      targets: [{ share: 4, hpBefore: 10, targetActorLink: true }]
+    });
+
+    assert.equal(calls[0].kind, "actor-update");
+    assert.equal(calls[0].options?.bloodmanAllowVitalResourceUpdate, true);
+    assert.equal(calls[1].kind, "apply-damage-actor");
+    assert.equal(calls[1].hpBeforeRead, 10);
+  });
 }
 
 run()

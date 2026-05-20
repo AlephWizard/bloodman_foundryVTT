@@ -121,7 +121,6 @@
   display: none !important;
 }
 
-.bloodman-sheet .carry-choice input.bag-slots-toggle,
 .bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"] {
   appearance: none !important;
   -webkit-appearance: none !important;
@@ -141,14 +140,11 @@
   opacity: 1 !important;
 }
 
-.bloodman-sheet .carry-choice input.bag-slots-toggle:checked,
 .bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]:checked {
   background: #000000 !important;
   border-color: #000000 !important;
 }
 
-.bloodman-sheet .carry-choice input.bag-slots-toggle::before,
-.bloodman-sheet .carry-choice input.bag-slots-toggle::after,
 .bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]::before,
 .bloodman-sheet.npc-sheet .char-hidden-roll-toggle input[type="checkbox"]::after {
   content: none !important;

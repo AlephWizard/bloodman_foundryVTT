@@ -61,7 +61,7 @@ export function createDefaultDataBuilders({ characteristics = [] } = {}) {
       monnaiesActuel: 0,
       transports: "",
       transportNpcs: [],
-      bagSlotsEnabled: false
+      carriedItemsMax: 10
     };
   }
 

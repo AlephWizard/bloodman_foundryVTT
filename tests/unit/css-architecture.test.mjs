@@ -82,7 +82,7 @@ function run() {
     "./bloodman-base.css",
     "./dialogs/drop-decision.css",
     "./actor-personnage.css",
-    "./features/backpack.css",
+    "./features/carried-items.css",
     "./item-unified.css"
   ]);
 

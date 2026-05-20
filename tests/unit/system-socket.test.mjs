@@ -34,7 +34,6 @@ async function run() {
     handleDeleteItemRequest: async () => calls.push("msg:delete-item"),
     handleReorderActorItemsRequest: async () => calls.push("msg:reorder-item"),
     handleActorItemTransferRequest: async () => calls.push("msg:transfer-item"),
-    handleActorBackpackStateChangedMessage: async () => calls.push("msg:backpack"),
     wasChaosRequestProcessed: id => remembered.has(id),
     rememberChaosRequest: id => {
       remembered.add(id);
@@ -57,7 +56,6 @@ async function run() {
   await registeredHandler({ type: "damageSplitPopup" });
   await registeredHandler({ type: "powerUsePopup" });
   await registeredHandler({ type: "damageApplied" });
-  await registeredHandler({ type: "actorBackpackStateChanged" });
   await registeredHandler({ type: "rerollDamage" });
   await registeredHandler({ type: "updateVitalResources" });
   await registeredHandler({ type: "updateActorSheetData" });
@@ -83,7 +81,6 @@ async function run() {
     "msg:damage-split",
     "msg:power-popup",
     "msg:damage-applied",
-    "msg:backpack",
     "msg:reroll",
     "msg:vital",
     "msg:sheet",

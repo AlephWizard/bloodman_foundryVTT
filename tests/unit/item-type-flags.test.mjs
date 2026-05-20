@@ -6,8 +6,7 @@ async function run() {
     damageRerollAllowedItemTypes: new Set(["arme", "aptitude", "pouvoir"]),
     voyageXpCostItemTypes: new Set(["aptitude", "pouvoir"]),
     carriedItemLimitActorTypes: new Set(["personnage", "personnage-non-joueur"]),
-    carriedItemLimitBase: 10,
-    carriedItemLimitWithBag: 15
+    carriedItemLimitDefault: 10
   });
 
   assert.equal(rules.isDamageRerollItemType("arme"), true);
@@ -21,23 +20,12 @@ async function run() {
   assert.equal(rules.isCarriedItemLimitedActorType("personnage-non-joueur"), true);
   assert.equal(rules.isCarriedItemLimitedActorType("vehicule"), false);
 
-  assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: true } } }), true);
-  assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: false } } }), false);
-  assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: "yes" } } }), true);
-  assert.equal(rules.isBagSlotsEnabled({ system: { equipment: { bagSlotsEnabled: "false" } } }), false);
-  assert.equal(rules.isBagSlotsEnabled(null), false);
-
-  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { bagSlotsEnabled: false } } }), 10);
-  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { bagSlotsEnabled: true } } }), 15);
-  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { bagSlotsEnabled: "false" } } }), 10);
-
-  const resolvedRules = createItemTypeFlagRules({
-    carriedItemLimitBase: 10,
-    carriedItemLimitWithBag: 15,
-    resolveBagSlotsEnabled: actor => actor?.resolvedBag === true
-  });
-  assert.equal(resolvedRules.getActorCarriedItemsLimit({ resolvedBag: true }), 15);
-  assert.equal(resolvedRules.getActorCarriedItemsLimit({ resolvedBag: false, system: { equipment: { bagSlotsEnabled: true } } }), 10);
+  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { carriedItemsMax: 12 } } }), 12);
+  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { carriedItemsMax: "15" } } }), 15);
+  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { carriedItemsMax: 3.8 } } }), 3);
+  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { carriedItemsMax: -4 } } }), 0);
+  assert.equal(rules.getActorCarriedItemsLimit({ system: { equipment: { carriedItemsMax: "" } } }), 10);
+  assert.equal(rules.getActorCarriedItemsLimit(null), 10);
 }
 
 run()

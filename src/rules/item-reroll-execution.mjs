@@ -200,7 +200,10 @@ export function createItemRerollExecutionRules({
 
       if (Number.isFinite(hpBefore)) {
         if (tokenIsLinked && targetActor) {
-          await targetActor.update({ "system.resources.pv.current": hpBefore });
+          await targetActor.update(
+            { "system.resources.pv.current": hpBefore },
+            { bloodmanAllowVitalResourceUpdate: true }
+          );
         } else if (tokenDoc) {
           await tokenDoc.update({ "delta.system.resources.pv.current": hpBefore });
         }

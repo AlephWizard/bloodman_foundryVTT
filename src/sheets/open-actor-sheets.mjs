@@ -23,8 +23,6 @@ export function createOpenActorSheetController({
   collectOpenApplications = collectDefaultOpenApplications,
   getApplicationDocumentActor = getDefaultApplicationDocumentActor,
   getSheetElementWrapperForApp = getSheetElementWrapper,
-  carriedItemLimitBase = 0,
-  carriedItemLimitWithBag = 0,
   characterActorTypes = ["personnage", "personnage-non-joueur"]
 } = {}) {
   const actorTypeSet = new Set(characterActorTypes.map(type => String(type || "").trim()).filter(Boolean));
@@ -165,53 +163,10 @@ export function createOpenActorSheetController({
     return apps;
   }
 
-  function patchBackpackControlsInRoot(root, enabled) {
-    if (!root?.find) return false;
-    root.find(".bag-slots-toggle[data-bag-slots='yes']").prop("checked", Boolean(enabled));
-    root.find(".bag-slots-toggle[data-bag-slots='no']").prop("checked", !Boolean(enabled));
-    root.find(".objects-bag-list").toggleClass("is-disabled", !Boolean(enabled));
-    const limit = Boolean(enabled) ? carriedItemLimitWithBag : carriedItemLimitBase;
-    const indicator = root.find(".carry-slots-indicator").first();
-    if (indicator.length) {
-      const current = String(indicator.text() || "").split("/")[0]?.trim() || "0";
-      indicator.text(`${current} / ${limit}`);
-    }
-    return true;
-  }
-
-  function patchOpenActorSheetBackpackControls(app, enabled) {
-    return patchBackpackControlsInRoot(getSheetElementWrapperForApp(app), enabled);
-  }
-
-  function patchActorSheetDomBackpackControls(actor, enabled) {
-    const jq = getJQuery();
-    const documentRef = getDocument();
-    if (typeof jq !== "function" || !documentRef) return 0;
-    const tokens = getActorSheetDomMatchTokens(actor);
-    if (!tokens.length) return 0;
-    let patched = 0;
-    const selector = ".app.bloodman.actor, .application.bloodman.actor, [id^='bloodman-actor-'], [id^='bloodman-npc-']";
-    for (const element of documentRef.querySelectorAll(selector)) {
-      const id = String(element?.id || "");
-      if (!tokens.some(token => id.includes(token))) continue;
-      if (patchBackpackControlsInRoot(jq(element), enabled)) patched += 1;
-    }
-    return patched;
-  }
-
   function renderOpenActorSheetsForActor(actor) {
     for (const app of getOpenActorSheetApplicationsForActor(actor) || []) {
       if (typeof app.render === "function") app.render(false);
     }
-  }
-
-  function updateOpenActorSheetsBackpackState(actor, enabled) {
-    for (const app of getOpenActorSheetApplicationsForActor(actor) || []) {
-      app._optimisticBagSlotsEnabled = Boolean(enabled);
-      patchOpenActorSheetBackpackControls(app, enabled);
-      if (typeof app.render === "function") app.render(false);
-    }
-    patchActorSheetDomBackpackControls(actor, enabled);
   }
 
   function resolveAttackerActorInstancesForDamageApplied(data) {
@@ -245,11 +200,7 @@ export function createOpenActorSheetController({
     getActorSheetMatchKeys,
     getActorSheetDomMatchTokens,
     getOpenActorSheetApplicationsForActor,
-    patchBackpackControlsInRoot,
-    patchOpenActorSheetBackpackControls,
-    patchActorSheetDomBackpackControls,
     renderOpenActorSheetsForActor,
-    updateOpenActorSheetsBackpackState,
     resolveAttackerActorInstancesForDamageApplied
   };
 }

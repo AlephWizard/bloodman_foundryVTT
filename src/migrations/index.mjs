@@ -1,9 +1,5 @@
 import { bmLog } from "../core/logger.mjs";
 import { SYSTEM_ID } from "../core/constants.mjs";
-import {
-  actorHasPersistedBackpackItems,
-  normalizeBackpackBoolean
-} from "../rules/backpack.mjs";
 
 const SCHEMA_SETTING_KEY = "schemaVersion";
 const INCLUDE_COMPENDIUMS_SETTING_KEY = "includeCompendiumMigrations";
@@ -288,15 +284,10 @@ export function computeActorStructureMigrationData(actorSource = {}) {
       updateData["system.equipment.monnaiesActuel"] = normalizedCurrencyCurrent;
     }
 
-    const rawBagSlotsEnabled = getPropertyCompat(equipment, "bagSlotsEnabled", false);
-    const hasPersistedBackpackItems = actorHasPersistedBackpackItems(actorSource, {
-      items: Array.isArray(actorSource?.items) ? actorSource.items : []
-    });
-    const normalizedBagSlotsEnabled = hasPersistedBackpackItems
-      ? true
-      : normalizeBackpackBoolean(rawBagSlotsEnabled, false);
-    if (rawBagSlotsEnabled !== normalizedBagSlotsEnabled) {
-      updateData["system.equipment.bagSlotsEnabled"] = normalizedBagSlotsEnabled;
+    const rawCarriedItemsMax = getPropertyCompat(equipment, "carriedItemsMax", 10);
+    const normalizedCarriedItemsMax = toNonNegativeInteger(rawCarriedItemsMax, 10);
+    if (rawCarriedItemsMax !== normalizedCarriedItemsMax) {
+      updateData["system.equipment.carriedItemsMax"] = normalizedCarriedItemsMax;
     }
 
     const rawTransportRefs = getPropertyCompat(equipment, "transportNpcs", []);
@@ -574,7 +565,7 @@ const MIGRATION_STEPS = Object.freeze([
   },
   {
     version: 3,
-    id: "normalize-backpack-state",
+    id: "normalize-carried-items-limit",
     run: migrationStepNormalizeActorStructure
   }
 ]);

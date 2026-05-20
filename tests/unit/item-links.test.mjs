@@ -70,7 +70,7 @@ async function run() {
       triggers: [],
       equiperAvecEnabled: false,
       equiperAvec: [],
-      containerCountsForBag: true
+      containerCountsForCarry: true
     }
   );
 
@@ -93,7 +93,7 @@ async function run() {
       triggers: [ITEM_LINK_TRIGGER_DAMAGE_ROLL],
       equiperAvecEnabled: false,
       equiperAvec: [],
-      containerCountsForBag: true
+      containerCountsForCarry: true
     }
   );
 
@@ -167,7 +167,7 @@ async function run() {
     "system.link.triggers": [ITEM_LINK_TRIGGER_DAMAGE_ROLL, "bad"],
     "system.link.equiperAvecEnabled": "true",
     "system.link.equiperAvec": ["child-a", "item-self", "", "child-a", "child-b"],
-    "system.link.containerCountsForBag": "false"
+    "system.link.containerCountsForCarry": "false"
   };
   const item = {
     id: "item-self",
@@ -179,7 +179,7 @@ async function run() {
         triggers: [],
         equiperAvecEnabled: false,
         equiperAvec: [],
-        containerCountsForBag: true
+        containerCountsForCarry: true
       }
     }
   };
@@ -190,7 +190,7 @@ async function run() {
   assert.deepEqual(normalized.link.triggers, [ITEM_LINK_TRIGGER_DAMAGE_ROLL]);
   assert.equal(normalized.link.equiperAvecEnabled, true);
   assert.deepEqual(normalized.link.equiperAvec, ["child-a", "child-b"]);
-  assert.equal(normalized.link.containerCountsForBag, false);
+  assert.equal(normalized.link.containerCountsForCarry, false);
   assert.equal(getProperty(updateData, "system.link.parentItemId"), "");
   assert.equal(getProperty(updateData, "system.link.equiperAvecEnabled"), true);
   assert.deepEqual(getProperty(updateData, "system.link.equiperAvec"), ["child-a", "child-b"]);
@@ -212,7 +212,7 @@ async function run() {
         triggers: [],
         equiperAvecEnabled: false,
         equiperAvec: [],
-        containerCountsForBag: true
+        containerCountsForCarry: true
       }
     }
   };

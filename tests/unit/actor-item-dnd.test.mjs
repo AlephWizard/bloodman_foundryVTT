@@ -109,9 +109,7 @@ async function run() {
       }
     },
     getItemFromListElement: li => items.get(li?.dataset?.itemId),
-    isActorBagSlotsEnabled: () => true,
-    isBagZoneSupportedItemType: type => ["objet", "soin", "ration"].includes(type),
-    getCarriedColumnState: () => ({ byId: {}, columns: { bag: [], "objects-1": [itemA, itemB, itemC] } }),
+    getCarriedColumnState: () => ({ byId: {}, columns: { "objects-1": [itemA, itemB, itemC] } }),
     getItemCarryColumn: () => "objects-1",
     getEquiperAvecDropContainerFromEvent: () => null,
     rememberEquiperAvecDropTargetFromEvent: () => null,
@@ -146,8 +144,8 @@ async function run() {
     },
     getDragEventData: event => event?.dropData || {},
     carriedItemTypes: new Set(["arme", "objet", "protection", "ration", "soin"]),
-    carryColumnSet: new Set(["equipment", "objects-1", "objects-2", "bag"]),
-    carryColumnCapacity: { equipment: 10, "objects-1": 5, "objects-2": 5, bag: 5 },
+    carryColumnSet: new Set(["equipment", "objects-1", "objects-2", "objects-3"]),
+    carryColumnCapacity: { equipment: 10, "objects-1": 5, "objects-2": 5, "objects-3": 5 },
     getCarriedItemInventorySlots: () => 1,
     sumCarriedItemInventorySlots: entries => entries.length
   });
@@ -227,6 +225,46 @@ async function run() {
   assert.deepEqual([...controller.getItemListAcceptedTypesFromElement(sheet, list)], ["objet", "soin"]);
   assert.equal(controller.getItemListCarryColumnFromElement(sheet, list), "objects-1");
   assert.equal(controller.getItemListColumnCountFromElement(sheet, list), 2);
+  assert.equal(controller.normalizeCarryColumn("objects-3"), "objects-3");
+  assert.equal(controller.isCarryColumnAllowedForItemType(sheet, "objects-3", "objet"), true);
+
+  itemA.column = "objects-1";
+  itemB.column = "objects-2";
+  itemC.column = "objects-2";
+  itemA.sort = 1000;
+  itemB.sort = 4000;
+  itemC.sort = 5000;
+  sheet.getItemCarryColumn = item => item?.column || "objects-1";
+  sheet.getCarriedColumnState = () => {
+    const columns = { "objects-1": [], "objects-2": [], "objects-3": [] };
+    const byId = {};
+    for (const item of items) {
+      const column = item.column || "objects-1";
+      columns[column]?.push(item);
+      byId[item.id] = column;
+    }
+    return { byId, columns };
+  };
+  sheet.setItemCarryColumn = async (item, column) => {
+    item.column = column;
+    return true;
+  };
+  sheet.buildCarryDropErrorResult = reason => ({ status: "error", reason });
+  sheet.buildCarryDropSuccessResult = () => ({ status: "success" });
+  const destinationList = new FakeElement({
+    classes: ["item-list"],
+    dataset: { acceptedTypes: "objet,soin", carryColumn: "objects-2" }
+  });
+  const dropResult = await controller.handleCarryColumnDrop(sheet, {
+    eventLike: { preventDefault() {}, stopPropagation() {} },
+    nativeEvent: { target: destinationList },
+    sourceItem: itemA,
+    list: destinationList,
+    targetColumn: "objects-2"
+  });
+  assert.equal(dropResult.status, "success");
+  assert.equal(itemA.column, "objects-2");
+  assert.deepEqual(logs.at(-1).updates, [{ _id: "a", sort: 6000 }]);
 
   const { html, handlers, attrs } = createHtmlRecorder();
   controller.activateActorItemDndListeners(sheet, html);

@@ -179,6 +179,39 @@ function run() {
   });
 
   withGlobals(({ notificationErrors }) => {
+    const hooks = buildHooks();
+    const actor = buildActor("personnage");
+    actor.system.resources.pv.max = 2;
+    actor.system.resources.pv.current = 9;
+    actor.system.resources.pp.max = 2;
+    actor.system.resources.pp.current = 8;
+    const updateData = {
+      "system.characteristics.PHY.base": 40,
+      "system.characteristics.ESP.base": 35
+    };
+    hooks.onPreUpdateActor(actor, updateData, {}, "u2");
+    assert.equal(getProperty(updateData, "system.resources.pv.max"), 8);
+    assert.equal(getProperty(updateData, "system.resources.pv.current"), 8);
+    assert.equal(getProperty(updateData, "system.resources.pp.max"), 7);
+    assert.equal(getProperty(updateData, "system.resources.pp.current"), 7);
+    assert.deepEqual(notificationErrors, []);
+  });
+
+  withGlobals(({ notificationErrors }) => {
+    const hooks = buildHooks();
+    const actor = buildActor("personnage");
+    actor.system.resources.pp.max = 10;
+    const updateData = {
+      "system.characteristics.ESP.base": 20,
+      "system.resources.pp.current": 99
+    };
+    hooks.onPreUpdateActor(actor, updateData, {}, "u2");
+    assert.equal(getProperty(updateData, "system.resources.pp.max"), 4);
+    assert.equal(getProperty(updateData, "system.resources.pp.current"), 4);
+    assert.deepEqual(notificationErrors, []);
+  });
+
+  withGlobals(({ notificationErrors }) => {
     let itemBonusCallCount = 0;
     const hooks = buildHooks({
       getItemBonusTotals: () => {
@@ -201,10 +234,21 @@ function run() {
       }
     });
     const updateData = {
-      "system.equipment.bagSlotsEnabled": true
+      "system.equipment.carriedItemsMax": 12
     };
     hooks.onPreUpdateActor(buildActor("personnage"), updateData, {}, "u1");
-    assert.equal(getProperty(updateData, "system.equipment.bagSlotsEnabled"), undefined);
+    assert.equal(getProperty(updateData, "system.equipment.carriedItemsMax"), undefined);
+    assert.deepEqual(notificationErrors, []);
+  });
+
+  withGlobals(({ notificationErrors }) => {
+    globalThis.game.users.set("gm1", { id: "gm1", role: 4, isGM: true });
+    const hooks = buildHooks();
+    const updateData = {
+      "system.equipment.carriedItemsMax": "14.8"
+    };
+    hooks.onPreUpdateActor(buildActor("personnage"), updateData, {}, "gm1");
+    assert.equal(getProperty(updateData, "system.equipment.carriedItemsMax"), 14);
     assert.deepEqual(notificationErrors, []);
   });
 }

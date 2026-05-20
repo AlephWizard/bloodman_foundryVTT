@@ -45,7 +45,14 @@ export function buildActorPreUpdateHooks({
     const trackingOptions = options && typeof options === "object" ? options : null;
 
     normalizeCharacteristicXpUpdates(updateData, actor);
-    const updaterRole = game.users?.get(userId)?.role ?? game.user?.role;
+    const updater = game.users?.get(userId) || null;
+    const updaterRole = updater?.role ?? game.user?.role;
+    const gmRole = Number(globalThis.CONST?.USER_ROLES?.GAMEMASTER ?? 4);
+    const updaterIsGM = Boolean(
+      updater?.isGM
+      || Number(updaterRole) >= gmRole
+      || (String(game.user?.id || "") === String(userId || "") && game.user?.isGM)
+    );
     const imageUpdatePlan = planPreUpdateActorImagePropagation({
       rawNextActorImage: foundry.utils.getProperty(updateData, "img"),
       updaterIsAssistantOrHigher: isAssistantOrHigherRole(updaterRole),
@@ -74,9 +81,6 @@ export function buildActorPreUpdateHooks({
       isAssistantOrHigherRole
     });
     applyActorUpdateRestrictionPlan(updateData, restrictionPlan);
-    if (basicPlayerUpdater) {
-      stripUpdatePaths(updateData, ["system.equipment.bagSlotsEnabled"]);
-    }
 
     normalizeActorAmmoUpdateData(actor, updateData, {
       allowUpdate: !restrictionPlan.stripAmmoUpdates,
@@ -97,6 +101,20 @@ export function buildActorPreUpdateHooks({
       getProperty: foundry.utils.getProperty,
       toFiniteNumber
     });
+
+    const carriedItemsMaxPath = "system.equipment.carriedItemsMax";
+    if (hasUpdatePath(carriedItemsMaxPath)) {
+      if (!updaterIsGM) {
+        stripUpdatePaths(updateData, [carriedItemsMaxPath]);
+      } else {
+        const fallbackLimit = actor.system?.equipment?.carriedItemsMax ?? 10;
+        const nextLimit = Math.max(0, Math.floor(toFiniteNumber(
+          getUpdatedRawValue(carriedItemsMaxPath, fallbackLimit),
+          fallbackLimit
+        )));
+        foundry.utils.setProperty(updateData, carriedItemsMaxPath, nextLimit);
+      }
+    }
 
     const stateLabelPath = "system.modifiers.label";
     const stateLabelUpdatePlan = planStateModifierLabelUpdate({
@@ -154,13 +172,14 @@ export function buildActorPreUpdateHooks({
     const hasPpMaxUpdate = hasUpdatePath(ppMaxPath);
     const hasPvCurrentUpdate = hasUpdatePath(pvCurrentPath);
     const hasPpCurrentUpdate = hasUpdatePath(ppCurrentPath);
-    const hasDerivedVitalInputUpdate = hasArchetypeBonusValueUpdate
+    const hasDerivedVitalMaxSourceUpdate = hasArchetypeBonusValueUpdate
       || hasArchetypeBonusCharacteristicUpdate
       || hasUpdatePath("system.characteristics.PHY.base")
       || hasUpdatePath("system.characteristics.ESP.base")
       || hasUpdatePath("system.resources.pv.itemBonus")
       || hasUpdatePath("system.resources.pp.itemBonus")
-      || hasUpdatePath("system.npcRole")
+      || hasUpdatePath("system.npcRole");
+    const hasDerivedVitalInputUpdate = hasDerivedVitalMaxSourceUpdate
       || hasPvMaxUpdate
       || hasPpMaxUpdate
       || hasPvCurrentUpdate
@@ -178,7 +197,7 @@ export function buildActorPreUpdateHooks({
       );
       const storedPvMax = getUpdatedNumber(pvMaxPath, actor.system.resources?.pv?.max);
       const storedPpMax = getUpdatedNumber(ppMaxPath, actor.system.resources?.pp?.max);
-      const { normalizedVitalMaxValues, normalizedVitalCurrentValues } = planPreUpdateActorDerivedVitalPatch({
+      const { pvMax, ppMax, normalizedVitalMaxValues, normalizedVitalCurrentValues } = planPreUpdateActorDerivedVitalPatch({
         phyBase: getUpdatedNumber("system.characteristics.PHY.base", actor.system.characteristics?.PHY?.base || 0),
         espBase: getUpdatedNumber("system.characteristics.ESP.base", actor.system.characteristics?.ESP?.base || 0),
         phyItemBonus: itemBonuses?.PHY,
@@ -201,9 +220,35 @@ export function buildActorPreUpdateHooks({
         fallbackPpMax: actor.system.resources?.pp?.max || 0,
         fallbackPvCurrent: actor.system.resources?.pv?.current || 0,
         fallbackPpCurrent: actor.system.resources?.pp?.current || 0,
-        storedPvMax,
-        storedPpMax
+        storedPvMax: hasDerivedVitalMaxSourceUpdate && !hasPvMaxUpdate ? Number.NaN : storedPvMax,
+        storedPpMax: hasDerivedVitalMaxSourceUpdate && !hasPpMaxUpdate ? Number.NaN : storedPpMax
       });
+      if (hasDerivedVitalMaxSourceUpdate && !hasPvMaxUpdate) {
+        const nextPvMax = Math.max(0, toFiniteNumber(pvMax, 0));
+        const currentPvMax = toFiniteNumber(actor.system.resources?.pv?.max, nextPvMax);
+        if (nextPvMax !== currentPvMax) {
+          foundry.utils.setProperty(updateData, pvMaxPath, nextPvMax);
+        }
+        if (!hasPvCurrentUpdate) {
+          const currentPv = toFiniteNumber(actor.system.resources?.pv?.current, 0);
+          if (currentPv > nextPvMax) {
+            foundry.utils.setProperty(updateData, pvCurrentPath, nextPvMax);
+          }
+        }
+      }
+      if (hasDerivedVitalMaxSourceUpdate && !hasPpMaxUpdate) {
+        const nextPpMax = Math.max(0, toFiniteNumber(ppMax, 0));
+        const currentPpMax = toFiniteNumber(actor.system.resources?.pp?.max, nextPpMax);
+        if (nextPpMax !== currentPpMax) {
+          foundry.utils.setProperty(updateData, ppMaxPath, nextPpMax);
+        }
+        if (!hasPpCurrentUpdate) {
+          const currentPp = toFiniteNumber(actor.system.resources?.pp?.current, 0);
+          if (currentPp > nextPpMax) {
+            foundry.utils.setProperty(updateData, ppCurrentPath, nextPpMax);
+          }
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(normalizedVitalMaxValues, "pvMax")) {
         foundry.utils.setProperty(updateData, pvMaxPath, normalizedVitalMaxValues.pvMax);
       }

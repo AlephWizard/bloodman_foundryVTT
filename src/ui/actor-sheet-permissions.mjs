@@ -21,7 +21,6 @@ export function createActorSheetPermissionController({
 
     if (basicPlayer) {
       root.find("input, textarea, select, button").prop("disabled", false).removeAttr("disabled");
-      root.find(".bag-slots-toggle").prop("disabled", true).attr("disabled", "disabled");
     }
     if (canToggleCharacteristicsEdit) {
       root.find(".char-edit-toggle").prop("disabled", false).removeAttr("disabled");

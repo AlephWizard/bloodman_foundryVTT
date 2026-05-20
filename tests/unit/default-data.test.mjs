@@ -59,7 +59,7 @@ async function run() {
     monnaiesActuel: 0,
     transports: "",
     transportNpcs: [],
-    bagSlotsEnabled: false
+    carriedItemsMax: 10
   });
 }
 

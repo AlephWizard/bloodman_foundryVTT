@@ -14,7 +14,6 @@ export function buildSystemSocketHooks({
   handleDeleteItemRequest,
   handleReorderActorItemsRequest,
   handleActorItemTransferRequest,
-  handleActorBackpackStateChangedMessage,
   wasChaosRequestProcessed,
   rememberChaosRequest,
   setChaosValue,
@@ -51,9 +50,6 @@ export function buildSystemSocketHooks({
   const onActorItemTransfer = typeof handleActorItemTransferRequest === "function"
     ? handleActorItemTransferRequest
     : async () => {};
-  const onActorBackpackStateChanged = typeof handleActorBackpackStateChangedMessage === "function"
-    ? handleActorBackpackStateChangedMessage
-    : async () => {};
   const onIncomingDamage = typeof handleIncomingDamageRequest === "function"
     ? handleIncomingDamageRequest
     : async () => {};
@@ -80,10 +76,6 @@ export function buildSystemSocketHooks({
       }
       if (data.type === "damageApplied") {
         await onDamageApplied(data);
-        return;
-      }
-      if (data.type === "actorBackpackStateChanged") {
-        await onActorBackpackStateChanged(data);
         return;
       }
       if (data.type === "rerollDamage") {

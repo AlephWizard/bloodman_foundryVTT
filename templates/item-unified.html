@@ -267,12 +267,12 @@
           {{/if}}
         </div>
 
-        {{#if itemLinkSupportsBagCount}}
-          <div class="bm-item-unified-field bm-item-unified-field-bag-count">
-            <label class="inline-label">{{localize "BLOODMAN.Items.CountForBagLabel"}}</label>
+        {{#if itemLinkSupportsCarryCount}}
+          <div class="bm-item-unified-field bm-item-unified-field-carry-count">
+            <label class="inline-label">{{localize "BLOODMAN.Items.CountForCarryLabel"}}</label>
             <div class="toggle-group bm-switch-group">
-              <label class="bm-switch" title="{{localize 'BLOODMAN.Items.CountForBagLabel'}}">
-                <input class="bm-switch-input" type="checkbox" name="system.link.containerCountsForBag" data-dtype="Boolean" {{checked item.system.link.containerCountsForBag}} aria-label="{{localize 'BLOODMAN.Items.CountForBagLabel'}}" />
+              <label class="bm-switch" title="{{localize 'BLOODMAN.Items.CountForCarryLabel'}}">
+                <input class="bm-switch-input" type="checkbox" name="system.link.containerCountsForCarry" data-dtype="Boolean" {{checked item.system.link.containerCountsForCarry}} aria-label="{{localize 'BLOODMAN.Items.CountForCarryLabel'}}" />
                 <span class="bm-switch-track" aria-hidden="true"></span>
               </label>
             </div>

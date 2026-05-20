@@ -129,6 +129,28 @@ function assertAbilitiesPowersDropScopes(templateText, label) {
     true,
     `${label} actor sheet should accept power drops only on the power list`
   );
+  assert.equal(
+    templateText.includes('name="system.profile.aptitudes"')
+      && templateText.includes('name="system.profile.pouvoirs"')
+      && templateText.includes('class="bm-autogrow-field abilities-powers-note"'),
+    true,
+    `${label} actor sheet should expose manual autogrow fields for abilities and powers`
+  );
+}
+
+function assertEquipmentObjectColumns(templateText, label) {
+  for (const [column, contextName] of [
+    ["objects-1", "objectColumnOneItems"],
+    ["objects-2", "objectColumnTwoItems"],
+    ["objects-3", "objectColumnThreeItems"]
+  ]) {
+    assert.equal(
+      templateText.includes(`data-carry-column="${column}"`)
+        && templateText.includes(`{{#each ${contextName}}}`),
+      true,
+      `${label} actor sheet should expose object carry column ${column}`
+    );
+  }
 }
 
 function collectLocalCssImports(relativePath, seen = new Set()) {
@@ -219,11 +241,11 @@ function run() {
     "Template directory should only contain runtime-referenced sheets"
   );
 
-  const bagCountHardHiddenPattern = /\.bm-item-unified-section-links\s+\.bm-item-unified-field-bag-count\s*\{[^}]*display\s*:\s*none/mi;
+  const carryCountHardHiddenPattern = /\.bm-item-unified-section-links\s+\.bm-item-unified-field-carry-count\s*\{[^}]*display\s*:\s*none/mi;
   assert.equal(
-    bagCountHardHiddenPattern.test(itemSheetCss),
+    carryCountHardHiddenPattern.test(itemSheetCss),
     false,
-    "Bag count field should not be hard-hidden by CSS"
+    "Carry count field should not be hard-hidden by CSS"
   );
 
   assert.equal(
@@ -232,20 +254,29 @@ function run() {
     "Unified item sheet should expose the inventory slot field"
   );
 
-  const bagToggleDisabledPattern = /class="bag-slots-toggle"[^>]*\{\{#if bagSlotsToggleDisabled\}\}disabled\{\{\/if\}\}/;
+  const carriedLimitInputPattern = /name="system\.equipment\.carriedItemsMax"[^>]*class="carried-items-limit-input"/;
   assert.equal(
-    bagToggleDisabledPattern.test(playerSheetTemplate),
+    carriedLimitInputPattern.test(playerSheetTemplate),
     true,
-    "Player actor sheet should keep the bag toggle visible but disabled when needed"
+    "Player actor sheet should expose the GM-editable carried item maximum"
   );
   assert.equal(
-    bagToggleDisabledPattern.test(npcSheetTemplate),
+    carriedLimitInputPattern.test(npcSheetTemplate),
     true,
-    "NPC actor sheet should keep the bag toggle visible but disabled when needed"
+    "NPC actor sheet should expose the GM-editable carried item maximum"
   );
 
   assertAbilitiesPowersDropScopes(playerSheetTemplate, "Player");
   assertAbilitiesPowersDropScopes(npcSheetTemplate, "NPC");
+  assertEquipmentObjectColumns(playerSheetTemplate, "Player");
+  assertEquipmentObjectColumns(npcSheetTemplate, "NPC");
+
+  assert.equal(
+    runtimeSource.includes('const CARRY_COLUMN_OBJECTS_THREE = "objects-3"')
+      && runtimeSource.includes("objectColumnThreeItems"),
+    true,
+    "Actor sheet data should prepare the third object carry column"
+  );
 
   const manifestCssFiles = systemJson.styles || [];
   for (const cssPath of manifestCssFiles) {
@@ -265,6 +296,13 @@ function run() {
     runtimeSource.includes("onItemSheetDragStart(eventLike)"),
     true,
     "Unified item sheet should publish item drag data"
+  );
+
+  assert.equal(
+    runtimeSource.includes("ensureBloodmanSheetRootClasses(this.resolveBloodmanSheetRenderRoot())")
+      && runtimeSource.includes('sheetRoot.classList.add("bloodman-sheet", typeClass)'),
+    true,
+    "ActorSheetV2 should restore actor sheet root classes when the template root is flattened"
   );
 }
 

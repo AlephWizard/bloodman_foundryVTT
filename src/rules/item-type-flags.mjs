@@ -1,12 +1,8 @@
-import { normalizeBooleanFlag } from "./boolean-flags.mjs";
-
 export function createItemTypeFlagRules({
   damageRerollAllowedItemTypes,
   voyageXpCostItemTypes,
   carriedItemLimitActorTypes,
-  carriedItemLimitBase = 10,
-  carriedItemLimitWithBag = 15,
-  resolveBagSlotsEnabled
+  carriedItemLimitDefault = 10
 } = {}) {
   const damageRerollTypes = damageRerollAllowedItemTypes instanceof Set
     ? damageRerollAllowedItemTypes
@@ -33,25 +29,18 @@ export function createItemTypeFlagRules({
     return carriedActorTypes.has(type);
   }
 
-  function isBagSlotsEnabled(actor) {
-    if (typeof resolveBagSlotsEnabled === "function") {
-      const resolved = resolveBagSlotsEnabled(actor);
-      if (resolved === true || resolved === false) return resolved;
-    }
-    return normalizeBooleanFlag(actor?.system?.equipment?.bagSlotsEnabled, false);
-  }
-
   function getActorCarriedItemsLimit(actor) {
-    return isBagSlotsEnabled(actor)
-      ? Math.max(0, Math.floor(Number(carriedItemLimitWithBag) || 0))
-      : Math.max(0, Math.floor(Number(carriedItemLimitBase) || 0));
+    const fallback = Math.max(0, Math.floor(Number(carriedItemLimitDefault) || 0));
+    const raw = actor?.system?.equipment?.carriedItemsMax;
+    if (raw == null || raw === "") return fallback;
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? Math.max(0, Math.floor(numeric)) : fallback;
   }
 
   return {
     isDamageRerollItemType,
     isVoyageXPCostItemType,
     isCarriedItemLimitedActorType,
-    isBagSlotsEnabled,
     getActorCarriedItemsLimit
   };
 }

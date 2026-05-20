@@ -21,48 +21,6 @@ function actorCollection(actors = []) {
   };
 }
 
-class FakeSelection {
-  constructor({ length = 1, text = "" } = {}) {
-    this.length = length;
-    this.props = new Map();
-    this.classes = new Map();
-    this._text = text;
-  }
-
-  prop(name, value) {
-    this.props.set(name, value);
-    return this;
-  }
-
-  toggleClass(name, value) {
-    this.classes.set(name, value);
-    return this;
-  }
-
-  first() {
-    return this;
-  }
-
-  text(value) {
-    if (value === undefined) return this._text;
-    this._text = value;
-    return this;
-  }
-}
-
-function fakeRoot() {
-  const selections = new Map([
-    [".bag-slots-toggle[data-bag-slots='yes']", new FakeSelection()],
-    [".bag-slots-toggle[data-bag-slots='no']", new FakeSelection()],
-    [".objects-bag-list", new FakeSelection()],
-    [".carry-slots-indicator", new FakeSelection({ text: "2 / 10" })]
-  ]);
-  return {
-    selections,
-    find: selector => selections.get(selector) || new FakeSelection({ length: 0 })
-  };
-}
-
 function run() {
   const worldActor = actor("a1");
   const tokenActor = actor("a1", { uuid: "Scene.s1.Token.t1.Actor.a1", parent: { id: "t1" } });
@@ -74,10 +32,8 @@ function run() {
       { tokens: [tokenDoc] }
     ]
   };
-  const root = fakeRoot();
   const app = {
     actor: worldActor,
-    root,
     renderCalls: [],
     render(force) {
       this.renderCalls.push(force);
@@ -85,13 +41,8 @@ function run() {
   };
   const controller = createOpenActorSheetController({
     getGame: () => game,
-    getDocument: () => null,
-    getJQuery: () => null,
     collectOpenApplications: () => [app],
-    getApplicationDocumentActor: candidate => candidate.actor || null,
-    getSheetElementWrapperForApp: candidate => candidate.root,
-    carriedItemLimitBase: 10,
-    carriedItemLimitWithBag: 15
+    getApplicationDocumentActor: candidate => candidate.actor || null
   });
 
   assert.deepEqual(controller.getTokenDocumentsForActor(worldActor), [tokenDoc]);
@@ -107,16 +58,8 @@ function run() {
   assert.ok(controller.getActorSheetDomMatchTokens({ uuid: "Actor.base" }).includes("Actor-base"));
   assert.deepEqual(controller.getOpenActorSheetApplicationsForActor(worldActor), [app]);
 
-  assert.equal(controller.patchBackpackControlsInRoot(root, true), true);
-  assert.equal(root.selections.get(".bag-slots-toggle[data-bag-slots='yes']").props.get("checked"), true);
-  assert.equal(root.selections.get(".bag-slots-toggle[data-bag-slots='no']").props.get("checked"), false);
-  assert.equal(root.selections.get(".objects-bag-list").classes.get("is-disabled"), false);
-  assert.equal(root.selections.get(".carry-slots-indicator").text(), "2 / 15");
-
-  controller.updateOpenActorSheetsBackpackState(worldActor, false);
-  assert.equal(app._optimisticBagSlotsEnabled, false);
+  controller.renderOpenActorSheetsForActor(worldActor);
   assert.deepEqual(app.renderCalls, [false]);
-  assert.equal(root.selections.get(".objects-bag-list").classes.get("is-disabled"), true);
 
   const itemActor = actor("fallback", { items: new Map([["item-1", {}]]) });
   const openOnlyApp = { actor: itemActor };

@@ -36,7 +36,7 @@ export function createActorItemDndController({
   carryColumnEquipment = "equipment",
   carryColumnObjectsOne = "objects-1",
   carryColumnObjectsTwo = "objects-2",
-  carryColumnBag = "bag",
+  carryColumnObjectsThree = "objects-3",
   carryColumnFullReason = "colonne pleine"
 } = {}) {
   function getListElement(element) {
@@ -84,13 +84,6 @@ export function createActorItemDndController({
     return isHTMLElementLike(nestedItemList, HTMLElementClass) && currentTarget.contains?.(nestedItemList);
   }
 
-  function getItemListBagZoneFromElement(_sheet, element) {
-    const list = getListElement(element);
-    if (!list) return "";
-    const bagZone = String(list.dataset?.bagZone || list.getAttribute?.("data-bag-zone") || "").trim().toLowerCase();
-    return bagZone === "yes" || bagZone === "no" ? bagZone : "";
-  }
-
   function getItemListReorderScopeFromElement(_sheet, element) {
     const list = getListElement(element);
     if (!list) return "";
@@ -118,13 +111,11 @@ export function createActorItemDndController({
     if (normalizedColumn === carryColumnEquipment) {
       return normalizedType === "arme" || normalizedType === "protection";
     }
-    if (normalizedColumn === carryColumnBag) {
-      const bagEnabled = options?.bagEnabledOverride == null
-        ? sheet.isActorBagSlotsEnabled()
-        : Boolean(options.bagEnabledOverride);
-      return bagEnabled;
-    }
-    return normalizedColumn === carryColumnObjectsOne || normalizedColumn === carryColumnObjectsTwo;
+    return (
+      normalizedColumn === carryColumnObjectsOne
+      || normalizedColumn === carryColumnObjectsTwo
+      || normalizedColumn === carryColumnObjectsThree
+    );
   }
 
   function getItemListCarryColumnFromElement(_sheet, element) {
@@ -136,12 +127,6 @@ export function createActorItemDndController({
   function getCarryColumnCapacity(sheet, column, options = {}) {
     const normalizedColumn = normalizeCarryColumn(column);
     if (!normalizedColumn) return Number.POSITIVE_INFINITY;
-    if (normalizedColumn === carryColumnBag) {
-      const bagEnabled = options?.bagEnabledOverride == null
-        ? sheet.isActorBagSlotsEnabled()
-        : Boolean(options.bagEnabledOverride);
-      return bagEnabled ? carryColumnCapacity[carryColumnBag] : 0;
-    }
     if (Object.prototype.hasOwnProperty.call(carryColumnCapacity, normalizedColumn)) {
       return carryColumnCapacity[normalizedColumn];
     }
@@ -353,7 +338,6 @@ export function createActorItemDndController({
     const targetRef = [
       String(sheet.actor?.uuid || sheet.actor?.id || "").trim(),
       isHTMLElementLike(list, HTMLElementClass) ? String(list.dataset?.carryColumn || "") : "",
-      isHTMLElementLike(list, HTMLElementClass) ? String(list.dataset?.bagZone || "") : "",
       isHTMLElementLike(list, HTMLElementClass) ? String(list.dataset?.reorderScope || "") : ""
     ].join("|");
     return `${targetRef}|${itemRef || JSON.stringify(data || {})}`;
@@ -508,20 +492,14 @@ export function createActorItemDndController({
       return sheet.buildCarryDropErrorResult("type non autorise");
     }
 
-    const bagEnabled = sheet.isActorBagSlotsEnabled();
     const destinationColumn = normalizeCarryColumn(targetColumn);
     if (!destinationColumn) return sheet.buildCarryDropErrorResult("operation invalide");
-    if (!isCarryColumnAllowedForItemType(sheet, destinationColumn, itemType, { bagEnabledOverride: bagEnabled })) {
+    if (!isCarryColumnAllowedForItemType(sheet, destinationColumn, itemType)) {
       clearItemReorderVisualState(sheet);
       return sheet.buildCarryDropErrorResult("type non autorise");
     }
-    if (destinationColumn === carryColumnBag && !bagEnabled) {
-      getUi()?.notifications?.warn("Le sac n'est pas actif.");
-      clearItemReorderVisualState(sheet);
-      return sheet.buildCarryDropErrorResult(carryColumnFullReason);
-    }
 
-    const stateBefore = sheet.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    const stateBefore = sheet.getCarriedColumnState();
     const sourceId = String(sourceItem.id || "").trim();
     const sourceColumn = sheet.getItemCarryColumn(sourceItem, { fallbackById: stateBefore.byId });
     const destinationCapacity = getItemListColumnCapacityFromElement(sheet, list);
@@ -539,7 +517,7 @@ export function createActorItemDndController({
 
     let movedAcrossColumns = false;
     if (destinationColumn !== sourceColumn) {
-      const moved = await sheet.setItemCarryColumn(sourceItem, destinationColumn, { bagEnabledOverride: bagEnabled });
+      const moved = await sheet.setItemCarryColumn(sourceItem, destinationColumn);
       if (!moved) {
         clearItemReorderVisualState(sheet);
         return sheet.buildCarryDropErrorResult("deplacement impossible");
@@ -548,7 +526,7 @@ export function createActorItemDndController({
     }
 
     const latestSourceItem = sheet.actor?.items?.get?.(sourceId) || sourceItem;
-    const stateAfterMove = sheet.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    const stateAfterMove = sheet.getCarriedColumnState();
     let targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
     if (!targetLi || !list.contains?.(targetLi)) targetLi = null;
     let targetItem = targetLi ? sheet.getItemFromListElement(targetLi) : null;
@@ -557,30 +535,30 @@ export function createActorItemDndController({
 
     let sortBefore = false;
     if (!targetItem || String(targetItem.id || "") === sourceId) {
-      targetItem = toItemArray(sheet.actor?.items)
+      const destinationItems = toItemArray(sheet.actor?.items)
         .filter(entry => (
           entry
           && carriedItemTypes.has(String(entry.type || "").trim().toLowerCase())
           && String(entry.id || "") !== sourceId
           && (!acceptedTypes || acceptedTypes.has(String(entry.type || "").trim().toLowerCase()))
           && sheet.getItemCarryColumn(entry, { fallbackById: stateAfterMove.byId }) === destinationColumn
-        ))
-        .sort((left, right) => {
-          const leftSort = toFiniteNumber(left?.sort, 0);
-          const rightSort = toFiniteNumber(right?.sort, 0);
-          if (leftSort !== rightSort) return leftSort - rightSort;
-          return String(left?.id || "").localeCompare(String(right?.id || ""));
-        })
-        .slice(-1)[0] || null;
-      sortBefore = false;
-    } else {
-      sortBefore = getItemReorderSortBefore(sheet, nativeEvent, targetLi, getItemListColumnCountFromElement(sheet, list));
+        ));
+      const maxDestinationSort = destinationItems.reduce(
+        (maxSort, entry) => Math.max(maxSort, Math.floor(toFiniteNumber(entry?.sort, 0))),
+        0
+      );
+      const sourceSort = Math.floor(toFiniteNumber(latestSourceItem?.sort, 0));
+      const appendUpdates = destinationItems.length && sourceSort <= maxDestinationSort
+        ? [{ _id: sourceId, sort: maxDestinationSort + 1000 }]
+        : [];
+      const applied = appendUpdates.length ? await applyActorItemOrderUpdates(sheet, appendUpdates) : false;
+      clearItemReorderVisualState(sheet);
+      if ((applied || movedAcrossColumns) && shouldManuallyRenderAfterUpdate(sheet)) sheet.render(false);
+      return sheet.buildCarryDropSuccessResult();
     }
 
-    if (!targetItem || String(targetItem.id || "") === sourceId) {
-      clearItemReorderVisualState(sheet);
-      if (movedAcrossColumns && shouldManuallyRenderAfterUpdate(sheet)) sheet.render(false);
-      return sheet.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
+    {
+      sortBefore = getItemReorderSortBefore(sheet, nativeEvent, targetLi, getItemListColumnCountFromElement(sheet, list));
     }
 
     const updates = buildItemReorderUpdates(sheet, latestSourceItem, targetItem, {
@@ -597,13 +575,13 @@ export function createActorItemDndController({
     if (!updates.length) {
       clearItemReorderVisualState(sheet);
       if (movedAcrossColumns && shouldManuallyRenderAfterUpdate(sheet)) sheet.render(false);
-      return sheet.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
+      return sheet.buildCarryDropSuccessResult();
     }
 
     const applied = await applyActorItemOrderUpdates(sheet, updates);
     clearItemReorderVisualState(sheet);
     if ((applied || movedAcrossColumns) && shouldManuallyRenderAfterUpdate(sheet)) sheet.render(false);
-    return sheet.buildCarryDropSuccessResult({ bagEnabledOverride: bagEnabled });
+    return sheet.buildCarryDropSuccessResult();
   }
 
   function onItemReorderDragStart(sheet, eventLike) {
@@ -668,16 +646,11 @@ export function createActorItemDndController({
       return;
     }
 
-    const bagZone = getItemListBagZoneFromElement(sheet, list);
     const carryColumn = getItemListCarryColumnFromElement(sheet, list);
     const acceptedTypes = getItemListAcceptedTypesFromElement(sheet, list);
     const isCarryMixedScope = getItemListReorderScopeFromElement(sheet, list) === "carry-mixed";
     if (carryColumn) {
       if (!carriedItemTypes.has(payload.itemType)) {
-        clearItemReorderVisualState(sheet);
-        return;
-      }
-      if (carryColumn === carryColumnBag && !sheet.isActorBagSlotsEnabled()) {
         clearItemReorderVisualState(sheet);
         return;
       }
@@ -701,10 +674,6 @@ export function createActorItemDndController({
       clearItemReorderVisualState(sheet);
       return;
     }
-    if (bagZone && !sheet.isBagZoneSupportedItemType(payload.itemType)) {
-      clearItemReorderVisualState(sheet);
-      return;
-    }
     eventLike?.preventDefault?.();
     nativeEvent?.preventDefault?.();
     if (nativeEvent?.dataTransfer) nativeEvent.dataTransfer.dropEffect = "move";
@@ -720,7 +689,7 @@ export function createActorItemDndController({
     if (carryColumn) {
       if (!carriedItemTypes.has(targetType)) return;
     } else if (isCarryMixedScope) {
-      if (!sheet.isBagZoneSupportedItemType(targetType)) return;
+      if (!carriedItemTypes.has(targetType)) return;
     } else if (targetType !== payload.itemType) {
       return;
     }
@@ -739,7 +708,6 @@ export function createActorItemDndController({
     const dataType = String(data?.type || (override ? "Item" : "")).trim().toLowerCase();
     const itemType = String(override?.itemType || getExternalItemDragTypeFromData(sheet, data)).trim().toLowerCase();
     const carryColumn = getItemListCarryColumnFromElement(sheet, list);
-    const bagZone = getItemListBagZoneFromElement(sheet, list);
     const acceptedTypes = getItemListAcceptedTypesFromElement(sheet, list);
 
     if (dataType && dataType !== "item") return;
@@ -763,14 +731,6 @@ export function createActorItemDndController({
         clearItemReorderVisualState(sheet);
         return;
       }
-      if (carryColumn === carryColumnBag && !sheet.isActorBagSlotsEnabled()) {
-        clearItemReorderVisualState(sheet);
-        return;
-      }
-    }
-    if (bagZone && itemType && !sheet.isBagZoneSupportedItemType(itemType)) {
-      clearItemReorderVisualState(sheet);
-      return;
     }
 
     eventLike?.preventDefault?.();
@@ -852,7 +812,6 @@ export function createActorItemDndController({
     getItemListColumnCountFromElement,
     getItemListDropTargetFromEvent,
     shouldSkipItemListContainerDelegate,
-    getItemListBagZoneFromElement,
     getItemListReorderScopeFromElement,
     getItemListAcceptedTypesFromElement,
     normalizeCarryColumn,

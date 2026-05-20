@@ -14,7 +14,7 @@ function run() {
     "## Chargement Et Console",
     "## Fiches Acteurs",
     "## Droits Joueur Et GM",
-    "## Inventaire, Sacs Et Equipement",
+    "## Inventaire, Portage Et Equipement",
     "## Drag And Drop",
     "## Jets Simples Et Rerolls",
     "## Degats, Soins Et Dialogues",
@@ -33,7 +33,7 @@ function run() {
   const requiredChecks = [
     "Ouvrir la fiche joueur depuis la barre laterale",
     "Ouvrir la meme fiche joueur depuis un token sur la scene",
-    "Glisser un objet dans le sac cote joueur",
+    "Modifier la limite maximale d'objets transportables cote GM sur PJ et PNJ",
     "Ouvrir la fenetre de configuration des degats cote GM",
     "Ouvrir la fenetre de configuration des degats cote joueur",
     "Comme GM, verifier que le panneau `Bloodman` du chaos apparait",

@@ -80,7 +80,6 @@ function run() {
     true
   );
   assert.equal(basicRoot.find("input, textarea, select, button").props.get("disabled"), false);
-  assert.equal(basicRoot.find(".bag-slots-toggle").props.get("disabled"), true);
   assert.equal(basicRoot.find(".characteristic-base-inputs").props.get("readonly"), true);
   assert.equal(basicRoot.find(".characteristic-base-inputs").classes.get("is-locked"), true);
   assert.equal(basicRoot.find(".char-edit-toggle").classes.get("is-active"), false);

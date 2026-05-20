@@ -155,7 +155,7 @@
       "EquipWithTitle": "ÉQUIPÉ AVEC",
       "EquipWithDropHint": "Glissez des objets, pouvoirs ou aptitudes ici pour les embarquer automatiquement avec cet objet.",
       "EquipWithChildHint": "Cet objet est déjà équipé dans un autre objet.",
-      "CountForBagLabel": "COMPTABILISER POUR LE SAC ?",
+      "CountForCarryLabel": "COMPTABILISER DANS LE PORTAGE ?",
       "PriceInvalid": "Le prix doit etre un nombre valide.",
       "AudioBrowse": "Parcourir un fichier audio"
     },

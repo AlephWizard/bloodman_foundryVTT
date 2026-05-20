@@ -155,7 +155,7 @@ export function resolveItemLinkData(itemOrSystem = null, { toCheckboxBoolean = d
       linkData.equiperAvec,
       { fallback: [] }
     );
-  const containerCountsForBag = toCheckboxBoolean(linkData.containerCountsForBag, true);
+  const containerCountsForCarry = toCheckboxBoolean(linkData.containerCountsForCarry, true);
   return {
     parentItemId,
     applyMode,
@@ -163,7 +163,7 @@ export function resolveItemLinkData(itemOrSystem = null, { toCheckboxBoolean = d
     triggers,
     equiperAvecEnabled,
     equiperAvec,
-    containerCountsForBag
+    containerCountsForCarry
   };
 }
 
@@ -202,7 +202,7 @@ export function hasAnyItemLinkPathUpdate(updateData = null, hasUpdatePath = defa
     || hasUpdatePath(updateData, "system.link.equiperAvecEnabled")
     || hasUpdatePath(updateData, "system.link.equiperAvec")
     || hasUpdatePath(updateData, "system.link.containerEnabled")
-    || hasUpdatePath(updateData, "system.link.containerCountsForBag");
+    || hasUpdatePath(updateData, "system.link.containerCountsForCarry");
 }
 
 export function createItemLinkRules({
@@ -264,9 +264,9 @@ export function createItemLinkRules({
     const rawEquiperAvec = hasEquiperAvecUpdate
       ? readPath(updateData, "system.link.equiperAvec", current.equiperAvec)
       : current.equiperAvec;
-    const rawContainerCountsForBag = updateData
-      ? readPath(updateData, "system.link.containerCountsForBag", current.containerCountsForBag)
-      : current.containerCountsForBag;
+    const rawContainerCountsForCarry = updateData
+      ? readPath(updateData, "system.link.containerCountsForCarry", current.containerCountsForCarry)
+      : current.containerCountsForCarry;
 
     let parentItemId = normalizeParentItemId(rawParentItemId);
     const selfItemId = normalizeParentItemId(item?.id || item?._id);
@@ -285,7 +285,7 @@ export function createItemLinkRules({
       : (selfItemId
         ? equiperAvec.filter(itemId => itemId !== selfItemId)
         : equiperAvec);
-    const containerCountsForBag = toCheckbox(rawContainerCountsForBag, true);
+    const containerCountsForCarry = toCheckbox(rawContainerCountsForCarry, true);
     const triggerFallback = applyMode === ITEM_LINK_APPLY_MODE_ON_USE
       ? (current.triggers.length ? current.triggers : ITEM_LINK_DEFAULT_USAGE_TRIGGERS)
       : [];
@@ -298,14 +298,14 @@ export function createItemLinkRules({
       triggers,
       equiperAvecEnabled,
       equiperAvec: sanitizedEquiperAvec,
-      containerCountsForBag
+      containerCountsForCarry
     };
     const changed = (
       current.parentItemId !== nextLink.parentItemId
       || current.applyMode !== nextLink.applyMode
       || current.active !== nextLink.active
       || current.equiperAvecEnabled !== nextLink.equiperAvecEnabled
-      || current.containerCountsForBag !== nextLink.containerCountsForBag
+      || current.containerCountsForCarry !== nextLink.containerCountsForCarry
       || current.equiperAvec.length !== nextLink.equiperAvec.length
       || current.equiperAvec.some((itemId, index) => itemId !== nextLink.equiperAvec[index])
       || current.triggers.length !== nextLink.triggers.length
@@ -319,7 +319,7 @@ export function createItemLinkRules({
       writePath(updateData, "system.link.triggers", [...nextLink.triggers]);
       writePath(updateData, "system.link.equiperAvecEnabled", nextLink.equiperAvecEnabled);
       writePath(updateData, "system.link.equiperAvec", [...nextLink.equiperAvec]);
-      writePath(updateData, "system.link.containerCountsForBag", nextLink.containerCountsForBag);
+      writePath(updateData, "system.link.containerCountsForCarry", nextLink.containerCountsForCarry);
     } else if (changed && item?.updateSource) {
       item.updateSource({
         "system.link.parentItemId": nextLink.parentItemId,
@@ -328,7 +328,7 @@ export function createItemLinkRules({
         "system.link.triggers": [...nextLink.triggers],
         "system.link.equiperAvecEnabled": nextLink.equiperAvecEnabled,
         "system.link.equiperAvec": [...nextLink.equiperAvec],
-        "system.link.containerCountsForBag": nextLink.containerCountsForBag
+        "system.link.containerCountsForCarry": nextLink.containerCountsForCarry
       });
     }
 

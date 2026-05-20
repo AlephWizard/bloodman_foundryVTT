@@ -222,7 +222,6 @@ import { createGrowthRollRules } from "./src/rules/growth-roll.mjs";
 import { createUiRefreshQueueRules } from "./src/rules/ui-refresh-queue.mjs";
 import { installCombatantInitiativePatch } from "./src/rules/combatant-initiative-patch.mjs";
 import { createStartupNormalizationRunner } from "./src/rules/startup-normalization.mjs";
-import { resolveActorBackpackEnabled } from "./src/rules/backpack.mjs";
 import {
   CHARACTERISTIC_BASE_MAX,
   CHARACTERISTIC_BASE_MIN,
@@ -311,8 +310,6 @@ function getOpenActorSheetController() {
       collectOpenApplications,
       getApplicationDocumentActor,
       getSheetElementWrapperForApp: getSheetElementWrapper,
-      carriedItemLimitBase: CARRIED_ITEM_LIMIT_BASE,
-      carriedItemLimitWithBag: CARRIED_ITEM_LIMIT_WITH_BAG,
       characterActorTypes: [PLAYER_ACTOR_TYPE, NPC_ACTOR_TYPE]
     });
   }
@@ -667,24 +664,8 @@ function getOpenActorSheetApplicationsForActor(actor) {
   return getOpenActorSheetController().getOpenActorSheetApplicationsForActor(actor);
 }
 
-function patchBackpackControlsInRoot(root, enabled) {
-  return getOpenActorSheetController().patchBackpackControlsInRoot(root, enabled);
-}
-
-function patchOpenActorSheetBackpackControls(app, enabled) {
-  return getOpenActorSheetController().patchOpenActorSheetBackpackControls(app, enabled);
-}
-
-function patchActorSheetDomBackpackControls(actor, enabled) {
-  return getOpenActorSheetController().patchActorSheetDomBackpackControls(actor, enabled);
-}
-
 function renderOpenActorSheetsForActor(actor) {
   return getOpenActorSheetController().renderOpenActorSheetsForActor(actor);
-}
-
-function updateOpenActorSheetsBackpackState(actor, enabled) {
-  return getOpenActorSheetController().updateOpenActorSheetsBackpackState(actor, enabled);
 }
 
 function resolveAttackerActorInstancesForDamageApplied(data) {
@@ -785,37 +766,30 @@ async function syncZeroPvBodyStateForActor(actor, actorType, isZeroOrLess) {
 
 const CARRIED_ITEMS_PER_MAIN_COLUMN = 5;
 const CARRIED_MAIN_COLUMN_COUNT = 2;
-const CARRIED_BAG_COLUMN_COUNT = 1;
-const CARRIED_ITEM_LIMIT_BASE = CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_MAIN_COLUMN_COUNT;
-const CARRIED_ITEM_LIMIT_WITH_BAG = CARRIED_ITEM_LIMIT_BASE + (CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_BAG_COLUMN_COUNT);
+const CARRIED_ITEM_LIMIT_DEFAULT = CARRIED_ITEMS_PER_MAIN_COLUMN * CARRIED_MAIN_COLUMN_COUNT;
 const CARRIED_ITEM_LIMIT_ACTOR_TYPES = new Set([PLAYER_ACTOR_TYPE, NPC_ACTOR_TYPE]);
 const CARRIED_ITEM_TYPE_LIST = Object.freeze(["arme", "objet", "protection", "ration", "soin"]);
 const CARRIED_ITEM_TYPES = new Set(CARRIED_ITEM_TYPE_LIST);
-const BAG_ZONE_ITEM_TYPES = new Set(CARRIED_ITEM_TYPE_LIST);
 const ITEM_LINK_SUPPORTED_TYPES = new Set(SYSTEM_ITEM_TYPES);
 const ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES = SYSTEM_ITEM_TYPES.join(",");
 const ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPE_SET = new Set(ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES.split(","));
-const BAG_ZONE_FLAG_KEY = "inBag";
 const CARRY_COLUMN_FLAG_KEY = "carryColumn";
 const CARRY_COLUMN_EQUIPMENT = "equipment";
 const CARRY_COLUMN_OBJECTS_ONE = "objects-1";
 const CARRY_COLUMN_OBJECTS_TWO = "objects-2";
-const CARRY_COLUMN_BAG = "bag";
+const CARRY_COLUMN_OBJECTS_THREE = "objects-3";
 const CARRY_COLUMN_SET = new Set([
   CARRY_COLUMN_EQUIPMENT,
   CARRY_COLUMN_OBJECTS_ONE,
   CARRY_COLUMN_OBJECTS_TWO,
-  CARRY_COLUMN_BAG
+  CARRY_COLUMN_OBJECTS_THREE
 ]);
 const CARRY_OBJECT_COLUMNS = [
   CARRY_COLUMN_OBJECTS_ONE,
-  CARRY_COLUMN_OBJECTS_TWO
+  CARRY_COLUMN_OBJECTS_TWO,
+  CARRY_COLUMN_OBJECTS_THREE
 ];
-const CARRY_COLUMN_CAPACITY = Object.freeze({
-  [CARRY_COLUMN_OBJECTS_ONE]: CARRIED_ITEMS_PER_MAIN_COLUMN,
-  [CARRY_COLUMN_OBJECTS_TWO]: CARRIED_ITEMS_PER_MAIN_COLUMN,
-  [CARRY_COLUMN_BAG]: CARRIED_ITEMS_PER_MAIN_COLUMN
-});
+const CARRY_COLUMN_CAPACITY = Object.freeze({});
 const CARRY_COLUMN_FULL_REASON = "colonne pleine";
 const CHARACTERISTIC_BONUS_ITEM_TYPES = new Set(["arme", "objet", "protection", "aptitude", "pouvoir"]);
 const ITEM_RESOURCE_BONUS_ITEM_TYPES = new Set(["aptitude", "pouvoir"]);
@@ -863,15 +837,12 @@ const itemTypeFlagRules = createItemTypeFlagRules({
   damageRerollAllowedItemTypes: DAMAGE_REROLL_ALLOWED_ITEM_TYPES,
   voyageXpCostItemTypes: VOYAGE_XP_COST_ITEM_TYPES,
   carriedItemLimitActorTypes: CARRIED_ITEM_LIMIT_ACTOR_TYPES,
-  carriedItemLimitBase: CARRIED_ITEM_LIMIT_BASE,
-  carriedItemLimitWithBag: CARRIED_ITEM_LIMIT_WITH_BAG,
-  resolveBagSlotsEnabled: actor => resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled
+  carriedItemLimitDefault: CARRIED_ITEM_LIMIT_DEFAULT
 });
 const {
   isDamageRerollItemType,
   isVoyageXPCostItemType,
   isCarriedItemLimitedActorType,
-  isBagSlotsEnabled,
   getActorCarriedItemsLimit
 } = itemTypeFlagRules;
 
@@ -1346,7 +1317,7 @@ const dropEvaluationRules = createDropEvaluationRules({
   getDropItemQuantity: resolveDropItemQuantity,
   getDroppedItemUnitPrice: resolveDroppedItemUnitPrice,
   carriedItemTypes: CARRIED_ITEM_TYPES,
-  shouldCountCarriedItem: item => isCarriedItemCountedForBag(item),
+  shouldCountCarriedItem: item => isCarriedItemCountedForCarry(item),
   getCarriedItemSlots: item => getCarriedItemInventorySlots(item)
 });
 const {
@@ -1602,12 +1573,12 @@ function isItemLinkSupportedType(typeLike) {
   return ITEM_LINK_SUPPORTED_TYPES.has(type);
 }
 
-function isCarriedItemCountedForBag(item, actorLike = null) {
+function isCarriedItemCountedForCarry(item, actorLike = null) {
   const itemType = String(item?.type || "").trim().toLowerCase();
   if (!CARRIED_ITEM_TYPES.has(itemType)) return false;
   if (isActorItemLinkedChild(item, actorLike)) return false;
   const link = resolveItemLinkState(item);
-  return Boolean(link.containerCountsForBag);
+  return Boolean(link.containerCountsForCarry);
 }
 
 function resolveLinkedChildOriginalItemType(item) {
@@ -2377,35 +2348,9 @@ actorItemDndController = createActorItemDndController({
   carryColumnEquipment: CARRY_COLUMN_EQUIPMENT,
   carryColumnObjectsOne: CARRY_COLUMN_OBJECTS_ONE,
   carryColumnObjectsTwo: CARRY_COLUMN_OBJECTS_TWO,
-  carryColumnBag: CARRY_COLUMN_BAG,
+  carryColumnObjectsThree: CARRY_COLUMN_OBJECTS_THREE,
   carryColumnFullReason: CARRY_COLUMN_FULL_REASON
 });
-
-async function handleActorBackpackStateChangedMessage(data) {
-  const requester = game.users?.get?.(String(data?.requesterId || ""));
-  if (!requester || (!requester.isGM && !isAssistantOrHigherRole(requester.role))) return;
-  const actor = await resolveActorForSheetRequest({
-    actorUuid: data?.actorUuid,
-    actorId: data?.actorId,
-    actorBaseId: data?.actorBaseId
-  });
-  const enabled = toBooleanFlag(data?.enabled, false);
-  if (actor && typeof actor.updateSource === "function") {
-    try {
-      const updateData = foundry.utils?.expandObject
-        ? foundry.utils.expandObject({ "system.equipment.bagSlotsEnabled": enabled })
-        : { system: { equipment: { bagSlotsEnabled: enabled } } };
-      actor.updateSource(updateData);
-    } catch (_error) {
-      // The authoritative Foundry document update may already have arrived.
-    }
-  }
-  updateOpenActorSheetsBackpackState(actor || {
-    id: String(data?.actorId || ""),
-    uuid: String(data?.actorUuid || ""),
-    baseActor: { id: String(data?.actorBaseId || "") }
-  }, enabled);
-}
 
 async function applyActorItemTransferFromSocket(payload = {}) {
   const targetActor = payload?.targetActor || null;
@@ -2415,11 +2360,11 @@ async function applyActorItemTransferFromSocket(payload = {}) {
     const incomingSlots = transferEntries
       .map(entry => entry?.droppedItem)
       .filter(item => item && CARRIED_ITEM_TYPES.has(String(item.type || "").trim().toLowerCase()))
-      .filter(item => isCarriedItemCountedForBag(item, targetActor))
+      .filter(item => isCarriedItemCountedForCarry(item, targetActor))
       .reduce((total, item) => total + getCarriedItemInventorySlots(item), 0);
     if (incomingSlots > 0) {
       const currentSlots = Array.from(targetActor.items || [])
-        .filter(item => isCarriedItemCountedForBag(item, targetActor))
+        .filter(item => isCarriedItemCountedForCarry(item, targetActor))
         .reduce((total, item) => total + getCarriedItemInventorySlots(item), 0);
       const limit = getActorCarriedItemsLimit(targetActor);
       if (isCarriedItemsLimitExceeded({
@@ -2453,7 +2398,6 @@ const systemSocketHooks = buildSystemSocketHooks({
   handleDeleteItemRequest,
   handleReorderActorItemsRequest,
   handleActorItemTransferRequest,
-  handleActorBackpackStateChangedMessage,
   wasChaosRequestProcessed,
   rememberChaosRequest,
   setChaosValue,
@@ -3512,14 +3456,7 @@ const actorUpdateHooks = buildActorUpdateHooks({
 
 const actorLifecycleHooks = createActorLifecycleHooks({
   clearResolvedActorDocumentCaches,
-  onUpdateActorCore: (...args) => actorUpdateHooks.onUpdateActor(...args),
-  getProperty: foundry.utils.getProperty,
-  getCurrentUser: () => game.user,
-  isCurrentUserPrimaryPrivilegedOperator,
-  socketEmit,
-  systemSocket: SYSTEM_SOCKET,
-  resolveActorBackpackEnabled,
-  updateOpenActorSheetsBackpackState
+  onUpdateActorCore: (...args) => actorUpdateHooks.onUpdateActor(...args)
 });
 
 Hooks.on("updateActor", actorLifecycleHooks.onUpdateActor);
@@ -3534,7 +3471,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     super(object, options);
     this.captureTokenDocumentReference(options?.token || object?.token || null);
     this.sanitizeStoredSheetOptions();
-    this._optimisticBagSlotsEnabled = null;
   }
 
   static get defaultOptions() {
@@ -4189,10 +4125,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     return actorItemDndController.shouldSkipItemListContainerDelegate(this, eventLike);
   }
 
-  getItemListBagZoneFromElement(element) {
-    return actorItemDndController.getItemListBagZoneFromElement(this, element);
-  }
-
   getItemListReorderScopeFromElement(element) {
     return actorItemDndController.getItemListReorderScopeFromElement(this, element);
   }
@@ -4221,12 +4153,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     return actorItemDndController.getCarryColumnCapacity(this, column, options);
   }
 
-  getLegacyItemBagState(item) {
-    const flaggedValue = item?.getFlag?.(SYSTEM_ID, BAG_ZONE_FLAG_KEY);
-    if (flaggedValue !== undefined) return toCheckboxBoolean(flaggedValue, false);
-    return toCheckboxBoolean(item?.system?.inBag, false);
-  }
-
   getExplicitItemCarryColumn(item) {
     if (!item) return "";
     const flaggedValue = item?.getFlag?.(SYSTEM_ID, CARRY_COLUMN_FLAG_KEY);
@@ -4235,13 +4161,10 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   getItemCarryColumn(item, options = {}) {
     if (!item) return "";
-    const bagEnabled = options?.bagEnabledOverride == null
-      ? this.isActorBagSlotsEnabled()
-      : Boolean(options.bagEnabledOverride);
     const explicitColumn = this.getExplicitItemCarryColumn(item);
     if (
       explicitColumn
-      && this.isCarryColumnAllowedForItemType(explicitColumn, item?.type, { bagEnabledOverride: bagEnabled })
+      && this.isCarryColumnAllowedForItemType(explicitColumn, item?.type)
     ) {
       return explicitColumn;
     }
@@ -4255,42 +4178,30 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (fallbackColumn) return fallbackColumn;
     }
 
-    if (this.getLegacyItemBagState(item) && bagEnabled) return CARRY_COLUMN_BAG;
     const itemType = String(item?.type || "").trim().toLowerCase();
     if (itemType === "arme" || itemType === "protection") return CARRY_COLUMN_EQUIPMENT;
     if (itemType === "objet" || itemType === "ration" || itemType === "soin") return CARRY_COLUMN_OBJECTS_ONE;
     return CARRY_COLUMN_EQUIPMENT;
   }
 
-  isBagZoneSupportedItemType(itemType) {
+  isCarryColumnSupportedItemType(itemType) {
     const normalizedType = String(itemType || "").trim().toLowerCase();
-    return BAG_ZONE_ITEM_TYPES.has(normalizedType);
-  }
-
-  isItemInBag(item) {
-    const explicitColumn = this.getExplicitItemCarryColumn(item);
-    if (explicitColumn) return explicitColumn === CARRY_COLUMN_BAG;
-    return this.getLegacyItemBagState(item);
+    return CARRIED_ITEM_TYPES.has(normalizedType);
   }
 
   async setItemCarryColumn(item, column, options = {}) {
-    if (!item || !this.isBagZoneSupportedItemType(item.type)) return false;
+    if (!item || !this.isCarryColumnSupportedItemType(item.type)) return false;
     const nextColumn = this.normalizeCarryColumn(column);
     if (!nextColumn) return false;
-    const bagEnabled = options?.bagEnabledOverride == null
-      ? this.isActorBagSlotsEnabled()
-      : Boolean(options.bagEnabledOverride);
-    if (!this.isCarryColumnAllowedForItemType(nextColumn, item.type, { bagEnabledOverride: bagEnabled })) return false;
+    if (!this.isCarryColumnAllowedForItemType(nextColumn, item.type)) return false;
 
     const itemId = String(item.id || "").trim();
     if (!itemId) return false;
-    const nextInBag = nextColumn === CARRY_COLUMN_BAG;
     const currentColumn = this.getItemCarryColumn(item);
-    const currentInBag = this.isItemInBag(item);
-    if (currentColumn === nextColumn && currentInBag === nextInBag) return true;
-    const targetCapacity = this.getCarryColumnCapacity(nextColumn, { bagEnabledOverride: bagEnabled });
+    if (currentColumn === nextColumn) return true;
+    const targetCapacity = this.getCarryColumnCapacity(nextColumn);
     if (Number.isFinite(targetCapacity) && targetCapacity > 0) {
-      const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+      const state = this.getCarriedColumnState();
       const currentTargetItems = (state.columns[nextColumn] || [])
         .filter(entry => String(entry?.id || "").trim() !== itemId);
       const targetSlots = sumCarriedItemInventorySlots(currentTargetItems) + getCarriedItemInventorySlots(item);
@@ -4298,19 +4209,14 @@ class BloodmanActorSheet extends BaseActorSheet {
     }
 
     const carryFlagPath = `flags.${SYSTEM_ID}.${CARRY_COLUMN_FLAG_KEY}`;
-    const bagFlagPath = `flags.${SYSTEM_ID}.${BAG_ZONE_FLAG_KEY}`;
     const payload = {
       _id: itemId,
-      [carryFlagPath]: nextColumn,
-      [bagFlagPath]: nextInBag
+      [carryFlagPath]: nextColumn
     };
 
     if (item.isOwner || this.actor?.isOwner || game.user?.isGM) {
       try {
-        await item.update({
-          [carryFlagPath]: nextColumn,
-          [bagFlagPath]: nextInBag
-        });
+        await item.update({ [carryFlagPath]: nextColumn });
         return true;
       } catch (_error) {
         // Falls through to embedded update fallback.
@@ -4330,42 +4236,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     return false;
   }
 
-  async setItemBagState(item, inBag) {
-    if (!item || !this.isBagZoneSupportedItemType(item.type)) return false;
-    const nextInBag = Boolean(inBag);
-    const targetColumn = nextInBag ? CARRY_COLUMN_BAG : CARRY_COLUMN_EQUIPMENT;
-    return this.setItemCarryColumn(item, targetColumn);
-  }
-
-  isActorBagSlotsEnabled(actorLike = null) {
-    const actor = actorLike || this.actor;
-    if (!actorLike && this._optimisticBagSlotsEnabled !== null) {
-      return Boolean(this._optimisticBagSlotsEnabled);
-    }
-    return resolveActorBackpackEnabled(actor, { items: Array.from(actor?.items || []) }).enabled;
-  }
-
-  getCarriedOutsideBagItems(options = {}) {
-    const excludeItemId = String(options?.excludeItemId || "").trim();
-    const includeUncounted = options?.includeUncounted === true;
-    const carriedItems = this.actor?.items
-      ?.filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()))
-      || [];
-    return carriedItems.filter(item => {
-      if (!item) return false;
-      if (isActorItemLinkedChild(item, this.actor)) return false;
-      if (!includeUncounted && !isCarriedItemCountedForBag(item, this.actor)) return false;
-      const itemId = String(item.id || "").trim();
-      if (excludeItemId && itemId === excludeItemId) return false;
-      if (!this.isBagZoneSupportedItemType(item.type)) return true;
-      return !this.isItemInBag(item);
-    });
-  }
-
   getCarriedColumnState(options = {}) {
-    const bagEnabled = options?.bagEnabledOverride == null
-      ? this.isActorBagSlotsEnabled()
-      : Boolean(options.bagEnabledOverride);
     const sourceItems = Array.isArray(options?.items)
       ? options.items
       : (this.actor?.items || []).filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()));
@@ -4386,13 +4257,13 @@ class BloodmanActorSheet extends BaseActorSheet {
       [CARRY_COLUMN_EQUIPMENT]: [],
       [CARRY_COLUMN_OBJECTS_ONE]: [],
       [CARRY_COLUMN_OBJECTS_TWO]: [],
-      [CARRY_COLUMN_BAG]: []
+      [CARRY_COLUMN_OBJECTS_THREE]: []
     };
     const columnUsage = {
       [CARRY_COLUMN_EQUIPMENT]: 0,
       [CARRY_COLUMN_OBJECTS_ONE]: 0,
       [CARRY_COLUMN_OBJECTS_TWO]: 0,
-      [CARRY_COLUMN_BAG]: 0
+      [CARRY_COLUMN_OBJECTS_THREE]: 0
     };
     const byId = {};
     const deferredItems = [];
@@ -4401,8 +4272,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (!itemId) return false;
       const column = this.normalizeCarryColumn(requestedColumn) || CARRY_COLUMN_EQUIPMENT;
       const itemType = String(item?.type || "").trim().toLowerCase();
-      if (!this.isCarryColumnAllowedForItemType(column, itemType, { bagEnabledOverride: bagEnabled })) return false;
-      const capacity = this.getCarryColumnCapacity(column, { bagEnabledOverride: bagEnabled });
+      if (!this.isCarryColumnAllowedForItemType(column, itemType)) return false;
+      const capacity = this.getCarryColumnCapacity(column);
       const itemSlots = getCarriedItemInventorySlots(item);
       if (Number.isFinite(capacity) && (columnUsage[column] + itemSlots) > capacity) return false;
       columns[column].push(item);
@@ -4417,7 +4288,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         deferredItems.push(item);
         continue;
       }
-      if (!this.isCarryColumnAllowedForItemType(explicitColumn, item?.type, { bagEnabledOverride: bagEnabled })) {
+      if (!this.isCarryColumnAllowedForItemType(explicitColumn, item?.type)) {
         deferredItems.push(item);
         continue;
       }
@@ -4426,8 +4297,6 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     for (const item of deferredItems) {
       const itemType = String(item?.type || "").trim().toLowerCase();
-      const preferBag = this.getLegacyItemBagState(item);
-      if (preferBag && bagEnabled && placeInColumn(item, CARRY_COLUMN_BAG)) continue;
 
       if (itemType === "arme" || itemType === "protection") {
         placeInColumn(item, CARRY_COLUMN_EQUIPMENT);
@@ -4443,39 +4312,13 @@ class BloodmanActorSheet extends BaseActorSheet {
         }
       }
       if (placed) continue;
-      if (bagEnabled && placeInColumn(item, CARRY_COLUMN_BAG)) continue;
       placeInColumn(item, CARRY_COLUMN_EQUIPMENT);
     }
 
     return {
-      bagEnabled,
       columns,
       byId
     };
-  }
-
-  async normalizeCarryColumnsAfterBagToggle(options = {}) {
-    const bagEnabled = options?.bagEnabledOverride == null
-      ? this.isActorBagSlotsEnabled()
-      : Boolean(options.bagEnabledOverride);
-    if (bagEnabled) return false;
-
-    let movedAny = false;
-    const state = this.getCarriedColumnState({ bagEnabledOverride: true });
-    const bagItems = [...(state.columns[CARRY_COLUMN_BAG] || [])];
-    for (const item of bagItems) {
-      const refreshed = this.getCarriedColumnState({ bagEnabledOverride: false });
-      let targetColumn = CARRY_COLUMN_OBJECTS_ONE;
-      if ((refreshed.columns[CARRY_COLUMN_OBJECTS_ONE] || []).length >= this.getCarryColumnCapacity(CARRY_COLUMN_OBJECTS_ONE)) {
-        targetColumn = CARRY_COLUMN_OBJECTS_TWO;
-      }
-      if ((refreshed.columns[targetColumn] || []).length >= this.getCarryColumnCapacity(targetColumn)) {
-        targetColumn = CARRY_COLUMN_EQUIPMENT;
-      }
-      const moved = await this.setItemCarryColumn(item, targetColumn, { bagEnabledOverride: false });
-      movedAny = movedAny || moved;
-    }
-    return movedAny;
   }
 
   getDropResultItemIds(dropResult) {
@@ -4505,10 +4348,7 @@ class BloodmanActorSheet extends BaseActorSheet {
   }
 
   buildEquipmentStatePayload(options = {}) {
-    const bagEnabled = options?.bagEnabledOverride == null
-      ? this.isActorBagSlotsEnabled()
-      : Boolean(options.bagEnabledOverride);
-    const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
+    const state = this.getCarriedColumnState(options);
     const equipementItems = (state.columns[CARRY_COLUMN_EQUIPMENT] || [])
       .map(item => this.buildEquipmentStateItemPayload(item))
       .filter(Boolean);
@@ -4518,11 +4358,9 @@ class BloodmanActorSheet extends BaseActorSheet {
     const objectsColumnTwo = (state.columns[CARRY_COLUMN_OBJECTS_TWO] || [])
       .map(item => this.buildEquipmentStateItemPayload(item))
       .filter(Boolean);
-    const bagColumn = bagEnabled
-      ? (state.columns[CARRY_COLUMN_BAG] || [])
-        .map(item => this.buildEquipmentStateItemPayload(item))
-        .filter(Boolean)
-      : [];
+    const objectsColumnThree = (state.columns[CARRY_COLUMN_OBJECTS_THREE] || [])
+      .map(item => this.buildEquipmentStateItemPayload(item))
+      .filter(Boolean);
 
     const ammoState = normalizeAmmoState(
       foundry.utils.mergeObject(buildDefaultAmmo(), this.actor?.system?.ammo || {}, { inplace: false }),
@@ -4549,7 +4387,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         objets: [
           objectsColumnOne,
           objectsColumnTwo,
-          bagColumn
+          objectsColumnThree
         ]
       }
     };
@@ -4567,59 +4405,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       status: "success",
       updated_state: this.buildEquipmentStatePayload(options)
     };
-  }
-
-  async enforceMainCarryOverflowToBag(options = {}) {
-    if (!this.actor || !isCarriedItemLimitedActorType(this.actor?.type)) return false;
-    const bagEnabled = options?.bagEnabledOverride == null
-      ? this.isActorBagSlotsEnabled()
-      : Boolean(options.bagEnabledOverride);
-    if (!bagEnabled) return false;
-    const mainSlotLimit = Math.max(0, Math.floor(toFiniteNumber(CARRIED_ITEM_LIMIT_BASE, 0)));
-    if (mainSlotLimit <= 0) return false;
-
-    const outsideItems = this.getCarriedOutsideBagItems();
-    const overflowSlots = sumCarriedItemInventorySlots(outsideItems) - mainSlotLimit;
-    if (overflowSlots <= 0) return false;
-
-    const state = this.getCarriedColumnState({ bagEnabledOverride: bagEnabled });
-    const movableOverflowCandidates = outsideItems.filter(item => {
-      const itemId = String(item?.id || "").trim();
-      if (!itemId) return false;
-      const column = this.normalizeCarryColumn(state?.byId?.[itemId] || this.getItemCarryColumn(item, { fallbackById: state.byId }));
-      return column === CARRY_COLUMN_OBJECTS_ONE || column === CARRY_COLUMN_OBJECTS_TWO;
-    });
-    if (!movableOverflowCandidates.length) return false;
-
-    const preferredIds = new Set(
-      (Array.isArray(options?.preferredItemIds) ? options.preferredItemIds : [])
-        .map(entry => String(entry || "").trim())
-        .filter(Boolean)
-    );
-    const preferredItems = movableOverflowCandidates.filter(item => preferredIds.has(String(item.id || "").trim()));
-    const remainingItems = movableOverflowCandidates
-      .filter(item => !preferredIds.has(String(item.id || "").trim()))
-      .sort((left, right) => {
-        const leftSort = toFiniteNumber(left?.sort, 0);
-        const rightSort = toFiniteNumber(right?.sort, 0);
-        if (leftSort !== rightSort) return rightSort - leftSort;
-        return String(right?.id || "").localeCompare(String(left?.id || ""));
-      });
-    const overflowItems = [];
-    let movedSlotTarget = 0;
-    for (const item of [...preferredItems, ...remainingItems]) {
-      if (movedSlotTarget >= overflowSlots) break;
-      overflowItems.push(item);
-      movedSlotTarget += getCarriedItemInventorySlots(item);
-    }
-    if (!overflowItems.length) return false;
-
-    let movedAny = false;
-    for (const item of overflowItems) {
-      const moved = await this.setItemCarryColumn(item, CARRY_COLUMN_BAG, { bagEnabledOverride: bagEnabled });
-      movedAny = movedAny || moved;
-    }
-    return movedAny;
   }
 
   normalizeItemReorderPayload(payloadLike) {
@@ -4751,7 +4536,6 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     try {
       const carryColumn = this.getItemListCarryColumnFromElement(list);
-      const bagZone = this.getItemListBagZoneFromElement(list);
       const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
       const droppedItem = await this.resolveDroppedItemDocument(data);
       const droppedType = String(droppedItem?.type || "").trim().toLowerCase();
@@ -4769,12 +4553,6 @@ class BloodmanActorSheet extends BaseActorSheet {
         this.clearItemReorderVisualState();
         return this.buildCarryDropErrorResult("type non autorise");
       }
-      if (carryColumn === CARRY_COLUMN_BAG && !this.isActorBagSlotsEnabled()) {
-        ui.notifications?.warn("Le sac n'est pas actif.");
-        this.clearItemReorderVisualState();
-        return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
-      }
-
       const beforeIds = new Set((this.actor?.items || [])
         .map(item => String(item?.id || "").trim())
         .filter(Boolean));
@@ -4797,12 +4575,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         const type = String(item.type || "").trim().toLowerCase();
         if (acceptedTypes && !acceptedTypes.has(type)) continue;
         if (carryColumn && CARRIED_ITEM_TYPES.has(type)) {
-          const moved = await this.setItemCarryColumn(item, carryColumn, {
-            bagEnabledOverride: this.isActorBagSlotsEnabled()
-          });
-          movedAny = movedAny || moved;
-        } else if (bagZone && this.isBagZoneSupportedItemType(type)) {
-          const moved = await this.setItemBagState(item, bagZone === "yes");
+          const moved = await this.setItemCarryColumn(item, carryColumn);
           movedAny = movedAny || moved;
         }
       }
@@ -4857,16 +4630,11 @@ class BloodmanActorSheet extends BaseActorSheet {
           targetColumn: carryColumn
         });
       }
-      const bagZone = this.getItemListBagZoneFromElement(list);
       const acceptedTypes = this.getItemListAcceptedTypesFromElement(list);
       const reorderScope = this.getItemListReorderScopeFromElement(list);
       const isCarryMixedScope = reorderScope === "carry-mixed";
-      const useMixedTypeOrdering = isCarryMixedScope && Boolean(bagZone);
+      const useMixedTypeOrdering = false;
       if (acceptedTypes && !acceptedTypes.has(sourceType)) {
-        this.clearItemReorderVisualState();
-        return this.buildCarryDropErrorResult("type non autorise");
-      }
-      if (bagZone && !this.isBagZoneSupportedItemType(sourceType)) {
         this.clearItemReorderVisualState();
         return this.buildCarryDropErrorResult("type non autorise");
       }
@@ -4875,34 +4643,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       if (typeof eventLike?.stopPropagation === "function") eventLike.stopPropagation();
       else nativeEvent?.stopPropagation?.();
 
-      if (
-        bagZone === "no"
-        && this.isBagZoneSupportedItemType(sourceType)
-        && this.isItemInBag(sourceItem)
-        && (
-          sumCarriedItemInventorySlots(this.getCarriedOutsideBagItems())
-          + (isCarriedItemCountedForBag(sourceItem, this.actor) ? getCarriedItemInventorySlots(sourceItem) : 0)
-        ) > CARRIED_ITEM_LIMIT_BASE
-      ) {
-        this.clearItemReorderVisualState();
-        ui.notifications?.warn(t("BLOODMAN.Notifications.MaxCarriedItems", { max: CARRIED_ITEM_LIMIT_BASE }));
-        return this.buildCarryDropErrorResult(CARRY_COLUMN_FULL_REASON);
-      }
-
-      let bagStateChanged = false;
-      if (bagZone) {
-        const shouldBeInBag = bagZone === "yes";
-        bagStateChanged = this.isItemInBag(sourceItem) !== shouldBeInBag;
-        const bagUpdated = await this.setItemBagState(sourceItem, shouldBeInBag);
-        if (!bagUpdated) {
-          this.clearItemReorderVisualState();
-          return this.buildCarryDropErrorResult("deplacement impossible");
-        }
-      }
       const latestSourceItem = this.actor?.items?.get(String(sourceItem.id || "")) || sourceItem;
-      const sourceInBag = bagZone && this.isBagZoneSupportedItemType(sourceType)
-        ? bagZone === "yes"
-        : this.isItemInBag(latestSourceItem);
 
       let targetLi = nativeEvent?.target?.closest?.("li.item[data-item-id]");
       if (!targetLi || !list.contains(targetLi)) targetLi = null;
@@ -4912,7 +4653,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       const targetType = String(targetItem?.type || "").trim().toLowerCase();
       const targetIsCompatible = Boolean(targetItem) && (
         useMixedTypeOrdering
-          ? this.isBagZoneSupportedItemType(targetType)
+          ? this.isCarryColumnSupportedItemType(targetType)
           : targetType === sourceType
       );
       const targetAccepted = !acceptedTypes || acceptedTypes.has(targetType);
@@ -4924,13 +4665,9 @@ class BloodmanActorSheet extends BaseActorSheet {
             if (String(entry?.id || "") === String(latestSourceItem.id || "")) return false;
             if (acceptedTypes && !acceptedTypes.has(entryType)) return false;
             if (useMixedTypeOrdering) {
-              if (!this.isBagZoneSupportedItemType(entryType)) return false;
-              return this.isItemInBag(entry) === sourceInBag;
+              return this.isCarryColumnSupportedItemType(entryType);
             }
             if (entryType !== sourceType) return false;
-            if (bagZone && this.isBagZoneSupportedItemType(sourceType)) {
-              return this.isItemInBag(entry) === sourceInBag;
-            }
             return true;
           })
           .sort((left, right) => {
@@ -4948,7 +4685,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       }
       if (!targetItem || String(targetItem.id || "") === String(latestSourceItem.id || "")) {
         this.clearItemReorderVisualState();
-        if (bagStateChanged && this.shouldManuallyRenderAfterUpdate()) this.render(false);
         return this.buildCarryDropSuccessResult();
       }
 
@@ -4956,7 +4692,7 @@ class BloodmanActorSheet extends BaseActorSheet {
         ? entry => {
           const entryType = String(entry?.type || "").trim().toLowerCase();
           if (acceptedTypes && !acceptedTypes.has(entryType)) return false;
-          return this.isBagZoneSupportedItemType(entryType) && this.isItemInBag(entry) === sourceInBag;
+          return this.isCarryColumnSupportedItemType(entryType);
         }
         : null;
       const updates = this.buildItemReorderUpdates(latestSourceItem, targetItem, {
@@ -4966,7 +4702,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
       if (!updates.length) {
         this.clearItemReorderVisualState();
-        if (bagStateChanged && this.shouldManuallyRenderAfterUpdate()) this.render(false);
         return this.buildCarryDropSuccessResult();
       }
       const applied = await this.applyActorItemOrderUpdates(updates);
@@ -5641,14 +5376,8 @@ class BloodmanActorSheet extends BaseActorSheet {
     });
     equipment.monnaies = String(equipment.monnaies ?? "").trim();
     equipment.monnaiesActuel = normalizeCurrencyCurrentValue(equipment.monnaiesActuel, 0).value;
-    const actorBagSlotsEnabled = resolveActorBackpackEnabled(this.actor, { items: visibleActorItems }).enabled;
-    if (this._optimisticBagSlotsEnabled !== null && actorBagSlotsEnabled === this._optimisticBagSlotsEnabled) {
-      this._optimisticBagSlotsEnabled = null;
-    }
-    const bagSlotsEnabled = this._optimisticBagSlotsEnabled !== null
-      ? Boolean(this._optimisticBagSlotsEnabled)
-      : actorBagSlotsEnabled;
-    const carriedItemsLimit = bagSlotsEnabled ? CARRIED_ITEM_LIMIT_WITH_BAG : CARRIED_ITEM_LIMIT_BASE;
+    equipment.carriedItemsMax = Math.max(0, Math.floor(toFiniteNumber(equipment.carriedItemsMax, CARRIED_ITEM_LIMIT_DEFAULT)));
+    const carriedItemsLimit = getActorCarriedItemsLimit({ system: { equipment } });
     const {
       ammoPool,
       ammoActiveIndex,
@@ -5726,10 +5455,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     const carriedItems = visibleActorItems
       .filter(item => CARRIED_ITEM_TYPES.has(String(item?.type || "").trim().toLowerCase()))
       .sort(sortItemsBySortKey);
-    const carriedColumnState = this.getCarriedColumnState({
-      bagEnabledOverride: bagSlotsEnabled,
-      items: carriedItems
-    });
+    const carriedColumnState = this.getCarriedColumnState({ items: carriedItems });
     const buildCarryDisplayItem = item => {
       const displayItem = item.toObject();
       displayItem._id = displayItem._id ?? item.id;
@@ -5737,32 +5463,32 @@ class BloodmanActorSheet extends BaseActorSheet {
       displayItem.displayNoteHtml = formatMultilineTextToHtml(
         displayItem.system?.note || displayItem.system?.notes || ""
       );
-      displayItem.bagActionLabel = "";
-      displayItem.bagActionClass = "";
-      displayItem.bagProtectionLabel = resolveItemProtectionLabel(displayItem, { type: displayItem.type });
-      displayItem.bagProtectionClass = "item-chip item-meta bm-btn-armor";
+      displayItem.carryActionLabel = "";
+      displayItem.carryActionClass = "";
+      displayItem.carryProtectionLabel = resolveItemProtectionLabel(displayItem, { type: displayItem.type });
+      displayItem.carryProtectionClass = "item-chip item-meta bm-btn-armor";
       const markValue = String(displayItem.system?.mark || "").trim();
       const noteSmallValue = String(displayItem.system?.noteSmall || "").trim();
       const markIsPa = /^PA\b/i.test(markValue);
       const noteSmallIsPa = /^PA\b/i.test(noteSmallValue);
-      displayItem.bagMarkClass = `item-chip item-mark${markIsPa ? " bm-btn-pa" : ""}`;
-      displayItem.bagNoteSmallClass = `item-chip item-meta${noteSmallIsPa ? " bm-btn-pa" : ""}`;
-      displayItem.bagShowAmmoState = false;
-      displayItem.bagAmmoMagazine = 0;
-      displayItem.bagAmmoCapacityDisplay = 0;
-      displayItem.bagShowReloadButton = false;
-      displayItem.bagReloadBlocked = false;
+      displayItem.carryMarkClass = `item-chip item-mark${markIsPa ? " bm-btn-pa" : ""}`;
+      displayItem.carryNoteSmallClass = `item-chip item-meta${noteSmallIsPa ? " bm-btn-pa" : ""}`;
+      displayItem.carryShowAmmoState = false;
+      displayItem.carryAmmoMagazine = 0;
+      displayItem.carryAmmoCapacityDisplay = 0;
+      displayItem.carryShowReloadButton = false;
+      displayItem.carryReloadBlocked = false;
       displayItem.showItemReroll = shouldShowItemReroll(item.id);
       const singleUseDisplay = resolveItemSingleUseDisplayData(displayItem.system || {});
-      displayItem.bagShowSingleUseCount = singleUseDisplay.show;
-      displayItem.bagSingleUseCountLabel = singleUseDisplay.label;
-      displayItem.bagSingleUseCountClass = "item-chip item-meta bm-btn-usage-count";
+      displayItem.carryShowSingleUseCount = singleUseDisplay.show;
+      displayItem.carrySingleUseCountLabel = singleUseDisplay.label;
+      displayItem.carrySingleUseCountClass = "item-chip item-meta bm-btn-usage-count";
 
       if (displayItem.type === "arme") {
         const damageDie = String(displayItem.system?.damageDie || "").trim();
         if (damageDie) {
-          displayItem.bagActionLabel = normalizeRollDieFormula(damageDie, "d4");
-          displayItem.bagActionClass = "weapon-roll bm-btn-damage";
+          displayItem.carryActionLabel = normalizeRollDieFormula(damageDie, "d4");
+          displayItem.carryActionClass = "weapon-roll bm-btn-damage";
         }
         const weaponCategory = getWeaponCategory(displayItem.system?.weaponType);
         const consumesAmmo = weaponCategory === "distance" && !toCheckboxBoolean(displayItem.system?.infiniteAmmo, false);
@@ -5773,18 +5499,18 @@ class BloodmanActorSheet extends BaseActorSheet {
           ? ammoStock
           : getWeaponLoadedAmmo(item, { fallback: ammo.magazine });
         const magazineMissingAmmo = !usesDirectStock && loadedAmmo < magazineCapacity;
-        displayItem.bagShowAmmoState = consumesAmmo;
-        displayItem.bagAmmoMagazine = loadedAmmo;
-        displayItem.bagAmmoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
-        displayItem.bagShowReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
-        displayItem.bagReloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
+        displayItem.carryShowAmmoState = consumesAmmo;
+        displayItem.carryAmmoMagazine = loadedAmmo;
+        displayItem.carryAmmoCapacityDisplay = usesDirectStock ? ammoStock : magazineCapacity;
+        displayItem.carryShowReloadButton = consumesAmmo && !usesDirectStock && ammoStock > 0 && magazineMissingAmmo;
+        displayItem.carryReloadBlocked = consumesAmmo && !usesDirectStock && ammoStock <= 0;
       } else if (displayItem.type === "soin") {
         const healDie = String(displayItem.system?.healDie || "").trim();
-        displayItem.bagActionLabel = normalizeRollDieFormula(healDie || "d4", "d4");
-        displayItem.bagActionClass = "item-use bm-btn-heal";
+        displayItem.carryActionLabel = normalizeRollDieFormula(healDie || "d4", "d4");
+        displayItem.carryActionClass = "item-use bm-btn-heal";
       } else if (displayItem.type === "ration") {
-        displayItem.bagActionLabel = t("BLOODMAN.Common.Eat");
-        displayItem.bagActionClass = "item-use bm-btn-heal";
+        displayItem.carryActionLabel = t("BLOODMAN.Common.Eat");
+        displayItem.carryActionClass = "item-use bm-btn-heal";
       } else if (displayItem.type === "objet" && toCheckboxBoolean(displayItem.system?.useEnabled, false)) {
         const objectDamageEnabled = toCheckboxBoolean(
           displayItem.system?.damageEnabled,
@@ -5792,11 +5518,11 @@ class BloodmanActorSheet extends BaseActorSheet {
         );
         const objectDamageDie = String(displayItem.system?.damageDie || "").trim();
         if (objectDamageEnabled && objectDamageDie) {
-          displayItem.bagActionLabel = normalizeRollDieFormula(objectDamageDie, "d4");
-          displayItem.bagActionClass = "item-use bm-btn-damage";
+          displayItem.carryActionLabel = normalizeRollDieFormula(objectDamageDie, "d4");
+          displayItem.carryActionClass = "item-use bm-btn-damage";
         } else {
-          displayItem.bagActionLabel = t("BLOODMAN.Common.Use");
-          displayItem.bagActionClass = "item-use bm-btn-magic";
+          displayItem.carryActionLabel = t("BLOODMAN.Common.Use");
+          displayItem.carryActionClass = "item-use bm-btn-magic";
         }
       }
 
@@ -5869,9 +5595,9 @@ class BloodmanActorSheet extends BaseActorSheet {
       });
     const objectColumnOneItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_ONE] || []).map(buildCarryDisplayItem);
     const objectColumnTwoItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_TWO] || []).map(buildCarryDisplayItem);
-    const bagItems = (carriedColumnState.columns[CARRY_COLUMN_BAG] || []).map(buildCarryDisplayItem);
+    const objectColumnThreeItems = (carriedColumnState.columns[CARRY_COLUMN_OBJECTS_THREE] || []).map(buildCarryDisplayItem);
     const carriedItemsCount = sumCarriedItemInventorySlots(
-      carriedItems.filter(item => isCarriedItemCountedForBag(item, this.actor))
+      carriedItems.filter(item => isCarriedItemCountedForCarry(item, this.actor))
     );
 
     return {
@@ -5909,17 +5635,14 @@ class BloodmanActorSheet extends BaseActorSheet {
       npcRoleSbireFort: npcRole === "sbire-fort",
       npcRoleBossSeul: npcRole === "boss-seul",
       equipment,
-      showBagSlotsToggle: isCarriedItemLimitedActorType(this.actor?.type),
-      bagSlotsEnabled,
-      bagSlotsDisabled: !bagSlotsEnabled,
-      bagSlotsToggleDisabled: isBasicPlayerRole(game.user?.role),
+      canEditCarriedItemsLimit: Boolean(game.user?.isGM && isCarriedItemLimitedActorType(this.actor?.type)),
       carriedItemsCount,
       carriedItemsLimit,
       weapons,
       protections,
       objectColumnOneItems,
       objectColumnTwoItems,
-      bagItems,
+      objectColumnThreeItems,
       aptitudes,
       pouvoirs,
       itemLinkAcceptedTypes: ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES,
@@ -6369,61 +6092,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       await this.applyActorUpdate({ "system.equipment.transportNpcs": nextRefs });
     });
 
-    html.find(".bag-slots-toggle").change(async ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      if (basicPlayer) {
-        const currentBagSlotsEnabled = this.isActorBagSlotsEnabled(this.actor);
-        html.find(".bag-slots-toggle[data-bag-slots='yes']").prop("checked", currentBagSlotsEnabled);
-        html.find(".bag-slots-toggle[data-bag-slots='no']").prop("checked", !currentBagSlotsEnabled);
-        return;
-      }
-      const input = ev.currentTarget;
-      const choice = String(input?.dataset?.bagSlots || "").toLowerCase();
-      if (choice !== "yes" && choice !== "no") return;
-
-      const yesInput = html.find(".bag-slots-toggle[data-bag-slots='yes']");
-      const noInput = html.find(".bag-slots-toggle[data-bag-slots='no']");
-      const checked = Boolean(input.checked);
-
-      let bagSlotsEnabled = false;
-      if (choice === "yes") {
-        bagSlotsEnabled = checked;
-        yesInput.prop("checked", checked);
-        noInput.prop("checked", !checked);
-      } else {
-        bagSlotsEnabled = !checked;
-        yesInput.prop("checked", !checked);
-        noInput.prop("checked", checked);
-      }
-
-      this._optimisticBagSlotsEnabled = bagSlotsEnabled;
-      const applied = await this.applyActorUpdate({ "system.equipment.bagSlotsEnabled": bagSlotsEnabled });
-      if (!applied) {
-        this._optimisticBagSlotsEnabled = null;
-        const currentBagSlotsEnabled = this.isActorBagSlotsEnabled(this.actor);
-        yesInput.prop("checked", currentBagSlotsEnabled);
-        noInput.prop("checked", !currentBagSlotsEnabled);
-        return;
-      }
-      socketEmit(SYSTEM_SOCKET, {
-        type: "actorBackpackStateChanged",
-        requesterId: String(game.user?.id || ""),
-        actorUuid: String(this.actor?.uuid || ""),
-        actorId: String(this.actor?.id || ""),
-        actorBaseId: String(this.actor?.token?.actorId || this.actor?.baseActor?.id || this.actor?.id || ""),
-        enabled: bagSlotsEnabled
-      });
-      updateOpenActorSheetsBackpackState(this.actor, bagSlotsEnabled);
-      if (bagSlotsEnabled) {
-        const overflowMoved = await this.enforceMainCarryOverflowToBag({ bagEnabledOverride: true });
-        if (overflowMoved) this.render(false);
-      } else {
-        const normalized = await this.normalizeCarryColumnsAfterBagToggle({ bagEnabledOverride: false });
-        if (normalized) this.render(false);
-      }
-    });
-
     html.find(".xp-check input").change(async ev => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -6847,12 +6515,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       const dropped = await this.applyActorToActorItemTransfer(actorTransferEntries, {
         createItemOptions: { [VOYAGE_XP_SKIP_CREATE_OPTION]: true }
       });
-      if (dropped) {
-        const overflowMoved = await this.enforceMainCarryOverflowToBag({
-          preferredItemIds: this.getDropResultItemIds(dropped)
-        });
-        if (overflowMoved) this.render(false);
-      }
       return dropped;
     }
 
@@ -6901,12 +6563,6 @@ class BloodmanActorSheet extends BaseActorSheet {
       const dropped = await this.withDropItemCreateOptions(createItemOptions, () => this.callBaseOnDropItem(event, data));
       if (!dropped && deductedBeforeDrop && previousCurrency != null) {
         await this.applyActorUpdate({ "system.equipment.monnaiesActuel": previousCurrency });
-      }
-      if (dropped) {
-        const overflowMoved = await this.enforceMainCarryOverflowToBag({
-          preferredItemIds: this.getDropResultItemIds(dropped)
-        });
-        if (overflowMoved) this.render(false);
       }
       logSheetPerformance("actor-sheet.drop.item", {
         actorId: this.actor?.id || "",
@@ -7092,7 +6748,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (incomingCarriedItemCount <= 0) return false;
 
     const carriedCount = this.actor.items
-      .filter(item => isCarriedItemCountedForBag(item, this.actor))
+      .filter(item => isCarriedItemCountedForCarry(item, this.actor))
       .reduce((total, item) => total + getCarriedItemInventorySlots(item), 0);
     const carriedItemsLimit = getActorCarriedItemsLimit(this.actor);
     if (!isCarriedItemsLimitExceeded({
@@ -7971,8 +7627,6 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       height: 670
     },
     window: {
-      contentTag: "form",
-      contentClasses: ["bloodman-sheet", "pj-sheet"],
       resizable: true,
       minimizable: true
     },
@@ -8039,8 +7693,9 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       await super._onRender(context, options);
     }
     const jq = globalThis.jQuery || globalThis.$;
-    const formElement = this.form || this.element;
-    this._bloodmanElementWrapper = typeof jq === "function" ? jq(formElement) : formElement;
+    const sheetRoot = this.ensureBloodmanSheetRootClasses(this.resolveBloodmanSheetRenderRoot());
+    this._bloodmanElementWrapper = typeof jq === "function" ? jq(sheetRoot) : sheetRoot;
+    this.ensureUsableActorSheetPosition();
     this.activateBloodmanActorListeners(this._bloodmanElementWrapper);
     this._debugActorSheetRenderCount = Number(this._debugActorSheetRenderCount || 0) + 1;
     logSheetPerformance("actor-sheet-v2.render", {
@@ -8048,6 +7703,90 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       renderCount: this._debugActorSheetRenderCount,
       durationMs: Number(endPerfTimer(startedAt).toFixed(2))
     });
+  }
+
+  resolveBloodmanSheetRenderRoot() {
+    const candidates = [];
+    const seen = new Set();
+    const addCandidate = element => {
+      if (!element || typeof element !== "object" || seen.has(element)) return;
+      seen.add(element);
+      if (element.matches?.(".bloodman-sheet")) candidates.push(element);
+      if (
+        element.querySelector?.(".sheet-header")
+        && element.querySelector?.(".sheet-tabs")
+        && element.querySelector?.(".sheet-body")
+      ) {
+        candidates.push(element);
+      }
+      const nested = typeof element.querySelectorAll === "function"
+        ? Array.from(element.querySelectorAll(".bloodman-sheet"))
+        : [];
+      for (const candidate of nested) {
+        if (!candidate || seen.has(candidate)) continue;
+        seen.add(candidate);
+        candidates.push(candidate);
+      }
+    };
+
+    addCandidate(this.element);
+    addCandidate(this.window?.content);
+    addCandidate(this.form);
+
+    const sheetRoot = [...candidates].reverse().find(candidate => (
+      candidate.querySelector?.(".sheet-header")
+      && candidate.querySelector?.(".sheet-tabs")
+      && candidate.querySelector?.(".sheet-body")
+    ));
+    return sheetRoot || this.form || this.window?.content || this.element;
+  }
+
+  ensureBloodmanSheetRootClasses(sheetRoot) {
+    if (!sheetRoot?.classList) return sheetRoot;
+    const typeClass = this.actor?.type === NPC_ACTOR_TYPE ? "npc-sheet" : "pj-sheet";
+    const otherTypeClass = typeClass === "npc-sheet" ? "pj-sheet" : "npc-sheet";
+    sheetRoot.classList.add("bloodman-sheet", typeClass);
+    sheetRoot.classList.remove(otherTypeClass);
+    return sheetRoot;
+  }
+
+  getMinimumUsableSheetSize() {
+    const configuredPosition = this.options?.position || this.constructor?.DEFAULT_OPTIONS?.position || {};
+    const configuredWidth = Math.max(320, Number(configuredPosition.width) || 1195);
+    const configuredHeight = Math.max(420, Number(configuredPosition.height) || (this.actor?.type === NPC_ACTOR_TYPE ? 815 : 670));
+    const viewportWidth = Math.max(
+      Number(globalThis?.innerWidth) || 0,
+      Number(globalThis?.document?.documentElement?.clientWidth) || 0,
+      0
+    );
+    const viewportHeight = Math.max(
+      Number(globalThis?.innerHeight) || 0,
+      Number(globalThis?.document?.documentElement?.clientHeight) || 0,
+      0
+    );
+    const maxWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 24) : configuredWidth;
+    const maxHeight = viewportHeight > 0 ? Math.max(420, viewportHeight - 32) : configuredHeight;
+    const preferredMinWidth = Math.min(configuredWidth, 760);
+    const preferredMinHeight = Math.min(configuredHeight, this.actor?.type === NPC_ACTOR_TYPE ? 620 : 560);
+    return {
+      width: Math.min(preferredMinWidth, maxWidth),
+      height: Math.min(preferredMinHeight, maxHeight),
+      maxWidth,
+      maxHeight
+    };
+  }
+
+  ensureUsableActorSheetPosition() {
+    if (this._minimized || this.minimized) return;
+    const size = this.getMinimumUsableSheetSize();
+    const rect = this.element?.getBoundingClientRect?.();
+    const currentWidth = Math.ceil(Number(this.position?.width) || Number(rect?.width) || 0);
+    const currentHeight = Math.ceil(Number(this.position?.height) || Number(rect?.height) || 0);
+    const nextPosition = {};
+    if (!currentWidth || currentWidth < size.width) nextPosition.width = size.width;
+    if (!currentHeight || currentHeight < size.height) nextPosition.height = size.height;
+    if (!Object.keys(nextPosition).length) return;
+    this.setPosition(nextPosition);
   }
 
   _prepareSubmitData(event, form, formData, updateData) {
@@ -8087,8 +7826,11 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       Number(globalThis?.document?.documentElement?.clientHeight) || 0,
       0
     );
-    const minWidth = 320;
-    const minHeight = 420;
+    const usableSize = typeof this.getMinimumUsableSheetSize === "function"
+      ? this.getMinimumUsableSheetSize()
+      : { width: 320, height: 420 };
+    const minWidth = Number(usableSize.width) || 320;
+    const minHeight = Number(usableSize.height) || 420;
     const maxWidth = Math.max(minWidth, viewportWidth - 24);
     const maxHeight = Math.max(minHeight, viewportHeight - 32);
     const nextPosition = { ...options };
@@ -8165,9 +7907,6 @@ class BloodmanNpcSheetV2 extends BloodmanActorSheetV2 {
     position: {
       width: 1195,
       height: 815
-    },
-    window: {
-      contentClasses: ["bloodman-sheet", "npc-sheet"]
     }
   }, { inplace: false });
 
@@ -8237,7 +7976,7 @@ class BloodmanItemSheet extends BaseItemSheet {
     const isLinkedChild = Boolean(getLinkedParentItemId(this.item, this.item?.actor || this.item?.parent || null));
     const keepTemplateSourceReference = !this.item?.actor;
     const supportsEquiperAvec = isItemLinkSupportedType(itemType) && !isLinkedChild;
-    const supportsBagCount = CARRIED_ITEM_TYPES.has(itemType);
+    const supportsCarryCount = CARRIED_ITEM_TYPES.has(itemType);
     systemData.link = systemData.link && typeof systemData.link === "object"
       ? systemData.link
       : {};
@@ -8248,8 +7987,8 @@ class BloodmanItemSheet extends BaseItemSheet {
     systemData.link.equiperAvec = supportsEquiperAvec
       ? [...linkData.equiperAvec]
       : [];
-    systemData.link.containerCountsForBag = supportsBagCount
-      ? Boolean(linkData.containerCountsForBag)
+    systemData.link.containerCountsForCarry = supportsCarryCount
+      ? Boolean(linkData.containerCountsForCarry)
       : true;
     const templateEntries = supportsEquiperAvec
       ? normalizeItemLinkTemplateEntries(this.item.system?.link?.equiperAvecTemplates, { keepSourceReference: keepTemplateSourceReference })
@@ -8258,7 +7997,7 @@ class BloodmanItemSheet extends BaseItemSheet {
     data.itemLinkSupported = isItemLinkSupportedType(itemType);
     data.itemLinkIsLinkedChild = isLinkedChild;
     data.itemLinkSupportsEquiperAvec = supportsEquiperAvec;
-    data.itemLinkSupportsBagCount = supportsBagCount;
+    data.itemLinkSupportsCarryCount = supportsCarryCount;
     data.itemLinkAcceptedTypes = ITEM_LINK_EQUIPER_AVEC_ACCEPTED_TYPES;
     data.itemLinkEquiperAvecTemplates = templateEntries.map((entry, index) => (
       buildItemLinkTemplateDisplayData(entry, index)

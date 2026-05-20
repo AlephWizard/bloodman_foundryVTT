@@ -68,7 +68,7 @@ function buildDefaultEquipment() {
     monnaies: "",
     monnaiesActuel: 0,
     itemCountLimit: 10,
-    bagSlotsEnabled: false
+    carriedItemsMax: 10
   };
 }
 
