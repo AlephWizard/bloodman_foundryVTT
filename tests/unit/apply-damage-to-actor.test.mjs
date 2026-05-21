@@ -20,8 +20,8 @@ function buildActor({
     },
     items: pa > 0 ? [{ type: "protection", system: { pa } }] : [],
     updateCalls: [],
-    async update(updateData) {
-      this.updateCalls.push(updateData);
+    async update(updateData, options = {}) {
+      this.updateCalls.push({ updateData, options });
       const nextPv = Number(updateData?.["system.resources.pv.current"]);
       if (Number.isFinite(nextPv)) this.system.resources.pv.current = nextPv;
       return this;
@@ -84,7 +84,8 @@ async function run() {
 
     assert.equal(playerActor.system.resources.pv.current, 8);
     assert.equal(playerActor.updateCalls.length, 1);
-    assert.equal(playerActor.updateCalls[0]["system.resources.pv.current"], 8);
+    assert.equal(playerActor.updateCalls[0].updateData["system.resources.pv.current"], 8);
+    assert.equal(playerActor.updateCalls[0].options.bloodmanAllowVitalResourceUpdate, true);
     assert.equal(playerResult?.hpBefore, 12);
     assert.equal(playerResult?.hpAfter, 8);
     assert.equal(playerResult?.finalDamage, 4);
@@ -104,7 +105,8 @@ async function run() {
 
     assert.equal(npcActor.system.resources.pv.current, 6);
     assert.equal(npcActor.updateCalls.length, 1);
-    assert.equal(npcActor.updateCalls[0]["system.resources.pv.current"], 6);
+    assert.equal(npcActor.updateCalls[0].updateData["system.resources.pv.current"], 6);
+    assert.equal(npcActor.updateCalls[0].options.bloodmanAllowVitalResourceUpdate, true);
     assert.equal(npcResult?.hpBefore, 9);
     assert.equal(npcResult?.hpAfter, 6);
     assert.equal(npcResult?.finalDamage, 3);

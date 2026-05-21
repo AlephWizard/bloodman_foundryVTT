@@ -822,7 +822,22 @@ const VITAL_RESOURCE_PATH_LIST = Array.from(VITAL_RESOURCE_PATHS);
 const VITAL_RESOURCE_INPUT_SELECTOR = VITAL_RESOURCE_PATH_LIST
   .map(path => `input[name='${path}']`)
   .join(", ");
+const VOYAGE_RESOURCE_PATHS = new Set([
+  "system.resources.voyage.current",
+  "system.resources.voyage.total"
+]);
+const VOYAGE_RESOURCE_PATH_LIST = Array.from(VOYAGE_RESOURCE_PATHS);
+const VOYAGE_RESOURCE_INPUT_SELECTOR = VOYAGE_RESOURCE_PATH_LIST
+  .map(path => `input[name='${path}']`)
+  .join(", ");
+const ARCHETYPE_BONUS_VALUE_PATH = "system.profile.archetypeBonusValue";
+const ARCHETYPE_BONUS_CHARACTERISTIC_PATH = "system.profile.archetypeBonusCharacteristic";
+const ARCHETYPE_BONUS_INPUT_SELECTOR = [
+  `input[name='${ARCHETYPE_BONUS_VALUE_PATH}']`,
+  `select[name='${ARCHETYPE_BONUS_CHARACTERISTIC_PATH}']`
+].join(", ");
 const CHARACTERISTIC_BASE_INPUT_SELECTOR = "input[name^='system.characteristics.'][name$='.base']";
+const STATE_MODIFIER_INPUT_SELECTOR = "input[name^='system.modifiers.']";
 const AMMO_UPDATE_PATHS = [
   "system.ammo",
   "system.ammo.type",
@@ -832,6 +847,63 @@ const AMMO_UPDATE_PATHS = [
   "system.ammoPool",
   "system.ammoActiveIndex"
 ];
+
+function eventTargetsSelector(event, selector) {
+  const target = event?.target || event?.currentTarget || null;
+  return Boolean(target?.matches?.(selector));
+}
+
+function normalizeSheetSubmitData(formData) {
+  if (!formData) return {};
+  const objectData = formData.object && typeof formData.object === "object"
+    ? formData.object
+    : null;
+  if (objectData) return foundry.utils.deepClone(objectData);
+  if (formData instanceof FormData) {
+    return Object.fromEntries(formData.entries());
+  }
+  if (typeof formData === "object") return foundry.utils.deepClone(formData);
+  return {};
+}
+
+function getActorSheetControlUpdateValue(control) {
+  if (!control) return undefined;
+  const type = String(control.type || "").trim().toLowerCase();
+  const dtype = String(control.dataset?.dtype || "").trim().toLowerCase();
+  if (type === "checkbox") return Boolean(control.checked);
+  if (dtype === "boolean") return Boolean(control.checked);
+  if (type === "number" || dtype === "number") {
+    const numeric = Number(control.value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+  return String(control.value ?? "");
+}
+
+function isActorSheetDerivedUiPath(path = "") {
+  const normalizedPath = String(path || "").trim();
+  return normalizedPath === "system.equipment.monnaies"
+    || normalizedPath === "system.equipment.monnaiesActuel"
+    || normalizedPath === "system.ammoActiveIndex"
+    || normalizedPath === "system.ammo"
+    || normalizedPath.startsWith("system.ammo.")
+    || normalizedPath === "system.ammoPool"
+    || /^system\.ammoPool\.\d+\.(type|stock|value)$/.test(normalizedPath);
+}
+
+function getActorSheetPersistSignature(path, value) {
+  let serializedValue = "";
+  try {
+    serializedValue = JSON.stringify(value);
+  } catch (_error) {
+    serializedValue = String(value);
+  }
+  return `${String(path || "")}:${serializedValue}`;
+}
+
+async function handleBloodmanActorSheetV2Submit(event, form, formData) {
+  if (typeof this?._processSubmitData !== "function") return undefined;
+  return this._processSubmitData(event, form, formData);
+}
 
 const itemTypeFlagRules = createItemTypeFlagRules({
   damageRerollAllowedItemTypes: DAMAGE_REROLL_ALLOWED_ITEM_TYPES,
@@ -1041,7 +1113,7 @@ const defaultDataBuilders = createDefaultDataBuilders({
   characteristics: CHARACTERISTICS
 });
 const {
-  buildDefaultCharacteristics,
+  buildMissingCharacteristicUpdates,
   buildDefaultModifiers,
   buildDefaultResources,
   buildDefaultProfile,
@@ -2678,16 +2750,7 @@ async function applyStartupActorNormalization(actor) {
 
   const updates = {};
 
-  if (!actor.system.characteristics) {
-    updates["system.characteristics"] = buildDefaultCharacteristics();
-  } else {
-    for (const characteristicDefinition of CHARACTERISTICS) {
-      const characteristicXp = actor.system.characteristics?.[characteristicDefinition.key]?.xp;
-      if (!Array.isArray(characteristicXp)) {
-        updates[`system.characteristics.${characteristicDefinition.key}.xp`] = [false, false, false];
-      }
-    }
-  }
+  Object.assign(updates, buildMissingCharacteristicUpdates(actor.system.characteristics));
 
   if (!actor.system.modifiers) updates["system.modifiers"] = buildDefaultModifiers();
 
@@ -2813,7 +2876,13 @@ async function applyStartupActorNormalization(actor) {
   }
   Object.assign(updates, await getPrototypeTokenImageNormalizationUpdates(actor));
 
-  if (Object.keys(updates).length) await actor.update(updates);
+  if (Object.keys(updates).length) {
+    await actor.update(updates, {
+      bloodmanAllowCharacteristicBase: true,
+      bloodmanAllowVitalResourceUpdate: true,
+      bloodmanAllowAmmoUpdate: true
+    });
+  }
   await applyItemResourceBonuses(actor);
   await syncActorDerivedCharacteristicsResources(actor);
 }
@@ -3263,7 +3332,8 @@ async function syncActorDerivedCharacteristicsResources(actor) {
     currentPpMax: actor.system.resources?.pp?.max,
     currentPv: actor.system.resources?.pv?.current,
     currentPp: actor.system.resources?.pp?.current,
-    clampMaxToZero: true
+    clampMaxToZero: true,
+    initializeCurrentWhenMaxWasZero: true
   });
   if (Object.keys(updates).length) {
     await actor.update(updates, { bloodmanAllowVitalResourceUpdate: true });
@@ -3460,7 +3530,18 @@ const actorLifecycleHooks = createActorLifecycleHooks({
 });
 
 Hooks.on("updateActor", actorLifecycleHooks.onUpdateActor);
-Hooks.on("createActor", actorLifecycleHooks.onActorDocumentCacheInvalidated);
+Hooks.on("createActor", async actor => {
+  actorLifecycleHooks.onActorDocumentCacheInvalidated();
+  try {
+    await applyStartupActorNormalization(actor);
+  } catch (error) {
+    bmLog.warn("createActor normalization skipped", {
+      actorId: actor?.id || "",
+      actorType: actor?.type || "",
+      error
+    });
+  }
+});
 Hooks.on("deleteActor", actorLifecycleHooks.onActorDocumentCacheInvalidated);
 Hooks.on("createScene", actorLifecycleHooks.onActorDocumentCacheInvalidated);
 Hooks.on("updateScene", actorLifecycleHooks.onActorDocumentCacheInvalidated);
@@ -3482,7 +3563,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       popOut: true,
       minimizable: true,
       resizable: true,
-      submitOnChange: true,
+      submitOnChange: false,
       tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "carac" }]
     });
   }
@@ -3913,14 +3994,60 @@ class BloodmanActorSheet extends BaseActorSheet {
       const input = event.target instanceof HTMLInputElement ? event.target : null;
       if (!input?.matches?.(CHARACTERISTIC_BASE_INPUT_SELECTOR)) return;
       if (!root.contains(input)) return;
-      if (!canCurrentUserEditCharacteristics()) return;
-      if (!this._characteristicsEditEnabled) return;
-      if (this.actor?.isOwner || game.user?.isGM) return;
+      if (!this.canApplyCharacteristicBaseInputChange()) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
       void this.updateTrustedCharacteristicBaseInput(input);
     }, listenerOptions);
+
+    root.addEventListener("change", event => {
+      const input = event.target instanceof HTMLInputElement ? event.target : null;
+      if (!input?.matches?.(STATE_MODIFIER_INPUT_SELECTOR)) return;
+      if (!root.contains(input)) return;
+      if (!canCurrentUserEditCharacteristics()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      void this.updateStateModifierInput(input);
+    }, listenerOptions);
+
+    root.addEventListener("change", event => {
+      const input = event.target instanceof HTMLInputElement ? event.target : null;
+      if (!input?.matches?.(VOYAGE_RESOURCE_INPUT_SELECTOR)) return;
+      if (!root.contains(input)) return;
+      if (!canCurrentUserEditCharacteristics()) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      void this.updateVoyageResourceInput(input, root);
+    }, listenerOptions);
+
+    root.addEventListener("change", event => {
+      const control = event.target instanceof HTMLElement ? event.target : null;
+      if (!control?.matches?.(ARCHETYPE_BONUS_INPUT_SELECTOR)) return;
+      if (!root.contains(control)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      void this.updateArchetypeBonusInputs(control, root);
+    }, listenerOptions);
+
+    const persistGenericControl = event => {
+      const control = event.target instanceof HTMLElement ? event.target : null;
+      if (!control?.matches?.("input[name], textarea[name], select[name]")) return;
+      if (!root.contains(control)) return;
+      if (!this.shouldPersistGenericActorSheetControl(control)) return;
+      void this.persistGenericActorSheetControl(control);
+    };
+    root.addEventListener("change", persistGenericControl, listenerOptions);
+    root.addEventListener("focusout", persistGenericControl, listenerOptions);
+  }
+
+  canApplyCharacteristicBaseInputChange() {
+    if (!canCurrentUserEditCharacteristics()) return false;
+    if (this.actor?.type !== PLAYER_ACTOR_TYPE) return true;
+    return Boolean(this._characteristicsEditEnabled);
   }
 
   async updateTrustedCharacteristicBaseInput(input) {
@@ -3929,12 +4056,156 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!match) return false;
     const characteristicKey = match[1];
     const fallback = toFiniteNumber(this.actor?.system?.characteristics?.[characteristicKey]?.base, CHARACTERISTIC_BASE_MIN);
-    const nextValue = clampCharacteristicBaseForRole(game.user?.role, input?.value, fallback);
+    const nextValue = this.actor?.type === PLAYER_ACTOR_TYPE
+      ? clampCharacteristicBaseForRole(game.user?.role, input?.value, fallback)
+      : toFiniteNumber(input?.value, fallback);
     input.value = String(nextValue);
     const updated = await this.applyActorUpdate({ [path]: nextValue }, {
       bloodmanAllowCharacteristicBase: true
     });
     if (updated) foundry.utils.setProperty(this.actor, path, nextValue);
+    return updated;
+  }
+
+  async updateStateModifierInput(input) {
+    const path = String(input?.name || "");
+    if (!path.startsWith("system.modifiers.")) return false;
+    const nextValue = path === "system.modifiers.label"
+      ? String(input?.value || "").trim()
+      : Math.trunc(toFiniteNumber(input?.value, 0));
+    input.value = String(nextValue);
+    const updated = await this.applyActorUpdate({ [path]: nextValue });
+    if (updated) {
+      foundry.utils.setProperty(this.actor, path, nextValue);
+      this.render(false);
+    }
+    return updated;
+  }
+
+  async updateVoyageResourceInput(input, rootLike = null) {
+    if (this.actor?.type !== PLAYER_ACTOR_TYPE) return false;
+    const path = String(input?.name || "");
+    if (!VOYAGE_RESOURCE_PATHS.has(path)) return false;
+    const root = getHTMLElementFromHtmlLike(rootLike) || input?.closest?.("form") || getSheetHTMLElement(this);
+    const currentInput = root?.querySelector?.("input[name='system.resources.voyage.current']") || null;
+    const totalInput = root?.querySelector?.("input[name='system.resources.voyage.total']") || null;
+    const storedVoyage = this.actor?.system?.resources?.voyage || {};
+    let current = normalizeNonNegativeInteger(currentInput?.value ?? storedVoyage.current, storedVoyage.current || 0);
+    let total = normalizeNonNegativeInteger(totalInput?.value ?? storedVoyage.total ?? storedVoyage.max, storedVoyage.total ?? storedVoyage.max ?? 0);
+
+    if (path === "system.resources.voyage.current" && current > total) total = current;
+    if (path === "system.resources.voyage.total" && current > total) current = total;
+
+    if (currentInput) currentInput.value = String(current);
+    if (totalInput) totalInput.value = String(total);
+    const updated = await this.applyActorUpdate({
+      "system.resources.voyage.current": current,
+      "system.resources.voyage.total": total,
+      "system.resources.voyage.max": total
+    });
+    if (updated) {
+      foundry.utils.setProperty(this.actor, "system.resources.voyage.current", current);
+      foundry.utils.setProperty(this.actor, "system.resources.voyage.total", total);
+      foundry.utils.setProperty(this.actor, "system.resources.voyage.max", total);
+    }
+    return updated;
+  }
+
+  shouldPersistGenericActorSheetControl(control) {
+    const path = String(control?.name || "").trim();
+    if (!path) return false;
+    if (control.disabled) return false;
+    if (path === "img" || path === "prototypeToken.texture.src") return false;
+    if (VITAL_RESOURCE_PATHS.has(path)) return false;
+    if (VOYAGE_RESOURCE_PATHS.has(path)) return false;
+    if (path === ARCHETYPE_BONUS_VALUE_PATH || path === ARCHETYPE_BONUS_CHARACTERISTIC_PATH) return false;
+    if (path.startsWith("system.modifiers.")) return false;
+    if (/^system\.characteristics\.[^\.]+\.base$/.test(path)) return false;
+    if (!path.startsWith("system.") && path !== "name") return false;
+    return true;
+  }
+
+  shouldSkipGenericActorSheetPersist(signature) {
+    const normalizedSignature = String(signature || "");
+    if (!normalizedSignature) return true;
+    if (!(this._genericActorSheetPersistInFlight instanceof Set)) {
+      this._genericActorSheetPersistInFlight = new Set();
+    }
+    if (this._genericActorSheetPersistInFlight.has(normalizedSignature)) return true;
+    const lastPersist = this._lastGenericActorSheetPersist || null;
+    const elapsed = Date.now() - Number(lastPersist?.at || 0);
+    return lastPersist?.signature === normalizedSignature && elapsed >= 0 && elapsed < 500;
+  }
+
+  async persistGenericActorSheetControl(control) {
+    const path = String(control?.name || "").trim();
+    if (!this.shouldPersistGenericActorSheetControl(control)) return false;
+    const value = getActorSheetControlUpdateValue(control);
+    const signature = getActorSheetPersistSignature(path, value);
+    if (this.shouldSkipGenericActorSheetPersist(signature)) return false;
+    this._genericActorSheetPersistInFlight.add(signature);
+    const updateData = { [path]: value };
+    const shouldRenderDerivedUi = isActorSheetDerivedUiPath(path);
+    try {
+      const updated = await this.applyActorUpdate(updateData, {
+        render: false,
+        bloodmanAllowAmmoUpdate: hasAmmoUpdatePayload(updateData)
+      });
+      if (updated) {
+        this._lastGenericActorSheetPersist = { signature, at: Date.now() };
+        try {
+          foundry.utils.setProperty(this.actor, path, value);
+        } catch (_error) {
+          // The document update is authoritative; this only keeps the open sheet responsive.
+        }
+        if (shouldRenderDerivedUi && this.rendered) this.queueSheetRender(false);
+      }
+      return updated;
+    } finally {
+      this._genericActorSheetPersistInFlight.delete(signature);
+    }
+  }
+
+  async updateArchetypeBonusInputs(changedControl, rootLike = null) {
+    const changedPath = String(changedControl?.name || "");
+    if (changedPath !== ARCHETYPE_BONUS_VALUE_PATH && changedPath !== ARCHETYPE_BONUS_CHARACTERISTIC_PATH) {
+      return false;
+    }
+    const root = getHTMLElementFromHtmlLike(rootLike) || changedControl?.closest?.("form") || getSheetHTMLElement(this);
+    const valueControl = root?.querySelector?.(`input[name='${ARCHETYPE_BONUS_VALUE_PATH}']`) || null;
+    const keyControl = root?.querySelector?.(`select[name='${ARCHETYPE_BONUS_CHARACTERISTIC_PATH}']`) || null;
+    const currentProfile = this.actor?.system?.profile || {};
+    const rawValue = valueControl ? valueControl.value : currentProfile.archetypeBonusValue;
+    const rawCharacteristic = keyControl ? keyControl.value : currentProfile.archetypeBonusCharacteristic;
+    const normalizedValue = normalizeArchetypeBonusValue(rawValue, currentProfile.archetypeBonusValue ?? 0);
+    const normalizedCharacteristic = normalizeCharacteristicKey(rawCharacteristic);
+    const rawCharacteristicText = String(rawCharacteristic || "").trim();
+
+    if (!Number.isFinite(normalizedValue)) {
+      ui.notifications?.error(t("BLOODMAN.Notifications.InvalidArchetypeBonusNumber"));
+      return false;
+    }
+    if (rawCharacteristicText && !normalizedCharacteristic) {
+      ui.notifications?.error(t("BLOODMAN.Notifications.InvalidArchetypeBonusCharacteristic"));
+      return false;
+    }
+    if (normalizedValue !== 0 && !normalizedCharacteristic) {
+      ui.notifications?.error(t("BLOODMAN.Notifications.ArchetypeBonusCharacteristicRequired"));
+      return false;
+    }
+
+    if (valueControl) valueControl.value = String(normalizedValue);
+    if (keyControl) keyControl.value = normalizedCharacteristic;
+    const updateData = {
+      [ARCHETYPE_BONUS_VALUE_PATH]: normalizedValue,
+      [ARCHETYPE_BONUS_CHARACTERISTIC_PATH]: normalizedCharacteristic
+    };
+    const updated = await this.applyActorUpdate(updateData);
+    if (updated) {
+      foundry.utils.setProperty(this.actor, ARCHETYPE_BONUS_VALUE_PATH, normalizedValue);
+      foundry.utils.setProperty(this.actor, ARCHETYPE_BONUS_CHARACTERISTIC_PATH, normalizedCharacteristic);
+      this.render(false);
+    }
     return updated;
   }
 
@@ -5183,8 +5454,13 @@ class BloodmanActorSheet extends BaseActorSheet {
   async _updateObject(_event, formData) {
     this.captureActorSheetNumericFocus(_event);
     const allowCharacteristicBase = canCurrentUserEditCharacteristics() && Boolean(this._characteristicsEditEnabled);
-    const allowVitalResourceUpdate = VITAL_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
+    const allowVitalResourceUpdate = eventTargetsSelector(_event, VITAL_RESOURCE_INPUT_SELECTOR)
+      && VITAL_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
+    const allowVoyageResourceUpdate = eventTargetsSelector(_event, VOYAGE_RESOURCE_INPUT_SELECTOR)
+      && VOYAGE_RESOURCE_PATH_LIST.some(path => hasUpdatePath(formData, path));
     const allowAmmoUpdate = hasAmmoUpdatePayload(formData);
+    if (!allowVitalResourceUpdate) stripUpdatePaths(formData, VITAL_RESOURCE_PATH_LIST);
+    if (!allowVoyageResourceUpdate) stripUpdatePaths(formData, VOYAGE_RESOURCE_PATH_LIST);
     if (this.actor?.isOwner || game.user?.isGM) {
       return this.actor.update(formData, {
         bloodmanAllowCharacteristicBase: allowCharacteristicBase,
@@ -5823,23 +6099,45 @@ class BloodmanActorSheet extends BaseActorSheet {
 
     html.on("change", VITAL_RESOURCE_INPUT_SELECTOR, async ev => {
       if (!canCurrentUserEditCharacteristics()) return;
-      if (this.actor?.isOwner) return;
       ev.preventDefault();
       ev.stopPropagation();
+      ev.stopImmediatePropagation?.();
       const input = ev.currentTarget;
       const path = String(input?.name || "");
       if (!VITAL_RESOURCE_PATHS.has(path)) return;
       const nextValue = Math.max(0, Math.floor(toFiniteNumber(input?.value, 0)));
-      requestVitalResourceUpdate(this.actor, path, nextValue);
+      input.value = String(nextValue);
+      if (this.actor?.isOwner || game.user?.isGM) {
+        const updated = await this.applyActorUpdate({ [path]: nextValue }, {
+          bloodmanAllowVitalResourceUpdate: true
+        });
+        if (updated) foundry.utils.setProperty(this.actor, path, nextValue);
+      } else {
+        requestVitalResourceUpdate(this.actor, path, nextValue);
+      }
     });
 
     html.on("change", CHARACTERISTIC_BASE_INPUT_SELECTOR, async ev => {
-      if (!canCurrentUserEditCharacteristics()) return;
-      if (!this._characteristicsEditEnabled) return;
-      if (this.actor?.isOwner || game.user?.isGM) return;
+      if (!this.canApplyCharacteristicBaseInputChange()) return;
       ev.preventDefault();
       ev.stopPropagation();
+      ev.stopImmediatePropagation?.();
       await this.updateTrustedCharacteristicBaseInput(ev.currentTarget);
+    });
+
+    html.on("change", VOYAGE_RESOURCE_INPUT_SELECTOR, async ev => {
+      if (!canCurrentUserEditCharacteristics()) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.stopImmediatePropagation?.();
+      await this.updateVoyageResourceInput(ev.currentTarget, html);
+    });
+
+    html.on("change", ARCHETYPE_BONUS_INPUT_SELECTOR, async ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      ev.stopImmediatePropagation?.();
+      await this.updateArchetypeBonusInputs(ev.currentTarget, html);
     });
 
     html.on("input change", VITAL_RESOURCE_INPUT_SELECTOR, () => {
@@ -6795,8 +7093,13 @@ class BloodmanActorSheet extends BaseActorSheet {
     const actorName = String(this.actor.name || "").trim() || t("BLOODMAN.Common.Name");
     const safeActorName = escapeChatMarkup(actorName);
     const safeLuckLabel = escapeChatMarkup(luckLabel);
-    const safeOutcome = escapeChatMarkup(outcome);
-    const content = `<p><strong>${safeActorName}</strong> - ${safeLuckLabel} : <strong>${safeOutcome}</strong></p><p><small>D1: <strong>${chanceValue}</strong> | D2: <strong>${luckValue}</strong></small></p>`;
+    const summary = buildCharacteristicSummaryFlavor({
+      outcome,
+      characteristicLabel: luckLabel,
+      rollTotal: luckValue,
+      success
+    });
+    const content = `<div class="bm-char-roll-result bm-luck-roll-result">${summary}<p><strong>${safeActorName}</strong> - ${safeLuckLabel}</p><p><small>D1: <strong>${chanceValue}</strong> | D2: <strong>${luckValue}</strong></small></p></div>`;
     let usedDice3d = false;
     try {
       if (game?.dice3d && typeof game.dice3d.showForRoll === "function") {
@@ -7631,8 +7934,9 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
       minimizable: true
     },
     form: {
-      submitOnChange: true,
-      closeOnSubmit: false
+      submitOnChange: false,
+      closeOnSubmit: false,
+      handler: handleBloodmanActorSheetV2Submit
     }
   }, { inplace: false });
 
@@ -7790,7 +8094,9 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
   }
 
   _prepareSubmitData(event, form, formData, updateData) {
-    const submitData = this._processFormData(event, form, formData);
+    const submitData = typeof this._processFormData === "function"
+      ? this._processFormData(event, form, formData)
+      : normalizeSheetSubmitData(formData);
     if (updateData) {
       foundry.utils.mergeObject(submitData, updateData, { applyOperators: true });
       foundry.utils.mergeObject(submitData, updateData, { applyOperators: false });
@@ -7799,7 +8105,7 @@ class BloodmanActorSheetV2 extends BloodmanActorSheetV2Base {
   }
 
   async _processSubmitData(event, _form, submitData, options = {}) {
-    return this._updateObject(event, submitData, options);
+    return this._updateObject(event, normalizeSheetSubmitData(submitData), options);
   }
 
   render(forceOrOptions = {}, maybeOptions = {}) {

@@ -66,6 +66,21 @@ async function run() {
     "system.resources.voyage.max": 10
   });
 
+  const legacyActorUpdates = [];
+  await rules.applyVoyageXPCostOnCreate(
+    {
+      type: "personnage",
+      system: { resources: { voyage: { current: 8, total: 0, max: 0 } } },
+      update: async updateData => legacyActorUpdates.push(updateData)
+    },
+    { type: "pouvoir", system: { xpVoyageCost: 3 } }
+  );
+  assert.deepEqual(legacyActorUpdates[0], {
+    "system.resources.voyage.current": 5,
+    "system.resources.voyage.total": 8,
+    "system.resources.voyage.max": 8
+  });
+
   await rules.applyVoyageXPCostOnCreate(
     actor,
     { type: "aptitude", system: { xpVoyageCost: 3 } },

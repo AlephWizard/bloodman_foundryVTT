@@ -7,6 +7,15 @@ function isCharacterLikeActor(actor) {
   return actor?.type === "personnage" || actor?.type === "personnage-non-joueur";
 }
 
+function getChangePath(changes, path) {
+  if (changes && Object.prototype.hasOwnProperty.call(changes, path)) return changes[path];
+  return foundry.utils.getProperty(changes, path);
+}
+
+function hasChangePath(changes, path) {
+  return getChangePath(changes, path) != null;
+}
+
 export function buildActorUpdateHooks({
   characteristics,
   normalizeArchetypeBonusValue,
@@ -34,13 +43,13 @@ export function buildActorUpdateHooks({
     const currentUserId = String(game.user?.id || "");
     if (sourceUserId && currentUserId && sourceUserId !== currentUserId) return;
     if (!game.user.isGM && !actor.isOwner) return;
-    if (foundry.utils.getProperty(changes, "system.resources.move.value") != null) return;
+    if (hasChangePath(changes, "system.resources.move.value")) return;
     const hasCharBaseChange = characteristics.some(c => {
-      return foundry.utils.getProperty(changes, `system.characteristics.${c.key}.base`) != null;
+      return hasChangePath(changes, `system.characteristics.${c.key}.base`);
     });
-    const hasNpcRoleChange = foundry.utils.getProperty(changes, "system.npcRole") != null;
-    const hasArchetypeBonusChange = foundry.utils.getProperty(changes, "system.profile.archetypeBonusValue") != null
-      || foundry.utils.getProperty(changes, "system.profile.archetypeBonusCharacteristic") != null;
+    const hasNpcRoleChange = hasChangePath(changes, "system.npcRole");
+    const hasArchetypeBonusChange = hasChangePath(changes, "system.profile.archetypeBonusValue")
+      || hasChangePath(changes, "system.profile.archetypeBonusCharacteristic");
     if (!hasCharBaseChange && !hasNpcRoleChange && !hasArchetypeBonusChange) return;
 
     const itemBonuses = getItemBonusTotals(actor);
@@ -59,8 +68,8 @@ export function buildActorUpdateHooks({
       archetypeBonusValue
     });
     const derivedPvMax = getDerivedPvMax(actor, phyEffective);
-    const pvMaxChange = foundry.utils.getProperty(changes, "system.resources.pv.max") != null;
-    const ppMaxChange = foundry.utils.getProperty(changes, "system.resources.pp.max") != null;
+    const pvMaxChange = hasChangePath(changes, "system.resources.pv.max");
+    const ppMaxChange = hasChangePath(changes, "system.resources.pp.max");
     const { updates: resourceUpdates } = computeUpdateActorDerivedResourceUpdateData({
       derivedPvMax,
       espEffective,
@@ -79,7 +88,7 @@ export function buildActorUpdateHooks({
   async function handleUpdateActorZeroPvSync(actor, changes) {
     if (!isCharacterLikeActor(actor)) return;
     if (!game.user.isGM) return;
-    const hasPvChange = foundry.utils.getProperty(changes, "system.resources.pv.current") != null;
+    const hasPvChange = hasChangePath(changes, "system.resources.pv.current");
     if (!hasPvChange) return;
     const pvCurrent = Number(actor.system?.resources?.pv?.current);
     if (Number.isFinite(pvCurrent)) {
@@ -100,7 +109,7 @@ export function buildActorUpdateHooks({
     if (!game.user.isGM) return;
     if (typeof syncInjuredStateStatusForActor !== "function") return;
     if (typeof resolveInjuredStateActive !== "function") return;
-    const hasStateLabelChange = foundry.utils.getProperty(changes, "system.modifiers.label") != null;
+    const hasStateLabelChange = hasChangePath(changes, "system.modifiers.label");
     if (!hasStateLabelChange) return;
     const active = Boolean(resolveInjuredStateActive(actor.system?.modifiers?.label || ""));
     await syncInjuredStateStatusForActor(actor, active);
@@ -112,7 +121,7 @@ export function buildActorUpdateHooks({
     if (options?.bloodmanSkipPrototypeImageSync) return;
     if (options?.bloodmanSkipSceneTokenImageSync) return;
 
-    const hasActorImageChange = foundry.utils.getProperty(changes, "img") != null;
+    const hasActorImageChange = hasChangePath(changes, "img");
     if (!hasActorImageChange) return;
 
     if (actor.isToken) {
@@ -152,10 +161,7 @@ export function buildActorUpdateHooks({
       ?? foundry.utils.getProperty(actor, "prototypeToken.texture.src")
       ?? ""
     ).trim();
-    const requestedPrototypeImage = String(
-      foundry.utils.getProperty(changes, "prototypeToken.texture.src")
-      ?? ""
-    ).trim();
+    const requestedPrototypeImage = String(getChangePath(changes, "prototypeToken.texture.src") ?? "").trim();
     if (
       requestedPrototypeImage
       && requestedPrototypeImage !== actorImageSrc

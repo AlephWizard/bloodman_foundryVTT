@@ -212,6 +212,25 @@ function run() {
   });
 
   withGlobals(({ notificationErrors }) => {
+    const hooks = buildHooks();
+    const actor = buildActor("personnage");
+    actor.system.resources.pv.max = 0;
+    actor.system.resources.pv.current = 0;
+    actor.system.resources.pp.max = 0;
+    actor.system.resources.pp.current = 0;
+    const updateData = {
+      "system.characteristics.PHY.base": 40,
+      "system.characteristics.ESP.base": 35
+    };
+    hooks.onPreUpdateActor(actor, updateData, {}, "u2");
+    assert.equal(getProperty(updateData, "system.resources.pv.max"), 8);
+    assert.equal(getProperty(updateData, "system.resources.pv.current"), 8);
+    assert.equal(getProperty(updateData, "system.resources.pp.max"), 7);
+    assert.equal(getProperty(updateData, "system.resources.pp.current"), 7);
+    assert.deepEqual(notificationErrors, []);
+  });
+
+  withGlobals(({ notificationErrors }) => {
     let itemBonusCallCount = 0;
     const hooks = buildHooks({
       getItemBonusTotals: () => {

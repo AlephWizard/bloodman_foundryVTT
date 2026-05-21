@@ -1,14 +1,42 @@
 export function createDefaultDataBuilders({ characteristics = [] } = {}) {
   const characteristicList = Array.isArray(characteristics) ? characteristics : [];
+  const DEFAULT_CHARACTERISTIC_BASE = 30;
 
   function buildDefaultCharacteristics() {
     const result = {};
     for (const characteristic of characteristicList) {
       const key = String(characteristic?.key || "").trim();
       if (!key) continue;
-      result[key] = { base: 50, xp: [false, false, false] };
+      result[key] = { base: DEFAULT_CHARACTERISTIC_BASE, xp: [false, false, false] };
     }
     return result;
+  }
+
+  function buildMissingCharacteristicUpdates(currentCharacteristics) {
+    const updates = {};
+    if (!currentCharacteristics || typeof currentCharacteristics !== "object") {
+      updates["system.characteristics"] = buildDefaultCharacteristics();
+      return updates;
+    }
+
+    for (const characteristic of characteristicList) {
+      const key = String(characteristic?.key || "").trim();
+      if (!key) continue;
+      const current = currentCharacteristics[key];
+      if (!current || typeof current !== "object") {
+        updates[`system.characteristics.${key}`] = { base: DEFAULT_CHARACTERISTIC_BASE, xp: [false, false, false] };
+        continue;
+      }
+      const numericBase = Number(current.base);
+      if (current.base == null || !Number.isFinite(numericBase)) {
+        updates[`system.characteristics.${key}.base`] = DEFAULT_CHARACTERISTIC_BASE;
+      }
+      if (!Array.isArray(current.xp)) {
+        updates[`system.characteristics.${key}.xp`] = [false, false, false];
+      }
+    }
+
+    return updates;
   }
 
   function buildDefaultModifiers() {
@@ -67,6 +95,7 @@ export function createDefaultDataBuilders({ characteristics = [] } = {}) {
 
   return {
     buildDefaultCharacteristics,
+    buildMissingCharacteristicUpdates,
     buildDefaultModifiers,
     buildDefaultResources,
     buildDefaultProfile,

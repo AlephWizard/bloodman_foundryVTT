@@ -32,14 +32,13 @@ export function createItemVoyageXpRules({
     const cost = normalizeNonNegativeInteger(item.system?.xpVoyageCost, 0);
     if (cost <= 0) return;
 
-    const voyageTotal = normalizeNonNegativeInteger(
+    const storedVoyageCurrent = normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0);
+    const storedVoyageTotal = normalizeNonNegativeInteger(
       actor.system?.resources?.voyage?.total ?? actor.system?.resources?.voyage?.max,
       0
     );
-    const voyageCurrent = Math.min(
-      normalizeNonNegativeInteger(actor.system?.resources?.voyage?.current, 0),
-      voyageTotal
-    );
+    const voyageTotal = Math.max(storedVoyageTotal, storedVoyageCurrent);
+    const voyageCurrent = Math.min(storedVoyageCurrent, voyageTotal);
     const nextVoyageCurrent = Math.max(0, voyageCurrent - cost);
     if (nextVoyageCurrent === voyageCurrent) return;
 

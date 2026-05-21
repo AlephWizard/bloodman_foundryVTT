@@ -198,7 +198,8 @@ export function computeDerivedResourceSyncUpdateData({
   currentPpMax,
   currentPv,
   currentPp,
-  clampMaxToZero = true
+  clampMaxToZero = true,
+  initializeCurrentWhenMaxWasZero = false
 } = {}) {
   const derivedPpMax = Math.round(toFiniteNumber(espEffective, 0) / 5);
   const rawPvMax = toFiniteNumber(derivedPvMax, 0) + toFiniteNumber(storedPvBonus, 0);
@@ -214,8 +215,26 @@ export function computeDerivedResourceSyncUpdateData({
   const updates = {};
   if (numericCurrentPvMax !== nextPvMax) updates["system.resources.pv.max"] = nextPvMax;
   if (numericCurrentPpMax !== nextPpMax) updates["system.resources.pp.max"] = nextPpMax;
-  if (numericCurrentPv > nextPvMax) updates["system.resources.pv.current"] = nextPvMax;
-  if (numericCurrentPp > nextPpMax) updates["system.resources.pp.current"] = nextPpMax;
+  if (
+    initializeCurrentWhenMaxWasZero
+    && numericCurrentPvMax <= 0
+    && numericCurrentPv <= 0
+    && nextPvMax > 0
+  ) {
+    updates["system.resources.pv.current"] = nextPvMax;
+  } else if (numericCurrentPv > nextPvMax) {
+    updates["system.resources.pv.current"] = nextPvMax;
+  }
+  if (
+    initializeCurrentWhenMaxWasZero
+    && numericCurrentPpMax <= 0
+    && numericCurrentPp <= 0
+    && nextPpMax > 0
+  ) {
+    updates["system.resources.pp.current"] = nextPpMax;
+  } else if (numericCurrentPp > nextPpMax) {
+    updates["system.resources.pp.current"] = nextPpMax;
+  }
 
   return {
     nextPvMax,
@@ -244,8 +263,10 @@ export function computeUpdateActorDerivedResourceUpdateData({
   const ppMax = toFiniteNumber(currentPpMax, derivedPpTotal);
   const pvCurrent = toFiniteNumber(currentPv, 0);
   const ppCurrent = toFiniteNumber(currentPp, 0);
-  const allowedPvMax = Math.max(0, pvMax);
-  const allowedPpMax = Math.max(0, ppMax);
+  const nextPvMax = pvMaxChange ? pvMax : derivedPvTotal;
+  const nextPpMax = ppMaxChange ? ppMax : derivedPpTotal;
+  const allowedPvMax = Math.max(0, nextPvMax);
+  const allowedPpMax = Math.max(0, nextPpMax);
 
   const updates = {};
   if (!pvMaxChange && derivedPvTotal !== pvMax) updates["system.resources.pv.max"] = derivedPvTotal;

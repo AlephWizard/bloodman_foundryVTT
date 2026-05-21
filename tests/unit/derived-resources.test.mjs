@@ -199,6 +199,26 @@ function run() {
   );
 
   assert.deepEqual(
+    computeDerivedResourceSyncUpdateData({
+      derivedPvMax: 10,
+      espEffective: 50,
+      storedPvBonus: 0,
+      storedPpBonus: 0,
+      currentPvMax: 0,
+      currentPpMax: 0,
+      currentPv: 0,
+      currentPp: 0,
+      initializeCurrentWhenMaxWasZero: true
+    }).updates,
+    {
+      "system.resources.pv.max": 10,
+      "system.resources.pp.max": 10,
+      "system.resources.pv.current": 10,
+      "system.resources.pp.current": 10
+    }
+  );
+
+  assert.deepEqual(
     computeUpdateActorDerivedResourceUpdateData({
       derivedPvMax: 11,
       espEffective: 24,
@@ -213,7 +233,7 @@ function run() {
     }).updates,
     {
       "system.resources.pv.max": 12,
-      "system.resources.pv.current": 20,
+      "system.resources.pv.current": 12,
       "system.resources.pp.current": 5
     }
   );

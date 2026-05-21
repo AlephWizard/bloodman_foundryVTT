@@ -304,6 +304,27 @@ function run() {
     true,
     "ActorSheetV2 should restore actor sheet root classes when the template root is flattened"
   );
+
+  assert.equal(
+    runtimeSource.includes("handler: handleBloodmanActorSheetV2Submit")
+      && runtimeSource.includes("normalizeSheetSubmitData(formData)"),
+    true,
+    "ActorSheetV2 form submissions should be wired to actor updates"
+  );
+
+  assert.equal(
+    runtimeSource.includes("persistGenericActorSheetControl(control)")
+      && runtimeSource.includes("submitOnChange: false"),
+    true,
+    "Actor sheets should persist individual fields without relying on full-form submit-on-change"
+  );
+
+  assert.equal(
+    runtimeSource.includes("shouldSkipGenericActorSheetPersist(signature)")
+      && runtimeSource.includes("render: false"),
+    true,
+    "Actor sheet field persistence should deduplicate duplicate blur/change events and avoid double renders"
+  );
 }
 
 run();

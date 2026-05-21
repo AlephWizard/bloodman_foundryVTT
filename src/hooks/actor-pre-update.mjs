@@ -231,7 +231,9 @@ export function buildActorPreUpdateHooks({
         }
         if (!hasPvCurrentUpdate) {
           const currentPv = toFiniteNumber(actor.system.resources?.pv?.current, 0);
-          if (currentPv > nextPvMax) {
+          if (currentPvMax <= 0 && currentPv <= 0 && nextPvMax > 0) {
+            foundry.utils.setProperty(updateData, pvCurrentPath, nextPvMax);
+          } else if (currentPv > nextPvMax) {
             foundry.utils.setProperty(updateData, pvCurrentPath, nextPvMax);
           }
         }
@@ -244,7 +246,9 @@ export function buildActorPreUpdateHooks({
         }
         if (!hasPpCurrentUpdate) {
           const currentPp = toFiniteNumber(actor.system.resources?.pp?.current, 0);
-          if (currentPp > nextPpMax) {
+          if (currentPpMax <= 0 && currentPp <= 0 && nextPpMax > 0) {
+            foundry.utils.setProperty(updateData, ppCurrentPath, nextPpMax);
+          } else if (currentPp > nextPpMax) {
             foundry.utils.setProperty(updateData, ppCurrentPath, nextPpMax);
           }
         }

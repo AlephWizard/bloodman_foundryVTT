@@ -8,11 +8,28 @@ async function run() {
 
   const characteristics = builders.buildDefaultCharacteristics();
   assert.deepEqual(characteristics, {
-    PHY: { base: 50, xp: [false, false, false] },
-    ESP: { base: 50, xp: [false, false, false] },
-    MOU: { base: 50, xp: [false, false, false] }
+    PHY: { base: 30, xp: [false, false, false] },
+    ESP: { base: 30, xp: [false, false, false] },
+    MOU: { base: 30, xp: [false, false, false] }
   });
   assert.notEqual(characteristics.PHY, characteristics.ESP);
+
+  assert.deepEqual(builders.buildMissingCharacteristicUpdates(null), {
+    "system.characteristics": {
+      PHY: { base: 30, xp: [false, false, false] },
+      ESP: { base: 30, xp: [false, false, false] },
+      MOU: { base: 30, xp: [false, false, false] }
+    }
+  });
+  assert.deepEqual(builders.buildMissingCharacteristicUpdates({
+    PHY: { base: 42, xp: [true, false, false], hiddenRoll: true },
+    ESP: {},
+    MOU: null
+  }), {
+    "system.characteristics.ESP.base": 30,
+    "system.characteristics.ESP.xp": [false, false, false],
+    "system.characteristics.MOU": { base: 30, xp: [false, false, false] }
+  });
 
   const modifiers = builders.buildDefaultModifiers();
   assert.deepEqual(modifiers, {
