@@ -108,7 +108,8 @@ function run() {
     "./actors/actor-personnage-visual-pass.css",
     "./actors/actor-personnage-window.css",
     "./actors/actor-personnage-responsive.css",
-    "./actors/actor-personnage-ux.css"
+    "./actors/actor-personnage-ux.css",
+    "./actors/actor-personnage-dark-theme.css"
   ]);
 
   assert.deepEqual(parseCssImports(readText("styles/item-unified.css")), [
