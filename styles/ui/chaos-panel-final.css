@@ -239,3 +239,48 @@
   box-shadow: 0 0 0 1px #d63c3c !important;
 }
 
+/* Keep the compact panel readable: active state is a restrained signal, not a decoration. */
+#bm-chaos-dice {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease !important;
+}
+
+#bm-chaos-dice.is-active {
+  border-color: #d63c3c !important;
+  box-shadow:
+    0 0 0 1px rgba(214, 60, 60, 0.38),
+    0 8px 18px rgba(0, 0, 0, 0.36) !important;
+}
+
+#bm-chaos-dice.is-dragging {
+  filter: brightness(1.08);
+  transform: scale(1.01);
+}
+
+#bm-chaos-dice .bm-chaos-panel-header {
+  transition: color var(--bm-motion-fast) ease !important;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-panel-header {
+  color: #ffebe9 !important;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-icon {
+  box-shadow:
+    0 0 0 1px #d63c3c,
+    inset 0 0 0 1px rgba(214, 60, 60, 0.18) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #bm-chaos-dice,
+  #bm-chaos-dice *,
+  #bm-chaos-dice *::before,
+  #bm-chaos-dice *::after {
+    animation: none !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+

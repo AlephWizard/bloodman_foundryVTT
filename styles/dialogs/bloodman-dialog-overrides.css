@@ -2162,3 +2162,90 @@
     linear-gradient(180deg, #11100f 0%, #070707 100%) !important;
 }
 
+/* Shared dialog motion: short, readable feedback for modal surfaces and primary actions. */
+.window-app.bloodman-damage-dialog .window-content,
+.window-app.dialog.bloodman-damage-dialog .window-content,
+.application.bloodman-damage-dialog .window-content,
+.window-app.bloodman-damage-config-dialog .window-content,
+.window-app.dialog.bloodman-damage-config-dialog .window-content,
+.application.bloodman-damage-config-dialog .window-content,
+.window-app.bloodman-drop-decision-dialog .window-content,
+.window-app.dialog.bloodman-drop-decision-dialog .window-content,
+.application.bloodman-drop-decision-dialog .window-content,
+.window-app.bloodman-insufficient-funds-dialog .window-content,
+.window-app.dialog.bloodman-insufficient-funds-dialog .window-content,
+.application.bloodman-insufficient-funds-dialog .window-content {
+  animation: bm-dialog-surface-enter var(--bm-motion-medium) var(--bm-ease-standard) both;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button,
+.application.bloodman-damage-dialog .dialog-buttons button,
+.window-app.bloodman-damage-config-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button,
+.application.bloodman-damage-config-dialog .dialog-buttons button,
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button,
+.application.bloodman-drop-decision-dialog .dialog-buttons button,
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button,
+.window-app.bloodman-damage-config-dialog .form-footer button,
+.window-app.dialog.bloodman-damage-config-dialog .form-footer button,
+.application.bloodman-damage-config-dialog .form-footer button {
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    color var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease !important;
+}
+
+.window-app.bloodman-damage-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-damage-dialog .dialog-buttons button:hover,
+.application.bloodman-damage-dialog .dialog-buttons button:hover,
+.window-app.bloodman-damage-config-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-damage-config-dialog .dialog-buttons button:hover,
+.application.bloodman-damage-config-dialog .dialog-buttons button:hover,
+.window-app.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.application.bloodman-drop-decision-dialog .dialog-buttons button:hover,
+.window-app.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
+.window-app.dialog.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
+.application.bloodman-insufficient-funds-dialog .dialog-buttons button:hover,
+.window-app.bloodman-damage-config-dialog .form-footer button:hover,
+.window-app.dialog.bloodman-damage-config-dialog .form-footer button:hover,
+.application.bloodman-damage-config-dialog .form-footer button:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes bm-dialog-surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.994);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window-app.bloodman-damage-dialog .window-content,
+  .window-app.dialog.bloodman-damage-dialog .window-content,
+  .application.bloodman-damage-dialog .window-content,
+  .window-app.bloodman-damage-config-dialog .window-content,
+  .window-app.dialog.bloodman-damage-config-dialog .window-content,
+  .application.bloodman-damage-config-dialog .window-content,
+  .window-app.bloodman-drop-decision-dialog .window-content,
+  .window-app.dialog.bloodman-drop-decision-dialog .window-content,
+  .application.bloodman-drop-decision-dialog .window-content,
+  .window-app.bloodman-insufficient-funds-dialog .window-content,
+  .window-app.dialog.bloodman-insufficient-funds-dialog .window-content,
+  .application.bloodman-insufficient-funds-dialog .window-content {
+    animation: none !important;
+  }
+}
+

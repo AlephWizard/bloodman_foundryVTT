@@ -9,6 +9,18 @@
   --bm-ink: #121212;
   --bm-line: #111111;
   --bm-white: #f6f5f2;
+  --bm-radius-xs: 4px;
+  --bm-radius-sm: 6px;
+  --bm-radius-md: 8px;
+  --bm-radius-lg: 12px;
+  --bm-motion-instant: 90ms;
+  --bm-motion-fast: 120ms;
+  --bm-motion-medium: 180ms;
+  --bm-motion-slow: 300ms;
+  --bm-ease-standard: cubic-bezier(0.2, 0.78, 0.28, 1);
+  --bm-shadow-lift: 0 8px 18px rgba(0, 0, 0, 0.24);
+  --bm-shadow-panel: 0 16px 30px rgba(0, 0, 0, 0.42);
+  --bm-focus-ring: rgba(200, 55, 46, 0.3);
 }
 
 .bloodman.sheet.actor,

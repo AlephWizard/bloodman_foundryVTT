@@ -1160,3 +1160,341 @@
   -webkit-text-fill-color: #111111 !important;
   text-shadow: none !important;
 }
+
+/* Final visual pass: clearer active affordances with the existing dark, clean direction. */
+.bloodman-sheet .sheet-tabs .item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    color var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .sheet-tabs .item i {
+  font-size: 0.9em;
+  opacity: 0.72;
+  transition:
+    opacity var(--bm-motion-fast) ease,
+    transform var(--bm-motion-fast) ease;
+}
+
+.bloodman-sheet .sheet-tabs .item::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -3px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--bm-dark-accent);
+  opacity: 0;
+  transform: scaleX(0.28);
+  transform-origin: center;
+  transition:
+    opacity var(--bm-motion-fast) ease,
+    transform var(--bm-motion-medium) var(--bm-ease-standard);
+}
+
+.bloodman-sheet .sheet-tabs .item:hover,
+.bloodman-sheet .sheet-tabs .item:focus-visible {
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .sheet-tabs .item:hover i,
+.bloodman-sheet .sheet-tabs .item:focus-visible i,
+.bloodman-sheet .sheet-tabs .item.active i {
+  opacity: 1;
+}
+
+.bloodman-sheet .sheet-tabs .item.active::after {
+  opacity: 0.95;
+  transform: scaleX(1);
+}
+
+.bloodman-sheet .resource-circle.pv,
+.bloodman-sheet .resource-circle.pp {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .resource-circle.pv:hover,
+.bloodman-sheet .resource-circle.pp:hover,
+.bloodman-sheet .resource-circle.pv:focus-within,
+.bloodman-sheet .resource-circle.pp:focus-within {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--bm-dark-accent) 54%, transparent),
+    var(--bm-shadow-lift) !important;
+}
+
+.bloodman-sheet .state-preset-panel {
+  transform-origin: top right;
+}
+
+.bloodman-sheet .state-preset-menu[open] .state-preset-panel {
+  animation: bm-popover-open var(--bm-motion-medium) var(--bm-ease-standard) both;
+}
+
+.bloodman-sheet .item.item--stacked,
+.bloodman-sheet .equiper-avec-item {
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .item.item--stacked:hover,
+.bloodman-sheet .item.item--stacked:focus-within,
+.bloodman-sheet .equiper-avec-item:hover,
+.bloodman-sheet .equiper-avec-item:focus-within {
+  transform: translateY(-1px);
+}
+
+@keyframes bm-popover-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloodman-sheet .state-preset-menu[open] .state-preset-panel {
+    animation: none !important;
+  }
+
+  .bloodman-sheet .sheet-tabs .item::after {
+    transition: none !important;
+  }
+}
+
+/* Actor sheet detail pass: stronger cues for portrait, presets, and primary rolls. */
+.bloodman-sheet .portrait-frame {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .portrait-frame:hover,
+.bloodman-sheet .portrait-frame:focus-within {
+  border-color: color-mix(in srgb, var(--bm-dark-accent) 62%, #ffffff 20%) !important;
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bm-dark-accent) 24%, transparent),
+    0 12px 24px rgba(0, 0, 0, 0.34) !important;
+}
+
+.bloodman-sheet .state-preset-item:hover,
+.bloodman-sheet .state-preset-item:focus-visible {
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .char-roll,
+.bloodman-sheet button.xp-roll,
+.bloodman-sheet button.luck-roll-header {
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    color var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .char-roll:hover,
+.bloodman-sheet .char-roll:focus-visible,
+.bloodman-sheet button.xp-roll:hover,
+.bloodman-sheet button.xp-roll:focus-visible,
+.bloodman-sheet button.luck-roll-header:hover,
+.bloodman-sheet button.luck-roll-header:focus-visible {
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet button.xp-roll:hover,
+.bloodman-sheet button.xp-roll:focus-visible {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bm-dark-accent) 22%, transparent),
+    0 5px 12px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* Inventory readability: item type colors live on icons and hover glow, keeping rows clean. */
+.bloodman-sheet .item.item--stacked,
+.bloodman-sheet .equiper-avec-item {
+  --bm-list-item-accent: var(--bm-dark-accent-2);
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="arme"] {
+  --bm-list-item-accent: var(--bm-dark-danger);
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="protection"] {
+  --bm-list-item-accent: var(--bm-dark-accent-2);
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="pouvoir"] {
+  --bm-list-item-accent: var(--bm-dark-magic);
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="soin"] {
+  --bm-list-item-accent: var(--bm-dark-success);
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="ration"] {
+  --bm-list-item-accent: #78a394;
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="objet"] {
+  --bm-list-item-accent: #8f9aaa;
+}
+
+.bloodman-sheet .item.item--stacked[data-item-type="aptitude"] {
+  --bm-list-item-accent: #c49763;
+}
+
+.bloodman-sheet .item.item--stacked .item-icon,
+.bloodman-sheet .equiper-avec-item .equiper-avec-icon {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .item.item--stacked:hover .item-icon,
+.bloodman-sheet .item.item--stacked:focus-within .item-icon,
+.bloodman-sheet .equiper-avec-item:hover .equiper-avec-icon,
+.bloodman-sheet .equiper-avec-item:focus-within .equiper-avec-icon {
+  border-color: color-mix(in srgb, var(--bm-list-item-accent) 76%, #ffffff 12%) !important;
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bm-list-item-accent) 24%, transparent),
+    0 6px 12px rgba(0, 0, 0, 0.32) !important;
+}
+
+.bloodman-sheet .item.item--stacked:hover .item-name,
+.bloodman-sheet .item.item--stacked:focus-within .item-name,
+.bloodman-sheet .equiper-avec-item:hover .equiper-avec-name,
+.bloodman-sheet .equiper-avec-item:focus-within .equiper-avec-name {
+  color: color-mix(in srgb, var(--bm-list-item-accent) 34%, #ffffff 66%) !important;
+}
+
+.bloodman-sheet .identity-card,
+.bloodman-sheet .characteristics-card,
+.bloodman-sheet .notes-card,
+.bloodman-sheet .equip-block,
+.bloodman-sheet .aptitudes-card,
+.bloodman-sheet .powers-card {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease;
+}
+
+.bloodman-sheet .identity-card:focus-within,
+.bloodman-sheet .characteristics-card:focus-within,
+.bloodman-sheet .notes-card:focus-within,
+.bloodman-sheet .equip-block:focus-within,
+.bloodman-sheet .aptitudes-card:focus-within,
+.bloodman-sheet .powers-card:focus-within {
+  filter: brightness(1.02);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--bm-dark-accent) 28%, transparent),
+    var(--bm-dark-inner-glow),
+    0 14px 28px rgba(0, 0, 0, 0.26) !important;
+}
+
+.bloodman-sheet .card-header .card-title i,
+.bloodman-sheet .equip-title i {
+  color: color-mix(in srgb, var(--bm-dark-accent) 64%, #ffffff 36%);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--bm-dark-accent) 18%, transparent));
+}
+
+/* Session readability: ammunition and writing fields get clearer focus without extra stripes. */
+.bloodman-sheet .ammo-line {
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 2px;
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease;
+}
+
+.bloodman-sheet .ammo-line:hover,
+.bloodman-sheet .ammo-line:focus-within {
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.bloodman-sheet .ammo-line.is-active {
+  border-color: color-mix(in srgb, var(--bm-dark-accent-2) 48%, transparent);
+  background:
+    linear-gradient(180deg, rgba(196, 151, 99, 0.12), rgba(196, 151, 99, 0.05)),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: 0 0 0 1px rgba(196, 151, 99, 0.08);
+}
+
+.bloodman-sheet .ammo-line.is-empty {
+  border-color: rgba(212, 90, 80, 0.36);
+  background:
+    linear-gradient(180deg, rgba(212, 90, 80, 0.11), rgba(212, 90, 80, 0.035)),
+    rgba(255, 255, 255, 0.018);
+}
+
+.bloodman-sheet .ammo-line-empty {
+  color: #f0b0aa;
+  opacity: 0.9;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.bloodman-sheet textarea.bm-autogrow-field,
+.bloodman-sheet .notes-card textarea,
+.bloodman-sheet .abilities-powers-note {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    min-height var(--bm-motion-medium) ease;
+}
+
+.bloodman-sheet textarea.bm-autogrow-field:focus,
+.bloodman-sheet textarea.bm-autogrow-field:focus-visible,
+.bloodman-sheet .notes-card textarea:focus,
+.bloodman-sheet .notes-card textarea:focus-visible,
+.bloodman-sheet .abilities-powers-note:focus,
+.bloodman-sheet .abilities-powers-note:focus-visible {
+  filter: brightness(1.04);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bm-dark-accent) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.bloodman-sheet .notes-card textarea:focus,
+.bloodman-sheet .notes-card textarea:focus-visible {
+  min-height: 190px;
+}
+
+.bloodman-sheet .abilities-powers-note:focus,
+.bloodman-sheet .abilities-powers-note:focus-visible {
+  min-height: 92px;
+}

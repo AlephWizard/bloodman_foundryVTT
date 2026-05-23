@@ -432,3 +432,77 @@
   border-radius: 4px;
   background: rgba(92, 18, 16, 0.54);
 }
+
+/* Focus the eye on the active item section without adding decorative clutter. */
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel {
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel:hover {
+  border-color: color-mix(in srgb, var(--bm-item-accent) 58%, var(--bm-item-border) 42%);
+  filter: brightness(1.035);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:focus-within,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel:focus-within {
+  transform: translateY(-1px);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:focus-within::after,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-note-panel:focus-within::after {
+  opacity: 1;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-img {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-img:hover,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-img:focus-within {
+  border-color: var(--bm-item-accent);
+  box-shadow:
+    0 0 0 2px var(--bm-item-accent-glow),
+    0 10px 18px rgba(0, 0, 0, 0.46);
+  transform: translateY(-1px);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section-title i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  border: 1px solid rgba(var(--bm-item-type-accent-rgb), 0.58);
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 45%),
+    rgba(var(--bm-item-type-accent-rgb), 0.16);
+  color: var(--bm-item-accent);
+  font-size: 10px;
+  text-shadow: none;
+  box-shadow: 0 0 0 2px rgba(var(--bm-item-type-accent-rgb), 0.08);
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    color var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:hover .bm-item-unified-section-title i,
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:focus-within .bm-item-unified-section-title i {
+  border-color: rgba(var(--bm-item-type-accent-rgb), 0.88);
+  background: var(--bm-item-accent);
+  color: var(--bm-item-type-badge-text);
+  transform: scale(1.06);
+}
