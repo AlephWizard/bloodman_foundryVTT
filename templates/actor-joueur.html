@@ -106,7 +106,7 @@
 
             <div class="characteristics-table">
               {{#each characteristics}}
-                <div class="char-row {{#if this.showMoveValue}}move-row{{/if}}" data-key="{{this.key}}">
+                <div class="char-row {{#if this.showMoveValue}}move-row{{/if}} xp-count-{{this.xpCount}}{{#if this.xpProgressAnimate}} xp-progress-animate{{/if}}" data-key="{{this.key}}" style="--bm-xp-progress-start: {{this.xpProgressStart}};">
                   <div class="char-icon"><i class="fa-solid {{this.icon}}"></i></div>
                   <div class="char-base">
                     <input type="number" class="char-base-input {{#unless ../characteristicsEditEnabled}}is-locked{{/unless}}" name="system.characteristics.{{this.key}}.base" value="{{this.base}}" {{#if ../characteristicBaseHasBounds}}min="{{../characteristicBaseMin}}" max="{{../characteristicBaseMax}}"{{/if}} {{#unless ../characteristicsEditEnabled}}readonly{{/unless}} />

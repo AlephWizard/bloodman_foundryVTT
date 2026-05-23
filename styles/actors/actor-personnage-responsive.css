@@ -85,10 +85,18 @@
   -webkit-text-fill-color: #b83228 !important;
 }
 
+.bloodman-sheet .state-field.is-negative span {
+  color: #b83228 !important;
+}
+
 .bloodman-sheet .state-field.is-positive input[type="number"],
 .bloodman-sheet .char-modifier.positive {
   color: #2f8a42 !important;
   -webkit-text-fill-color: #2f8a42 !important;
+}
+
+.bloodman-sheet .state-field.is-positive span {
+  color: #2f8a42 !important;
 }
 
 .bloodman-sheet .char-xp .xp-check input[type="checkbox"] {

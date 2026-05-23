@@ -701,8 +701,7 @@ const {
   applyStateModifierUpdateToData,
   buildStatePresetModifierLabel,
   buildStatePresetTooltip,
-  buildStatePresetDisplayData,
-  buildInvalidStatePresetMessage
+  buildStatePresetDisplayData
 } = statePresetRules;
 
 function stopHandledDropEvent(eventLike) {
@@ -929,6 +928,7 @@ const ENABLE_CHAT_TRANSPORT_FALLBACK = false;
 const CHAOS_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-chaos-request</span>";
 const REROLL_REQUEST_CHAT_MARKUP = "<span style='display:none'>bloodman-reroll-request</span>";
 const INITIATIVE_GROUP_BUFFER_MS = 180;
+const XP_PROGRESS_ANIMATION_MS = 700;
 const TOKEN_MOVE_LIMIT_EPSILON = 0.0001;
 let LAST_COMBAT_MOVE_RESET_KEY = "";
 let LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
@@ -937,6 +937,17 @@ function resetCombatRuntimeKeys() {
   LAST_COMBAT_MOVE_RESET_KEY = "";
   LAST_COMBAT_MOVE_HISTORY_RESET_KEY = "";
   LAST_TOKEN_HUD_COUNTER_TICK_KEY = "";
+}
+
+function getXpProgressCount(xp = []) {
+  return Array.isArray(xp) ? xp.filter(Boolean).length : 0;
+}
+
+function getXpProgressPercent(count = 0) {
+  const normalized = Math.max(0, Math.min(3, Math.floor(Number(count) || 0)));
+  if (normalized >= 3) return "100%";
+  if (normalized <= 0) return "0%";
+  return normalized === 1 ? "33.333%" : "66.667%";
 }
 const chaosDicePanelController = createChaosDicePanelController({
   systemId: SYSTEM_ID,
@@ -3492,7 +3503,6 @@ const actorPreUpdateHooks = buildActorPreUpdateHooks({
   normalizeActorEquipmentCurrencyUpdateData,
   buildInvalidCurrencyCurrentMessage,
   normalizeCharacteristicBaseUpdatesForRole,
-  buildInvalidStatePresetMessage,
   buildStateModifierUpdateFromLabel,
   applyStateModifierUpdateToData,
   getItemBonusTotals,
@@ -4303,6 +4313,49 @@ class BloodmanActorSheet extends BaseActorSheet {
       fallbackEnabled: 1
     });
     return { enabled, remaining };
+  }
+
+  rememberXpProgressAnimation(characteristicKey, previousCount, nextCount) {
+    const key = String(characteristicKey || "").trim();
+    const fromCount = Math.max(0, Math.min(3, Math.floor(Number(previousCount) || 0)));
+    const toCount = Math.max(0, Math.min(3, Math.floor(Number(nextCount) || 0)));
+    if (!key || toCount <= fromCount) return;
+    const now = Date.now();
+    this._xpProgressAnimationState = {
+      key,
+      fromCount,
+      toCount,
+      expiresAt: now + XP_PROGRESS_ANIMATION_MS + 180
+    };
+  }
+
+  getXpProgressAnimationState(characteristicKey, currentCount) {
+    const key = String(characteristicKey || "").trim();
+    const animation = this._xpProgressAnimationState || null;
+    const normalizedCount = Math.max(0, Math.min(3, Math.floor(Number(currentCount) || 0)));
+    if (!animation || animation.key !== key || animation.toCount !== normalizedCount || Date.now() > animation.expiresAt) {
+      if (animation?.key === key) this._xpProgressAnimationState = null;
+      return { animate: false, startPercent: getXpProgressPercent(normalizedCount) };
+    }
+    this._xpProgressAnimationState = null;
+    return {
+      animate: true,
+      startPercent: getXpProgressPercent(animation.fromCount)
+    };
+  }
+
+  animateXpProgressRow(row, previousCount, nextCount) {
+    if (typeof HTMLElement === "undefined" || !(row instanceof HTMLElement)) return;
+    const fromCount = Math.max(0, Math.min(3, Math.floor(Number(previousCount) || 0)));
+    const toCount = Math.max(0, Math.min(3, Math.floor(Number(nextCount) || 0)));
+    for (let count = 0; count <= 3; count += 1) row.classList.remove(`xp-count-${count}`);
+    row.classList.remove("xp-progress-animate");
+    row.style.setProperty("--bm-xp-progress-start", getXpProgressPercent(fromCount));
+    void row.offsetWidth;
+    row.classList.add(`xp-count-${toCount}`);
+    if (toCount <= fromCount) return;
+    row.classList.add("xp-progress-animate");
+    setTimeout(() => row.classList.remove("xp-progress-animate"), XP_PROGRESS_ANIMATION_MS + 120);
   }
 
   async updateSingleUseItemCount(item, nextCount) {
@@ -5554,6 +5607,8 @@ class BloodmanActorSheet extends BaseActorSheet {
       const xp = Array.isArray(data.actor.system.characteristics?.[c.key]?.xp)
         ? data.actor.system.characteristics[c.key].xp
         : [false, false, false];
+      const xpCount = getXpProgressCount(xp);
+      const xpProgressAnimation = this.getXpProgressAnimationState(c.key, xpCount);
       const hiddenRoll = toCheckboxBoolean(data.actor.system.characteristics?.[c.key]?.hiddenRoll, false);
       const flat = Number(modifiers.all || 0) + Number(modifiers[c.key] || 0);
       const itemBonus = Number(itemBonuses[c.key] || 0);
@@ -5575,6 +5630,9 @@ class BloodmanActorSheet extends BaseActorSheet {
         itemBonus: totalBonus,
         modifierTotal,
         xp,
+        xpCount,
+        xpProgressAnimate: xpProgressAnimation.animate,
+        xpProgressStart: xpProgressAnimation.startPercent,
         xpReady,
         hiddenRoll,
         showReroll,
@@ -6405,7 +6463,10 @@ class BloodmanActorSheet extends BaseActorSheet {
       const xp = Array.isArray(this.actor.system.characteristics?.[key]?.xp)
         ? [...this.actor.system.characteristics[key].xp]
         : [false, false, false];
+      const previousXpCount = getXpProgressCount(xp);
       xp[index] = Boolean(input.checked);
+      const nextXpCount = getXpProgressCount(xp);
+      this.rememberXpProgressAnimation(key, previousXpCount, nextXpCount);
       await this.applyActorUpdate({ [`system.characteristics.${key}.xp`]: xp });
       foundry.utils.setProperty(this.actor, `system.characteristics.${key}.xp`, xp);
       const ready = xp.length === 3 && xp.every(Boolean);
@@ -6427,10 +6488,6 @@ class BloodmanActorSheet extends BaseActorSheet {
     if (!preset) return;
     const currentLabel = String(this.actor?.system?.modifiers?.label || "");
     const currentSelection = resolveStatePresetSelection(currentLabel);
-    if (currentSelection.invalidTokens.length) {
-      ui.notifications?.error(buildInvalidStatePresetMessage(currentSelection.invalidTokens));
-      return;
-    }
     const selected = new Set(currentSelection.ids);
     if (selected.has(preset.id)) selected.delete(preset.id);
     else selected.add(preset.id);

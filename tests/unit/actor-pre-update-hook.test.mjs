@@ -151,8 +151,9 @@ function run() {
     });
     const updateData = { system: { modifiers: { label: "oops" } } };
     const result = hooks.onPreUpdateActor(buildActor("personnage"), updateData, {}, "u2");
-    assert.equal(result, false);
-    assert.deepEqual(notificationErrors, ["invalid-state:oops"]);
+    assert.equal(result, undefined);
+    assert.equal(getProperty(updateData, "system.modifiers.label"), "oops");
+    assert.deepEqual(notificationErrors, []);
   });
 
   withGlobals(({ notificationErrors }) => {

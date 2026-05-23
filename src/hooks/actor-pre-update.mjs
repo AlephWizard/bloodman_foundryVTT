@@ -25,7 +25,6 @@ export function buildActorPreUpdateHooks({
   normalizeActorEquipmentCurrencyUpdateData,
   buildInvalidCurrencyCurrentMessage,
   normalizeCharacteristicBaseUpdatesForRole,
-  buildInvalidStatePresetMessage,
   buildStateModifierUpdateFromLabel,
   applyStateModifierUpdateToData,
   getItemBonusTotals,
@@ -123,10 +122,6 @@ export function buildActorPreUpdateHooks({
       currentLabel: actor.system?.modifiers?.label || "",
       buildStateModifierUpdate: buildStateModifierUpdateFromLabel
     });
-    if (stateLabelUpdatePlan.kind === "invalid") {
-      ui.notifications?.error(buildInvalidStatePresetMessage(stateLabelUpdatePlan.invalidTokens));
-      return false;
-    }
     if (stateLabelUpdatePlan.kind === "apply") {
       applyStateModifierUpdateToData(updateData, stateLabelUpdatePlan.label, stateLabelUpdatePlan.totals);
     }
