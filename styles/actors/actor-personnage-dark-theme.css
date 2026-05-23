@@ -948,6 +948,191 @@
   opacity: 0.68;
 }
 
+/* Movement gauge control: blend into the row instead of reading as separate buttons. */
+.bloodman-sheet .move-slot {
+  background: transparent;
+}
+
+.bloodman-sheet .move-box,
+.bloodman-sheet .move-reset-btn {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgba(237, 240, 243, 0.86) !important;
+  -webkit-text-fill-color: rgba(237, 240, 243, 0.86) !important;
+  box-shadow: none !important;
+}
+
+.bloodman-sheet .move-box {
+  width: 30px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.bloodman-sheet .char-name .move-slot input.move-box,
+.bloodman-sheet input[type="number"].move-box,
+.bloodman-sheet input[type="number"].move-box:hover,
+.bloodman-sheet input[type="number"].move-box:focus,
+.bloodman-sheet input[type="number"].move-box:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.bloodman-sheet .move-reset-btn {
+  opacity: 0.58;
+}
+
+.bloodman-sheet .move-reset-btn:hover,
+.bloodman-sheet .move-reset-btn:focus-visible {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+  opacity: 0.88;
+}
+
+/* NPC-only controls: one global hidden-roll toggle and cleaner role pills. */
+.bloodman-sheet .card-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.022);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.32px;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--bm-dark-muted);
+}
+
+.bloodman-sheet.npc-sheet .npc-role-option input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 13px !important;
+  height: 13px !important;
+  min-width: 13px !important;
+  min-height: 13px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+  box-shadow: none !important;
+}
+
+.bloodman-sheet.npc-sheet .npc-role-option input[type="checkbox"]:checked {
+  border-color: rgba(196, 151, 99, 0.68) !important;
+  background: var(--bm-dark-accent-2) !important;
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle input[type="checkbox"] {
+  position: absolute !important;
+  opacity: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 1px !important;
+  min-height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none;
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle input[type="checkbox"]::before,
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle input[type="checkbox"]::after {
+  content: none !important;
+  display: none !important;
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle span::before {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: none;
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle input[type="checkbox"]:checked + span::before {
+  border-color: rgba(196, 151, 99, 0.68);
+  background:
+    linear-gradient(180deg, rgba(196, 151, 99, 0.82), rgba(142, 103, 58, 0.88));
+  box-shadow: inset 0 0 0 2px rgba(12, 14, 18, 0.42);
+}
+
+.bloodman-sheet.npc-sheet .npc-hidden-roll-toggle input[type="checkbox"]:focus-visible + span::before {
+  outline: 2px solid var(--bm-dark-accent);
+  outline-offset: 2px;
+}
+
+@supports selector(:has(*)) {
+  .bloodman-sheet.npc-sheet .npc-hidden-roll-toggle:has(input[type="checkbox"]:checked) {
+    border-color: rgba(196, 151, 99, 0.32);
+    background: rgba(196, 151, 99, 0.075);
+    color: #f4dfbf;
+  }
+}
+
+.bloodman-sheet.npc-sheet .npc-role-bar {
+  gap: 8px;
+  padding: 2px 0 10px;
+  color: var(--bm-dark-text-soft);
+}
+
+.bloodman-sheet.npc-sheet .npc-role-option {
+  min-height: 24px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  color: rgba(199, 205, 213, 0.78);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 100ms ease;
+}
+
+.bloodman-sheet.npc-sheet .npc-role-option:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--bm-dark-text);
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet.npc-sheet .char-row,
+.bloodman-sheet.npc-sheet .char-row.move-row {
+  grid-template-columns: 24px 84px minmax(0, 1fr) 92px;
+}
+
+@supports selector(:has(*)) {
+  .bloodman-sheet.npc-sheet .npc-role-option:has(input[type="checkbox"]:checked) {
+    border-color: rgba(196, 151, 99, 0.42);
+    background: rgba(196, 151, 99, 0.12);
+    color: #f4dfbf;
+  }
+}
+
 /* PV / PP seam fix: tuck the liquid under the rounded border without changing colors or bubbles. */
 .bloodman-sheet .resource-circle.pv::before,
 .bloodman-sheet .resource-circle.pp::before {

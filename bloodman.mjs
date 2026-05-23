@@ -5694,6 +5694,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       moveChar.moveMax = moveMax;
       moveChar.showMoveValue = true;
     }
+    const npcCharacteristicHiddenRoll = isNpcActor && characteristics.some(c => c.hiddenRoll);
 
     const profile = foundry.utils.mergeObject(buildDefaultProfile(), data.actor.system.profile || {}, {
       inplace: false
@@ -5955,6 +5956,7 @@ class BloodmanActorSheet extends BaseActorSheet {
       showSimpleAttackReroll,
       characteristicsEditEnabled,
       characteristics,
+      npcCharacteristicHiddenRoll,
       totalPoints,
       modifiers,
       canEditStatePresets: canEditRestrictedFields,
@@ -7184,13 +7186,12 @@ class BloodmanActorSheet extends BaseActorSheet {
 
   isCharacteristicRollHidden(key) {
     if (this.actor?.type !== "personnage-non-joueur") return false;
-    const characteristicKey = String(key || "").trim();
-    if (!characteristicKey) return false;
-    const selector = `input[name='system.characteristics.${characteristicKey}.hiddenRoll']`;
     const root = getSheetElementWrapper(this);
-    const checkbox = root?.find ? root.find(selector) : null;
+    const checkbox = root?.find ? root.find(".npc-hidden-roll-global") : null;
     if (checkbox?.length) return checkbox.first().is(":checked");
-    return toCheckboxBoolean(this.actor?.system?.characteristics?.[characteristicKey]?.hiddenRoll, false);
+    return CHARACTERISTICS.some(characteristic => (
+      toCheckboxBoolean(this.actor?.system?.characteristics?.[characteristic.key]?.hiddenRoll, false)
+    ));
   }
 
   async handleCharacteristicRoll(key, options = {}) {
@@ -7958,6 +7959,15 @@ class BloodmanNpcSheet extends BloodmanActorSheet {
         html.find(".npc-role-toggle").not(input).prop("checked", false);
       }
       this.applyActorUpdate({ "system.npcRole": nextRole });
+    });
+
+    html.find(".npc-hidden-roll-global").change(ev => {
+      const hiddenRoll = Boolean(ev.currentTarget.checked);
+      const updateData = {};
+      for (const characteristic of CHARACTERISTICS) {
+        updateData[`system.characteristics.${characteristic.key}.hiddenRoll`] = hiddenRoll;
+      }
+      this.applyActorUpdate(updateData);
     });
   }
 }
