@@ -83,7 +83,8 @@ function run() {
     "./dialogs/drop-decision.css",
     "./actor-personnage.css",
     "./features/carried-items.css",
-    "./item-unified.css"
+    "./item-unified.css",
+    "./base/visual-refinements.css"
   ]);
 
   assert.deepEqual(parseCssImports(readText("styles/bloodman-base.css")), [

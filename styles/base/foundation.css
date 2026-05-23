@@ -17,7 +17,9 @@
   --bm-motion-fast: 120ms;
   --bm-motion-medium: 180ms;
   --bm-motion-slow: 300ms;
+  --bm-motion-feedback: 380ms;
   --bm-ease-standard: cubic-bezier(0.2, 0.78, 0.28, 1);
+  --bm-ease-feedback: cubic-bezier(0.16, 1, 0.3, 1);
   --bm-shadow-lift: 0 8px 18px rgba(0, 0, 0, 0.24);
   --bm-shadow-panel: 0 16px 30px rgba(0, 0, 0, 0.42);
   --bm-focus-ring: rgba(200, 55, 46, 0.3);

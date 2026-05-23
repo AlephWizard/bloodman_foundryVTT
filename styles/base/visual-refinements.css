@@ -1,0 +1,207 @@
+/* Final visual refinement layer: concise feedback loaded after legacy overrides. */
+
+:root {
+  --bm-positive-glow: rgba(95, 205, 119, 0.24);
+  --bm-negative-glow: rgba(212, 90, 80, 0.28);
+  --bm-neutral-glow: rgba(255, 255, 255, 0.12);
+}
+
+.bloodman-sheet .state-field {
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    opacity var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .state-field:hover,
+.bloodman-sheet .state-field:focus-within {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .state-field:focus-within {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 0 2px var(--bm-neutral-glow),
+    0 6px 12px rgba(0, 0, 0, 0.18);
+}
+
+.bloodman-sheet .state-field.is-positive:hover,
+.bloodman-sheet .state-field.is-positive:focus-within {
+  box-shadow:
+    0 0 0 2px var(--bm-positive-glow),
+    0 6px 12px rgba(0, 0, 0, 0.18);
+}
+
+.bloodman-sheet .state-field.is-negative:hover,
+.bloodman-sheet .state-field.is-negative:focus-within {
+  box-shadow:
+    0 0 0 2px var(--bm-negative-glow),
+    0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.bloodman-sheet .state-preset-item.is-selected {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 0 2px color-mix(in srgb, var(--bm-dark-accent) 18%, transparent) !important;
+}
+
+.bloodman-sheet .resource-circle.pv.is-rising,
+.bloodman-sheet .resource-circle.pp.is-rising {
+  animation: bm-resource-gain var(--bm-motion-feedback) var(--bm-ease-feedback) both;
+}
+
+.bloodman-sheet .resource-circle.pv.is-falling,
+.bloodman-sheet .resource-circle.pp.is-falling {
+  animation: bm-resource-loss var(--bm-motion-feedback) var(--bm-ease-feedback) both;
+}
+
+.bloodman-sheet .resource-circle.pv.is-critical,
+.bloodman-sheet .resource-circle.pv.is-empty {
+  box-shadow:
+    0 0 0 1px rgba(212, 90, 80, 0.46),
+    0 0 18px rgba(212, 90, 80, 0.18) !important;
+}
+
+.bloodman-sheet .resource-circle.pp.is-critical,
+.bloodman-sheet .resource-circle.pp.is-empty {
+  box-shadow:
+    0 0 0 1px rgba(160, 108, 240, 0.44),
+    0 0 18px rgba(160, 108, 240, 0.18) !important;
+}
+
+.bloodman-sheet .char-row:hover .char-icon,
+.bloodman-sheet .char-row:focus-within .char-icon {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.bloodman-sheet .char-reroll,
+.bloodman-sheet .char-reroll-clear,
+.bloodman-sheet .move-reset-btn,
+.bloodman-sheet .ammo-line-toolbar-button {
+  transition:
+    background-color var(--bm-motion-fast) ease,
+    border-color var(--bm-motion-fast) ease,
+    box-shadow var(--bm-motion-fast) ease,
+    color var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease,
+    transform var(--bm-motion-instant) ease;
+}
+
+.bloodman-sheet .char-reroll:hover,
+.bloodman-sheet .char-reroll:focus-visible,
+.bloodman-sheet .char-reroll-clear:hover,
+.bloodman-sheet .char-reroll-clear:focus-visible,
+.bloodman-sheet .move-reset-btn:hover,
+.bloodman-sheet .move-reset-btn:focus-visible {
+  transform: translateY(-1px);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section:focus-within {
+  box-shadow:
+    0 0 0 2px var(--bm-item-accent-glow),
+    0 10px 22px rgba(0, 0, 0, 0.28);
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-empty {
+  transition:
+    border-color var(--bm-motion-fast) ease,
+    color var(--bm-motion-fast) ease,
+    filter var(--bm-motion-fast) ease;
+}
+
+.bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-empty:hover {
+  border-color: color-mix(in srgb, var(--bm-item-accent) 44%, var(--bm-item-border) 56%);
+  color: color-mix(in srgb, var(--bm-item-accent) 28%, var(--bm-item-text) 72%);
+  filter: brightness(1.04);
+}
+
+:is(
+  .window-app,
+  .window-app.dialog,
+  .application
+):is(
+  .bloodman-damage-dialog,
+  .bloodman-damage-config-dialog,
+  .bloodman-drop-decision-dialog,
+  .bloodman-insufficient-funds-dialog,
+  .bloodman-growth-dialog
+) :is(.dialog-buttons, .form-footer) button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.78) !important;
+  outline-offset: 2px !important;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--bm-red) 34%, transparent),
+    0 8px 18px rgba(0, 0, 0, 0.34) !important;
+}
+
+#bm-chaos-dice.is-active .bm-chaos-icon {
+  animation: bm-chaos-ready var(--bm-motion-slow) var(--bm-ease-feedback) both;
+}
+
+@keyframes bm-resource-gain {
+  0% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+
+  46% {
+    filter: brightness(1.16);
+    transform: scale(1.025);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes bm-resource-loss {
+  0% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+
+  38% {
+    filter: brightness(0.86) saturate(1.18);
+    transform: scale(0.982);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+}
+
+@keyframes bm-chaos-ready {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloodman-sheet .state-field,
+  .bloodman-sheet .resource-circle.pv,
+  .bloodman-sheet .resource-circle.pp,
+  .bloodman-sheet .char-row .char-icon,
+  .bloodman-sheet .char-reroll,
+  .bloodman-sheet .char-reroll-clear,
+  .bloodman-sheet .move-reset-btn,
+  .bloodman-sheet .ammo-line-toolbar-button,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-unified-section,
+  .bloodman-item.bm-item-sheet.bm-item-unified .bm-item-equiper-avec-empty,
+  #bm-chaos-dice.is-active .bm-chaos-icon {
+    animation: none !important;
+    transition-duration: 0.001ms !important;
+  }
+}
