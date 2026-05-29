@@ -321,9 +321,16 @@ function run() {
 
   assert.equal(
     runtimeSource.includes("shouldSkipGenericActorSheetPersist(signature)")
-      && runtimeSource.includes("render: false"),
+      && runtimeSource.includes("render: shouldRenderDocumentUpdate"),
     true,
-    "Actor sheet field persistence should deduplicate duplicate blur/change events and avoid double renders"
+    "Actor sheet field persistence should deduplicate duplicate blur/change events and avoid double renders for ordinary fields"
+  );
+
+  assert.equal(
+    runtimeSource.includes('const shouldRenderDocumentUpdate = path === "name";')
+      && runtimeSource.includes("render: shouldRenderDocumentUpdate"),
+    true,
+    "Actor sheet name persistence should render document updates so the displayed sheet name refreshes immediately"
   );
 }
 

@@ -4156,9 +4156,10 @@ class BloodmanActorSheet extends BaseActorSheet {
     this._genericActorSheetPersistInFlight.add(signature);
     const updateData = { [path]: value };
     const shouldRenderDerivedUi = isActorSheetDerivedUiPath(path);
+    const shouldRenderDocumentUpdate = path === "name";
     try {
       const updated = await this.applyActorUpdate(updateData, {
-        render: false,
+        render: shouldRenderDocumentUpdate,
         bloodmanAllowAmmoUpdate: hasAmmoUpdatePayload(updateData)
       });
       if (updated) {
