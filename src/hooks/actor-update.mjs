@@ -16,6 +16,25 @@ function hasChangePath(changes, path) {
   return getChangePath(changes, path) != null;
 }
 
+function collectChangePaths(changes, prefix = "", paths = new Set()) {
+  if (!changes || typeof changes !== "object") return paths;
+  for (const [key, value] of Object.entries(changes)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    paths.add(path);
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      collectChangePaths(value, path, paths);
+    }
+  }
+  return paths;
+}
+
+function hasActorIdentitySheetChange(changes) {
+  for (const path of collectChangePaths(changes)) {
+    if (path === "name" || path === "system.profile" || path.startsWith("system.profile.")) return true;
+  }
+  return false;
+}
+
 export function buildActorUpdateHooks({
   characteristics,
   normalizeArchetypeBonusValue,
@@ -35,8 +54,15 @@ export function buildActorUpdateHooks({
   resolveWorldActorFromTokenDocument,
   syncSceneTokenImagesFromActorImage,
   syncPrototypeTokenImageFromActorImage,
+  renderOpenActorSheetsForActor = () => {},
   bmLog
 } = {}) {
+  async function handleUpdateActorIdentitySheetRender(actor, changes) {
+    if (!isCharacterLikeActor(actor)) return;
+    if (!hasActorIdentitySheetChange(changes)) return;
+    renderOpenActorSheetsForActor(actor);
+  }
+
   async function handleUpdateActorDerivedResources(actor, changes, _options, userId) {
     if (!isCharacterLikeActor(actor)) return;
     const sourceUserId = String(userId || "");
@@ -187,6 +213,7 @@ export function buildActorUpdateHooks({
   }
 
   async function onUpdateActor(actor, changes, options, userId) {
+    await runUpdateActorSubhandler("identity-sheet-render", handleUpdateActorIdentitySheetRender, actor, changes, options, userId);
     await runUpdateActorSubhandler("derived-resources", handleUpdateActorDerivedResources, actor, changes, options, userId);
     await runUpdateActorSubhandler("zero-pv-sync", handleUpdateActorZeroPvSync, actor, changes, options, userId);
     await runUpdateActorSubhandler("injured-state-status", handleUpdateActorInjuredStateStatus, actor, changes, options, userId);
@@ -194,6 +221,7 @@ export function buildActorUpdateHooks({
   }
 
   return {
+    handleUpdateActorIdentitySheetRender,
     handleUpdateActorDerivedResources,
     handleUpdateActorZeroPvSync,
     handleUpdateActorInjuredStateStatus,

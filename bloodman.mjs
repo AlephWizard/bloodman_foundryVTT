@@ -3536,6 +3536,7 @@ const actorUpdateHooks = buildActorUpdateHooks({
   resolveWorldActorFromTokenDocument,
   syncSceneTokenImagesFromActorImage,
   syncPrototypeTokenImageFromActorImage,
+  renderOpenActorSheetsForActor,
   bmLog
 });
 

@@ -185,6 +185,38 @@ async function run() {
       }
     ]);
   });
+
+  await withGlobals(async () => {
+    const actor = buildActor();
+    const renderCalls = [];
+    const { hooks } = buildHooks({
+      renderOpenActorSheetsForActor: actorArg => renderCalls.push(actorArg.id)
+    });
+
+    await hooks.handleUpdateActorIdentitySheetRender(actor, {
+      "system.profile.origine": ""
+    });
+    await hooks.handleUpdateActorIdentitySheetRender(actor, {
+      system: { profile: { historique: "Nouvelle histoire" } }
+    });
+    await hooks.handleUpdateActorIdentitySheetRender(actor, {
+      system: { resources: { pp: { current: 4 } } }
+    });
+
+    assert.deepEqual(renderCalls, ["actor-1", "actor-1"]);
+  });
+
+  await withGlobals(async () => {
+    const actor = buildActor();
+    const renderCalls = [];
+    const { hooks } = buildHooks({
+      renderOpenActorSheetsForActor: actorArg => renderCalls.push(actorArg.id)
+    });
+
+    await hooks.onUpdateActor(actor, { name: "Nouveau nom" }, {}, "u2");
+
+    assert.deepEqual(renderCalls, ["actor-1"]);
+  });
 }
 
 run()
