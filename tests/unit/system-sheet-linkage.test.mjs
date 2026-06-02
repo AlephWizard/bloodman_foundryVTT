@@ -327,10 +327,11 @@ function run() {
   );
 
   assert.equal(
-    runtimeSource.includes('const shouldRenderDocumentUpdate = path === "name";')
+    runtimeSource.includes("function shouldRenderActorSheetDocumentUpdate(path = \"\")")
+      && runtimeSource.includes('return normalizedPath === "name" || normalizedPath.startsWith("system.profile.");')
       && runtimeSource.includes("render: shouldRenderDocumentUpdate"),
     true,
-    "Actor sheet name persistence should render document updates so the displayed sheet name refreshes immediately"
+    "Actor sheet name and profile persistence should render document updates so open identity fields refresh immediately"
   );
 }
 

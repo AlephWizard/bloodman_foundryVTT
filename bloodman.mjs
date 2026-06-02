@@ -889,6 +889,11 @@ function isActorSheetDerivedUiPath(path = "") {
     || /^system\.ammoPool\.\d+\.(type|stock|value)$/.test(normalizedPath);
 }
 
+function shouldRenderActorSheetDocumentUpdate(path = "") {
+  const normalizedPath = String(path || "").trim();
+  return normalizedPath === "name" || normalizedPath.startsWith("system.profile.");
+}
+
 function getActorSheetPersistSignature(path, value) {
   let serializedValue = "";
   try {
@@ -4156,7 +4161,7 @@ class BloodmanActorSheet extends BaseActorSheet {
     this._genericActorSheetPersistInFlight.add(signature);
     const updateData = { [path]: value };
     const shouldRenderDerivedUi = isActorSheetDerivedUiPath(path);
-    const shouldRenderDocumentUpdate = path === "name";
+    const shouldRenderDocumentUpdate = shouldRenderActorSheetDocumentUpdate(path);
     try {
       const updated = await this.applyActorUpdate(updateData, {
         render: shouldRenderDocumentUpdate,
